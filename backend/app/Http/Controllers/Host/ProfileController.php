@@ -45,18 +45,18 @@ class ProfileController extends Controller
     }
 
     /**
-     * Change password.
+     * Change password, or set a first one for Google-only accounts.
      */
     public function changePassword(Request $request): JsonResponse
     {
+        $user = $request->user();
+
         $request->validate([
-            'current_password' => 'required',
+            'current_password' => $user->has_password ? 'required' : 'nullable',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $user = $request->user();
-
-        if (! Hash::check($request->current_password, $user->password)) {
+        if ($user->has_password && ! Hash::check($request->current_password, $user->password)) {
             return response()->json([
                 'message' => 'Current password is incorrect',
             ], 422);

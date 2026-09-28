@@ -65,8 +65,12 @@ class UserManagementController extends Controller
     /**
      * Deactivate a user.
      */
-    public function deactivate(User $user): JsonResponse
+    public function deactivate(Request $request, User $user): JsonResponse
     {
+        if ($user->is($request->user())) {
+            return response()->json(['message' => 'You cannot deactivate your own account.'], 422);
+        }
+
         $user->update(['status' => 'inactive']);
         $user->tokens()->delete(); // Revoke all tokens
 

@@ -1,4 +1,4 @@
-import type { AuthUser } from "./api";
+import { ApiError, authApi, type AuthUser, type RoleName } from "./api";
 
 const TOKEN_KEY = "vidhelp_token";
 const USER_KEY = "vidhelp_user";
@@ -23,12 +23,34 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
 }
 
+/**
+ * Check the stored token with the backend. Returns null (and forgets the token)
+ * if it is missing, expired, revoked, or the account is no longer active.
+ */
+export async function loadSession(): Promise<{ token: string; user: AuthUser } | null> {
+  const token = getToken();
+  if (!token) return null;
+
+  try {
+    const { user } = await authApi.me(token);
+    saveSession(token, user);
+    return { token, user };
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      clearSession();
+    }
+    return null;
+  }
+}
+
+export function hasAnyRole(user: AuthUser, roles: RoleName[]): boolean {
+  return user.roles.some((role) => roles.includes(role.name));
+}
+
 /** Landing page for a user, based on their highest role. */
 export function homePathFor(user: AuthUser): string {
-  const roles = user.roles.map((role) => role.name);
-
-  if (roles.includes("admin")) return "/admin/dashboard";
-  if (roles.includes("operator")) return "/operator/dashboard";
+  if (hasAnyRole(user, ["admin"])) return "/admin/dashboard";
+  if (hasAnyRole(user, ["operator"])) return "/operator/dashboard";
   return "/host/schedule";
 }
 

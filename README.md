@@ -99,10 +99,22 @@ frontend/
 
 | Prefix | Middleware | Access |
 |--------|-----------|--------|
-| `/api/auth/*` | Public | Everyone |
-| `/api/admin/*` | `auth:sanctum` + `role:admin` | Admin only |
-| `/api/operator/*` | `auth:sanctum` + `role:operator\|admin` | Operator + Admin |
-| `/api/host/*` | `auth:sanctum` + `role:host\|operator\|admin` | All authenticated |
+| `/api/auth/*` | `throttle:10,1` | Everyone |
+| `/api/admin/*` | `auth:sanctum` + `active` + `role:admin` | Admin only |
+| `/api/operator/*` | `auth:sanctum` + `active` + `role:operator\|admin` | Operator + Admin |
+| `/api/host/*` | `auth:sanctum` + `active` + `role:host\|operator\|admin` | All authenticated |
+
+`active` rejects tokens of users whose `status` is no longer `active`.
+
+## 🔓 Auth Flow
+- **Sign up** (email/password or Google) → account is created as a `host` with `status=pending`.
+- **Admin approves** it on `/admin/users` (Pending approval tab) → `status=active`, `approved_by`/`approved_at` recorded.
+- **Sign in** with email/password or Google → Sanctum token stored in `localStorage` (`vidhelp_token`).
+- **Google** redirects to the frontend `/auth/google/callback`, which sends the `code` to `GET /api/auth/google/callback`.
+  An existing account with the same email gets Google linked to it.
+- **Forgot password** emails a link to the frontend `/reset-password` page (with `MAIL_MAILER=log` the email is in `storage/logs/laravel.log`).
+  Google-only users can use it, or the profile page, to set a password.
+- The frontend layouts wrap pages in `<RequireAuth roles={...}>`, which verifies the token with `/api/auth/me`.
 
 ## 🌱 Default Admin Account
 - **Email:** `admin@vidhelp.com`
@@ -123,8 +135,8 @@ frontend/
 ---
 
 ## ⏭️ Next Steps
-1. Finalize ERD (database schema)
+1. ~~Finalize ERD~~ · ~~Auth: login, register, Google, approval, password reset~~
 2. Create migrations for schedules, ratings, etc.
-3. Build out the login/register UI
-4. Connect frontend to backend API
+3. Host profiles & brands (from ERD)
+4. Connect remaining pages to the API
 5. Implement the schedule management feature

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\FinanceController;
@@ -19,9 +20,13 @@ use Illuminate\Support\Facades\Route;
 | Auth Routes (Public)
 |--------------------------------------------------------------------------
 */
-Route::prefix('auth')->group(function () {
+Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+
+    // Password reset (link in the email opens the frontend /reset-password page)
+    Route::post('/forgot-password', [PasswordResetController::class, 'sendLink']);
+    Route::post('/reset-password', [PasswordResetController::class, 'reset']);
 
     // Google OAuth
     Route::get('/google/redirect', [GoogleAuthController::class, 'redirect']);
@@ -33,7 +38,7 @@ Route::prefix('auth')->group(function () {
 | Protected Routes (Require Auth)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Shared auth routes
     Route::post('/auth/logout', [AuthController::class, 'logout']);
