@@ -137,6 +137,6 @@ frontend/
 ## ⏭️ Next Steps
 1. ~~Finalize ERD~~ · ~~Auth: login, register, Google, approval, password reset~~
 2. Create migrations for schedules, ratings, etc.
-3. Host profiles & brands (from ERD)
+3. ~~Host profiles, rate levels, brands & assignments~~
 4. Connect remaining pages to the API
 5. Implement the schedule management feature

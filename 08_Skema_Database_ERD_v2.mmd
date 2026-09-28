@@ -122,7 +122,7 @@ erDiagram
         datetime email_verified_at "diisi otomatis saat login Google"
         string password "nullable, hash only; null untuk akun Google-only"
         string google_id UK "nullable, sub dari Google"
-        string avatar "nullable, URL Google atau path upload"
+        string avatar "nullable, URL Google atau path upload; foto profil semua role (pengganti photo_path)"
         enum status "pending, active, inactive, archived"
         enum signup_source "admin_created, self_register"
         uuid approved_by FK
@@ -146,19 +146,21 @@ erDiagram
 
     HOST_RATE_CATEGORIES {
         uuid id PK
-        string name "magang, baru, di atas 1 tahun"
-        int min_tenure_months "auto naik dari join_date"
+        string name UK "magang, baru, di atas 1 tahun"
+        int min_tenure_months UK "auto naik dari join_date"
         decimal rate_per_hour
+        datetime created_at
+        datetime updated_at
     }
 
     HOST_PROFILES {
         uuid id PK
-        uuid user_id FK
+        uuid user_id FK,UK "dibuat otomatis saat admin approve host"
         uuid rate_category_id FK
+        boolean rate_category_overridden "true = diset manual admin, job harian tidak mengubah"
         string phone
         string guardian_phone "no telp wali/keluarga"
-        string photo_path
-        date join_date
+        date join_date "default tanggal approve, hanya admin yang ubah"
         enum status "active, inactive, archived, banned"
         datetime created_at
         datetime updated_at
@@ -166,30 +168,32 @@ erDiagram
 
     HOST_SENSITIVE_DATA {
         uuid id PK
-        uuid host_id FK
-        string ktp_number_encrypted
-        string ktp_image_path
+        uuid host_id FK,UK
+        text ktp_number "encrypted (Laravel encrypted cast)"
+        string ktp_image_path "disk private, hanya admin"
         string bank_name
-        string bank_account_encrypted
+        text bank_account "encrypted (Laravel encrypted cast)"
         string account_holder_name
+        datetime created_at
         datetime updated_at
     }
 
     BRANDS {
         uuid id PK
-        string name
+        string name UK
         boolean is_obs
         int target_hours_per_period "konfigurable per brand"
         int payment_cycle_days
         enum status "active, inactive"
         datetime created_at
+        datetime updated_at
     }
 
     HOST_BRAND_ASSIGNMENTS {
         uuid id PK
-        uuid host_id FK
+        uuid host_id FK "unik per (host_id, brand_id)"
         uuid brand_id FK
-        boolean is_leader
+        boolean is_leader "maksimal 1 leader aktif per brand"
         enum status "active, inactive, banned"
         datetime created_at
         datetime updated_at

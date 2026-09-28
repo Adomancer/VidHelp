@@ -55,6 +55,7 @@ class UserManagementController extends Controller
         }
 
         $user->update($validated);
+        $user->ensureHostProfile();
 
         return response()->json([
             'user' => $user->fresh()->load('roles'),
@@ -87,6 +88,7 @@ class UserManagementController extends Controller
             'approved_by' => $user->approved_by ?? $request->user()->id,
             'approved_at' => $user->approved_at ?? now(),
         ]);
+        $user->ensureHostProfile();
 
         return response()->json(['message' => 'User activated']);
     }

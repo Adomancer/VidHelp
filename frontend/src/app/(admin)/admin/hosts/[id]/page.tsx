@@ -1,0 +1,180 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { adminHostsApi, errorMessage, operatorApi, type AdminHostDetail, type HostStatus, type RateCategory } from "@/lib/api";
+import { formatDate, formatRupiah, formatTenure } from "@/lib/format";
+import { useApiData } from "@/lib/useApiData";
+import { formValue, useApiForm } from "@/lib/useApiForm";
+import AssignmentEditor from "@/components/AssignmentEditor";
+import { useAuth } from "@/components/AuthProvider";
+import Card from "@/components/Card";
+import FormAlert from "@/components/FormAlert";
+import SelectField from "@/components/SelectField";
+import SubmitButton from "@/components/SubmitButton";
+import TextField from "@/components/TextField";
+import UserAvatar from "@/components/UserAvatar";
+
+export default function AdminHostDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const { token } = useAuth();
+  const host = useApiData(id, () => adminHostsApi.host(token, id));
+  const rates = useApiData("rates", () => adminHostsApi.rateCategories(token));
+  const brands = useApiData("brands", () => operatorApi.brands(token));
+
+  if (host.error && !host.data) return <FormAlert tone="error">{host.error}</FormAlert>;
+  if (!host.data) return <p className="text-gray-400">Loading…</p>;
+
+  const detail = host.data.host;
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <Link href="/admin/hosts" className="text-sm text-purple-300 hover:text-white">
+        ← All hosts
+      </Link>
+
+      <div className="flex items-center gap-4">
+        <UserAvatar user={detail.user} size="w-14 h-14" />
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-white truncate">{detail.user.name}</h1>
+          <p className="text-sm text-gray-400 truncate">{detail.user.email}</p>
+        </div>
+      </div>
+
+      {/* Wait for the levels: the rate select's defaultValue only applies to options present on first render */}
+      {rates.data ? (
+        <SettingsForm host={detail} rates={rates.data.rate_categories} onSaved={(updated) => host.setData({ host: updated })} />
+      ) : (
+        <Card title="Host settings">
+          {rates.error ? <FormAlert tone="error">{rates.error}</FormAlert> : <p className="text-sm text-gray-400">Loading…</p>}
+        </Card>
+      )}
+
+      <SensitiveCard host={detail} />
+
+      <Card title="Brands" description="★ Leader — a brand has at most one.">
+        {brands.data && (
+          <AssignmentEditor hostId={detail.id} assignments={detail.assignments} brands={brands.data.brands} onChanged={host.reload} />
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function SettingsForm({ host, rates, onSaved }: { host: AdminHostDetail; rates: RateCategory[]; onSaved: (host: AdminHostDetail) => void }) {
+  const { token } = useAuth();
+  const [saved, setSaved] = useState(false);
+
+  const { loading, errors, error, handleSubmit } = useApiForm(
+    (data) =>
+      adminHostsApi.updateHost(token, host.id, {
+        phone: formValue(data, "phone") || null,
+        guardian_phone: formValue(data, "guardian_phone") || null,
+        join_date: formValue(data, "join_date"),
+        status: formValue(data, "status") as HostStatus,
+        rate_category_id: formValue(data, "rate_category_id") || null,
+      }),
+    ({ host: updated }) => {
+      setSaved(true);
+      onSaved(updated);
+    }
+  );
+
+  const current = host.rate_category ? `${host.rate_category.name}, ${formatRupiah(host.rate_category.rate_per_hour)}/h` : "none";
+
+  return (
+    <Card title="Host settings">
+      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
+        {error && (
+          <div className="sm:col-span-2">
+            <FormAlert tone="error">{error}</FormAlert>
+          </div>
+        )}
+        {saved && (
+          <div className="sm:col-span-2">
+            <FormAlert tone="success">Saved.</FormAlert>
+          </div>
+        )}
+
+        <TextField label="Phone" name="phone" type="tel" defaultValue={host.phone ?? ""} error={errors.phone} />
+        <TextField label="Guardian phone" name="guardian_phone" type="tel" defaultValue={host.guardian_phone ?? ""} error={errors.guardian_phone} />
+        <TextField label="Join date" name="join_date" type="date" defaultValue={host.join_date.slice(0, 10)} error={errors.join_date} />
+        <SelectField
+          label="Host status"
+          name="status"
+          defaultValue={host.status}
+          options={["active", "inactive", "archived", "banned"].map((value) => ({ value, label: value }))}
+        />
+        <div className="sm:col-span-2">
+          <SelectField
+            label="Rate level"
+            name="rate_category_id"
+            defaultValue={host.rate_category_overridden ? (host.rate_category_id ?? "") : ""}
+            error={errors.rate_category_id}
+            options={[
+              { value: "", label: "Automatic by tenure" },
+              ...rates.map((rate) => ({ value: rate.id, label: `${rate.name} (set by hand)` })),
+            ]}
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Now: {current} · with the agency {formatTenure(host.join_date)} (since {formatDate(host.join_date)})
+          </p>
+        </div>
+
+        <div className="w-40">
+          <SubmitButton loading={loading}>Save</SubmitButton>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+function SensitiveCard({ host }: { host: AdminHostDetail }) {
+  const { token } = useAuth();
+  const [ktpUrl, setKtpUrl] = useState<string | null>(null);
+  const [ktpError, setKtpError] = useState<string | null>(null);
+  const data = host.sensitive_data;
+
+  async function showKtp() {
+    try {
+      setKtpUrl(await adminHostsApi.ktpImageUrl(token, host.id));
+    } catch (caught) {
+      setKtpError(errorMessage(caught));
+    }
+  }
+
+  const rows: [string, string | null | undefined][] = [
+    ["KTP number", data?.ktp_number],
+    ["Bank", data?.bank_name],
+    ["Account number", data?.bank_account],
+    ["Account holder", data?.account_holder_name],
+  ];
+
+  return (
+    <Card title="KTP & bank" description="Entered by the host. Only admins can see these values.">
+      <dl className="grid gap-3 sm:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-xs text-gray-400">{label}</dt>
+            <dd className="text-white font-mono">{value || <span className="text-gray-500 font-sans">not filled in</span>}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {ktpError && <FormAlert tone="error">{ktpError}</FormAlert>}
+      {data?.has_ktp_image ? (
+        ktpUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- private blob URL
+          <img src={ktpUrl} alt="KTP photo" className="max-h-80 rounded-lg border border-slate-700" />
+        ) : (
+          <button type="button" onClick={showKtp} className="px-4 py-2 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800">
+            Show KTP photo
+          </button>
+        )
+      ) : (
+        <p className="text-sm text-gray-500">No KTP photo uploaded.</p>
+      )}
+    </Card>
+  );
+}

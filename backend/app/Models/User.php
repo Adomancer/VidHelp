@@ -11,9 +11,11 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -22,7 +24,7 @@ use Spatie\Permission\Traits\HasRoles;
     'status', 'signup_source', 'approved_by', 'approved_at', 'last_login_at',
 ])]
 #[Hidden(['password', 'remember_token', 'google_id'])]
-#[Appends(['has_password'])]
+#[Appends(['has_password', 'avatar_url'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -50,6 +52,38 @@ class User extends Authenticatable
     protected function hasPassword(): Attribute
     {
         return Attribute::get(fn () => $this->password !== null);
+    }
+
+    /**
+     * Displayable photo URL: the Google photo, or an uploaded file on the public disk.
+     */
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::get(fn () => match (true) {
+            $this->avatar === null => null,
+            str_starts_with($this->avatar, 'http') => $this->avatar,
+            default => Storage::disk('public')->url($this->avatar),
+        });
+    }
+
+    public function hostProfile(): HasOne
+    {
+        return $this->hasOne(HostProfile::class);
+    }
+
+    /**
+     * Create the host profile for an active host who doesn't have one yet
+     * (join date = today, rate category from tenure).
+     */
+    public function ensureHostProfile(): void
+    {
+        if ($this->status !== 'active' || ! $this->hasRole('host') || $this->hostProfile()->exists()) {
+            return;
+        }
+
+        $profile = $this->hostProfile()->make(['join_date' => today()]);
+        $profile->syncRateCategory();
+        $profile->save();
     }
 
     /**

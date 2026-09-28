@@ -1,0 +1,186 @@
+"use client";
+
+import { Fragment, useState } from "react";
+import Link from "next/link";
+import { operatorApi, type HostListItem } from "@/lib/api";
+import { formatTenure } from "@/lib/format";
+import { useApiData } from "@/lib/useApiData";
+import AssignmentEditor from "./AssignmentEditor";
+import { useAuth } from "./AuthProvider";
+import FormAlert from "./FormAlert";
+import UserAvatar from "./UserAvatar";
+
+interface HostTableProps {
+  /** Admin: link each host to its detail page. */
+  detailHref?: (host: HostListItem) => string;
+  /** Operator: expand a row to manage the host's brands in place. */
+  editableBrands?: boolean;
+}
+
+/** Searchable, brand-filterable host list shared by the operator and admin panels. */
+export default function HostTable({ detailHref, editableBrands = false }: HostTableProps) {
+  const { token } = useAuth();
+  const [search, setSearch] = useState("");
+  const [brandId, setBrandId] = useState("");
+  const [page, setPage] = useState(1);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const brands = useApiData("brands", () => operatorApi.brands(token));
+  const hosts = useApiData(JSON.stringify({ search, brandId, page }), () =>
+    operatorApi.hosts(token, { search, brand_id: brandId, page })
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <form
+          className="flex-1"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSearch(String(new FormData(event.currentTarget).get("search") ?? ""));
+            setPage(1);
+          }}
+        >
+          <input
+            name="search"
+            type="search"
+            placeholder="Search name or email…"
+            className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
+          />
+        </form>
+        <select
+          value={brandId}
+          onChange={(event) => {
+            setBrandId(event.target.value);
+            setPage(1);
+          }}
+          aria-label="Filter by brand"
+          className="sm:w-56 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white"
+        >
+          <option value="">All brands</option>
+          {brands.data?.brands.map((brand) => (
+            <option key={brand.id} value={brand.id}>
+              {brand.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {hosts.error && <FormAlert tone="error">{hosts.error}</FormAlert>}
+
+      <div className={`bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto ${hosts.loading ? "opacity-60" : ""}`}>
+        <table className="w-full text-sm">
+          <thead className="text-left text-gray-400 border-b border-slate-800">
+            <tr>
+              <th className="px-4 py-3 font-medium">Host</th>
+              <th className="px-4 py-3 font-medium">Rate level</th>
+              <th className="px-4 py-3 font-medium">Brands</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              {editableBrands && <th className="px-4 py-3" />}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800">
+            {hosts.data?.data.map((host) => {
+              const active = host.assignments.filter((assignment) => assignment.status === "active");
+              const open = openId === host.id;
+
+              return (
+                <Fragment key={host.id}>
+                  <tr className="text-gray-200 align-top">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <UserAvatar user={host.user} />
+                        <div className="min-w-0">
+                          {detailHref ? (
+                            <Link href={detailHref(host)} className="text-white hover:text-purple-300">
+                              {host.user.name}
+                            </Link>
+                          ) : (
+                            <p className="text-white">{host.user.name}</p>
+                          )}
+                          <p className="text-gray-400 truncate">{host.user.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {host.rate_category?.name ?? "—"}
+                      <span className="block text-xs text-gray-400">
+                        {formatTenure(host.join_date)}
+                        {host.rate_category_overridden && " · set by admin"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {active.length === 0 && <span className="text-gray-500">—</span>}
+                        {active.map((assignment) => (
+                          <span key={assignment.id} className="px-2 py-0.5 rounded-md bg-slate-800 text-xs">
+                            {assignment.brand.name}
+                            {assignment.is_leader && <span className="text-yellow-300"> ★</span>}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 capitalize">{host.status}</td>
+                    {editableBrands && (
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(open ? null : host.id)}
+                          className="px-3 py-1.5 rounded-md border border-slate-700 text-gray-300 hover:bg-slate-800"
+                        >
+                          {open ? "Close" : "Brands"}
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                  {open && brands.data && (
+                    <tr>
+                      <td colSpan={5} className="px-4 pb-4">
+                        <AssignmentEditor
+                          hostId={host.id}
+                          assignments={host.assignments}
+                          brands={brands.data.brands}
+                          onChanged={() => {
+                            hosts.reload();
+                            brands.reload();
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {hosts.data?.data.length === 0 && (
+          <p className="px-4 py-8 text-center text-gray-400">
+            No hosts found. Hosts appear here after an admin approves their account.
+          </p>
+        )}
+      </div>
+
+      {hosts.data && hosts.data.last_page > 1 && (
+        <div className="flex items-center justify-between text-sm text-gray-400">
+          <span>
+            Page {hosts.data.current_page} of {hosts.data.last_page} · {hosts.data.total} hosts
+          </span>
+          <div className="flex gap-2">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
+              Previous
+            </button>
+            <button
+              type="button"
+              disabled={page >= hosts.data.last_page}
+              onClick={() => setPage(page + 1)}
+              className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

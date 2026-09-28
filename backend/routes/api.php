@@ -6,10 +6,15 @@ use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\FinanceController;
+use App\Http\Controllers\Admin\BrandController;
+use App\Http\Controllers\Admin\HostController as AdminHostController;
+use App\Http\Controllers\Admin\RateCategoryController;
 use App\Http\Controllers\Operator\DashboardController as OperatorDashboardController;
 use App\Http\Controllers\Operator\ScheduleController;
 use App\Http\Controllers\Operator\BackupHostController;
 use App\Http\Controllers\Operator\HostRatingController;
+use App\Http\Controllers\Operator\HostController as OperatorHostController;
+use App\Http\Controllers\Operator\AssignmentController;
 use App\Http\Controllers\Host\MyScheduleController;
 use App\Http\Controllers\Host\ProfileController;
 use App\Http\Controllers\Host\MyRatingController;
@@ -59,6 +64,21 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/users/{user}/deactivate', [UserManagementController::class, 'deactivate']);
         Route::post('/users/{user}/activate', [UserManagementController::class, 'activate']);
 
+        // Brands (create/edit; listing is in the operator group)
+        Route::post('/brands', [BrandController::class, 'store']);
+        Route::put('/brands/{brand}', [BrandController::class, 'update']);
+
+        // Rate levels (magang, baru, ...)
+        Route::get('/rate-categories', [RateCategoryController::class, 'index']);
+        Route::post('/rate-categories', [RateCategoryController::class, 'store']);
+        Route::put('/rate-categories/{rateCategory}', [RateCategoryController::class, 'update']);
+        Route::delete('/rate-categories/{rateCategory}', [RateCategoryController::class, 'destroy']);
+
+        // Host details incl. KTP & bank (admin only)
+        Route::get('/hosts/{host}', [AdminHostController::class, 'show']);
+        Route::put('/hosts/{host}', [AdminHostController::class, 'update']);
+        Route::get('/hosts/{host}/ktp-image', [AdminHostController::class, 'ktpImage']);
+
         // Finance (Admin Only)
         Route::get('/finance', [FinanceController::class, 'index']);
         Route::get('/finance/payroll', [FinanceController::class, 'payroll']);
@@ -71,6 +91,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     */
     Route::prefix('operator')->middleware('role:operator|admin')->group(function () {
         Route::get('/dashboard', [OperatorDashboardController::class, 'index']);
+
+        // Hosts & brand assignments
+        Route::get('/hosts', [OperatorHostController::class, 'index']);
+        Route::get('/brands', [BrandController::class, 'index']);
+        Route::post('/assignments', [AssignmentController::class, 'store']);
+        Route::put('/assignments/{assignment}', [AssignmentController::class, 'update']);
 
         // Schedule Management
         Route::apiResource('/schedules', ScheduleController::class);
@@ -99,6 +125,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
         Route::post('/profile/password', [ProfileController::class, 'changePassword']);
+        Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
+        Route::put('/profile/sensitive', [ProfileController::class, 'updateSensitive']);
+        Route::post('/profile/ktp-image', [ProfileController::class, 'uploadKtpImage']);
 
         // My Ratings (read-only)
         Route::get('/ratings', [MyRatingController::class, 'index']);
