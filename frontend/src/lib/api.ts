@@ -555,3 +555,89 @@ export const operatorBackupApi = {
   unassign: (token: string, id: string) => post(`/operator/backups/${id}/unassign`, token),
   letterUrl: (token: string, id: string) => apiFileUrl(`/operator/backups/${id}/letter`, token),
 };
+
+/*
+|--------------------------------------------------------------------------
+| Attendance & live reports
+|--------------------------------------------------------------------------
+*/
+export type ReportStatus = "submitted" | "flagged" | "approved" | "rejected";
+
+export interface LiveReport {
+  id: string;
+  attendance_id: string;
+  session_count: number;
+  duration_hours: number;
+  metrics: Record<string, number> | null;
+  notes: string | null;
+  status: ReportStatus;
+  flag_reasons: string[] | null;
+  submitted_at: string;
+  reviewed_at: string | null;
+  review_note: string | null;
+}
+
+export interface Attendance {
+  id: string;
+  slot_id: string;
+  backup_request_id: string | null;
+  session_date: string;
+  scheduled_start_at: string;
+  scheduled_end_at: string;
+  check_in_at: string;
+  check_out_at: string | null;
+  report_due_at: string;
+  report?: LiveReport | null;
+  brand?: { id: string; name: string };
+  host?: HostWithUser;
+}
+
+/** One session occurrence on the host's Live page. */
+export interface LiveSession {
+  slot_id: string;
+  date: string;
+  backup_request_id: string | null;
+  brand: { id: string; name: string };
+  start_at: string;
+  end_at: string;
+  /** own = my slot, off = someone covers me, cover = I cover someone */
+  role: "own" | "off" | "cover";
+  covered_by?: string | null;
+  covered_for?: string;
+  attendance: Attendance | null;
+}
+
+export interface ReportInput {
+  session_count: number;
+  duration_hours: number;
+  metrics: Record<string, number | null>;
+  notes: string | null;
+}
+
+export interface ReviewReport extends LiveReport {
+  brand: { id: string; name: string };
+  host: HostWithUser;
+  attendance: Attendance;
+  reviewer: { id: string; name: string } | null;
+  scheduled_hours: number;
+  attended_hours: number | null;
+}
+
+export const liveApi = {
+  today: (token: string) =>
+    api<{ sessions: LiveSession[]; missing_reports: Attendance[]; metrics: string[] }>("/host/live", { token }),
+  checkIn: (token: string, session: Pick<LiveSession, "slot_id" | "date" | "backup_request_id">) =>
+    post<{ attendance: Attendance } & Message>("/host/live/check-in", token, session),
+  checkOut: (token: string, attendanceId: string) => post<{ attendance: Attendance } & Message>(`/host/live/${attendanceId}/check-out`, token),
+  report: (token: string, attendanceId: string, data: ReportInput) =>
+    post<{ report: LiveReport } & Message>(`/host/live/${attendanceId}/report`, token, data),
+};
+
+export const reportApi = {
+  list: (token: string, status: "flagged" | "approved" | "rejected") =>
+    api<{ reports: ReviewReport[]; metrics: string[] }>(`/operator/reports?status=${status}`, { token }),
+  missing: (token: string) => api<{ attendances: Attendance[] }>("/operator/reports?status=missing", { token }),
+  approve: (token: string, id: string, data: { duration_hours: number; review_note: string | null }) =>
+    post(`/operator/reports/${id}/approve`, token, data),
+  reject: (token: string, id: string, reviewNote: string) => post(`/operator/reports/${id}/reject`, token, { review_note: reviewNote }),
+};

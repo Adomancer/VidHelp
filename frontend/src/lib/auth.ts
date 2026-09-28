@@ -51,7 +51,7 @@ export function hasAnyRole(user: AuthUser, roles: RoleName[]): boolean {
 export function homePathFor(user: AuthUser): string {
   if (hasAnyRole(user, ["admin"])) return "/admin/dashboard";
   if (hasAnyRole(user, ["operator"])) return "/operator/dashboard";
-  return "/host/schedule";
+  return "/host/live";
 }
 
 /*

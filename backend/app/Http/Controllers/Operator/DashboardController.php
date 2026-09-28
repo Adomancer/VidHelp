@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
 use App\Models\BackupRequest;
+use App\Models\LiveReport;
 use App\Models\ScheduleSlot;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,7 @@ class DashboardController extends Controller
             'active_hosts' => User::role('host')->where('status', 'active')->count(),
             'today_schedules' => ScheduleSlot::activeOn(today())->where('day_of_week', today()->dayOfWeekIso)->count(),
             'pending_backups' => BackupRequest::where('status', 'pending')->where('end_at', '>', now())->count(),
+            'reports_to_review' => LiveReport::where('status', 'flagged')->count(),
         ];
 
         return response()->json(['stats' => $stats]);

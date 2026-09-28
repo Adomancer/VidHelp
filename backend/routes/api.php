@@ -20,6 +20,8 @@ use App\Http\Controllers\Host\MyRatingController;
 use App\Http\Controllers\Host\AvailabilityController;
 use App\Http\Controllers\Host\BackupController as HostBackupController;
 use App\Http\Controllers\Operator\BackupController as OperatorBackupController;
+use App\Http\Controllers\Operator\ReportController;
+use App\Http\Controllers\Host\LiveController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -119,6 +121,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/backups/{backup}/assign', [OperatorBackupController::class, 'assign']);
         Route::post('/backups/{backup}/unassign', [OperatorBackupController::class, 'unassign']);
 
+        // Live reports: review flagged ones, see overdue ones
+        Route::get('/reports', [ReportController::class, 'index']);
+        Route::post('/reports/{report}/approve', [ReportController::class, 'approve']);
+        Route::post('/reports/{report}/reject', [ReportController::class, 'reject']);
+
         // Host Rating
         Route::get('/ratings', [HostRatingController::class, 'index']);
         Route::post('/ratings', [HostRatingController::class, 'store']);
@@ -146,6 +153,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/backups/{backup}/apply', [HostBackupController::class, 'apply']);
         Route::post('/backups/{backup}/withdraw', [HostBackupController::class, 'withdraw']);
         Route::post('/backups/{backup}/drop', [HostBackupController::class, 'drop']);
+
+        // Live: check in/out and send the live report
+        Route::get('/live', [LiveController::class, 'index']);
+        Route::post('/live/check-in', [LiveController::class, 'checkIn']);
+        Route::post('/live/{attendance}/check-out', [LiveController::class, 'checkOut']);
+        Route::post('/live/{attendance}/report', [LiveController::class, 'report']);
 
         // My Profile
         Route::get('/profile', [ProfileController::class, 'show']);

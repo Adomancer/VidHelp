@@ -307,39 +307,52 @@ erDiagram
         uuid id PK
         uuid host_id FK
         uuid slot_id FK
-        uuid backup_request_id FK
+        uuid backup_request_id FK "diisi jika host sedang backup"
         uuid brand_id FK
-        datetime check_in_at
+        date session_date "tanggal sesi (slot occurrence)"
+        datetime scheduled_start_at "snapshot jadwal"
+        datetime scheduled_end_at
+        datetime check_in_at "belum ada aturan telat (TBD)"
         datetime check_out_at
         datetime report_due_at "check_in_at plus 24 jam"
+        datetime created_at
+        datetime updated_at
     }
 
     LIVE_REPORTS {
         uuid id PK
-        uuid attendance_id FK
+        uuid attendance_id FK,UK
         uuid host_id FK
         uuid brand_id FK
         int session_count
         decimal duration_hours
+        json metrics "sementara: gmv, orders, viewers (template dari agency menyusul)"
         string notes
-        enum status "draft, submitted, flagged, approved"
+        enum status "submitted, flagged, approved, rejected"
+        json flag_reasons "late_report, no_check_out, more_than_scheduled, ..."
         datetime submitted_at
+        uuid reviewed_by FK "null = auto-approve"
+        datetime reviewed_at
+        string review_note
+        datetime created_at
+        datetime updated_at
     }
 
     WORK_SESSIONS {
         uuid id PK
-        uuid live_report_id FK
+        uuid live_report_id FK,UK
         uuid host_id FK
         uuid brand_id FK
-        uuid payment_period_id FK
+        uuid payment_period_id FK "diisi saat modul payroll"
         date session_date
         datetime start_at
         datetime end_at
-        decimal duration_hours
+        decimal duration_hours "jam yang dibayar"
         enum session_type "regular, backup, double, disrupted, adjustment"
         enum status "normal, flagged, carried_over"
         string notes
         datetime created_at
+        datetime updated_at
     }
 
     VIOLATION_TYPES {

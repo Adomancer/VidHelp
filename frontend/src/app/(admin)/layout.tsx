@@ -14,6 +14,7 @@ const links = [
   { href: "/admin/rates", label: "Rate Levels" },
   { href: "/admin/schedules", label: "Schedules" },
   { href: "/admin/backups", label: "Backups" },
+  { href: "/admin/reports", label: "Live Reports" },
   { href: "/admin/finance", label: "Finance" },
 ];
 
