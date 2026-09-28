@@ -1,13 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { errorMessage, fieldErrors, scheduleApi, type AvailabilityRange, type BackupNeed, type DayOfWeek, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
+import {
+  errorMessage,
+  fieldErrors,
+  scheduleApi,
+  type AvailabilityRange,
+  type BackupNeed,
+  type DayOfWeek,
+  type MyEventClaim,
+  type ReplacingEvent,
+  type ScheduleSlot,
+  type SlotBackupMarker,
+} from "@/lib/api";
 import { carriedInto, dateOfWeekday, DAYS, dayShort, formatDate, formatShortDate, formatTimeRange, formatWindow, isoWeekday, toDateInput } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
 import BackupMarker, { markerFor } from "@/components/BackupMarker";
 import FormAlert from "@/components/FormAlert";
+import HostEvents from "@/components/HostEvents";
 
 export default function HostSchedulePage() {
   const { token, user } = useAuth();
@@ -19,15 +31,24 @@ export default function HostSchedulePage() {
       <h1 className="text-xl font-bold text-white">My Schedule</h1>
 
       {schedule.error && <FormAlert tone="error">{schedule.error}</FormAlert>}
-      {schedule.data && <WeekList slots={schedule.data.slots} covers={schedule.data.covers} absences={schedule.data.absences} />}
+      {schedule.data && (
+        <WeekList
+          slots={schedule.data.slots}
+          covers={schedule.data.covers}
+          absences={schedule.data.absences}
+          eventClaims={schedule.data.event_claims}
+          replacingEvents={schedule.data.replacing_events}
+        />
+      )}
       {schedule.data && schedule.data.upcoming.length > 0 && <UpcomingList slots={schedule.data.upcoming} />}
+      {isHost && <HostEvents />}
       {isHost && <AvailabilityEditor />}
     </div>
   );
 }
 
-function SlotLine({ slot, marker }: { slot: ScheduleSlot; marker?: SlotBackupMarker }) {
-  const off = marker?.status === "filled";
+function SlotLine({ slot, marker, replacedBy }: { slot: ScheduleSlot; marker?: SlotBackupMarker; replacedBy?: string }) {
+  const off = marker?.status === "filled" || replacedBy !== undefined;
 
   return (
     <li className={`rounded-lg px-3 py-2 ${off ? "bg-slate-800/40" : "bg-slate-800"}`}>
@@ -38,7 +59,24 @@ function SlotLine({ slot, marker }: { slot: ScheduleSlot; marker?: SlotBackupMar
           {slot.slot_type === "pd" && <span className="ml-1 px-1 rounded bg-yellow-500/20 text-yellow-200 text-xs">PD</span>}
         </span>
       </div>
-      {marker && <BackupMarker marker={marker} mine />}
+      {replacedBy ? (
+        <span className="block text-xs text-yellow-200">Replaced by {replacedBy}: claim event blocks below</span>
+      ) : (
+        marker && <BackupMarker marker={marker} mine />
+      )}
+    </li>
+  );
+}
+
+/** An event block I claimed on this date. */
+function EventLine({ claim }: { claim: MyEventClaim }) {
+  return (
+    <li className="rounded-lg bg-yellow-500/10 border border-yellow-400/30 px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-white">{claim.brand.name}</span>
+        <span className="text-sm text-yellow-100 whitespace-nowrap">{formatWindow(claim.start_at, claim.end_at).split(", ")[1]}</span>
+      </div>
+      <span className="block text-xs text-yellow-200">Event: {claim.event_name}</span>
     </li>
   );
 }
@@ -70,14 +108,28 @@ function CarryOverLine({ slot }: { slot: ScheduleSlot }) {
 
 /**
  * The next 7 days starting today: my recurring slots (marked when someone covers
- * me) plus backups I'm doing for others on those dates.
+ * me or an event replaces them), backups I'm doing for others and my event blocks.
  */
-function WeekList({ slots, covers, absences }: { slots: ScheduleSlot[]; covers: BackupNeed[]; absences: SlotBackupMarker[] }) {
+function WeekList({
+  slots,
+  covers,
+  absences,
+  eventClaims,
+  replacingEvents,
+}: {
+  slots: ScheduleSlot[];
+  covers: BackupNeed[];
+  absences: SlotBackupMarker[];
+  eventClaims: MyEventClaim[];
+  replacingEvents: ReplacingEvent[];
+}) {
   const today = isoWeekday();
   const todayDate = toDateInput();
   const ordered = [...DAYS.filter((day) => day.value >= today), ...DAYS.filter((day) => day.value < today)];
+  const replacedBy = (slot: ScheduleSlot, date: string) =>
+    replacingEvents.find((event) => event.brand_id === slot.assignment.brand_id && event.start_date <= date && event.end_date >= date)?.name;
 
-  if (slots.length === 0 && covers.length === 0) {
+  if (slots.length === 0 && covers.length === 0 && eventClaims.length === 0) {
     return (
       <Card>
         <p className="text-sm text-gray-400">You don&apos;t have any live slots yet. Your operator will add them.</p>
@@ -92,7 +144,8 @@ function WeekList({ slots, covers, absences }: { slots: ScheduleSlot[]; covers: 
         const daySlots = slots.filter((slot) => slot.day_of_week === day.value);
         const carried = carriedInto(slots, day.value);
         const dayCovers = covers.filter((cover) => cover.backup_date === date);
-        if (daySlots.length === 0 && carried.length === 0 && dayCovers.length === 0) return null;
+        const dayEvents = eventClaims.filter((claim) => claim.date === date);
+        if (daySlots.length === 0 && carried.length === 0 && dayCovers.length === 0 && dayEvents.length === 0) return null;
 
         return (
           <Card key={day.value}>
@@ -106,10 +159,13 @@ function WeekList({ slots, covers, absences }: { slots: ScheduleSlot[]; covers: 
                 <CarryOverLine key={`carry-${slot.id}`} slot={slot} />
               ))}
               {daySlots.map((slot) => (
-                <SlotLine key={slot.id} slot={slot} marker={markerFor(absences, slot.id, date)} />
+                <SlotLine key={slot.id} slot={slot} marker={markerFor(absences, slot.id, date)} replacedBy={replacedBy(slot, date)} />
               ))}
               {dayCovers.map((cover) => (
                 <CoverLine key={cover.id} cover={cover} />
+              ))}
+              {dayEvents.map((claim) => (
+                <EventLine key={claim.id} claim={claim} />
               ))}
             </ul>
           </Card>

@@ -26,7 +26,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
   const brandId = chosenBrandId || activeBrands[0]?.id || "";
 
   const slots = useApiData(`${brandId}|${on}`, () =>
-    brandId ? scheduleApi.list(token, { brand_id: brandId, on }) : Promise.resolve({ slots: [], backups: [] })
+    brandId ? scheduleApi.list(token, { brand_id: brandId, on }) : Promise.resolve({ slots: [], backups: [], replacing_events: [] })
   );
   const hosts = useApiData(brandId, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
 
@@ -99,12 +99,21 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           // The board shows the 7 days starting at "as of"; backups are per date
           const date = dateOfWeekday(on, day.value);
           const dayBefore = toDateInput(new Date(new Date(`${date}T00:00`).getTime() - 86_400_000));
+          // An event with "schedule opened empty" replaces the regular slots on its days
+          const replacedBy = (onDate: string) =>
+            slots.data?.replacing_events.find((event) => event.start_date <= onDate && event.end_date >= onDate);
+          const event = replacedBy(date);
 
           return (
             <div
               key={day.value}
               className={`bg-slate-900 border rounded-xl p-3 space-y-2 min-h-24 ${day.value === today ? "border-purple-500" : "border-slate-800"}`}
             >
+              {event && (
+                <p className="rounded-md bg-yellow-500/10 px-2 py-1 text-[11px] text-yellow-200">
+                  {event.name}: regular slots don&apos;t run, hosts claim event blocks
+                </p>
+              )}
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-white">
                   <span className="md:hidden">{day.long}</span>
@@ -128,7 +137,9 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                   type="button"
                   onClick={() => setEditing({ slot })}
                   title={`Continues from ${dayShort(slot.day_of_week)} night`}
-                  className="w-full text-left rounded-lg border border-dashed border-slate-600 hover:bg-slate-800 px-2.5 py-1.5 transition-colors"
+                  className={`w-full text-left rounded-lg border border-dashed border-slate-600 hover:bg-slate-800 px-2.5 py-1.5 transition-colors ${
+                    replacedBy(dayBefore) ? "opacity-40" : ""
+                  }`}
                 >
                   <span className="block text-xs text-gray-400">
                     until {slot.end_time} · from {dayShort(slot.day_of_week)} {slot.start_time}
@@ -143,7 +154,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                   key={slot.id}
                   type="button"
                   onClick={() => setEditing({ slot })}
-                  className="w-full text-left rounded-lg bg-slate-800 hover:bg-slate-700 px-2.5 py-2 transition-colors"
+                  className={`w-full text-left rounded-lg bg-slate-800 hover:bg-slate-700 px-2.5 py-2 transition-colors ${event ? "opacity-40" : ""}`}
                 >
                   <span className="block text-xs text-purple-200">
                     {formatTimeRange(slot.start_time, slot.end_time, slot.day_of_week)}

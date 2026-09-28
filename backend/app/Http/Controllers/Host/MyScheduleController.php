@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Host;
 
 use App\Http\Controllers\Controller;
 use App\Models\BackupRequest;
+use App\Models\EventSlotClaim;
 use App\Models\ScheduleSlot;
+use App\Models\SpecialEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +21,9 @@ class MyScheduleController extends Controller
         $profile = $request->user()->hostProfile;
 
         if (! $profile) {
-            return response()->json(['slots' => [], 'upcoming' => []]);
+            return response()->json([
+                'slots' => [], 'upcoming' => [], 'covers' => [], 'absences' => [], 'event_claims' => [], 'replacing_events' => [],
+            ]);
         }
 
         $mine = fn () => ScheduleSlot::query()
@@ -52,6 +56,32 @@ class MyScheduleController extends Controller
                 ->with('filler.user')
                 ->get()
                 ->map(fn (BackupRequest $backup) => $backup->slotMarker()),
+
+            // Event blocks I claimed in the next 7 days
+            'event_claims' => EventSlotClaim::active()
+                ->where('host_id', $profile->id)
+                ->where('end_at', '>', now())
+                ->where('start_at', '<', today()->addDays(7))
+                ->with('event:id,name,brand_id', 'event.brand:id,name')
+                ->orderBy('start_at')
+                ->get()
+                ->map(fn (EventSlotClaim $claim) => [
+                    'id' => $claim->id,
+                    'event_name' => $claim->event->name,
+                    'brand' => $claim->event->brand->only('id', 'name'),
+                    'date' => $claim->start_at->toDateString(),
+                    'start_at' => $claim->start_at,
+                    'end_at' => $claim->end_at,
+                ]),
+
+            // Events replacing my brands' regular schedule on some of the next 7 days
+            'replacing_events' => SpecialEvent::query()
+                ->where('status', 'active')
+                ->where('open_full_schedule', true)
+                ->whereIn('brand_id', $profile->assignments()->where('status', 'active')->pluck('brand_id'))
+                ->whereDate('start_date', '<', today()->addDays(7))
+                ->whereDate('end_date', '>=', today())
+                ->get(['id', 'brand_id', 'name', 'start_date', 'end_date']),
         ]);
     }
 }

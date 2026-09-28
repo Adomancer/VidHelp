@@ -55,7 +55,7 @@ export default function HostLivePage() {
       )}
 
       {current.map((session) => (
-        <SessionCard key={`${session.slot_id}|${session.date}|${session.role}`} session={session} metrics={live.data!.metrics} act={act} />
+        <SessionCard key={sessionKey(session)} session={session} metrics={live.data!.metrics} act={act} />
       ))}
 
       {live.data && live.data.missing_reports.length > 0 && (
@@ -77,7 +77,7 @@ export default function HostLivePage() {
         <Card title="Earlier">
           <ul className="space-y-2">
             {done.map((session) => (
-              <li key={`${session.slot_id}|${session.date}|${session.role}`} className="flex items-center justify-between gap-3 text-sm">
+              <li key={sessionKey(session)} className="flex items-center justify-between gap-3 text-sm">
                 <span className="text-gray-300">
                   {session.brand.name} · {formatWindow(session.start_at, session.end_at)}
                 </span>
@@ -92,6 +92,11 @@ export default function HostLivePage() {
 }
 
 type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
+
+/** Event blocks have no weekly slot, so they are keyed by their claim. */
+function sessionKey(session: LiveSession): string {
+  return session.event_claim_id ?? `${session.slot_id}|${session.date}|${session.role}`;
+}
 
 function DoneLabel({ session }: { session: LiveSession }) {
   if (session.role === "off") return <span className="text-xs text-gray-500">off</span>;
@@ -114,6 +119,7 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
           <p className={`font-medium ${session.role === "off" ? "text-gray-400" : "text-white"}`}>{session.brand.name}</p>
           <p className="text-sm text-purple-200">{formatWindow(session.start_at, session.end_at)}</p>
           {session.role === "cover" && <p className="text-xs text-green-300">Backup for {session.covered_for}</p>}
+          {session.role === "event" && <p className="text-xs text-yellow-200">Event: {session.event_name}</p>}
           {session.role === "off" && <p className="text-xs text-gray-400">You&apos;re off · covered by {session.covered_by}</p>}
         </div>
         {attendance && <ReportStatusLabel report={attendance.report ?? null} />}

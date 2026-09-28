@@ -119,6 +119,7 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
           <p className="text-white font-medium">
             {report.host.user.name} · {report.brand.name}
             {attendance.backup_request_id && <span className="ml-2 text-xs text-green-300">backup</span>}
+            {attendance.event_claim_id && <span className="ml-2 text-xs text-yellow-200">event</span>}
           </p>
           <p className="text-sm text-purple-200">{formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}</p>
         </div>

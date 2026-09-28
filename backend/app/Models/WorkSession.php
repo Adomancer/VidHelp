@@ -38,6 +38,11 @@ class WorkSession extends Model
         return $this->belongsTo(HostProfile::class, 'host_id');
     }
 
+    public function period(): BelongsTo
+    {
+        return $this->belongsTo(PaymentPeriod::class, 'payment_period_id');
+    }
+
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);

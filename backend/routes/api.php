@@ -5,18 +5,25 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
-use App\Http\Controllers\Admin\FinanceController;
+use App\Http\Controllers\Admin\PayrollController;
+use App\Http\Controllers\Admin\CashAdvanceController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\HostController as AdminHostController;
 use App\Http\Controllers\Admin\RateCategoryController;
 use App\Http\Controllers\Operator\DashboardController as OperatorDashboardController;
 use App\Http\Controllers\Operator\ScheduleController;
-use App\Http\Controllers\Operator\HostRatingController;
 use App\Http\Controllers\Operator\HostController as OperatorHostController;
 use App\Http\Controllers\Operator\AssignmentController;
+use App\Http\Controllers\Operator\PointController;
+use App\Http\Controllers\Admin\PointAdminController;
+use App\Http\Controllers\Admin\ViolationTypeController;
+use App\Http\Controllers\Admin\RatingController;
 use App\Http\Controllers\Host\MyScheduleController;
 use App\Http\Controllers\Host\ProfileController;
-use App\Http\Controllers\Host\MyRatingController;
+use App\Http\Controllers\Host\PerformanceController;
+use App\Http\Controllers\Host\PayController;
+use App\Http\Controllers\Host\EventController as HostEventController;
+use App\Http\Controllers\Operator\EventController as OperatorEventController;
 use App\Http\Controllers\Host\AvailabilityController;
 use App\Http\Controllers\Host\BackupController as HostBackupController;
 use App\Http\Controllers\Operator\BackupController as OperatorBackupController;
@@ -86,9 +93,30 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         // Lock/unlock schedule slots
         Route::put('/schedules/{schedule}/lock', [ScheduleController::class, 'lock']);
 
-        // Finance (Admin Only)
-        Route::get('/finance', [FinanceController::class, 'index']);
-        Route::get('/finance/payroll', [FinanceController::class, 'payroll']);
+        // Points & SP corrections, violation types, monthly ratings
+        Route::post('/points/logs/{log}/void', [PointAdminController::class, 'voidLog']);
+        Route::post('/warning-letters', [PointAdminController::class, 'issueWarning']);
+        Route::post('/warning-letters/{letter}/void', [PointAdminController::class, 'voidWarning']);
+        Route::get('/violation-types', [ViolationTypeController::class, 'index']);
+        Route::post('/violation-types', [ViolationTypeController::class, 'store']);
+        Route::put('/violation-types/{violationType}', [ViolationTypeController::class, 'update']);
+        Route::get('/ratings', [RatingController::class, 'index']);
+        Route::put('/ratings', [RatingController::class, 'upsert']);
+
+        // Payroll: periods per brand, adjustments, payment requests, salary slips
+        Route::get('/payroll/periods', [PayrollController::class, 'periods']);
+        Route::get('/payroll/periods/{period}', [PayrollController::class, 'show']);
+        Route::post('/payroll/periods/{period}/adjustments', [PayrollController::class, 'storeAdjustment']);
+        Route::delete('/payroll/adjustments/{adjustment}', [PayrollController::class, 'destroyAdjustment']);
+        Route::post('/payroll/periods/{period}/request', [PayrollController::class, 'requestPayment']);
+        Route::post('/payroll/periods/{period}/paid', [PayrollController::class, 'markPaid']);
+        Route::get('/payroll/periods/{period}/export', [PayrollController::class, 'export']);
+        Route::get('/payroll/slips/{slip}', [PayrollController::class, 'slip']);
+
+        // Kasbon (cash advances)
+        Route::get('/cash-advances', [CashAdvanceController::class, 'index']);
+        Route::post('/cash-advances', [CashAdvanceController::class, 'store']);
+        Route::delete('/cash-advances/{advance}', [CashAdvanceController::class, 'destroy']);
     });
 
     /*
@@ -126,10 +154,21 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/reports/{report}/approve', [ReportController::class, 'approve']);
         Route::post('/reports/{report}/reject', [ReportController::class, 'reject']);
 
-        // Host Rating
-        Route::get('/ratings', [HostRatingController::class, 'index']);
-        Route::post('/ratings', [HostRatingController::class, 'store']);
-        Route::put('/ratings/{id}', [HostRatingController::class, 'update']);
+        // Special events (PD, double date): blocks hosts claim
+        Route::get('/events', [OperatorEventController::class, 'index']);
+        Route::post('/events', [OperatorEventController::class, 'store']);
+        Route::get('/events/{event}', [OperatorEventController::class, 'show']);
+        Route::put('/events/{event}', [OperatorEventController::class, 'update']);
+        Route::post('/events/{event}/cancel', [OperatorEventController::class, 'cancel']);
+        Route::post('/events/{event}/assign', [OperatorEventController::class, 'assign']);
+        Route::post('/event-claims/{claim}/release', [OperatorEventController::class, 'release']);
+
+        // Points: record violations and brand complaints
+        Route::get('/points', [PointController::class, 'index']);
+        Route::get('/points/hosts/{host}', [PointController::class, 'show']);
+        Route::get('/violation-types', [PointController::class, 'violationTypes']);
+        Route::post('/points/violations', [PointController::class, 'storeViolation']);
+        Route::post('/points/complaints', [PointController::class, 'storeComplaint']);
     });
 
     /*
@@ -154,6 +193,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::post('/backups/{backup}/withdraw', [HostBackupController::class, 'withdraw']);
         Route::post('/backups/{backup}/drop', [HostBackupController::class, 'drop']);
 
+        // Special events: claim blocks
+        Route::get('/events', [HostEventController::class, 'index']);
+        Route::post('/events/{event}/claim', [HostEventController::class, 'claim']);
+        Route::post('/event-claims/{claim}/cancel', [HostEventController::class, 'cancel']);
+
         // Live: check in/out and send the live report
         Route::get('/live', [LiveController::class, 'index']);
         Route::post('/live/check-in', [LiveController::class, 'checkIn']);
@@ -168,7 +212,11 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::put('/profile/sensitive', [ProfileController::class, 'updateSensitive']);
         Route::post('/profile/ktp-image', [ProfileController::class, 'uploadKtpImage']);
 
-        // My Ratings (read-only)
-        Route::get('/ratings', [MyRatingController::class, 'index']);
+        // My points, SPs and ratings (read-only)
+        Route::get('/performance', [PerformanceController::class, 'index']);
+
+        // My pay: open periods, salary slips, kasbon
+        Route::get('/pay', [PayController::class, 'index']);
+        Route::get('/pay/slips/{slip}', [PayController::class, 'slip']);
     });
 });

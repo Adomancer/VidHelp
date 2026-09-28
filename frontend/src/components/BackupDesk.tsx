@@ -227,7 +227,7 @@ function CoverPicker({ backup, act }: { backup: BackupRequest; act: Act }) {
 
   return (
     <div className="space-y-3 border-t border-slate-800 pt-3">
-      <p className="text-xs text-gray-400">Applicants, best first (same brand first, then who applied earliest):</p>
+      <p className="text-xs text-gray-400">Applicants, best first (highest rating, then same brand, then who applied earliest):</p>
       {applicants.data?.applicants.length === 0 && <p className="text-sm text-gray-400">Nobody has applied yet.</p>}
       <CandidateList candidates={applicants.data?.applicants ?? []} onPick={pick} />
 
@@ -254,6 +254,7 @@ function CandidateList({ candidates, onPick }: { candidates: BackupCandidate[]; 
           <div className="flex-1 min-w-0">
             <p className="text-sm text-white truncate">{candidate.name}</p>
             <p className="text-xs text-gray-400 truncate">
+              {candidate.rating != null && <span className="text-yellow-200">★ {candidate.rating.toFixed(1)} · </span>}
               {candidate.same_brand ? "Same brand" : `Other brand · quota ${candidate.quota.quota_used}/${candidate.quota.quota_max}`}
               {candidate.ineligible_reason && <span className="text-red-300"> · {candidate.ineligible_reason}</span>}
             </p>

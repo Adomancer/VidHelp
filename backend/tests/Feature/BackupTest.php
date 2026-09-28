@@ -219,7 +219,7 @@ class BackupTest extends TestCase
 
         $application = BackupApplication::where('applicant_host_id', $this->otherBrand->id)->firstOrFail();
         $this->assertSame('cancelled', $application->status);
-        $this->assertFalse($application->penalty_applied); // points module will apply it
+        $this->assertTrue($application->penalty_applied); // processed; the deduction itself is tested in PointsTest
     }
 
     public function test_cover_cannot_overlap_another_cover(): void

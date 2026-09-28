@@ -45,4 +45,20 @@ return [
         'viewers' => 'nullable|integer|min:0',
     ],
 
+    'points' => [
+        // Every host starts each points period with this many points
+        'starting_points' => (int) env('POINTS_STARTING', 100),
+
+        // Points reset every N months, aligned to the calendar (3 = Jan, Apr, Jul, Oct)
+        'reset_every_months' => (int) env('POINTS_RESET_EVERY_MONTHS', 3),
+
+        // An SP is issued automatically when points fall to or below these values (placeholders)
+        'sp_thresholds' => [1 => 75, 2 => 50, 3 => 25],
+    ],
+
+    'rating' => [
+        'min' => 1,
+        'max' => 5,
+    ],
+
 ];

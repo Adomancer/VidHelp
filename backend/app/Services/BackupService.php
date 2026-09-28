@@ -20,6 +20,13 @@ use Illuminate\Validation\ValidationException;
  */
 class BackupService
 {
+    public function __construct(
+        private PointService $points,
+        private HostCalendar $calendar,
+        private EventCalendar $events,
+    ) {
+    }
+
     /**
      * Open a request for a host's slot on a date. Requests made by admin/operator
      * are approved straight away; host requests wait for approval (or auto-open).
@@ -30,6 +37,9 @@ class BackupService
 
         if (! $slot->runsOn($day)) {
             throw ValidationException::withMessages(['backup_date' => ['That slot is not scheduled on this date.']]);
+        }
+        if ($event = $this->events->replacing($slot->assignment->brand_id, $day)) {
+            throw ValidationException::withMessages(['backup_date' => ["That day the regular schedule is replaced by {$event->name}."]]);
         }
 
         [$start, $end] = $slot->occurrenceOn($day);
@@ -91,40 +101,11 @@ class BackupService
     }
 
     /**
-     * What keeps the host busy between start and end: their own slot or another cover.
+     * What keeps the host busy between start and end: their own slot, another cover or an event block.
      */
     public function busyReason(HostProfile $host, CarbonInterface $start, CarbonInterface $end, ?BackupRequest $except = null): ?string
     {
-        $slots = ScheduleSlot::query()
-            ->with('assignment.brand:id,name')
-            ->where('status', 'active')
-            ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
-            ->get();
-
-        // An overnight slot from the day before can still be running at `start`
-        for ($day = $start->copy()->subDay()->startOfDay(); $day->lte($end); $day = $day->addDay()) {
-            foreach ($slots as $slot) {
-                if (! $slot->runsOn($day)) {
-                    continue;
-                }
-
-                [$slotStart, $slotEnd] = $slot->occurrenceOn($day);
-                if ($slotStart->lt($end) && $start->lt($slotEnd)) {
-                    return "Live on {$slot->assignment->brand->name} ({$slot->label()}).";
-                }
-            }
-        }
-
-        $cover = BackupRequest::query()
-            ->with('brand:id,name')
-            ->where('status', 'filled')
-            ->where('filled_by_host_id', $host->id)
-            ->when($except, fn ($q) => $q->whereKeyNot($except->getKey()))
-            ->where('start_at', '<', $end)
-            ->where('end_at', '>', $start)
-            ->first();
-
-        return $cover ? "Already covering {$cover->brand->name} at that time." : null;
+        return $this->calendar->busyReason($host, $start, $end, exceptBackupId: $except?->getKey());
     }
 
     public function isSameBrand(HostProfile $host, BackupRequest $request): bool
@@ -133,18 +114,21 @@ class BackupService
     }
 
     /**
-     * Applicants in pick order: same brand first, then earliest to apply.
-     * TODO: rank by monthly rating first once host ratings exist.
+     * Applicants in pick order: best latest rating first, then same brand, then earliest to apply.
      *
      * @return Collection<int, BackupApplication>
      */
     public function rankedApplicants(BackupRequest $request): Collection
     {
+        // Unrated hosts rank below every rated one
+        $rating = fn (BackupApplication $application) => $application->applicant->latestRating?->rating ?? -1;
+
         return $request->applications()
-            ->with('applicant.user')
+            ->with(['applicant.user', 'applicant.latestRating'])
             ->where('status', 'applied')
             ->get()
             ->sortBy([
+                fn (BackupApplication $a, BackupApplication $b) => $rating($b) <=> $rating($a),
                 fn (BackupApplication $a, BackupApplication $b) => $this->isSameBrand($b->applicant, $request) <=> $this->isSameBrand($a->applicant, $request),
                 fn (BackupApplication $a, BackupApplication $b) => $a->created_at <=> $b->created_at,
             ])
@@ -199,9 +183,13 @@ class BackupService
                 BackupQuota::for($request->filled_by_host_id, $request->quotaMonth())->decrement('quota_used');
             }
 
-            $request->applications()
-                ->where('applicant_host_id', $request->filled_by_host_id)
-                ->update(['status' => $applicationStatus, 'decided_at' => now()]);
+            $cover = $request->applications()->where('applicant_host_id', $request->filled_by_host_id)->first();
+            $cover?->update(['status' => $applicationStatus, 'decided_at' => now()]);
+
+            // The cover dropped out after being picked: point penalty
+            if ($cover && $applicationStatus === 'cancelled') {
+                $this->points->penalizeBackupDrop($cover);
+            }
 
             $request->update([
                 'status' => 'open',

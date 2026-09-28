@@ -2,6 +2,8 @@
 
 use App\Models\HostProfile;
 use App\Services\BackupService;
+use App\Services\PayrollService;
+use App\Services\PointService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -23,3 +25,17 @@ Artisan::command('backups:auto-process', function (BackupService $backups) {
 })->purpose('Open backup requests nobody reviewed and pick covers for ones about to start');
 
 Schedule::command('backups:auto-process')->everyMinute();
+
+Artisan::command('points:apply-penalties', function (PointService $points) {
+    $penalized = $points->penalizeLateSickLetters();
+    $this->info("Deducted points for {$penalized} late or missing sick letter(s).");
+})->purpose('Deduct points for sick letters that were missing or late');
+
+Schedule::command('points:apply-penalties')->everyTenMinutes();
+
+Artisan::command('payroll:roll-periods', function (PayrollService $payroll) {
+    $closed = $payroll->rollPeriods();
+    $this->info("{$closed} ended period(s) now wait for payment.");
+})->purpose('Move ended payment periods to waiting_payment and open current periods');
+
+Schedule::command('payroll:roll-periods')->dailyAt('00:05');

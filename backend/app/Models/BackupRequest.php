@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 #[Fillable([
     'slot_id', 'brand_id', 'requesting_host_id', 'created_by', 'backup_date', 'start_at', 'end_at',
     'reason_type', 'reason', 'status', 'approved_by', 'approved_at', 'auto_approved', 'auto_open_at',
-    'auto_fill_at', 'auto_filled', 'counts_toward_quota', 'filled_by_host_id', 'filled_at', 'cancelled_at',
+    'auto_fill_at', 'auto_filled', 'counts_toward_quota', 'letter_penalty_applied', 'filled_by_host_id', 'filled_at', 'cancelled_at',
 ])]
 #[Appends(['letter_status', 'letter_due_at'])]
 class BackupRequest extends Model
@@ -41,6 +41,7 @@ class BackupRequest extends Model
             'auto_approved' => 'boolean',
             'auto_filled' => 'boolean',
             'counts_toward_quota' => 'boolean',
+            'letter_penalty_applied' => 'boolean',
         ];
     }
 

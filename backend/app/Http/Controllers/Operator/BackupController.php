@@ -64,7 +64,7 @@ class BackupController extends Controller
             ->where('status', 'active')
             ->whereKeyNot($backup->requesting_host_id)
             ->whereHas('user', fn ($q) => $q->where('status', 'active'))
-            ->with('user')
+            ->with(['user', 'latestRating'])
             ->get()
             ->map(fn (HostProfile $host) => $this->candidate($host, $backup))
             ->sortBy([['eligible', 'desc'], ['same_brand', 'desc'], ['name', 'asc']])
@@ -179,6 +179,7 @@ class BackupController extends Controller
             'name' => $host->user->name,
             'avatar_url' => $host->user->avatar_url,
             'same_brand' => $this->backups->isSameBrand($host, $backup),
+            'rating' => $host->latestRating?->rating,
             'eligible' => $reason === null,
             'ineligible_reason' => $reason,
             'quota' => $quota->only('quota_used', 'quota_max'),

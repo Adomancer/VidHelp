@@ -13,9 +13,12 @@ const links = [
   { href: "/admin/brands", label: "Brands" },
   { href: "/admin/rates", label: "Rate Levels" },
   { href: "/admin/schedules", label: "Schedules" },
+  { href: "/admin/events", label: "Events" },
   { href: "/admin/backups", label: "Backups" },
   { href: "/admin/reports", label: "Live Reports" },
-  { href: "/admin/finance", label: "Finance" },
+  { href: "/admin/points", label: "Points & SP" },
+  { href: "/admin/ratings", label: "Ratings" },
+  { href: "/admin/payroll", label: "Payroll" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

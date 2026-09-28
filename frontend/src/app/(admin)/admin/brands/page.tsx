@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { adminHostsApi, operatorApi, type BrandInput, type BrandSummary } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
@@ -67,7 +68,12 @@ export default function AdminBrandsPage() {
                   {brand.is_obs && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-xs">OBS</span>}
                 </td>
                 <td className="px-4 py-3">{brand.target_hours_per_period} h</td>
-                <td className="px-4 py-3">{brand.payment_cycle_days} days</td>
+                <td className="px-4 py-3">
+                  {brand.payment_cycle_days} days
+                  <span className="block text-xs text-gray-500">
+                    {brand.payroll_start_date ? `from ${formatDate(brand.payroll_start_date)}` : "payroll not started"}
+                  </span>
+                </td>
                 <td className="px-4 py-3">{brand.active_hosts_count}</td>
                 <td className="px-4 py-3">{brand.leader?.name ?? <span className="text-gray-500">—</span>}</td>
                 <td className="px-4 py-3 capitalize">{brand.status}</td>
@@ -98,6 +104,7 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
       is_obs: data.get("is_obs") === "on",
       target_hours_per_period: Number(formValue(data, "target_hours_per_period")),
       payment_cycle_days: Number(formValue(data, "payment_cycle_days")),
+      payroll_start_date: formValue(data, "payroll_start_date") || null,
       status: (formValue(data, "status") || "active") as BrandInput["status"],
     };
     return brand ? adminHostsApi.updateBrand(token, brand.id, input) : adminHostsApi.createBrand(token, input);
@@ -129,6 +136,13 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           defaultValue={brand?.payment_cycle_days ?? 14}
           required
           error={errors.payment_cycle_days}
+        />
+        <TextField
+          label="Payroll start (first period begins)"
+          name="payroll_start_date"
+          type="date"
+          defaultValue={brand?.payroll_start_date ?? ""}
+          error={errors.payroll_start_date}
         />
         {brand && (
           <SelectField

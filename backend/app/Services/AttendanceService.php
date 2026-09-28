@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Attendance;
 use App\Models\BackupRequest;
+use App\Models\EventSlotClaim;
 use App\Models\HostProfile;
 use App\Models\LiveReport;
 use App\Models\ScheduleSlot;
@@ -20,9 +21,14 @@ use Illuminate\Validation\ValidationException;
  */
 class AttendanceService
 {
+    public function __construct(private EventCalendar $events, private PayrollService $payroll)
+    {
+    }
+
     /**
      * The host's session occurrences between two moments: their own slots (minus ones
-     * someone else covers) plus backups they cover. Each with its attendance/report.
+     * someone else covers or an event replaces), backups they cover and event blocks
+     * they claimed. Each with its attendance/report.
      *
      * @return Collection<int, array>
      */
@@ -45,13 +51,13 @@ class AttendanceService
             ->where('scheduled_end_at', '>', $from->copy()->subDay())
             ->with('report')
             ->get()
-            ->keyBy(fn (Attendance $attendance) => $attendance->slot_id.'|'.$attendance->session_date->toDateString());
+            ->keyBy(fn (Attendance $attendance) => $this->attendanceKey($attendance));
 
         $sessions = collect();
 
         for ($day = CarbonImmutable::parse($from)->subDay()->startOfDay(); $day->lte($to); $day = $day->addDay()) {
             foreach ($slots as $slot) {
-                if (! $slot->runsOn($day)) {
+                if (! $slot->runsOn($day) || $this->events->replacing($slot->assignment->brand_id, $day)) {
                     continue;
                 }
 
@@ -98,15 +104,54 @@ class AttendanceService
             ]);
         }
 
+        $claims = EventSlotClaim::active()
+            ->where('host_id', $host->id)
+            ->where('end_at', '>', $from)
+            ->where('start_at', '<', $to)
+            ->with('event.brand:id,name')
+            ->get();
+
+        foreach ($claims as $claim) {
+            $sessions->push([
+                'slot_id' => null,
+                'date' => $claim->start_at->toDateString(),
+                'backup_request_id' => null,
+                'event_claim_id' => $claim->id,
+                'event_name' => $claim->event->name,
+                'brand' => $claim->event->brand->only('id', 'name'),
+                'start_at' => $claim->start_at,
+                'end_at' => $claim->end_at,
+                'role' => 'event',
+                'attendance' => $attendances->get('event|'.$claim->id),
+            ]);
+        }
+
         return $sessions->sortBy('start_at')->values();
     }
 
-    /**
-     * Check in for my own slot occurrence, or for a backup I'm covering.
-     */
-    public function checkIn(HostProfile $host, string $slotId, string $date, ?string $backupRequestId): Attendance
+    private function attendanceKey(Attendance $attendance): string
     {
-        if ($backupRequestId) {
+        return $attendance->event_claim_id
+            ? 'event|'.$attendance->event_claim_id
+            : $attendance->slot_id.'|'.$attendance->session_date->toDateString();
+    }
+
+    /**
+     * Check in for my own slot occurrence, a backup I'm covering, or an event block I claimed.
+     */
+    public function checkIn(HostProfile $host, ?string $slotId, ?string $date, ?string $backupRequestId, ?string $eventClaimId = null): Attendance
+    {
+        if ($eventClaimId) {
+            $claim = EventSlotClaim::active()
+                ->whereKey($eventClaimId)
+                ->where('host_id', $host->id)
+                ->with('event')
+                ->first() ?? throw ValidationException::withMessages(['session' => ['This event block is not yours.']]);
+
+            [$slotId, $brandId, $date, $start, $end] = [
+                null, $claim->event->brand_id, $claim->start_at->toDateString(), $claim->start_at, $claim->end_at,
+            ];
+        } elseif ($backupRequestId) {
             $backup = BackupRequest::whereKey($backupRequestId)
                 ->where('filled_by_host_id', $host->id)
                 ->where('status', 'filled')
@@ -124,6 +169,9 @@ class AttendanceService
             $day = CarbonImmutable::parse($date);
             if (! $slot->runsOn($day)) {
                 throw ValidationException::withMessages(['session' => ['That session is not scheduled on this date.']]);
+            }
+            if ($event = $this->events->replacing($slot->assignment->brand_id, $day)) {
+                throw ValidationException::withMessages(['session' => ["That day {$event->name} replaces the regular schedule; check in for your event blocks instead."]]);
             }
 
             $cover = BackupRequest::where('slot_id', $slot->id)->whereDate('backup_date', $day)->where('status', 'filled')->with('filler.user')->first();
@@ -143,7 +191,9 @@ class AttendanceService
             throw ValidationException::withMessages(['session' => ['This session has already ended.']]);
         }
 
-        $existing = Attendance::where('host_id', $host->id)->where('slot_id', $slotId)->whereDate('session_date', $date)->exists();
+        $existing = $eventClaimId
+            ? Attendance::where('event_claim_id', $eventClaimId)->exists()
+            : Attendance::where('host_id', $host->id)->where('slot_id', $slotId)->whereDate('session_date', $date)->exists();
         if ($existing) {
             throw ValidationException::withMessages(['session' => ['You already checked in for this session.']]);
         }
@@ -152,6 +202,7 @@ class AttendanceService
             'host_id' => $host->id,
             'slot_id' => $slotId,
             'backup_request_id' => $backupRequestId,
+            'event_claim_id' => $eventClaimId,
             'brand_id' => $brandId,
             'session_date' => $date,
             'scheduled_start_at' => $start,
@@ -275,15 +326,23 @@ class AttendanceService
     {
         $checkedOut = $attendance->check_out_at !== null;
 
-        return $report->workSession()->create([
+        $session = $report->workSession()->create([
             'host_id' => $attendance->host_id,
             'brand_id' => $attendance->brand_id,
             'session_date' => $attendance->session_date,
             'start_at' => $checkedOut ? $attendance->check_in_at : $attendance->scheduled_start_at,
             'end_at' => $checkedOut ? $attendance->check_out_at : $attendance->scheduled_end_at,
             'duration_hours' => $hours,
-            'session_type' => $attendance->backup_request_id ? 'backup' : 'regular',
+            'session_type' => match (true) {
+                $attendance->event_claim_id !== null => 'event',
+                $attendance->backup_request_id !== null => 'backup',
+                default => 'regular',
+            },
             'notes' => $report->review_note,
         ]);
+
+        $this->payroll->assign($session);
+
+        return $session;
     }
 }

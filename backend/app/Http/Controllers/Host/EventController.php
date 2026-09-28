@@ -1,0 +1,66 @@
+<?php
+
+namespace App\Http\Controllers\Host;
+
+use App\Http\Controllers\Controller;
+use App\Models\EventSlotClaim;
+use App\Models\HostProfile;
+use App\Models\SpecialEvent;
+use App\Services\EventService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class EventController extends Controller
+{
+    public function __construct(private EventService $events)
+    {
+    }
+
+    /**
+     * Running and upcoming events of my brands, with every block and whether I can claim it.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $host = $this->host($request);
+        $brandIds = $host->assignments()->where('status', 'active')->pluck('brand_id');
+
+        $events = SpecialEvent::query()
+            ->with('brand:id,name')
+            ->where('status', 'active')
+            ->whereIn('brand_id', $brandIds)
+            ->whereDate('end_date', '>=', today()->subDay())
+            ->orderBy('start_date')
+            ->get()
+            ->map(fn (SpecialEvent $event) => [
+                ...$event->toArray(),
+                'my_claims' => EventSlotClaim::active()->where('event_id', $event->id)->where('host_id', $host->id)->count(),
+                'blocks' => $this->events->blocks($event, $host),
+            ]);
+
+        return response()->json(['events' => $events]);
+    }
+
+    public function claim(Request $request, SpecialEvent $event): JsonResponse
+    {
+        $request->validate(['start_at' => 'required|date']);
+        $host = $this->host($request);
+
+        $claim = $this->events->claim($event, $host, $request->date('start_at'), $request->user());
+
+        return response()->json(['claim' => $claim, 'message' => 'Block claimed. It appears on your Live page on the day.'], 201);
+    }
+
+    public function cancel(Request $request, EventSlotClaim $claim): JsonResponse
+    {
+        abort_unless($claim->host_id === $this->host($request)->id, 403, 'This is not your block.');
+
+        $this->events->release($claim);
+
+        return response()->json(['message' => 'Block released for other hosts.']);
+    }
+
+    private function host(Request $request): HostProfile
+    {
+        return $request->user()->hostProfile ?? abort(404, 'You do not have a host profile.');
+    }
+}

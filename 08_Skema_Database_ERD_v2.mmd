@@ -26,6 +26,7 @@ erDiagram
     BRANDS ||--o{ SPECIAL_EVENTS : "runs"
     SPECIAL_EVENTS ||--o{ EVENT_SLOT_CLAIMS : "receives"
     HOST_PROFILES ||--o{ EVENT_SLOT_CLAIMS : "claims"
+    EVENT_SLOT_CLAIMS ||--o| ATTENDANCES : "checked in"
 
     %% ===== C. BACKUP =====
     SCHEDULE_SLOTS ||--o{ BACKUP_REQUESTS : "needs"
@@ -53,7 +54,7 @@ erDiagram
     BRAND_COMPLAINTS ||--o| POINT_LOGS : "causes"
     BRANDS ||--o{ BRAND_COMPLAINTS : "issues"
     HOST_PROFILES ||--o{ BRAND_COMPLAINTS : "receives"
-    HOST_PROFILES ||--o{ MONTHLY_POINT_BALANCES : "has"
+    HOST_PROFILES ||--o{ POINT_BALANCES : "has per 3 bulan"
     HOST_PROFILES ||--o{ HOST_RATINGS : "rated"
     HOST_PROFILES ||--o{ WARNING_LETTERS : "receives"
     POINT_LOGS ||--o| WARNING_LETTERS : "may trigger"
@@ -70,6 +71,7 @@ erDiagram
     HOST_PROFILES ||--o{ CASH_ADVANCES : "requests"
     CASH_ADVANCES ||--o{ CASH_ADVANCE_INSTALLMENTS : "split into"
     PAYMENT_PERIODS ||--o{ CASH_ADVANCE_INSTALLMENTS : "deducted in"
+    SALARY_SLIPS ||--o{ CASH_ADVANCE_INSTALLMENTS : "deducts"
 
     %% ===== G. KONFIGURASI =====
     SYSTEM_SETTINGS
@@ -186,6 +188,7 @@ erDiagram
         boolean is_obs
         int target_hours_per_period "konfigurable per brand"
         int payment_cycle_days
+        date payroll_start_date "awal periode pembayaran pertama; periode berikutnya berurutan per siklus"
         enum status "active, inactive"
         datetime created_at
         datetime updated_at
@@ -234,19 +237,28 @@ erDiagram
         string name "PD, double date"
         date start_date
         date end_date
-        boolean open_full_schedule "jadwal dibuka kosong"
+        time daily_start_time "jam buka tiap hari"
+        time daily_end_time "boleh lewat tengah malam"
+        smallint block_minutes "panjang blok yang bisa diklaim, mis. 120"
+        boolean open_full_schedule "jadwal dibuka kosong: slot reguler brand tidak berlaku di hari event"
         int max_slots_per_host
+        enum status "active, cancelled"
         uuid created_by FK
+        datetime created_at
+        datetime updated_at
     }
 
     EVENT_SLOT_CLAIMS {
         uuid id PK
         uuid event_id FK
         uuid host_id FK
-        datetime start_at
+        datetime start_at "satu blok"
         datetime end_at
         enum status "active, overridden, cancelled"
+        uuid claimed_by FK "host sendiri, atau admin/operator yang menugaskan"
         datetime claimed_at
+        datetime created_at
+        datetime updated_at
     }
 
     BACKUP_REQUESTS {
@@ -268,6 +280,7 @@ erDiagram
         datetime auto_fill_at "start_at - 30 menit: sistem pilih pelamar terbaik"
         boolean auto_filled
         boolean counts_toward_quota "true jika host pengganti beda brand"
+        boolean letter_penalty_applied "poin sudah dipotong karena surat sakit telat"
         uuid filled_by_host_id FK
         datetime filled_at
         datetime cancelled_at
@@ -306,8 +319,9 @@ erDiagram
     ATTENDANCES {
         uuid id PK
         uuid host_id FK
-        uuid slot_id FK
+        uuid slot_id FK "null untuk blok event"
         uuid backup_request_id FK "diisi jika host sedang backup"
+        uuid event_claim_id FK,UK "diisi untuk blok event"
         uuid brand_id FK
         date session_date "tanggal sesi (slot occurrence)"
         datetime scheduled_start_at "snapshot jadwal"
@@ -348,7 +362,7 @@ erDiagram
         datetime start_at
         datetime end_at
         decimal duration_hours "jam yang dibayar"
-        enum session_type "regular, backup, double, disrupted, adjustment"
+        enum session_type "regular, backup, event, double, disrupted, adjustment"
         enum status "normal, flagged, carried_over"
         string notes
         datetime created_at
@@ -357,10 +371,13 @@ erDiagram
 
     VIOLATION_TYPES {
         uuid id PK
-        string name "telat, main HP, ketiduran, batal backup"
-        int default_points
-        int rating_impact "lebih kecil dari poin"
+        string name UK "telat, main HP, ketiduran, batal backup, surat sakit telat, komplain brand"
+        string code UK "untuk potongan otomatis: backup_cancel, late_sick_letter, brand_complaint"
+        int default_points "poin yang dipotong"
+        decimal rating_impact "lebih kecil dari poin, mis. 0.5 dari rating 1-5"
         boolean is_active
+        datetime created_at
+        datetime updated_at
     }
 
     BRAND_COMPLAINTS {
@@ -370,6 +387,7 @@ erDiagram
         string description
         uuid recorded_by FK
         datetime created_at
+        datetime updated_at
     }
 
     POINT_LOGS {
@@ -378,72 +396,93 @@ erDiagram
         uuid violation_type_id FK
         uuid brand_complaint_id FK
         enum source "internal, brand_complaint, backup_cancel, late_attachment"
-        int points_change
+        int points_change "negatif = potongan"
         string reason
-        uuid recorded_by FK
-        string month_year
+        uuid recorded_by FK "null = otomatis oleh sistem"
+        date period_start "awal periode poin (per 3 bulan)"
+        date occurred_on
+        datetime voided_at "dibatalkan admin (salah input)"
+        uuid voided_by FK
         datetime created_at
+        datetime updated_at
     }
 
-    MONTHLY_POINT_BALANCES {
-        uuid id PK
-        uuid host_id FK
-        string month_year
-        int opening_points "maksimal 100"
-        int current_points
+    POINT_BALANCES {
+        uuid id PK "pengganti MONTHLY_POINT_BALANCES: reset tiap 3 bulan"
+        uuid host_id FK "unik per (host, period_start)"
+        date period_start "Jan, Apr, Jul, Okt"
+        date period_end
+        int opening_points "100"
+        int current_points "opening + potongan, minimal 0"
+        datetime created_at
+        datetime updated_at
     }
 
     HOST_RATINGS {
         uuid id PK
-        uuid host_id FK
-        string month_year
-        decimal rating
+        uuid host_id FK "unik per (host, month_year)"
+        string month_year "YYYY-MM"
+        decimal rating "1.0 - 5.0"
+        decimal suggested_rating "5 - total rating_impact pelanggaran bulan itu"
+        string note
         uuid rated_by FK "penilaian admin, bukan sesama host"
+        datetime created_at
+        datetime updated_at
     }
 
     WARNING_LETTERS {
         uuid id PK
         uuid host_id FK
-        uuid point_log_id FK
-        int level "SP1, SP2, SP3"
+        uuid point_log_id FK "null jika diterbitkan manual"
+        tinyint level "1 = SP1, 2 = SP2, 3 = SP3; otomatis di 75 / 50 / 25 poin"
+        date period_start "periode poin saat terbit"
         string reason
-        uuid issued_by FK
+        uuid issued_by FK "null = otomatis"
         datetime issued_at
+        datetime voided_at
+        uuid voided_by FK
+        datetime created_at
+        datetime updated_at
     }
 
     PAYMENT_PERIODS {
         uuid id PK
-        uuid brand_id FK
+        uuid brand_id FK "unik per (brand, period_start)"
         date period_start
         date period_end
-        int target_hours
-        decimal achieved_hours "di-cap sesuai target"
+        int target_hours "snapshot target brand"
+        decimal worked_hours "semua jam kerja + penyesuaian di periode ini"
+        decimal achieved_hours "ditagih ke brand: min(worked + carried_in, target)"
         decimal carried_in_hours "sisa dari periode sebelumnya"
         decimal carried_out_hours "kelebihan ke periode berikutnya"
         enum status "in_progress, waiting_payment, requested, paid"
         datetime locked_at "terkunci setelah request payment"
         datetime created_at
+        datetime updated_at
     }
 
     PAYMENT_ITEMS {
         uuid id PK
-        uuid payment_period_id FK
+        uuid payment_period_id FK "unik per (periode, host)"
         uuid host_id FK
         int session_count
-        decimal hours
+        decimal hours "host dibayar semua jam kerja (carry-over hanya untuk tagihan brand, belum final)"
         decimal rate_per_hour "snapshot saat periode ditutup"
         decimal amount
+        datetime created_at
+        datetime updated_at
     }
 
     HOUR_ADJUSTMENTS {
         uuid id PK
         uuid payment_period_id FK
         uuid host_id FK
-        int sessions_added
-        decimal hours_added
+        int sessions_added "boleh negatif"
+        decimal hours_added "boleh negatif"
         string notes
         uuid created_by FK
         datetime created_at
+        datetime updated_at
     }
 
     PAYMENT_REQUESTS {
@@ -452,14 +491,16 @@ erDiagram
         uuid requested_by FK
         datetime requested_at
         enum status "requested, processing, paid"
-        string exported_report_url
+        string exported_report_url "laporan CSV untuk brand"
         datetime paid_at
+        datetime created_at
+        datetime updated_at
     }
 
     CASH_ADVANCES {
         uuid id PK
         uuid host_id FK
-        uuid brand_id FK
+        uuid brand_id FK "opsional: brand saat kasbon dicatat"
         enum type "early_payment, loan"
         decimal total_amount
         int installment_count
@@ -467,29 +508,36 @@ erDiagram
         enum status "unpaid, in_progress, paid"
         uuid recorded_by FK
         datetime requested_at
+        datetime created_at
+        datetime updated_at
     }
 
     CASH_ADVANCE_INSTALLMENTS {
         uuid id PK
         uuid cash_advance_id FK
-        uuid payment_period_id FK
+        uuid payment_period_id FK "diisi saat dipotong"
         int seq
         decimal amount
-        uuid deducted_brand_id FK "diisi saat potongan diproses"
+        uuid salary_slip_id FK "slip tempat cicilan dipotong"
+        uuid deducted_brand_id FK "diisi saat potongan diproses (slip brand mana pun)"
         enum status "scheduled, deducted, skipped"
         datetime deducted_at
+        datetime created_at
+        datetime updated_at
     }
 
     SALARY_SLIPS {
         uuid id PK
-        uuid host_id FK
+        uuid host_id FK "unik per (host, periode)"
         uuid payment_period_id FK
         decimal gross_amount
-        decimal advance_deduction
+        decimal advance_deduction "cicilan kasbon yang dipotong"
         decimal net_amount
-        string pdf_path
-        datetime generated_at
+        string pdf_path "null: slip ditampilkan sebagai halaman cetak"
+        datetime generated_at "saat periode ditandai lunas"
         datetime sent_at
+        datetime created_at
+        datetime updated_at
     }
 
     ATTACHMENTS {

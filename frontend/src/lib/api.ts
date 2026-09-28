@@ -251,6 +251,8 @@ export interface Brand {
   is_obs: boolean;
   target_hours_per_period: number;
   payment_cycle_days: number;
+  /** First day of the first payment period; later periods follow back to back */
+  payroll_start_date?: string | null;
   status: "active" | "inactive";
 }
 
@@ -399,7 +401,7 @@ export interface BrandHost extends Omit<Assignment, "brand"> {
 export const scheduleApi = {
   list: (token: string, params: { brand_id?: string; host_id?: string; on?: string }) => {
     const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as [string, string][]);
-    return api<{ slots: ScheduleSlot[]; backups: SlotBackupMarker[] }>(`/operator/schedules?${query}`, { token });
+    return api<{ slots: ScheduleSlot[]; backups: SlotBackupMarker[]; replacing_events: ReplacingEvent[] }>(`/operator/schedules?${query}`, { token });
   },
 
   brandHosts: (token: string, brandId: string) => api<{ assignments: BrandHost[] }>(`/operator/brands/${brandId}/hosts`, { token }),
@@ -419,7 +421,14 @@ export const scheduleApi = {
 
   /** covers: backups I do for others; absences: my sessions someone else covers (next 7 days). */
   mine: (token: string) =>
-    api<{ slots: ScheduleSlot[]; upcoming: ScheduleSlot[]; covers: BackupNeed[]; absences: SlotBackupMarker[] }>("/host/schedules", { token }),
+    api<{
+      slots: ScheduleSlot[];
+      upcoming: ScheduleSlot[];
+      covers: BackupNeed[];
+      absences: SlotBackupMarker[];
+      event_claims: MyEventClaim[];
+      replacing_events: ReplacingEvent[];
+    }>("/host/schedules", { token }),
 
   myAvailability: (token: string) => api<{ availability: AvailabilityRange[] }>("/host/availability", { token }),
 
@@ -499,6 +508,7 @@ export interface BackupCandidate {
   name: string;
   avatar_url: string | null;
   same_brand: boolean;
+  rating?: number | null;
   eligible: boolean;
   ineligible_reason: string | null;
   quota: BackupQuota;
@@ -579,8 +589,10 @@ export interface LiveReport {
 
 export interface Attendance {
   id: string;
-  slot_id: string;
+  /** null for event blocks */
+  slot_id: string | null;
   backup_request_id: string | null;
+  event_claim_id?: string | null;
   session_date: string;
   scheduled_start_at: string;
   scheduled_end_at: string;
@@ -594,14 +606,17 @@ export interface Attendance {
 
 /** One session occurrence on the host's Live page. */
 export interface LiveSession {
-  slot_id: string;
+  /** null for event blocks */
+  slot_id: string | null;
   date: string;
   backup_request_id: string | null;
+  event_claim_id?: string | null;
+  event_name?: string;
   brand: { id: string; name: string };
   start_at: string;
   end_at: string;
-  /** own = my slot, off = someone covers me, cover = I cover someone */
-  role: "own" | "off" | "cover";
+  /** own = my slot, off = someone covers me, cover = I cover someone, event = a claimed event block */
+  role: "own" | "off" | "cover" | "event";
   covered_by?: string | null;
   covered_for?: string;
   attendance: Attendance | null;
@@ -626,7 +641,7 @@ export interface ReviewReport extends LiveReport {
 export const liveApi = {
   today: (token: string) =>
     api<{ sessions: LiveSession[]; missing_reports: Attendance[]; metrics: string[] }>("/host/live", { token }),
-  checkIn: (token: string, session: Pick<LiveSession, "slot_id" | "date" | "backup_request_id">) =>
+  checkIn: (token: string, session: Pick<LiveSession, "slot_id" | "date" | "backup_request_id" | "event_claim_id">) =>
     post<{ attendance: Attendance } & Message>("/host/live/check-in", token, session),
   checkOut: (token: string, attendanceId: string) => post<{ attendance: Attendance } & Message>(`/host/live/${attendanceId}/check-out`, token),
   report: (token: string, attendanceId: string, data: ReportInput) =>
@@ -640,4 +655,380 @@ export const reportApi = {
   approve: (token: string, id: string, data: { duration_hours: number; review_note: string | null }) =>
     post(`/operator/reports/${id}/approve`, token, data),
   reject: (token: string, id: string, reviewNote: string) => post(`/operator/reports/${id}/reject`, token, { review_note: reviewNote }),
+};
+
+/*
+|--------------------------------------------------------------------------
+| Points, warning letters (SP) & ratings
+|--------------------------------------------------------------------------
+*/
+export interface ViolationType {
+  id: string;
+  name: string;
+  code: string | null;
+  default_points: number;
+  rating_impact: number;
+  is_active: boolean;
+}
+
+export interface PointLog {
+  id: string;
+  source: "internal" | "brand_complaint" | "backup_cancel" | "late_attachment";
+  points_change: number;
+  reason: string | null;
+  occurred_on: string;
+  voided_at?: string | null;
+  violation_type: { id: string; name: string } | null;
+  recorder?: { id: string; name: string } | null;
+  brand_complaint?: { id: string; description: string; brand: { id: string; name: string } } | null;
+}
+
+export interface WarningLetter {
+  id: string;
+  level: 1 | 2 | 3;
+  reason: string;
+  issued_at: string;
+  period_start: string;
+  voided_at?: string | null;
+  issuer?: { id: string; name: string } | null;
+}
+
+export interface HostRating {
+  id: string;
+  month_year: string;
+  rating: number;
+  suggested_rating?: number | null;
+  note: string | null;
+  rater?: { id: string; name: string } | null;
+}
+
+export interface PointsPeriod {
+  start: string;
+  end: string;
+}
+
+/** SP level → points threshold, e.g. { 1: 75, 2: 50, 3: 25 } */
+export type SpThresholds = Record<string, number>;
+
+export interface PointsHostRow {
+  host_id: string;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+  points: number;
+  sp_level: number;
+  deductions: number;
+}
+
+export interface PointsHostDetail {
+  host: HostProfile & { user: AuthUser };
+  period: PointsPeriod;
+  points: number;
+  opening_points: number;
+  thresholds: SpThresholds;
+  logs: PointLog[];
+  warning_letters: WarningLetter[];
+  ratings: HostRating[];
+}
+
+export interface RatingRow {
+  host_id: string;
+  name: string;
+  avatar_url: string | null;
+  violations: number;
+  suggested: number;
+  rating: HostRating | null;
+}
+
+export const pointsApi = {
+  hosts: (token: string, search = "") =>
+    api<{ period: PointsPeriod; thresholds: SpThresholds; hosts: PointsHostRow[] }>(
+      `/operator/points${search ? `?search=${encodeURIComponent(search)}` : ""}`,
+      { token }
+    ),
+  host: (token: string, hostId: string, on?: string) =>
+    api<PointsHostDetail>(`/operator/points/hosts/${hostId}${on ? `?on=${on}` : ""}`, { token }),
+  violationTypes: (token: string) => api<{ violation_types: ViolationType[] }>("/operator/violation-types", { token }),
+  recordViolation: (
+    token: string,
+    data: { host_id: string; violation_type_id: string; points: number | null; reason: string | null; occurred_on: string }
+  ) => post<{ points: number; warning_letter: WarningLetter | null } & Message>("/operator/points/violations", token, data),
+  recordComplaint: (
+    token: string,
+    data: { host_id: string; brand_id: string; description: string; points: number | null; occurred_on: string }
+  ) => post<{ points?: number; warning_letter?: WarningLetter | null } & Message>("/operator/points/complaints", token, data),
+
+  // Admin only
+  voidLog: (token: string, logId: string) => post<{ points: number } & Message>(`/admin/points/logs/${logId}/void`, token),
+  issueWarning: (token: string, data: { host_id: string; level: number; reason: string }) =>
+    post<{ warning_letter: WarningLetter } & Message>("/admin/warning-letters", token, data),
+  voidWarning: (token: string, letterId: string) => post(`/admin/warning-letters/${letterId}/void`, token),
+  allViolationTypes: (token: string) => api<{ violation_types: ViolationType[] }>("/admin/violation-types", { token }),
+  createViolationType: (token: string, data: Pick<ViolationType, "name" | "default_points" | "rating_impact">) =>
+    post<{ violation_type: ViolationType } & Message>("/admin/violation-types", token, data),
+  updateViolationType: (token: string, id: string, data: Partial<Pick<ViolationType, "name" | "default_points" | "rating_impact" | "is_active">>) =>
+    api<{ violation_type: ViolationType } & Message>(`/admin/violation-types/${id}`, { method: "PUT", body: JSON.stringify(data), token }),
+  ratings: (token: string, month: string) =>
+    api<{ month: string; scale: { min: number; max: number }; hosts: RatingRow[] }>(`/admin/ratings?month=${month}`, { token }),
+  rate: (token: string, data: { host_id: string; month_year: string; rating: number; note: string | null }) =>
+    api<{ rating: HostRating } & Message>("/admin/ratings", { method: "PUT", body: JSON.stringify(data), token }),
+};
+
+export interface Performance {
+  period: PointsPeriod;
+  points: number;
+  opening_points: number;
+  thresholds: SpThresholds;
+  logs: PointLog[];
+  warning_letters: WarningLetter[];
+  ratings: HostRating[];
+}
+
+export const performanceApi = {
+  mine: (token: string) => api<Performance>("/host/performance", { token }),
+};
+
+/*
+|--------------------------------------------------------------------------
+| Special events (PD, double date)
+|--------------------------------------------------------------------------
+*/
+export interface SpecialEvent {
+  id: string;
+  brand_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  /** "HH:MM"; an end before the start runs past midnight */
+  daily_start_time: string;
+  daily_end_time: string;
+  block_minutes: number;
+  open_full_schedule: boolean;
+  max_slots_per_host: number;
+  status: "active" | "cancelled";
+  brand?: { id: string; name: string };
+}
+
+export interface EventListItem extends SpecialEvent {
+  claimed_blocks: number;
+  total_blocks: number;
+}
+
+/** mine | taken | past | unavailable (brand's regular schedule) | busy (you) | free */
+export type BlockState = "mine" | "taken" | "past" | "unavailable" | "busy" | "free";
+
+export interface EventBlock {
+  start_at: string;
+  end_at: string;
+  state: BlockState;
+  reason: string | null;
+  claim: { id: string; host_id: string; host_name: string } | null;
+}
+
+export interface HostEvent extends SpecialEvent {
+  my_claims: number;
+  blocks: EventBlock[];
+}
+
+/** A block I claimed, as shown on my schedule. */
+export interface MyEventClaim {
+  id: string;
+  event_name: string;
+  brand: { id: string; name: string };
+  date: string;
+  start_at: string;
+  end_at: string;
+}
+
+/** An event whose days replace a brand's regular schedule. */
+export interface ReplacingEvent {
+  id: string;
+  brand_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+}
+
+export type EventInput = Omit<SpecialEvent, "id" | "status" | "brand">;
+
+export const eventApi = {
+  list: (token: string) => api<{ events: EventListItem[] }>("/operator/events", { token }),
+  show: (token: string, id: string) => api<{ event: SpecialEvent; blocks: EventBlock[] }>(`/operator/events/${id}`, { token }),
+  create: (token: string, data: EventInput) => post<{ event: SpecialEvent } & Message>("/operator/events", token, data),
+  update: (token: string, id: string, data: Partial<Pick<SpecialEvent, "name" | "open_full_schedule" | "max_slots_per_host">>) =>
+    api<{ event: SpecialEvent } & Message>(`/operator/events/${id}`, { method: "PUT", body: JSON.stringify(data), token }),
+  cancel: (token: string, id: string) => post(`/operator/events/${id}/cancel`, token),
+  assign: (token: string, id: string, startAt: string, hostId: string) =>
+    post(`/operator/events/${id}/assign`, token, { start_at: startAt, host_id: hostId }),
+  release: (token: string, claimId: string) => post(`/operator/event-claims/${claimId}/release`, token),
+
+  // Hosts
+  mine: (token: string) => api<{ events: HostEvent[] }>("/host/events", { token }),
+  claim: (token: string, id: string, startAt: string) => post(`/host/events/${id}/claim`, token, { start_at: startAt }),
+  cancelClaim: (token: string, claimId: string) => post(`/host/event-claims/${claimId}/cancel`, token),
+};
+
+/*
+|--------------------------------------------------------------------------
+| Payroll, salary slips & kasbon
+|--------------------------------------------------------------------------
+*/
+export type PeriodStatus = "in_progress" | "waiting_payment" | "requested" | "paid";
+
+export interface PeriodSummary {
+  worked_hours: number;
+  carried_in_hours: number;
+  /** Billable to the brand: worked + carried in, capped at the target */
+  achieved_hours: number;
+  carried_out_hours: number;
+  target_hours: number;
+  total_amount: number;
+}
+
+export interface PaymentPeriod {
+  id: string;
+  brand_id: string;
+  period_start: string;
+  period_end: string;
+  status: PeriodStatus;
+  locked_at: string | null;
+  brand?: { id: string; name: string };
+  payment_request?: {
+    id: string;
+    status: "requested" | "processing" | "paid";
+    requested_at: string;
+    paid_at: string | null;
+    requester?: { id: string; name: string } | null;
+  } | null;
+}
+
+export interface PeriodListItem extends PaymentPeriod, PeriodSummary {
+  hosts: number;
+}
+
+export interface HostPayRow {
+  host_id: string;
+  name: string;
+  session_count: number;
+  hours: number;
+  rate_per_hour: number;
+  amount: number;
+  /** true while the period is open: at today's rate, not final */
+  estimate: boolean;
+}
+
+export interface HourAdjustment {
+  id: string;
+  host_id: string;
+  sessions_added: number;
+  hours_added: number;
+  notes: string;
+  created_at: string;
+  host: HostWithUser;
+  creator: { id: string; name: string } | null;
+}
+
+export interface SalarySlipRow {
+  id: string;
+  host_id: string;
+  gross_amount: number;
+  advance_deduction: number;
+  net_amount: number;
+  generated_at: string;
+  host?: HostWithUser;
+}
+
+export interface SlipDetail {
+  id: string;
+  host_name: string;
+  brand: { id: string; name: string };
+  period_start: string;
+  period_end: string;
+  session_count: number;
+  hours: number;
+  rate_per_hour: number;
+  gross_amount: number;
+  advance_deduction: number;
+  net_amount: number;
+  deductions: { type: "early_payment" | "loan"; seq: number; installment_count: number; amount: number }[];
+  bank: { bank_name: string | null; account: string | null; holder: string | null } | null;
+  generated_at: string;
+}
+
+export interface CashAdvance {
+  id: string;
+  host_id: string;
+  type: "early_payment" | "loan";
+  total_amount: number;
+  installment_count: number;
+  notes: string | null;
+  status: "unpaid" | "in_progress" | "paid";
+  requested_at: string;
+  deducted_amount: number;
+  host: HostWithUser;
+  brand: { id: string; name: string } | null;
+  installments: { id: string; seq: number; amount: number; status: "scheduled" | "deducted" | "skipped"; deducted_at: string | null }[];
+}
+
+export const payrollApi = {
+  periods: (token: string, brandId = "") =>
+    api<{ periods: PeriodListItem[] }>(`/admin/payroll/periods${brandId ? `?brand_id=${brandId}` : ""}`, { token }),
+  period: (token: string, id: string) =>
+    api<{ period: PaymentPeriod; summary: PeriodSummary; hosts: HostPayRow[]; adjustments: HourAdjustment[]; slips: SalarySlipRow[] }>(
+      `/admin/payroll/periods/${id}`,
+      { token }
+    ),
+  addAdjustment: (token: string, periodId: string, data: { host_id: string; sessions_added: number; hours_added: number; notes: string }) =>
+    post(`/admin/payroll/periods/${periodId}/adjustments`, token, data),
+  removeAdjustment: (token: string, id: string) => api<Message>(`/admin/payroll/adjustments/${id}`, { method: "DELETE", token }),
+  requestPayment: (token: string, periodId: string) => post(`/admin/payroll/periods/${periodId}/request`, token),
+  markPaid: (token: string, periodId: string) => post(`/admin/payroll/periods/${periodId}/paid`, token),
+  exportUrl: (token: string, periodId: string) => apiFileUrl(`/admin/payroll/periods/${periodId}/export`, token),
+  slip: (token: string, id: string) => api<{ slip: SlipDetail }>(`/admin/payroll/slips/${id}`, { token }),
+  advances: (token: string, status: "open" | "paid" | "" = "") =>
+    api<{ advances: CashAdvance[] }>(`/admin/cash-advances${status ? `?status=${status}` : ""}`, { token }),
+  createAdvance: (
+    token: string,
+    data: { host_id: string; type: CashAdvance["type"]; total_amount: number; installment_count: number; notes: string | null }
+  ) => post("/admin/cash-advances", token, data),
+  removeAdvance: (token: string, id: string) => api<Message>(`/admin/cash-advances/${id}`, { method: "DELETE", token }),
+};
+
+export interface MyPay {
+  current: {
+    period_id: string;
+    brand: { id: string; name: string };
+    period_start: string;
+    period_end: string;
+    status: PeriodStatus;
+    session_count: number;
+    hours: number;
+    rate_per_hour: number;
+    estimate: number;
+  }[];
+  slips: {
+    id: string;
+    brand: { id: string; name: string };
+    period_start: string;
+    period_end: string;
+    gross_amount: number;
+    advance_deduction: number;
+    net_amount: number;
+    generated_at: string;
+  }[];
+  advances: {
+    id: string;
+    type: CashAdvance["type"];
+    total_amount: number;
+    installment_count: number;
+    status: CashAdvance["status"];
+    notes: string | null;
+    requested_at: string;
+    remaining: number;
+  }[];
+}
+
+export const payApi = {
+  mine: (token: string) => api<MyPay>("/host/pay", { token }),
+  slip: (token: string, id: string) => api<{ slip: SlipDetail }>(`/host/pay/slips/${id}`, { token }),
 };

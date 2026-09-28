@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operator;
 use App\Http\Controllers\Controller;
 use App\Models\BackupRequest;
 use App\Models\ScheduleSlot;
+use App\Models\SpecialEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -43,7 +44,16 @@ class ScheduleController extends Controller
             ->get()
             ->map(fn (BackupRequest $backup) => $backup->slotMarker());
 
-        return response()->json(['slots' => $slots, 'backups' => $backups]);
+        // Events replacing the regular schedule in that week (slots on those days don't run)
+        $events = SpecialEvent::query()
+            ->where('status', 'active')
+            ->where('open_full_schedule', true)
+            ->when($request->brand_id, fn ($q, $id) => $q->where('brand_id', $id))
+            ->whereDate('start_date', '<', $from->copy()->addDays(7))
+            ->whereDate('end_date', '>=', $from)
+            ->get(['id', 'brand_id', 'name', 'start_date', 'end_date']);
+
+        return response()->json(['slots' => $slots, 'backups' => $backups, 'replacing_events' => $events]);
     }
 
     public function store(Request $request): JsonResponse

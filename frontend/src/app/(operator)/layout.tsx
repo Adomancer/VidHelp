@@ -9,10 +9,11 @@ export const metadata: Metadata = {
 const links = [
   { href: "/operator/dashboard", label: "Dashboard" },
   { href: "/operator/schedules", label: "Schedules" },
+  { href: "/operator/events", label: "Events" },
   { href: "/operator/backups", label: "Backups" },
   { href: "/operator/reports", label: "Live Reports" },
   { href: "/operator/hosts", label: "Hosts" },
-  { href: "/operator/ratings", label: "Ratings" },
+  { href: "/operator/points", label: "Points & SP" },
 ];
 
 export default function OperatorLayout({ children }: { children: React.ReactNode }) {

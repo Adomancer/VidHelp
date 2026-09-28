@@ -43,16 +43,18 @@ class LiveController extends Controller
     public function checkIn(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'slot_id' => 'required|uuid',
-            'date' => 'required|date_format:Y-m-d',
+            'slot_id' => 'required_without:event_claim_id|nullable|uuid',
+            'date' => 'required_without:event_claim_id|nullable|date_format:Y-m-d',
             'backup_request_id' => 'nullable|uuid',
+            'event_claim_id' => 'nullable|uuid',
         ]);
 
         $attendance = $this->attendance->checkIn(
             $this->host($request),
-            $validated['slot_id'],
-            $validated['date'],
+            $validated['slot_id'] ?? null,
+            $validated['date'] ?? null,
             $validated['backup_request_id'] ?? null,
+            $validated['event_claim_id'] ?? null,
         );
 
         return response()->json(['attendance' => $attendance, 'message' => 'Checked in. Have a good live!'], 201);

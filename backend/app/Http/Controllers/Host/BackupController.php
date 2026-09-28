@@ -8,6 +8,7 @@ use App\Models\BackupRequest;
 use App\Models\HostProfile;
 use App\Models\ScheduleSlot;
 use App\Services\BackupService;
+use App\Services\EventCalendar;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class BackupController extends Controller
 {
-    public function __construct(private BackupService $backups)
+    public function __construct(private BackupService $backups, private EventCalendar $events)
     {
     }
 
@@ -93,7 +94,8 @@ class BackupController extends Controller
         for ($day = CarbonImmutable::today(); $day->lt(today()->addDays(14)); $day = $day->addDay()) {
             foreach ($slots as $slot) {
                 [$start, $end] = $slot->occurrenceOn($day);
-                if ($slot->runsOn($day) && $end->isFuture() && ! $taken->has($slot->id.'|'.$day->toDateString())) {
+                $runs = $slot->runsOn($day) && ! $this->events->replacing($slot->assignment->brand_id, $day);
+                if ($runs && $end->isFuture() && ! $taken->has($slot->id.'|'.$day->toDateString())) {
                     $occurrences[] = [
                         'slot_id' => $slot->id,
                         'date' => $day->toDateString(),

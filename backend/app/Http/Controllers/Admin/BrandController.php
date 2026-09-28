@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Brand;
+use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class BrandController extends Controller
 {
@@ -45,16 +47,37 @@ class BrandController extends Controller
         return response()->json(['assignments' => $assignments]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, PayrollService $payroll): JsonResponse
     {
         $brand = Brand::create($this->validated($request));
+
+        if ($brand->payroll_start_date) {
+            $payroll->periodFor($brand, today());
+        }
 
         return response()->json(['brand' => $brand, 'message' => 'Brand created'], 201);
     }
 
-    public function update(Request $request, Brand $brand): JsonResponse
+    public function update(Request $request, Brand $brand, PayrollService $payroll): JsonResponse
     {
-        $brand->update($this->validated($request, $brand));
+        $validated = $this->validated($request, $brand);
+
+        // Periods are laid out from the start date and cycle; changing either would shift every period
+        $moves = fn (string $key) => array_key_exists($key, $validated) && (string) $validated[$key] !== (string) ($key === 'payroll_start_date'
+            ? $brand->payroll_start_date?->toDateString()
+            : $brand->{$key});
+        if (($moves('payroll_start_date') || $moves('payment_cycle_days')) && $brand->paymentPeriods()->exists()) {
+            throw ValidationException::withMessages([
+                'payroll_start_date' => ['Payment periods already exist for this brand, so the payroll start date and cycle can no longer change.'],
+            ]);
+        }
+
+        $brand->update($validated);
+
+        if ($brand->payroll_start_date) {
+            $payroll->assignUnassigned($brand);
+            $payroll->periodFor($brand, today());
+        }
 
         return response()->json(['brand' => $brand, 'message' => 'Brand updated']);
     }
@@ -68,6 +91,7 @@ class BrandController extends Controller
             'is_obs' => 'sometimes|boolean',
             'target_hours_per_period' => "$required|integer|min:1|max:10000",
             'payment_cycle_days' => "$required|integer|min:1|max:365",
+            'payroll_start_date' => 'sometimes|nullable|date_format:Y-m-d',
             'status' => 'sometimes|in:active,inactive',
         ]);
     }

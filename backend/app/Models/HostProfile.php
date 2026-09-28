@@ -50,6 +50,27 @@ class HostProfile extends Model
         return $this->hasMany(HostBrandAssignment::class, 'host_id');
     }
 
+    public function pointLogs(): HasMany
+    {
+        return $this->hasMany(PointLog::class, 'host_id');
+    }
+
+    public function warningLetters(): HasMany
+    {
+        return $this->hasMany(WarningLetter::class, 'host_id');
+    }
+
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(HostRating::class, 'host_id');
+    }
+
+    /** The most recent monthly rating, if the host has been rated. */
+    public function latestRating(): HasOne
+    {
+        return $this->hasOne(HostRating::class, 'host_id')->latestOfMany('month_year');
+    }
+
     /**
      * Whole months since join_date (0 for a future join date).
      */

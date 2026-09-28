@@ -135,8 +135,14 @@ frontend/
 ---
 
 ## ⏭️ Next Steps
-1. ~~Finalize ERD~~ · ~~Auth: login, register, Google, approval, password reset~~
-2. Create migrations for schedules, ratings, etc.
-3. ~~Host profiles, rate levels, brands & assignments~~
-4. Connect remaining pages to the API
-5. ~~Weekly schedules & host availability~~ · ~~Backups~~ · ~~Attendance & live reports~~ → next: payroll, points & ratings, special events
+Done: auth · host profiles, rate levels, brands · weekly schedules · backups · attendance & live reports ·
+points, SP & ratings · special events · payroll, salary slips & kasbon.
+
+Remaining:
+1. Notifications (in-app, Discord)
+2. Admin settings page (SYSTEM_SETTINGS), 2FA, audit log
+3. Real dashboard figures
+4. Decisions still open: late check-in rule, live report template, payroll carry-over for host pay
+
+Scheduled jobs (run `php artisan schedule:work` in development): `backups:auto-process` (every minute),
+`points:apply-penalties` (every 10 min), `payroll:roll-periods` (00:05), `hosts:sync-rate-categories` (00:10).

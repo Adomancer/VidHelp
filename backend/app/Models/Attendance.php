@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * A host's check-in/out for one session occurrence (their own slot, or a backup they cover).
+ * A host's check-in/out for one session occurrence: their own slot, a backup they cover,
+ * or a special event block they claimed.
  */
 #[Fillable([
-    'host_id', 'slot_id', 'backup_request_id', 'brand_id', 'session_date',
+    'host_id', 'slot_id', 'backup_request_id', 'event_claim_id', 'brand_id', 'session_date',
     'scheduled_start_at', 'scheduled_end_at', 'check_in_at', 'check_out_at', 'report_due_at',
 ])]
 class Attendance extends Model
@@ -39,6 +40,11 @@ class Attendance extends Model
     public function slot(): BelongsTo
     {
         return $this->belongsTo(ScheduleSlot::class, 'slot_id');
+    }
+
+    public function eventClaim(): BelongsTo
+    {
+        return $this->belongsTo(EventSlotClaim::class, 'event_claim_id');
     }
 
     public function backupRequest(): BelongsTo
