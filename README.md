@@ -139,4 +139,4 @@ frontend/
 2. Create migrations for schedules, ratings, etc.
 3. ~~Host profiles, rate levels, brands & assignments~~
 4. Connect remaining pages to the API
-5. ~~Weekly schedules & host availability~~ → next: special events (PD, double date), backups
+5. ~~Weekly schedules & host availability~~ · ~~Backups~~ → next: special events (PD, double date), attendance

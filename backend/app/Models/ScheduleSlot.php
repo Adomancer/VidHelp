@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 
 /**
@@ -112,6 +114,30 @@ class ScheduleSlot extends Model
             ->get()
             ->filter(fn (ScheduleSlot $other) => $this->overlaps($other))
             ->values();
+    }
+
+    /**
+     * Whether this weekly slot runs on the given date (right weekday, in its effective period).
+     */
+    public function runsOn(CarbonInterface $date): bool
+    {
+        return $this->status === 'active'
+            && $date->dayOfWeekIso === $this->day_of_week
+            && $this->effective_from->lte($date->toDateString())
+            && ($this->effective_to === null || $this->effective_to->gte($date->toDateString()));
+    }
+
+    /**
+     * Concrete [start, end] of the slot on a date; overnight slots end the next day.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public function occurrenceOn(CarbonInterface $date): array
+    {
+        $start = CarbonImmutable::parse($date->toDateString().' '.$this->start_time);
+        $end = CarbonImmutable::parse($date->toDateString().' '.$this->end_time);
+
+        return [$start, $end->lte($start) ? $end->addDay() : $end];
     }
 
     public function overlaps(ScheduleSlot $other): bool

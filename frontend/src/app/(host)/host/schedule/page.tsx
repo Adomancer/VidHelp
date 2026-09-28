@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { errorMessage, fieldErrors, scheduleApi, type AvailabilityRange, type DayOfWeek, type ScheduleSlot } from "@/lib/api";
-import { carriedInto, DAYS, dayShort, formatDate, formatTimeRange, isoWeekday } from "@/lib/format";
+import { errorMessage, fieldErrors, scheduleApi, type AvailabilityRange, type BackupNeed, type DayOfWeek, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
+import { carriedInto, dateOfWeekday, DAYS, dayShort, formatDate, formatShortDate, formatTimeRange, formatWindow, isoWeekday, toDateInput } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
+import BackupMarker, { markerFor } from "@/components/BackupMarker";
 import FormAlert from "@/components/FormAlert";
 
 export default function HostSchedulePage() {
@@ -18,21 +19,39 @@ export default function HostSchedulePage() {
       <h1 className="text-xl font-bold text-white">My Schedule</h1>
 
       {schedule.error && <FormAlert tone="error">{schedule.error}</FormAlert>}
-      {schedule.data && <WeekList slots={schedule.data.slots} />}
+      {schedule.data && <WeekList slots={schedule.data.slots} covers={schedule.data.covers} absences={schedule.data.absences} />}
       {schedule.data && schedule.data.upcoming.length > 0 && <UpcomingList slots={schedule.data.upcoming} />}
       {isHost && <AvailabilityEditor />}
     </div>
   );
 }
 
-function SlotLine({ slot }: { slot: ScheduleSlot }) {
+function SlotLine({ slot, marker }: { slot: ScheduleSlot; marker?: SlotBackupMarker }) {
+  const off = marker?.status === "filled";
+
   return (
-    <li className="flex items-center justify-between gap-3 rounded-lg bg-slate-800 px-3 py-2">
-      <span className="text-white">{slot.assignment.brand.name}</span>
-      <span className="text-sm text-purple-200 whitespace-nowrap">
-        {formatTimeRange(slot.start_time, slot.end_time, slot.day_of_week)}
-        {slot.slot_type === "pd" && <span className="ml-1 px-1 rounded bg-yellow-500/20 text-yellow-200 text-xs">PD</span>}
-      </span>
+    <li className={`rounded-lg px-3 py-2 ${off ? "bg-slate-800/40" : "bg-slate-800"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className={off ? "text-gray-400 line-through" : "text-white"}>{slot.assignment.brand.name}</span>
+        <span className={`text-sm whitespace-nowrap ${off ? "text-gray-500 line-through" : "text-purple-200"}`}>
+          {formatTimeRange(slot.start_time, slot.end_time, slot.day_of_week)}
+          {slot.slot_type === "pd" && <span className="ml-1 px-1 rounded bg-yellow-500/20 text-yellow-200 text-xs">PD</span>}
+        </span>
+      </div>
+      {marker && <BackupMarker marker={marker} mine />}
+    </li>
+  );
+}
+
+/** A backup I'm doing for someone else on this date. */
+function CoverLine({ cover }: { cover: BackupNeed }) {
+  return (
+    <li className="rounded-lg bg-green-500/10 border border-green-400/30 px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-white">{cover.brand.name}</span>
+        <span className="text-sm text-green-200 whitespace-nowrap">{formatWindow(cover.start_at, cover.end_at).split(", ")[1]}</span>
+      </div>
+      <span className="block text-xs text-green-300">Backup for {cover.requester_name}</span>
     </li>
   );
 }
@@ -49,12 +68,16 @@ function CarryOverLine({ slot }: { slot: ScheduleSlot }) {
   );
 }
 
-/** This week's recurring slots grouped by day, starting from today. */
-function WeekList({ slots }: { slots: ScheduleSlot[] }) {
+/**
+ * The next 7 days starting today: my recurring slots (marked when someone covers
+ * me) plus backups I'm doing for others on those dates.
+ */
+function WeekList({ slots, covers, absences }: { slots: ScheduleSlot[]; covers: BackupNeed[]; absences: SlotBackupMarker[] }) {
   const today = isoWeekday();
+  const todayDate = toDateInput();
   const ordered = [...DAYS.filter((day) => day.value >= today), ...DAYS.filter((day) => day.value < today)];
 
-  if (slots.length === 0) {
+  if (slots.length === 0 && covers.length === 0) {
     return (
       <Card>
         <p className="text-sm text-gray-400">You don&apos;t have any live slots yet. Your operator will add them.</p>
@@ -65,14 +88,17 @@ function WeekList({ slots }: { slots: ScheduleSlot[] }) {
   return (
     <div className="space-y-3">
       {ordered.map((day) => {
+        const date = dateOfWeekday(todayDate, day.value);
         const daySlots = slots.filter((slot) => slot.day_of_week === day.value);
         const carried = carriedInto(slots, day.value);
-        if (daySlots.length === 0 && carried.length === 0) return null;
+        const dayCovers = covers.filter((cover) => cover.backup_date === date);
+        if (daySlots.length === 0 && carried.length === 0 && dayCovers.length === 0) return null;
 
         return (
           <Card key={day.value}>
             <h2 className={`text-sm font-medium ${day.value === today ? "text-purple-300" : "text-white"}`}>
               {day.long}
+              <span className="ml-1 font-normal text-gray-500">{formatShortDate(date)}</span>
               {day.value === today && " · today"}
             </h2>
             <ul className="space-y-2">
@@ -80,7 +106,10 @@ function WeekList({ slots }: { slots: ScheduleSlot[] }) {
                 <CarryOverLine key={`carry-${slot.id}`} slot={slot} />
               ))}
               {daySlots.map((slot) => (
-                <SlotLine key={slot.id} slot={slot} />
+                <SlotLine key={slot.id} slot={slot} marker={markerFor(absences, slot.id, date)} />
+              ))}
+              {dayCovers.map((cover) => (
+                <CoverLine key={cover.id} cover={cover} />
               ))}
             </ul>
           </Card>

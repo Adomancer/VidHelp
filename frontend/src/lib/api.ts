@@ -399,7 +399,7 @@ export interface BrandHost extends Omit<Assignment, "brand"> {
 export const scheduleApi = {
   list: (token: string, params: { brand_id?: string; host_id?: string; on?: string }) => {
     const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as [string, string][]);
-    return api<{ slots: ScheduleSlot[] }>(`/operator/schedules?${query}`, { token });
+    return api<{ slots: ScheduleSlot[]; backups: SlotBackupMarker[] }>(`/operator/schedules?${query}`, { token });
   },
 
   brandHosts: (token: string, brandId: string) => api<{ assignments: BrandHost[] }>(`/operator/brands/${brandId}/hosts`, { token }),
@@ -417,10 +417,141 @@ export const scheduleApi = {
   lock: (token: string, id: string, isLocked: boolean) =>
     api<{ slot: ScheduleSlot }>(`/admin/schedules/${id}/lock`, { method: "PUT", body: JSON.stringify({ is_locked: isLocked }), token }),
 
-  mine: (token: string) => api<{ slots: ScheduleSlot[]; upcoming: ScheduleSlot[] }>("/host/schedules", { token }),
+  /** covers: backups I do for others; absences: my sessions someone else covers (next 7 days). */
+  mine: (token: string) =>
+    api<{ slots: ScheduleSlot[]; upcoming: ScheduleSlot[]; covers: BackupNeed[]; absences: SlotBackupMarker[] }>("/host/schedules", { token }),
 
   myAvailability: (token: string) => api<{ availability: AvailabilityRange[] }>("/host/availability", { token }),
 
   saveAvailability: (token: string, ranges: AvailabilityRange[]) =>
     api<{ availability: AvailabilityRange[] } & Message>("/host/availability", { method: "PUT", body: JSON.stringify({ ranges }), token }),
+};
+
+/*
+|--------------------------------------------------------------------------
+| Backups
+|--------------------------------------------------------------------------
+*/
+export type BackupStatus = "pending" | "open" | "filled" | "cancelled" | "rejected";
+export type BackupReason = "sick" | "permit" | "other";
+export type LetterStatus = "not_needed" | "uploaded" | "due" | "late";
+
+type HostWithUser = HostProfile & { user: AuthUser };
+
+export interface BackupRequest {
+  id: string;
+  slot_id: string;
+  brand_id: string;
+  requesting_host_id: string;
+  backup_date: string;
+  /** ISO datetimes */
+  start_at: string;
+  end_at: string;
+  reason_type: BackupReason;
+  reason: string | null;
+  status: BackupStatus;
+  approved_at: string | null;
+  auto_approved: boolean;
+  auto_open_at: string | null;
+  auto_fill_at: string;
+  auto_filled: boolean;
+  counts_toward_quota: boolean;
+  filled_by_host_id: string | null;
+  letter_status: LetterStatus;
+  letter_due_at: string | null;
+  brand: { id: string; name: string };
+  requester?: HostWithUser;
+  filler?: HostWithUser | null;
+  attachments?: { id: string; original_name: string | null; created_at: string }[];
+  applicants_count?: number;
+}
+
+/** What hosts see about someone else's request (no reason). */
+export interface BackupNeed {
+  id: string;
+  brand: { id: string; name: string };
+  requester_name: string;
+  backup_date: string;
+  start_at: string;
+  end_at: string;
+  status: BackupStatus;
+  same_brand?: boolean;
+  my_application?: { id: string; status: "applied" | "approved" | "rejected" | "withdrawn" | "cancelled" } | null;
+  ineligible_reason?: string | null;
+}
+
+export interface SlotOccurrence {
+  slot_id: string;
+  date: string;
+  start_at: string;
+  end_at: string;
+  brand: { id: string; name: string };
+}
+
+export interface BackupQuota {
+  month_year?: string;
+  quota_used: number;
+  quota_max: number;
+}
+
+export interface BackupCandidate {
+  host_id: string;
+  name: string;
+  avatar_url: string | null;
+  same_brand: boolean;
+  eligible: boolean;
+  ineligible_reason: string | null;
+  quota: BackupQuota;
+  applied_at?: string;
+}
+
+/** A backup on one date of a weekly slot, for marking schedules. */
+export interface SlotBackupMarker {
+  id: string;
+  slot_id: string;
+  backup_date: string;
+  status: "pending" | "open" | "filled";
+  filler_name: string | null;
+}
+
+export interface BackupRequestInput {
+  slot_id: string;
+  backup_date: string;
+  reason_type: BackupReason;
+  reason: string | null;
+}
+
+const post = <T = Message>(endpoint: string, token: string, body?: unknown) =>
+  api<T>(endpoint, { method: "POST", token, body: body === undefined ? undefined : JSON.stringify(body) });
+
+export const hostBackupApi = {
+  mine: (token: string) =>
+    api<{ requests: BackupRequest[]; covers: BackupNeed[]; quota: BackupQuota }>("/host/backups", { token }),
+  needs: (token: string) => api<{ needs: BackupNeed[] }>("/host/backups/needs", { token }),
+  slots: (token: string) => api<{ slots: SlotOccurrence[] }>("/host/backups/slots", { token }),
+  request: (token: string, data: BackupRequestInput) => post<{ request: BackupRequest } & Message>("/host/backups", token, data),
+  cancel: (token: string, id: string) => post(`/host/backups/${id}/cancel`, token),
+  uploadLetter: (token: string, id: string, letter: File) => {
+    const body = new FormData();
+    body.append("letter", letter);
+    return api<{ request: BackupRequest } & Message>(`/host/backups/${id}/letter`, { method: "POST", body, token });
+  },
+  apply: (token: string, id: string) => post(`/host/backups/${id}/apply`, token),
+  withdraw: (token: string, id: string) => post(`/host/backups/${id}/withdraw`, token),
+  /** Drop a backup you were picked for (point penalty). */
+  drop: (token: string, id: string) => post(`/host/backups/${id}/drop`, token),
+};
+
+export const operatorBackupApi = {
+  list: (token: string, status: "pending" | "open" | "filled" | "closed") =>
+    api<{ requests: BackupRequest[] }>(`/operator/backups?status=${status}`, { token }),
+  create: (token: string, data: BackupRequestInput) => post<{ request: BackupRequest } & Message>("/operator/backups", token, data),
+  applicants: (token: string, id: string) => api<{ applicants: BackupCandidate[] }>(`/operator/backups/${id}/applicants`, { token }),
+  candidates: (token: string, id: string) => api<{ candidates: BackupCandidate[] }>(`/operator/backups/${id}/candidates`, { token }),
+  approve: (token: string, id: string) => post(`/operator/backups/${id}/approve`, token),
+  reject: (token: string, id: string) => post(`/operator/backups/${id}/reject`, token),
+  cancel: (token: string, id: string) => post(`/operator/backups/${id}/cancel`, token),
+  assign: (token: string, id: string, hostId: string) => post(`/operator/backups/${id}/assign`, token, { host_id: hostId }),
+  unassign: (token: string, id: string) => post(`/operator/backups/${id}/unassign`, token),
+  letterUrl: (token: string, id: string) => apiFileUrl(`/operator/backups/${id}/letter`, token),
 };

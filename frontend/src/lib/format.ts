@@ -68,3 +68,40 @@ export function formatTimeRange(start: string, end: string, day?: number): strin
 export function carriedInto<T extends { day_of_week: number; crosses_midnight: boolean }>(slots: T[], day: number): T[] {
   return slots.filter((slot) => slot.crosses_midnight && slot.day_of_week === previousDay(day));
 }
+
+/** "2026-10-06T07:00:00Z" → "Tue 6 Oct" (local time) */
+export function formatDay(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
+
+/** "14:00" (local time) */
+export function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** "Tue 6 Oct, 14:00–16:00" or "Tue 6 Oct, 23:00 – Wed 02:00" */
+export function formatWindow(startIso: string, endIso: string): string {
+  const sameDay = new Date(startIso).toDateString() === new Date(endIso).toDateString();
+  const end = sameDay ? formatClock(endIso) : ` ${new Date(endIso).toLocaleDateString("en-GB", { weekday: "short" })} ${formatClock(endIso)}`;
+  return `${formatDay(startIso)}, ${formatClock(startIso)}${sameDay ? "–" : " –"}${end}`;
+}
+
+/** "Tue 6 Oct, 14:00" (local time) */
+export function formatDateTime(iso: string): string {
+  return `${formatDay(iso)}, ${formatClock(iso)}`;
+}
+
+/**
+ * The date ("YYYY-MM-DD") within the 7 days starting at `from` that falls on `day`
+ * (ISO weekday). E.g. from Wednesday, Monday is the Monday after.
+ */
+export function dateOfWeekday(from: string, day: number): string {
+  const start = new Date(`${from}T00:00`);
+  start.setDate(start.getDate() + ((day - isoWeekday(start) + 7) % 7));
+  return toDateInput(start);
+}
+
+/** "2026-10-06" → "6 Oct" */
+export function formatShortDate(date: string): string {
+  return new Date(`${date}T00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}

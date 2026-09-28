@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { operatorApi, scheduleApi, type ScheduleSlot } from "@/lib/api";
-import { carriedInto, DAYS, dayShort, formatTimeRange, isoWeekday, toDateInput } from "@/lib/format";
+import { operatorApi, scheduleApi, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
+import { carriedInto, dateOfWeekday, DAYS, dayShort, formatShortDate, formatTimeRange, isoWeekday, toDateInput } from "@/lib/format";
+import BackupMarker, { markerFor } from "./BackupMarker";
 import { useApiData } from "@/lib/useApiData";
 import { useAuth } from "./AuthProvider";
 import FormAlert from "./FormAlert";
@@ -25,7 +26,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
   const brandId = chosenBrandId || activeBrands[0]?.id || "";
 
   const slots = useApiData(`${brandId}|${on}`, () =>
-    brandId ? scheduleApi.list(token, { brand_id: brandId, on }) : Promise.resolve({ slots: [] })
+    brandId ? scheduleApi.list(token, { brand_id: brandId, on }) : Promise.resolve({ slots: [], backups: [] })
   );
   const hosts = useApiData(brandId, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
 
@@ -95,6 +96,9 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
       <div className={`grid grid-cols-1 md:grid-cols-7 gap-3 ${slots.loading ? "opacity-60" : ""}`}>
         {DAYS.map((day) => {
           const daySlots = slots.data?.slots.filter((slot) => slot.day_of_week === day.value) ?? [];
+          // The board shows the 7 days starting at "as of"; backups are per date
+          const date = dateOfWeekday(on, day.value);
+          const dayBefore = toDateInput(new Date(new Date(`${date}T00:00`).getTime() - 86_400_000));
 
           return (
             <div
@@ -105,6 +109,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                 <h3 className="text-sm font-medium text-white">
                   <span className="md:hidden">{day.long}</span>
                   <span className="hidden md:inline">{day.short}</span>
+                  <span className="ml-1 text-xs font-normal text-gray-500">{formatShortDate(date)}</span>
                 </h3>
                 <button
                   type="button"
@@ -129,6 +134,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                     until {slot.end_time} · from {dayShort(slot.day_of_week)} {slot.start_time}
                   </span>
                   <span className="block text-sm text-gray-300 truncate">{slot.assignment.host?.user.name}</span>
+                  <SlotBackup markers={slots.data?.backups} slotId={slot.id} date={dayBefore} />
                 </button>
               ))}
 
@@ -145,6 +151,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                     {slot.slot_type === "pd" && <span className="ml-1 px-1 rounded bg-yellow-500/20 text-yellow-200">PD</span>}
                   </span>
                   <span className="block text-sm text-white truncate">{slot.assignment.host?.user.name}</span>
+                  <SlotBackup markers={slots.data?.backups} slotId={slot.id} date={date} />
                 </button>
               ))}
             </div>
@@ -153,8 +160,13 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
       </div>
 
       <p className="text-xs text-gray-500">
-        Slots repeat every week. Dashed entries are overnight slots continuing from the day before. Change &quot;Schedule as of&quot; to see or plan a future week.
+        Slots repeat every week; dates show the week from &quot;Schedule as of&quot;, including backups on those dates. Dashed entries are overnight slots continuing from the day before. Change &quot;Schedule as of&quot; to see or plan a future week.
       </p>
     </div>
   );
+}
+
+function SlotBackup({ markers, slotId, date }: { markers?: SlotBackupMarker[]; slotId: string; date: string }) {
+  const marker = markerFor(markers, slotId, date);
+  return marker ? <BackupMarker marker={marker} /> : null;
 }

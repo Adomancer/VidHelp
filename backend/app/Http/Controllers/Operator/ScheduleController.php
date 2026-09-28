@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
+use App\Models\BackupRequest;
 use App\Models\ScheduleSlot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,18 @@ class ScheduleController extends Controller
             ->orderBy('start_time')
             ->get();
 
-        return response()->json(['slots' => $slots]);
+        // Backups in the 7 days from `on`, so the board can mark "covered by B" on that week's slots
+        $from = ($request->date('on') ?? today())->startOfDay();
+        $backups = BackupRequest::query()
+            ->whereIn('status', ['pending', 'open', 'filled'])
+            ->whereIn('slot_id', $slots->pluck('id'))
+            ->whereDate('backup_date', '>=', $from)
+            ->whereDate('backup_date', '<', $from->copy()->addDays(7))
+            ->with('filler.user')
+            ->get()
+            ->map(fn (BackupRequest $backup) => $backup->slotMarker());
+
+        return response()->json(['slots' => $slots, 'backups' => $backups]);
     }
 
     public function store(Request $request): JsonResponse

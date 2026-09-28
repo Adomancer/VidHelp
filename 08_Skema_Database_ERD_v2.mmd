@@ -35,6 +35,8 @@ erDiagram
     BACKUP_REQUESTS ||--o{ BACKUP_APPLICATIONS : "receives"
     HOST_PROFILES ||--o{ BACKUP_APPLICATIONS : "applies"
     HOST_PROFILES ||--o{ BACKUP_QUOTAS : "has monthly"
+    BRANDS ||--o{ BACKUP_REQUESTS : "for"
+    BACKUP_REQUESTS ||--o{ ATTACHMENTS : "surat sakit"
 
     %% ===== D. ABSENSI & LAPORAN =====
     HOST_PROFILES ||--o{ ATTENDANCES : "checks in"
@@ -250,26 +252,31 @@ erDiagram
     BACKUP_REQUESTS {
         uuid id PK
         uuid slot_id FK
+        uuid brand_id FK "snapshot brand slot saat request"
         uuid requesting_host_id FK
-        uuid created_by FK "admin bisa buat atas nama host"
+        uuid created_by FK "admin/operator bisa buat atas nama host (langsung open)"
         date backup_date
         datetime start_at
         datetime end_at
         enum reason_type "sick, permit, other"
         string reason
-        enum status "pending, acc_admin, open, filled, cancelled, rejected"
-        uuid approved_by FK
-        boolean auto_approved
-        datetime auto_approve_at "start_at dikurangi 30 menit"
-        boolean counts_toward_quota "true jika beda brand"
+        enum status "pending, open, filled, cancelled, rejected"
+        uuid approved_by FK "null jika auto"
+        datetime approved_at
+        boolean auto_approved "pending otomatis jadi open setelah auto_open_at"
+        datetime auto_open_at "created_at + 30 menit"
+        datetime auto_fill_at "start_at - 30 menit: sistem pilih pelamar terbaik"
+        boolean auto_filled
+        boolean counts_toward_quota "true jika host pengganti beda brand"
         uuid filled_by_host_id FK
+        datetime filled_at
         datetime cancelled_at
-        boolean penalty_applied
         datetime created_at
+        datetime updated_at
     }
 
     BACKUP_NOMINEES {
-        uuid id PK
+        uuid id PK "belum diimplementasi"
         uuid backup_request_id FK
         uuid nominee_host_id FK
         enum response "pending, accepted, declined"
@@ -277,18 +284,22 @@ erDiagram
 
     BACKUP_APPLICATIONS {
         uuid id PK
-        uuid backup_request_id FK
+        uuid backup_request_id FK "unik per (request, host)"
         uuid applicant_host_id FK
-        enum status "applied, approved, rejected, withdrawn"
-        datetime applied_at
+        enum status "applied, approved, rejected, withdrawn, cancelled"
+        boolean penalty_applied "cancelled = batal setelah di-ACC; poin dipotong oleh modul poin"
+        datetime decided_at
+        datetime created_at "applied_at"
+        datetime updated_at
     }
 
     BACKUP_QUOTAS {
         uuid id PK
-        uuid host_id FK
-        string month_year
+        uuid host_id FK "host yang MEMBANTU brand lain"
+        string month_year "YYYY-MM, unik per host"
         int quota_used
-        int quota_max
+        int quota_max "default 3, bisa diubah per host/bulan"
+        datetime created_at
         datetime updated_at
     }
 

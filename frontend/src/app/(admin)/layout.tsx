@@ -13,6 +13,7 @@ const links = [
   { href: "/admin/brands", label: "Brands" },
   { href: "/admin/rates", label: "Rate Levels" },
   { href: "/admin/schedules", label: "Schedules" },
+  { href: "/admin/backups", label: "Backups" },
   { href: "/admin/finance", label: "Finance" },
 ];
 
