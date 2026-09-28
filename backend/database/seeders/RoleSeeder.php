@@ -72,6 +72,9 @@ class RoleSeeder extends Seeder
             [
                 'name' => 'Admin',
                 'password' => Hash::make('password'),
+                'email_verified_at' => now(),
+                'status' => 'active',
+                'signup_source' => 'admin_created',
             ]
         );
         $adminUser->assignRole('admin');

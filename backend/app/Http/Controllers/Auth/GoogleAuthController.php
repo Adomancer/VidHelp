@@ -7,11 +7,15 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
+use Throwable;
 
 class GoogleAuthController extends Controller
 {
     /**
-     * Redirect to Google OAuth.
+     * Get the Google consent screen URL.
+     *
+     * The frontend sends the browser there. Google then redirects back to the
+     * frontend (GOOGLE_REDIRECT_URI), which forwards the query string to callback().
      */
     public function redirect(): JsonResponse
     {
@@ -24,34 +28,60 @@ class GoogleAuthController extends Controller
     }
 
     /**
-     * Handle Google OAuth callback.
+     * Exchange the Google authorization code for a VidHelp token.
+     *
+     * Existing accounts are matched by google_id, then by verified email (and linked).
+     * Unknown accounts are registered as pending hosts awaiting admin approval.
      */
     public function callback(Request $request): JsonResponse
     {
-        $googleUser = Socialite::driver('google')
-            ->stateless()
-            ->user();
+        try {
+            $googleUser = Socialite::driver('google')->stateless()->user();
+        } catch (Throwable $e) {
+            report($e);
 
-        $user = User::updateOrCreate(
-            ['email' => $googleUser->getEmail()],
-            [
-                'name' => $googleUser->getName(),
-                'avatar' => $googleUser->getAvatar(),
-                'google_id' => $googleUser->getId(),
-                'is_active' => true,
-            ]
-        );
-
-        // Assign default role if new user
-        if (! $user->hasAnyRole(['admin', 'operator', 'host'])) {
-            $user->assignRole('host');
+            return response()->json(['message' => 'Google sign-in failed. Please try again.'], 401);
         }
 
-        $token = $user->createToken('google-auth-token')->plainTextToken;
+        if (! ($googleUser->user['email_verified'] ?? false)) {
+            return response()->json(['message' => 'Your Google email address is not verified.'], 403);
+        }
+
+        $user = User::where('google_id', $googleUser->getId())->first()
+            ?? User::where('email', $googleUser->getEmail())->first();
+
+        if (! $user) {
+            $user = User::create([
+                'name' => $googleUser->getName(),
+                'email' => $googleUser->getEmail(),
+                'email_verified_at' => now(),
+                'google_id' => $googleUser->getId(),
+                'avatar' => $googleUser->getAvatar(),
+                'status' => 'pending',
+                'signup_source' => 'self_register',
+            ]);
+            $user->assignRole('host');
+
+            return response()->json([
+                'message' => 'Account created. An admin needs to approve it before you can sign in.',
+                'status' => 'pending',
+            ], 202);
+        }
+
+        // Link Google to an account that was created by email/password or by an admin
+        $user->fill([
+            'google_id' => $user->google_id ?? $googleUser->getId(),
+            'avatar' => $user->avatar ?? $googleUser->getAvatar(),
+            'email_verified_at' => $user->email_verified_at ?? now(),
+        ])->save();
+
+        if ($reason = $user->loginBlockedReason()) {
+            return response()->json(['message' => $reason, 'status' => $user->status], 403);
+        }
 
         return response()->json([
             'user' => $user->load('roles'),
-            'token' => $token,
+            'token' => $user->issueToken('google-auth-token'),
         ]);
     }
 }

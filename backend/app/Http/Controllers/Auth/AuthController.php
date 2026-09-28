@@ -21,25 +21,22 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'phone' => 'nullable|string|max:20',
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'phone' => $validated['phone'] ?? null,
-            'is_active' => true,
+            'status' => 'pending',
+            'signup_source' => 'self_register',
         ]);
 
-        // Default role is host
+        // Default role is host; an admin must approve the account before login
         $user->assignRole('host');
 
-        $token = $user->createToken('auth-token')->plainTextToken;
-
         return response()->json([
-            'user' => $user->load('roles'),
-            'token' => $token,
+            'message' => 'Account created. An admin needs to approve it before you can sign in.',
+            'status' => 'pending',
         ], 201);
     }
 
@@ -61,17 +58,15 @@ class AuthController extends Controller
             ]);
         }
 
-        if (! $user->is_active) {
+        if ($reason = $user->loginBlockedReason()) {
             throw ValidationException::withMessages([
-                'email' => ['Your account has been deactivated.'],
+                'email' => [$reason],
             ]);
         }
 
-        $token = $user->createToken('auth-token')->plainTextToken;
-
         return response()->json([
             'user' => $user->load('roles'),
-            'token' => $token,
+            'token' => $user->issueToken(),
         ]);
     }
 

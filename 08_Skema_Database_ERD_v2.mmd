@@ -1,0 +1,507 @@
+erDiagram
+    %% ===== A. AKUN & KEAMANAN =====
+    %% Roles & permissions dikelola oleh spatie/laravel-permission
+    USERS ||--o{ MODEL_HAS_ROLES : "assigned"
+    ROLES ||--o{ MODEL_HAS_ROLES : "granted to"
+    USERS ||--o{ MODEL_HAS_PERMISSIONS : "granted directly"
+    PERMISSIONS ||--o{ MODEL_HAS_PERMISSIONS : "granted to"
+    ROLES ||--o{ ROLE_HAS_PERMISSIONS : "has"
+    PERMISSIONS ||--o{ ROLE_HAS_PERMISSIONS : "belongs to"
+    USERS ||--o{ PERSONAL_ACCESS_TOKENS : "owns (sanctum)"
+
+    USERS ||--o| HOST_PROFILES : "has"
+    USERS ||--o| TWO_FACTOR_AUTH : "has"
+    USERS ||--o{ AUDIT_LOGS : "performs"
+    USERS ||--o{ NOTIFICATIONS : "receives"
+    USERS ||--o| DISCORD_LINKS : "linked to"
+
+    HOST_PROFILES ||--o| HOST_SENSITIVE_DATA : "has"
+    HOST_RATE_CATEGORIES ||--o{ HOST_PROFILES : "classifies"
+
+    %% ===== B. BRAND & JADWAL =====
+    HOST_PROFILES ||--o{ HOST_BRAND_ASSIGNMENTS : "assigned to"
+    BRANDS ||--o{ HOST_BRAND_ASSIGNMENTS : "has"
+    HOST_BRAND_ASSIGNMENTS ||--o{ SCHEDULE_SLOTS : "has"
+    HOST_PROFILES ||--o{ HOST_AVAILABILITY : "declares"
+    BRANDS ||--o{ SPECIAL_EVENTS : "runs"
+    SPECIAL_EVENTS ||--o{ EVENT_SLOT_CLAIMS : "receives"
+    HOST_PROFILES ||--o{ EVENT_SLOT_CLAIMS : "claims"
+
+    %% ===== C. BACKUP =====
+    SCHEDULE_SLOTS ||--o{ BACKUP_REQUESTS : "needs"
+    HOST_PROFILES ||--o{ BACKUP_REQUESTS : "requests"
+    BACKUP_REQUESTS ||--o{ BACKUP_NOMINEES : "suggests"
+    HOST_PROFILES ||--o{ BACKUP_NOMINEES : "nominated as"
+    BACKUP_REQUESTS ||--o{ BACKUP_APPLICATIONS : "receives"
+    HOST_PROFILES ||--o{ BACKUP_APPLICATIONS : "applies"
+    HOST_PROFILES ||--o{ BACKUP_QUOTAS : "has monthly"
+
+    %% ===== D. ABSENSI & LAPORAN =====
+    HOST_PROFILES ||--o{ ATTENDANCES : "checks in"
+    SCHEDULE_SLOTS ||--o{ ATTENDANCES : "for"
+    BACKUP_REQUESTS ||--o| ATTENDANCES : "covered by"
+    ATTENDANCES ||--o| LIVE_REPORTS : "must fill"
+    LIVE_REPORTS ||--o| WORK_SESSIONS : "validated into"
+    HOST_PROFILES ||--o{ WORK_SESSIONS : "logs"
+    BRANDS ||--o{ WORK_SESSIONS : "for"
+
+    %% ===== E. RATING, POIN, SP =====
+    VIOLATION_TYPES ||--o{ POINT_LOGS : "categorizes"
+    HOST_PROFILES ||--o{ POINT_LOGS : "has"
+    BRAND_COMPLAINTS ||--o| POINT_LOGS : "causes"
+    BRANDS ||--o{ BRAND_COMPLAINTS : "issues"
+    HOST_PROFILES ||--o{ BRAND_COMPLAINTS : "receives"
+    HOST_PROFILES ||--o{ MONTHLY_POINT_BALANCES : "has"
+    HOST_PROFILES ||--o{ HOST_RATINGS : "rated"
+    HOST_PROFILES ||--o{ WARNING_LETTERS : "receives"
+    POINT_LOGS ||--o| WARNING_LETTERS : "may trigger"
+
+    %% ===== F. PAYMENT, KASBON, SLIP =====
+    BRANDS ||--o{ PAYMENT_PERIODS : "has"
+    PAYMENT_PERIODS ||--o{ WORK_SESSIONS : "counts"
+    PAYMENT_PERIODS ||--o{ PAYMENT_ITEMS : "contains"
+    HOST_PROFILES ||--o{ PAYMENT_ITEMS : "paid via"
+    PAYMENT_PERIODS ||--o{ HOUR_ADJUSTMENTS : "adjusted by"
+    PAYMENT_PERIODS ||--o{ PAYMENT_REQUESTS : "generates"
+    PAYMENT_PERIODS ||--o{ SALARY_SLIPS : "produces"
+    HOST_PROFILES ||--o{ SALARY_SLIPS : "receives"
+    HOST_PROFILES ||--o{ CASH_ADVANCES : "requests"
+    CASH_ADVANCES ||--o{ CASH_ADVANCE_INSTALLMENTS : "split into"
+    PAYMENT_PERIODS ||--o{ CASH_ADVANCE_INSTALLMENTS : "deducted in"
+
+    %% ===== G. KONFIGURASI =====
+    SYSTEM_SETTINGS
+
+    ROLES {
+        bigint id PK "spatie"
+        string name UK "admin, operator, host"
+        string guard_name "web"
+        datetime created_at
+        datetime updated_at
+    }
+
+    PERMISSIONS {
+        bigint id PK "spatie"
+        string name UK "manage-users, view-finance, ..."
+        string guard_name "web"
+        datetime created_at
+        datetime updated_at
+    }
+
+    MODEL_HAS_ROLES {
+        bigint role_id PK,FK
+        string model_type PK "User model"
+        uuid model_id PK "users.id"
+    }
+
+    MODEL_HAS_PERMISSIONS {
+        bigint permission_id PK,FK
+        string model_type PK "User model"
+        uuid model_id PK "users.id"
+    }
+
+    ROLE_HAS_PERMISSIONS {
+        bigint permission_id PK,FK
+        bigint role_id PK,FK
+    }
+
+    PERSONAL_ACCESS_TOKENS {
+        bigint id PK "sanctum"
+        string tokenable_type "User model"
+        uuid tokenable_id "users.id"
+        string name
+        string token UK "sha256 hash"
+        datetime last_used_at
+        datetime expires_at
+    }
+
+    USERS {
+        uuid id PK
+        string name
+        string email UK
+        datetime email_verified_at "diisi otomatis saat login Google"
+        string password "nullable, hash only; null untuk akun Google-only"
+        string google_id UK "nullable, sub dari Google"
+        string avatar "nullable, URL Google atau path upload"
+        enum status "pending, active, inactive, archived"
+        enum signup_source "admin_created, self_register"
+        uuid approved_by FK
+        datetime approved_at
+        boolean two_factor_enabled
+        datetime last_login_at
+        string remember_token
+        datetime created_at
+        datetime updated_at
+        datetime deleted_at "soft delete"
+    }
+
+    TWO_FACTOR_AUTH {
+        uuid id PK
+        uuid user_id FK
+        string secret_key_encrypted
+        string recovery_codes_hash
+        boolean is_enabled
+        datetime enabled_at
+    }
+
+    HOST_RATE_CATEGORIES {
+        uuid id PK
+        string name "magang, baru, di atas 1 tahun"
+        int min_tenure_months "auto naik dari join_date"
+        decimal rate_per_hour
+    }
+
+    HOST_PROFILES {
+        uuid id PK
+        uuid user_id FK
+        uuid rate_category_id FK
+        string phone
+        string guardian_phone "no telp wali/keluarga"
+        string photo_path
+        date join_date
+        enum status "active, inactive, archived, banned"
+        datetime created_at
+        datetime updated_at
+    }
+
+    HOST_SENSITIVE_DATA {
+        uuid id PK
+        uuid host_id FK
+        string ktp_number_encrypted
+        string ktp_image_path
+        string bank_name
+        string bank_account_encrypted
+        string account_holder_name
+        datetime updated_at
+    }
+
+    BRANDS {
+        uuid id PK
+        string name
+        boolean is_obs
+        int target_hours_per_period "konfigurable per brand"
+        int payment_cycle_days
+        enum status "active, inactive"
+        datetime created_at
+    }
+
+    HOST_BRAND_ASSIGNMENTS {
+        uuid id PK
+        uuid host_id FK
+        uuid brand_id FK
+        boolean is_leader
+        enum status "active, inactive, banned"
+        datetime created_at
+        datetime updated_at
+    }
+
+    SCHEDULE_SLOTS {
+        uuid id PK
+        uuid assignment_id FK
+        enum slot_type "regular, pd"
+        time start_time
+        time end_time
+        boolean crosses_midnight "contoh 23:00 - 01:00"
+        boolean is_locked
+        enum status "active, inactive"
+        date effective_from
+        date effective_to
+        datetime updated_at
+    }
+
+    HOST_AVAILABILITY {
+        uuid id PK
+        uuid host_id FK
+        time available_from
+        time available_to
+        string note
+    }
+
+    SPECIAL_EVENTS {
+        uuid id PK
+        uuid brand_id FK
+        string name "PD, double date"
+        date start_date
+        date end_date
+        boolean open_full_schedule "jadwal dibuka kosong"
+        int max_slots_per_host
+        uuid created_by FK
+    }
+
+    EVENT_SLOT_CLAIMS {
+        uuid id PK
+        uuid event_id FK
+        uuid host_id FK
+        datetime start_at
+        datetime end_at
+        enum status "active, overridden, cancelled"
+        datetime claimed_at
+    }
+
+    BACKUP_REQUESTS {
+        uuid id PK
+        uuid slot_id FK
+        uuid requesting_host_id FK
+        uuid created_by FK "admin bisa buat atas nama host"
+        date backup_date
+        datetime start_at
+        datetime end_at
+        enum reason_type "sick, permit, other"
+        string reason
+        enum status "pending, acc_admin, open, filled, cancelled, rejected"
+        uuid approved_by FK
+        boolean auto_approved
+        datetime auto_approve_at "start_at dikurangi 30 menit"
+        boolean counts_toward_quota "true jika beda brand"
+        uuid filled_by_host_id FK
+        datetime cancelled_at
+        boolean penalty_applied
+        datetime created_at
+    }
+
+    BACKUP_NOMINEES {
+        uuid id PK
+        uuid backup_request_id FK
+        uuid nominee_host_id FK
+        enum response "pending, accepted, declined"
+    }
+
+    BACKUP_APPLICATIONS {
+        uuid id PK
+        uuid backup_request_id FK
+        uuid applicant_host_id FK
+        enum status "applied, approved, rejected, withdrawn"
+        datetime applied_at
+    }
+
+    BACKUP_QUOTAS {
+        uuid id PK
+        uuid host_id FK
+        string month_year
+        int quota_used
+        int quota_max
+        datetime updated_at
+    }
+
+    ATTENDANCES {
+        uuid id PK
+        uuid host_id FK
+        uuid slot_id FK
+        uuid backup_request_id FK
+        uuid brand_id FK
+        datetime check_in_at
+        datetime check_out_at
+        datetime report_due_at "check_in_at plus 24 jam"
+    }
+
+    LIVE_REPORTS {
+        uuid id PK
+        uuid attendance_id FK
+        uuid host_id FK
+        uuid brand_id FK
+        int session_count
+        decimal duration_hours
+        string notes
+        enum status "draft, submitted, flagged, approved"
+        datetime submitted_at
+    }
+
+    WORK_SESSIONS {
+        uuid id PK
+        uuid live_report_id FK
+        uuid host_id FK
+        uuid brand_id FK
+        uuid payment_period_id FK
+        date session_date
+        datetime start_at
+        datetime end_at
+        decimal duration_hours
+        enum session_type "regular, backup, double, disrupted, adjustment"
+        enum status "normal, flagged, carried_over"
+        string notes
+        datetime created_at
+    }
+
+    VIOLATION_TYPES {
+        uuid id PK
+        string name "telat, main HP, ketiduran, batal backup"
+        int default_points
+        int rating_impact "lebih kecil dari poin"
+        boolean is_active
+    }
+
+    BRAND_COMPLAINTS {
+        uuid id PK
+        uuid host_id FK
+        uuid brand_id FK
+        string description
+        uuid recorded_by FK
+        datetime created_at
+    }
+
+    POINT_LOGS {
+        uuid id PK
+        uuid host_id FK
+        uuid violation_type_id FK
+        uuid brand_complaint_id FK
+        enum source "internal, brand_complaint, backup_cancel, late_attachment"
+        int points_change
+        string reason
+        uuid recorded_by FK
+        string month_year
+        datetime created_at
+    }
+
+    MONTHLY_POINT_BALANCES {
+        uuid id PK
+        uuid host_id FK
+        string month_year
+        int opening_points "maksimal 100"
+        int current_points
+    }
+
+    HOST_RATINGS {
+        uuid id PK
+        uuid host_id FK
+        string month_year
+        decimal rating
+        uuid rated_by FK "penilaian admin, bukan sesama host"
+    }
+
+    WARNING_LETTERS {
+        uuid id PK
+        uuid host_id FK
+        uuid point_log_id FK
+        int level "SP1, SP2, SP3"
+        string reason
+        uuid issued_by FK
+        datetime issued_at
+    }
+
+    PAYMENT_PERIODS {
+        uuid id PK
+        uuid brand_id FK
+        date period_start
+        date period_end
+        int target_hours
+        decimal achieved_hours "di-cap sesuai target"
+        decimal carried_in_hours "sisa dari periode sebelumnya"
+        decimal carried_out_hours "kelebihan ke periode berikutnya"
+        enum status "in_progress, waiting_payment, requested, paid"
+        datetime locked_at "terkunci setelah request payment"
+        datetime created_at
+    }
+
+    PAYMENT_ITEMS {
+        uuid id PK
+        uuid payment_period_id FK
+        uuid host_id FK
+        int session_count
+        decimal hours
+        decimal rate_per_hour "snapshot saat periode ditutup"
+        decimal amount
+    }
+
+    HOUR_ADJUSTMENTS {
+        uuid id PK
+        uuid payment_period_id FK
+        uuid host_id FK
+        int sessions_added
+        decimal hours_added
+        string notes
+        uuid created_by FK
+        datetime created_at
+    }
+
+    PAYMENT_REQUESTS {
+        uuid id PK
+        uuid payment_period_id FK
+        uuid requested_by FK
+        datetime requested_at
+        enum status "requested, processing, paid"
+        string exported_report_url
+        datetime paid_at
+    }
+
+    CASH_ADVANCES {
+        uuid id PK
+        uuid host_id FK
+        uuid brand_id FK
+        enum type "early_payment, loan"
+        decimal total_amount
+        int installment_count
+        string notes
+        enum status "unpaid, in_progress, paid"
+        uuid recorded_by FK
+        datetime requested_at
+    }
+
+    CASH_ADVANCE_INSTALLMENTS {
+        uuid id PK
+        uuid cash_advance_id FK
+        uuid payment_period_id FK
+        int seq
+        decimal amount
+        uuid deducted_brand_id FK "diisi saat potongan diproses"
+        enum status "scheduled, deducted, skipped"
+        datetime deducted_at
+    }
+
+    SALARY_SLIPS {
+        uuid id PK
+        uuid host_id FK
+        uuid payment_period_id FK
+        decimal gross_amount
+        decimal advance_deduction
+        decimal net_amount
+        string pdf_path
+        datetime generated_at
+        datetime sent_at
+    }
+
+    ATTACHMENTS {
+        uuid id PK
+        string owner_type "backup_request, cash_advance, live_report, host_profile, payment_request"
+        uuid owner_id
+        string file_path
+        string mime_type
+        int size_kb
+        uuid uploaded_by FK
+        datetime uploaded_at
+    }
+
+    NOTIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        string type "backup_open, backup_acc, complaint, sp"
+        json payload
+        enum channel "web, discord_channel, discord_dm"
+        enum status "pending, sent, failed"
+        datetime sent_at
+    }
+
+    DISCORD_LINKS {
+        uuid id PK
+        uuid user_id FK
+        string discord_user_id
+        datetime linked_at
+    }
+
+    SYSTEM_SETTINGS {
+        string key PK "max_points, sp_thresholds, auto_approve_minutes, backup_quota_max, sick_letter_grace_hours"
+        json value
+        uuid updated_by FK
+        datetime updated_at
+    }
+
+    AUDIT_LOGS {
+        uuid id PK
+        uuid user_id FK
+        string action "login, create, update, delete, approve"
+        string target_table
+        uuid target_id
+        json old_value
+        json new_value
+        string ip_address
+        datetime timestamp
+    }

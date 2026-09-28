@@ -29,8 +29,21 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'status' => 'active',
+            'signup_source' => 'admin_created',
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /**
+     * Indicate that the user signed up themselves and awaits approval.
+     */
+    public function pending(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'pending',
+            'signup_source' => 'self_register',
+        ]);
     }
 
     /**

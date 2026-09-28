@@ -26,7 +26,6 @@ class ProfileController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'phone' => 'nullable|string|max:20',
             'avatar' => 'nullable|image|max:2048',
         ]);
 

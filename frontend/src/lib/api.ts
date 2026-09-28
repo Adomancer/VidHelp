@@ -58,6 +58,29 @@ export class ApiError extends Error {
 | Auth API
 |--------------------------------------------------------------------------
 */
+export type UserStatus = "pending" | "active" | "inactive" | "archived";
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  status: UserStatus;
+  roles: { name: string }[];
+}
+
+/** Returned when login succeeds. */
+export interface AuthSession {
+  user: AuthUser;
+  token: string;
+}
+
+/** Returned when an account was created but still needs admin approval. */
+export interface PendingSignup {
+  message: string;
+  status: "pending";
+}
+
 export const authApi = {
   login: (email: string, password: string) =>
     api("/auth/login", {
@@ -79,4 +102,8 @@ export const authApi = {
 
   googleRedirect: () =>
     api<{ url: string }>("/auth/google/redirect"),
+
+  /** Exchange the authorization code Google redirected back with. */
+  googleCallback: (code: string) =>
+    api<AuthSession | PendingSignup>(`/auth/google/callback?code=${encodeURIComponent(code)}`),
 };

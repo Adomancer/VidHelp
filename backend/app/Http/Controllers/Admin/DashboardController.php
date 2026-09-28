@@ -16,7 +16,7 @@ class DashboardController extends Controller
     {
         $stats = [
             'total_hosts' => User::role('host')->count(),
-            'active_hosts' => User::role('host')->where('is_active', true)->count(),
+            'active_hosts' => User::role('host')->where('status', 'active')->count(),
             'total_operators' => User::role('operator')->count(),
             'total_users' => User::count(),
         ];

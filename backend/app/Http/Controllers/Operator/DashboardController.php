@@ -16,7 +16,7 @@ class DashboardController extends Controller
     {
         $stats = [
             'total_hosts' => User::role('host')->count(),
-            'active_hosts' => User::role('host')->where('is_active', true)->count(),
+            'active_hosts' => User::role('host')->where('status', 'active')->count(),
             // TODO: Add schedule stats when schedule model exists
             'today_schedules' => 0,
             'pending_backups' => 0,
