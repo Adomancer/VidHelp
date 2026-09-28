@@ -40,6 +40,11 @@ class HostProfile extends Model
         return $this->hasOne(HostSensitiveData::class, 'host_id');
     }
 
+    public function availability(): HasMany
+    {
+        return $this->hasMany(HostAvailability::class, 'host_id')->orderBy('day_of_week')->orderBy('available_from');
+    }
+
     public function assignments(): HasMany
     {
         return $this->hasMany(HostBrandAssignment::class, 'host_id');

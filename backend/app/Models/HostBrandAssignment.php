@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['host_id', 'brand_id', 'is_leader', 'status'])]
 class HostBrandAssignment extends Model
@@ -27,5 +28,10 @@ class HostBrandAssignment extends Model
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
+    }
+
+    public function slots(): HasMany
+    {
+        return $this->hasMany(ScheduleSlot::class, 'assignment_id');
     }
 }

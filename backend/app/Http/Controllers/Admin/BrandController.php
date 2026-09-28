@@ -30,6 +30,21 @@ class BrandController extends Controller
         return response()->json(['brands' => $brands]);
     }
 
+    /**
+     * Hosts actively assigned to a brand, with their weekly availability (for placing slots).
+     */
+    public function hosts(Brand $brand): JsonResponse
+    {
+        $assignments = $brand->assignments()
+            ->where('status', 'active')
+            ->with(['host.user', 'host.availability'])
+            ->get()
+            ->sortBy('host.user.name')
+            ->values();
+
+        return response()->json(['assignments' => $assignments]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $brand = Brand::create($this->validated($request));

@@ -350,3 +350,77 @@ export const operatorApi = {
   updateAssignment: (token: string, id: string, data: { is_leader?: boolean; status?: AssignmentStatus }) =>
     api<{ assignment: Assignment }>(`/operator/assignments/${id}`, { method: "PUT", body: JSON.stringify(data), token }),
 };
+
+/*
+|--------------------------------------------------------------------------
+| Schedules & availability
+|--------------------------------------------------------------------------
+*/
+/** ISO weekday: 1 = Monday ... 7 = Sunday */
+export type DayOfWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export interface ScheduleSlot {
+  id: string;
+  assignment_id: string;
+  day_of_week: DayOfWeek;
+  slot_type: "regular" | "pd";
+  /** "HH:MM" */
+  start_time: string;
+  end_time: string;
+  crosses_midnight: boolean;
+  is_locked: boolean;
+  status: "active" | "inactive";
+  effective_from: string;
+  effective_to: string | null;
+  assignment: Assignment & { host?: HostProfile & { user: AuthUser } };
+}
+
+export interface SlotInput {
+  assignment_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  slot_type: ScheduleSlot["slot_type"];
+  effective_from: string;
+  effective_to: string | null;
+}
+
+export interface AvailabilityRange {
+  day_of_week: DayOfWeek;
+  available_from: string;
+  available_to: string;
+  note: string | null;
+}
+
+export interface BrandHost extends Omit<Assignment, "brand"> {
+  host: HostProfile & { user: AuthUser; availability: AvailabilityRange[] };
+}
+
+export const scheduleApi = {
+  list: (token: string, params: { brand_id?: string; host_id?: string; on?: string }) => {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as [string, string][]);
+    return api<{ slots: ScheduleSlot[] }>(`/operator/schedules?${query}`, { token });
+  },
+
+  brandHosts: (token: string, brandId: string) => api<{ assignments: BrandHost[] }>(`/operator/brands/${brandId}/hosts`, { token }),
+
+  create: (token: string, data: SlotInput) =>
+    api<{ slot: ScheduleSlot }>("/operator/schedules", { method: "POST", body: JSON.stringify(data), token }),
+
+  update: (token: string, id: string, data: Partial<SlotInput>) =>
+    api<{ slot: ScheduleSlot }>(`/operator/schedules/${id}`, { method: "PUT", body: JSON.stringify(data), token }),
+
+  /** Ends the slot from today on (deletes it if it hasn't started yet). */
+  remove: (token: string, id: string) => api<Message>(`/operator/schedules/${id}`, { method: "DELETE", token }),
+
+  /** Admin only. */
+  lock: (token: string, id: string, isLocked: boolean) =>
+    api<{ slot: ScheduleSlot }>(`/admin/schedules/${id}/lock`, { method: "PUT", body: JSON.stringify({ is_locked: isLocked }), token }),
+
+  mine: (token: string) => api<{ slots: ScheduleSlot[]; upcoming: ScheduleSlot[] }>("/host/schedules", { token }),
+
+  myAvailability: (token: string) => api<{ availability: AvailabilityRange[] }>("/host/availability", { token }),
+
+  saveAvailability: (token: string, ranges: AvailabilityRange[]) =>
+    api<{ availability: AvailabilityRange[] } & Message>("/host/availability", { method: "PUT", body: JSON.stringify({ ranges }), token }),
+};

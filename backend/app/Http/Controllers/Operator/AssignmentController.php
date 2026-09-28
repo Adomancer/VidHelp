@@ -61,7 +61,13 @@ class AssignmentController extends Controller
                 $assignment->is_leader = false;
             }
 
+            $leftBrand = $assignment->exists && $assignment->isDirty('status') && $assignment->status !== 'active';
             $assignment->save();
+
+            // A host who leaves a brand stops appearing on its schedule from today
+            if ($leftBrand) {
+                $assignment->slots()->where('status', 'active')->get()->each->retire();
+            }
 
             if ($assignment->is_leader) {
                 HostBrandAssignment::where('brand_id', $assignment->brand_id)

@@ -18,6 +18,7 @@ use App\Http\Controllers\Operator\AssignmentController;
 use App\Http\Controllers\Host\MyScheduleController;
 use App\Http\Controllers\Host\ProfileController;
 use App\Http\Controllers\Host\MyRatingController;
+use App\Http\Controllers\Host\AvailabilityController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -79,6 +80,9 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::put('/hosts/{host}', [AdminHostController::class, 'update']);
         Route::get('/hosts/{host}/ktp-image', [AdminHostController::class, 'ktpImage']);
 
+        // Lock/unlock schedule slots
+        Route::put('/schedules/{schedule}/lock', [ScheduleController::class, 'lock']);
+
         // Finance (Admin Only)
         Route::get('/finance', [FinanceController::class, 'index']);
         Route::get('/finance/payroll', [FinanceController::class, 'payroll']);
@@ -95,11 +99,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         // Hosts & brand assignments
         Route::get('/hosts', [OperatorHostController::class, 'index']);
         Route::get('/brands', [BrandController::class, 'index']);
+        Route::get('/brands/{brand}/hosts', [BrandController::class, 'hosts']);
         Route::post('/assignments', [AssignmentController::class, 'store']);
         Route::put('/assignments/{assignment}', [AssignmentController::class, 'update']);
 
         // Schedule Management
-        Route::apiResource('/schedules', ScheduleController::class);
+        Route::apiResource('/schedules', ScheduleController::class)->except('show');
 
         // Backup Host Management
         Route::get('/backup-hosts', [BackupHostController::class, 'index']);
@@ -119,7 +124,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::prefix('host')->middleware('role:host|operator|admin')->group(function () {
         // My Schedule (read-only)
         Route::get('/schedules', [MyScheduleController::class, 'index']);
-        Route::get('/schedules/{id}', [MyScheduleController::class, 'show']);
+        Route::get('/availability', [AvailabilityController::class, 'show']);
+        Route::put('/availability', [AvailabilityController::class, 'update']);
 
         // My Profile
         Route::get('/profile', [ProfileController::class, 'show']);

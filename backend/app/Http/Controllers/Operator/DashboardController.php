@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
+use App\Models\ScheduleSlot;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,8 +18,7 @@ class DashboardController extends Controller
         $stats = [
             'total_hosts' => User::role('host')->count(),
             'active_hosts' => User::role('host')->where('status', 'active')->count(),
-            // TODO: Add schedule stats when schedule model exists
-            'today_schedules' => 0,
+            'today_schedules' => ScheduleSlot::activeOn(today())->where('day_of_week', today()->dayOfWeekIso)->count(),
             'pending_backups' => 0,
         ];
 

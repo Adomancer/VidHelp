@@ -201,24 +201,29 @@ erDiagram
 
     SCHEDULE_SLOTS {
         uuid id PK
-        uuid assignment_id FK
+        uuid assignment_id FK "host + brand"
+        tinyint day_of_week "1=Senin ... 7=Minggu, berulang tiap minggu"
         enum slot_type "regular, pd"
         time start_time
         time end_time
-        boolean crosses_midnight "contoh 23:00 - 01:00"
-        boolean is_locked
+        boolean crosses_midnight "otomatis jika end <= start, contoh 23:00 - 01:00"
+        boolean is_locked "hanya admin yang bisa ubah/hapus/unlock"
         enum status "active, inactive"
         date effective_from
-        date effective_to
+        date effective_to "null = berlaku terus; hapus slot lama = isi tanggal ini"
+        datetime created_at
         datetime updated_at
     }
 
     HOST_AVAILABILITY {
         uuid id PK
         uuid host_id FK
+        tinyint day_of_week "1=Senin ... 7=Minggu"
         time available_from
-        time available_to
+        time available_to "boleh lewat tengah malam"
         string note
+        datetime created_at
+        datetime updated_at
     }
 
     SPECIAL_EVENTS {
