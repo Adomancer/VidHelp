@@ -125,7 +125,12 @@ export default function AdminUsersPage() {
               return (
                 <tr key={user.id} className="text-gray-200">
                   <td className="px-4 py-3">
-                    <p className="text-white">{user.name}</p>
+                    <p className="text-white">
+                      {user.name}
+                      {user.two_factor_enabled && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-purple-500/15 text-[10px] text-purple-200 align-middle">2FA</span>
+                      )}
+                    </p>
                     <p className="text-gray-400">{user.email}</p>
                   </td>
                   <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
@@ -160,6 +165,20 @@ export default function AdminUsersPage() {
                         className="px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50"
                       >
                         {user.status === "pending" ? "Approve" : "Activate"}
+                      </button>
+                    )}
+                    {user.two_factor_enabled && !isMe && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          if (window.confirm(`Reset 2FA for ${user.name}? They will be signed out and must set up 2FA again. Only do this if they lost their phone and recovery codes.`)) {
+                            run(user.id, () => adminApi.resetTwoFactor(token, user.id));
+                          }
+                        }}
+                        className="mr-2 px-3 py-1.5 rounded-md border border-purple-400/40 text-purple-200 hover:bg-purple-500/10 disabled:opacity-50"
+                      >
+                        Reset 2FA
                       </button>
                     )}
                     {user.status === "active" && !isMe && (

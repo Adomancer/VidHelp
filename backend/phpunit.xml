@@ -38,5 +38,7 @@
         <env name="DISCORD_CLIENT_SECRET" value="" force="true"/>
         <env name="DISCORD_CHANNEL_BACKUPS" value="" force="true"/>
         <env name="DISCORD_CHANNEL_ADMIN" value="" force="true"/>
+        <!-- Admin tests act without 2FA; TwoFactorTest turns the requirement on itself -->
+        <env name="TWO_FACTOR_REQUIRED_FOR_ADMINS" value="false" force="true"/>
     </php>
 </phpunit>

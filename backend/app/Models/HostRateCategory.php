@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['name', 'min_tenure_months', 'rate_per_hour'])]
 class HostRateCategory extends Model
 {
-    use HasUuids;
+    use Auditable, HasUuids;
 
     protected function casts(): array
     {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -25,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 #[Appends(['letter_status', 'letter_due_at'])]
 class BackupRequest extends Model
 {
-    use HasUuids;
+    use Auditable, HasUuids;
 
     protected function casts(): array
     {

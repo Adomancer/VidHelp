@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AuditLog;
 use App\Models\HostProfile;
 use App\Services\BackupService;
 use App\Services\Notifier;
@@ -47,3 +48,6 @@ Artisan::command('notifications:retry-discord', function (Notifier $notifier) {
 })->purpose('Resend Discord messages that failed or were never sent');
 
 Schedule::command('notifications:retry-discord')->everyFiveMinutes();
+
+// Delete audit rows older than vidhelp.audit.keep_days
+Schedule::command('model:prune', ['--model' => [AuditLog::class]])->dailyAt('01:00');

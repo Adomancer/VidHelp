@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, authApi } from "@/lib/api";
 import { consumeOAuthState, homePathFor, saveSession } from "@/lib/auth";
+import TwoFactorChallengeForm from "./TwoFactorChallengeForm";
 
 type Outcome =
   | { kind: "signed-in"; path: string }
   | { kind: "pending"; message: string }
+  | { kind: "two-factor"; challengeToken: string }
   | { kind: "error"; message: string };
 
 /**
@@ -27,6 +29,9 @@ async function finishGoogleLogin(params: URLSearchParams): Promise<Outcome> {
   try {
     const response = await authApi.googleCallback(code);
 
+    if ("two_factor" in response) {
+      return { kind: "two-factor", challengeToken: response.challenge_token };
+    }
     if (!("token" in response)) {
       return { kind: "pending", message: response.message };
     }
@@ -68,6 +73,10 @@ export default function GoogleCallback() {
 
   if (!outcome || outcome.kind === "signed-in") {
     return <p className="text-center text-gray-300">Signing you in…</p>;
+  }
+
+  if (outcome.kind === "two-factor") {
+    return <TwoFactorChallengeForm challengeToken={outcome.challengeToken} onRestart={() => router.replace("/login")} />;
   }
 
   return (

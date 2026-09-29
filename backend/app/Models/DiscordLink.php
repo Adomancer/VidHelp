@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['user_id', 'discord_user_id', 'discord_username', 'dm_channel_id', 'linked_at'])]
 class DiscordLink extends Model
 {
-    use HasUuids;
+    use Auditable, HasUuids;
 
     protected function casts(): array
     {

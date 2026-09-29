@@ -61,4 +61,24 @@ return [
         'max' => 5,
     ],
 
+    'two_factor' => [
+        // Admins must set up an authenticator app before they can use the app
+        // (false = optional: admins may turn it on or off themselves)
+        'required_for_admins' => (bool) env('TWO_FACTOR_REQUIRED_FOR_ADMINS', true),
+
+        // Name shown next to the account in the authenticator app
+        'issuer' => env('TWO_FACTOR_ISSUER', env('APP_NAME', 'VidHelp')),
+
+        // The code step of a sign-in expires after this many minutes / wrong codes
+        'challenge_minutes' => 5,
+        'challenge_attempts' => 5,
+
+        'recovery_codes' => 8,
+    ],
+
+    'audit' => [
+        // Audit rows older than this are deleted daily (0 = keep forever)
+        'keep_days' => (int) env('AUDIT_KEEP_DAYS', 365),
+    ],
+
 ];

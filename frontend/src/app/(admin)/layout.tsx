@@ -19,6 +19,8 @@ const links = [
   { href: "/admin/points", label: "Points & SP" },
   { href: "/admin/ratings", label: "Ratings" },
   { href: "/admin/payroll", label: "Payroll" },
+  { href: "/admin/audit", label: "Audit Log" },
+  { href: "/admin/security", label: "Security" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['event_id', 'host_id', 'start_at', 'end_at', 'status', 'claimed_by', 'claimed_at'])]
 class EventSlotClaim extends Model
 {
-    use HasUuids;
+    use Auditable, HasUuids;
 
     protected function casts(): array
     {

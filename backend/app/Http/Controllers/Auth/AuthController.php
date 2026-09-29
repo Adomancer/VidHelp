@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\SignsUserIn;
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\Notifier;
+use App\Services\TwoFactorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    use SignsUserIn;
+
     /**
      * Register a new user.
      */
@@ -43,7 +48,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Login user and return token.
+     * Login user and return token (or, for admins with 2FA, a challenge for the code step).
      */
     public function login(Request $request): JsonResponse
     {
@@ -55,6 +60,8 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
+            AuditLog::record('login_failed', $user, new: ['email' => $request->email, 'method' => 'password']);
+
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
@@ -66,10 +73,27 @@ class AuthController extends Controller
             ]);
         }
 
-        return response()->json([
-            'user' => $user->load('roles'),
-            'token' => $user->issueToken(),
+        return $this->signIn($user, 'password');
+    }
+
+    /**
+     * Second sign-in step for admins with 2FA: a code from the authenticator app or a recovery code.
+     */
+    public function twoFactorChallenge(Request $request, TwoFactorService $twoFactor): JsonResponse
+    {
+        $request->validate([
+            'challenge_token' => 'required|string',
+            'code' => 'nullable|string|required_without:recovery_code',
+            'recovery_code' => 'nullable|string',
         ]);
+
+        ['user' => $user, 'method' => $method, 'token_name' => $tokenName] = $twoFactor->completeChallenge(
+            $request->challenge_token,
+            $request->code,
+            $request->recovery_code,
+        );
+
+        return $this->issueSession($user, $method, $tokenName, twoFactor: true);
     }
 
     /**
@@ -78,6 +102,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
+        AuditLog::record('logout', $request->user());
 
         return response()->json(['message' => 'Logged out successfully']);
     }
@@ -88,7 +113,7 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json([
-            'user' => $request->user()->load('roles', 'permissions'),
+            'user' => $request->user()->forSession()->load('permissions'),
         ]);
     }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
@@ -9,16 +10,26 @@ import FormAlert from "./FormAlert";
 import GoogleButton from "./GoogleButton";
 import SubmitButton from "./SubmitButton";
 import TextField from "./TextField";
+import TwoFactorChallengeForm from "./TwoFactorChallengeForm";
 
 export default function LoginForm() {
   const router = useRouter();
+  const [challenge, setChallenge] = useState<string | null>(null);
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) => authApi.login(formValue(data, "email"), formValue(data, "password")),
-    ({ token, user }) => {
-      saveSession(token, user);
-      router.replace(homePathFor(user));
+    (result) => {
+      if ("two_factor" in result) {
+        setChallenge(result.challenge_token); // admin with 2FA: ask for the code next
+        return;
+      }
+      saveSession(result.token, result.user);
+      router.replace(homePathFor(result.user));
     }
   );
+
+  if (challenge) {
+    return <TwoFactorChallengeForm challengeToken={challenge} onRestart={() => setChallenge(null)} />;
+  }
 
   return (
     <div className="space-y-6">

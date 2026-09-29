@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -13,7 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['name', 'code', 'default_points', 'rating_impact', 'is_active'])]
 class ViolationType extends Model
 {
-    use HasUuids;
+    use Auditable, HasUuids;
 
     public const BACKUP_CANCEL = 'backup_cancel';
 

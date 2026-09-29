@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Concerns\Auditable;
+use App\Services\TwoFactorService;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -28,7 +30,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, HasRoles, HasUuids, SoftDeletes;
+    use Auditable, HasFactory, Notifiable, HasApiTokens, HasRoles, HasUuids, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.
@@ -64,6 +66,31 @@ class User extends Authenticatable
             str_starts_with($this->avatar, 'http') => $this->avatar,
             default => Storage::disk('public')->url($this->avatar),
         });
+    }
+
+    /**
+     * Admins who must still set up 2FA before using the app (sent with login and /auth/me).
+     */
+    protected function twoFactorSetupRequired(): Attribute
+    {
+        return Attribute::get(fn () => app(TwoFactorService::class)->needsSetup($this));
+    }
+
+    /** The user as the frontend keeps it after sign-in. */
+    public function forSession(): static
+    {
+        return $this->load('roles')->append('two_factor_setup_required');
+    }
+
+    /** Changes on every sign-in; not worth an audit row. */
+    public function auditExcept(): array
+    {
+        return ['last_login_at'];
+    }
+
+    public function twoFactorAuth(): HasOne
+    {
+        return $this->hasOne(TwoFactorAuth::class);
     }
 
     public function discordLink(): HasOne

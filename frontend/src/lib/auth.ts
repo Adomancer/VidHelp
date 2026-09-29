@@ -47,8 +47,11 @@ export function hasAnyRole(user: AuthUser, roles: RoleName[]): boolean {
   return user.roles.some((role) => roles.includes(role.name));
 }
 
-/** Landing page for a user, based on their highest role. */
+export const TWO_FACTOR_SETUP_PATH = "/two-factor/setup";
+
+/** Landing page for a user, based on their highest role (admins without required 2FA set it up first). */
 export function homePathFor(user: AuthUser): string {
+  if (user.two_factor_setup_required) return TWO_FACTOR_SETUP_PATH;
   if (hasAnyRole(user, ["admin"])) return "/admin/dashboard";
   if (hasAnyRole(user, ["operator"])) return "/operator/dashboard";
   return "/host/live";

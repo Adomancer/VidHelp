@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\SignsUserIn;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Notifier;
@@ -12,6 +13,8 @@ use Throwable;
 
 class GoogleAuthController extends Controller
 {
+    use SignsUserIn;
+
     /**
      * Get the Google consent screen URL.
      *
@@ -33,6 +36,7 @@ class GoogleAuthController extends Controller
      *
      * Existing accounts are matched by google_id, then by verified email (and linked).
      * Unknown accounts are registered as pending hosts awaiting admin approval.
+     * Admins with 2FA get a challenge for the code step instead of a token.
      */
     public function callback(Request $request): JsonResponse
     {
@@ -81,9 +85,6 @@ class GoogleAuthController extends Controller
             return response()->json(['message' => $reason, 'status' => $user->status], 403);
         }
 
-        return response()->json([
-            'user' => $user->load('roles'),
-            'token' => $user->issueToken('google-auth-token'),
-        ]);
+        return $this->signIn($user, 'google', 'google-auth-token');
     }
 }

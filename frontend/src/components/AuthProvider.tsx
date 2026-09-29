@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi, type AuthUser, type RoleName } from "@/lib/api";
-import { clearSession, hasAnyRole, homePathFor, loadSession, saveSession } from "@/lib/auth";
+import { clearSession, hasAnyRole, homePathFor, loadSession, saveSession, TWO_FACTOR_SETUP_PATH } from "@/lib/auth";
 
 interface AuthContextValue {
   user: AuthUser;
@@ -24,9 +24,18 @@ export function useAuth(): AuthContextValue {
 
 /**
  * Renders children only for a signed-in, active user with one of `roles`.
- * Signed-out users go to /login; users with the wrong role go to their own home page.
+ * Signed-out users go to /login; users with the wrong role go to their own home page;
+ * admins who must still set up 2FA go to the setup page (unless this is that page).
  */
-export function RequireAuth({ roles, children }: { roles: RoleName[]; children: React.ReactNode }) {
+export function RequireAuth({
+  roles,
+  allowTwoFactorSetup = false,
+  children,
+}: {
+  roles: RoleName[];
+  allowTwoFactorSetup?: boolean;
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const [session, setSession] = useState<{ token: string; user: AuthUser } | null>(null);
   const rolesKey = roles.join("|");
@@ -41,6 +50,8 @@ export function RequireAuth({ roles, children }: { roles: RoleName[]; children: 
         router.replace("/login");
       } else if (!hasAnyRole(result.user, rolesKey.split("|") as RoleName[])) {
         router.replace(homePathFor(result.user));
+      } else if (result.user.two_factor_setup_required && !allowTwoFactorSetup) {
+        router.replace(TWO_FACTOR_SETUP_PATH);
       } else {
         setSession(result);
       }
@@ -49,7 +60,7 @@ export function RequireAuth({ roles, children }: { roles: RoleName[]; children: 
     return () => {
       cancelled = true;
     };
-  }, [router, rolesKey]);
+  }, [router, rolesKey, allowTwoFactorSetup]);
 
   const setUser = useCallback((user: AuthUser) => {
     setSession((current) => {

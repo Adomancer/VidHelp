@@ -94,6 +94,9 @@ export interface AuthUser {
   status: UserStatus;
   signup_source: "admin_created" | "self_register";
   has_password: boolean;
+  two_factor_enabled: boolean;
+  /** Admin who must set up 2FA before using the app (only sent with login and /auth/me). */
+  two_factor_setup_required?: boolean;
   approved_at: string | null;
   last_login_at: string | null;
   created_at: string;
@@ -104,6 +107,13 @@ export interface AuthUser {
 export interface AuthSession {
   user: AuthUser;
   token: string;
+}
+
+/** Returned instead of a session when an admin with 2FA must enter a code next. */
+export interface TwoFactorChallenge {
+  two_factor: true;
+  challenge_token: string;
+  message: string;
 }
 
 /** Returned when an account was created but still needs admin approval. */
@@ -118,9 +128,16 @@ export interface Message {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    api<AuthSession>("/auth/login", {
+    api<AuthSession | TwoFactorChallenge>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
+    }),
+
+  /** Second sign-in step: a code from the authenticator app, or a recovery code. */
+  twoFactorChallenge: (challengeToken: string, answer: { code: string } | { recovery_code: string }) =>
+    api<AuthSession>("/auth/two-factor-challenge", {
+      method: "POST",
+      body: JSON.stringify({ challenge_token: challengeToken, ...answer }),
     }),
 
   register: (data: { name: string; email: string; password: string; password_confirmation: string }) =>
@@ -160,7 +177,44 @@ export const authApi = {
 
   /** Exchange the authorization code Google redirected back with. */
   googleCallback: (code: string) =>
-    api<AuthSession | PendingSignup>(`/auth/google/callback?code=${encodeURIComponent(code)}`),
+    api<AuthSession | PendingSignup | TwoFactorChallenge>(`/auth/google/callback?code=${encodeURIComponent(code)}`),
+};
+
+/*
+|--------------------------------------------------------------------------
+| Two-factor authentication (admins)
+|--------------------------------------------------------------------------
+*/
+export interface TwoFactorStatus {
+  available: boolean;
+  required: boolean;
+  enabled: boolean;
+  enabled_at: string | null;
+  recovery_codes_left: number;
+}
+
+export const twoFactorApi = {
+  status: (token: string) => api<TwoFactorStatus>("/two-factor", { token }),
+
+  /** A fresh secret; 2FA turns on only after confirm() with a code from the app. */
+  setup: (token: string) => api<{ secret: string; otpauth_url: string }>("/two-factor/setup", { method: "POST", token }),
+
+  confirm: (token: string, code: string) =>
+    api<Message & { recovery_codes: string[]; user: AuthUser }>("/two-factor/confirm", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+      token,
+    }),
+
+  regenerateRecoveryCodes: (token: string, code: string) =>
+    api<Message & { recovery_codes: string[] }>("/two-factor/recovery-codes", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+      token,
+    }),
+
+  disable: (token: string, code: string) =>
+    api<Message>("/two-factor", { method: "DELETE", body: JSON.stringify({ code }), token }),
 };
 
 /*
@@ -197,7 +251,41 @@ export const adminApi = {
       body: JSON.stringify({ role }),
       token,
     }),
+
+  /** Clear another admin's 2FA (lost phone); they set it up again at the next sign-in. */
+  resetTwoFactor: (token: string, id: string) =>
+    api<Message>(`/admin/users/${id}/two-factor/reset`, { method: "POST", token }),
+
+  auditLogs: (token: string, filters: AuditFilters & { page?: number }) => {
+    const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value).map(([key, value]) => [key, String(value)]));
+    return api<{ logs: Paginated<AuditLogEntry>; actions: string[]; target_tables: string[] }>(`/admin/audit-logs?${query}`, { token });
+  },
 };
+
+export interface AuditFilters {
+  action?: string;
+  target_table?: string;
+  target_id?: string;
+  user_id?: string;
+  search?: string;
+  from?: string;
+  to?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  target_table: string | null;
+  target_id: string | null;
+  target_label: string | null;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+  /** Who did it; null = the system (scheduled jobs) or a failed sign-in. */
+  user: { id: string; name: string; email: string } | null;
+}
 
 export const adminHostsApi = {
   rateCategories: (token: string) =>

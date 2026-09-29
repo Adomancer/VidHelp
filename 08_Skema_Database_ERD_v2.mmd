@@ -141,11 +141,12 @@ erDiagram
 
     TWO_FACTOR_AUTH {
         uuid id PK
-        uuid user_id FK
-        string secret_key_encrypted
-        string recovery_codes_hash
+        uuid user_id FK "unique; admins only"
+        string secret_key_encrypted "TOTP secret, encrypted"
+        json recovery_codes_hash "bcrypt hash per one-time code"
         boolean is_enabled
         datetime enabled_at
+        bigint last_used_step "blocks reusing a code"
     }
 
     HOST_RATE_CATEGORIES {
@@ -590,12 +591,14 @@ erDiagram
 
     AUDIT_LOGS {
         uuid id PK
-        uuid user_id FK
-        string action "login, create, update, delete, approve"
+        uuid user_id FK "actor; null = system or failed login"
+        string action "login, login_failed, logout, create, update, delete, approve, role_change, two_factor_*"
         string target_table
         uuid target_id
-        json old_value
+        string target_label
+        json old_value "hidden/encrypted fields stored as [hidden]"
         json new_value
         string ip_address
-        datetime timestamp
+        string user_agent
+        datetime created_at
     }

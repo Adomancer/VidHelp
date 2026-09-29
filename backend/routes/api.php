@@ -31,6 +31,8 @@ use App\Http\Controllers\Operator\ReportController;
 use App\Http\Controllers\Host\LiveController;
 use App\Http\Controllers\DiscordController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\TwoFactorController;
+use App\Http\Controllers\Admin\AuditLogController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -41,6 +43,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/two-factor-challenge', [AuthController::class, 'twoFactorChallenge']);
 
     // Password reset (link in the email opens the frontend /reset-password page)
     Route::post('/forgot-password', [PasswordResetController::class, 'sendLink']);
@@ -57,10 +60,22 @@ Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
-
     // Shared auth routes
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+
+    // My two-factor authentication (admins only). Reachable before 2FA is set up.
+    Route::prefix('two-factor')->middleware(['role:admin', 'throttle:20,1'])->group(function () {
+        Route::get('/', [TwoFactorController::class, 'show']);
+        Route::post('/setup', [TwoFactorController::class, 'setup']);
+        Route::post('/confirm', [TwoFactorController::class, 'confirm']);
+        Route::post('/recovery-codes', [TwoFactorController::class, 'regenerateRecoveryCodes']);
+        Route::delete('/', [TwoFactorController::class, 'destroy']);
+    });
+});
+
+// Everything else: admins must have 2FA set up first (while it's required)
+Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
     // In-app notifications (the bell) and Discord linking, for every role
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -87,6 +102,10 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::put('/users/{user}', [UserManagementController::class, 'update']);
         Route::post('/users/{user}/deactivate', [UserManagementController::class, 'deactivate']);
         Route::post('/users/{user}/activate', [UserManagementController::class, 'activate']);
+        Route::post('/users/{user}/two-factor/reset', [UserManagementController::class, 'resetTwoFactor']);
+
+        // Audit trail
+        Route::get('/audit-logs', [AuditLogController::class, 'index']);
 
         // Brands (create/edit; listing is in the operator group)
         Route::post('/brands', [BrandController::class, 'store']);
