@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
@@ -81,14 +82,20 @@ class UserManagementController extends Controller
     /**
      * Activate a user. The first activation of a pending signup records the approval.
      */
-    public function activate(Request $request, User $user): JsonResponse
+    public function activate(Request $request, User $user, Notifier $notifier): JsonResponse
     {
+        $firstApproval = $user->approved_at === null;
+
         $user->update([
             'status' => 'active',
             'approved_by' => $user->approved_by ?? $request->user()->id,
             'approved_at' => $user->approved_at ?? now(),
         ]);
         $user->ensureHostProfile();
+
+        if ($firstApproval) {
+            $notifier->toUsers($user, 'account_approved', 'Your account is approved', 'Welcome to VidHelp! You can sign in now.', '/host/live', dm: true);
+        }
 
         return response()->json(['message' => 'User activated']);
     }

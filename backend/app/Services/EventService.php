@@ -16,7 +16,7 @@ use Illuminate\Validation\ValidationException;
  */
 class EventService
 {
-    public function __construct(private HostCalendar $calendar)
+    public function __construct(private HostCalendar $calendar, private Notifier $notifier)
     {
     }
 
@@ -24,7 +24,15 @@ class EventService
     {
         $this->ensureNoOverlap($attributes['brand_id'], $attributes['start_date'], $attributes['end_date']);
 
-        return SpecialEvent::create([...$attributes, 'status' => 'active', 'created_by' => $by->id]);
+        $event = SpecialEvent::create([...$attributes, 'status' => 'active', 'created_by' => $by->id])->load('brand');
+
+        $title = "New event: {$event->name} ({$event->brand->name})";
+        $days = $event->start_date->format('j M').($event->end_date->equalTo($event->start_date) ? '' : ' – '.$event->end_date->format('j M'));
+        $body = "{$days}, {$event->daily_start_time}–{$event->daily_end_time}. Claim your blocks on the Schedule page (max {$event->max_slots_per_host}).";
+        $this->notifier->toUsers($this->notifier->hosts($event->brand_id), 'event_opened', $title, $body, '/host/schedule');
+        $this->notifier->toChannel('backups', 'event_opened', $title, $body, '/host/schedule');
+
+        return $event;
     }
 
     /** Only settings that don't move existing blocks can change. */

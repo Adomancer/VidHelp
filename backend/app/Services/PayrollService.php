@@ -26,6 +26,10 @@ use Illuminate\Validation\ValidationException;
  */
 class PayrollService
 {
+    public function __construct(private Notifier $notifier)
+    {
+    }
+
     /**
      * The brand's period containing `$date`, created on first use. Null before the brand's payroll start date.
      */
@@ -252,6 +256,15 @@ class PayrollService
 
                 $deducted = $this->deductAdvances($slip, $period);
                 $slip->update(['advance_deduction' => $deducted, 'net_amount' => $slip->gross_amount - $deducted]);
+
+                $this->notifier->toUsers(
+                    $item->host->user,
+                    'slip_ready',
+                    "Salary slip ready: {$period->brand->name}",
+                    'Net pay Rp '.number_format($slip->net_amount, 0, ',', '.')." for {$period->period_start->format('j M')} – {$period->period_end->format('j M Y')}.",
+                    "/host/pay/slips/{$slip->id}",
+                    dm: true,
+                );
 
                 return $slip;
             });

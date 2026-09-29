@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { RoleName } from "@/lib/api";
 import { RequireAuth } from "./AuthProvider";
+import NotificationBell from "./NotificationBell";
 import SidebarAccount from "./SidebarAccount";
 
 interface SidebarLayoutProps {
@@ -17,9 +18,12 @@ export default function SidebarLayout({ panel, accentClass, roles, links, childr
     <RequireAuth roles={roles}>
       <div className="min-h-screen bg-slate-950 flex">
         <aside className="hidden md:flex md:w-64 flex-col bg-slate-900 border-r border-slate-800 p-6 print:hidden">
-          <div className="mb-8">
-            <h2 className="text-xl font-bold text-white">VidHelp</h2>
-            <span className={`text-xs font-medium ${accentClass}`}>{panel}</span>
+          <div className="mb-8 flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-xl font-bold text-white">VidHelp</h2>
+              <span className={`text-xs font-medium ${accentClass}`}>{panel}</span>
+            </div>
+            <NotificationBell align="left" />
           </div>
           <nav className="flex-1 space-y-2">
             {links.map((link) => (

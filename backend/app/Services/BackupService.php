@@ -24,6 +24,7 @@ class BackupService
         private PointService $points,
         private HostCalendar $calendar,
         private EventCalendar $events,
+        private Notifier $notifier,
     ) {
     }
 
@@ -56,7 +57,7 @@ class BackupService
             throw ValidationException::withMessages(['backup_date' => ['A backup is already requested for this slot on that date.']]);
         }
 
-        return BackupRequest::create([
+        $backup = BackupRequest::create([
             ...$reason,
             'slot_id' => $slot->id,
             'brand_id' => $slot->assignment->brand_id,
@@ -71,6 +72,10 @@ class BackupService
             'auto_open_at' => $approved ? null : now()->addMinutes(config('vidhelp.backup.auto_open_after_minutes')),
             'auto_fill_at' => $start->subMinutes(config('vidhelp.backup.auto_fill_before_minutes')),
         ]);
+
+        $approved ? $this->announceOpen($backup) : $this->announceRequested($backup);
+
+        return $backup;
     }
 
     /**
@@ -140,7 +145,7 @@ class BackupService
      */
     public function fill(BackupRequest $request, HostProfile $host, bool $auto = false): BackupRequest
     {
-        return DB::transaction(function () use ($request, $host, $auto) {
+        $filled = DB::transaction(function () use ($request, $host, $auto) {
             $request = BackupRequest::lockForUpdate()->findOrFail($request->id);
 
             if ($request->status !== 'open') {
@@ -170,14 +175,20 @@ class BackupService
 
             return $request;
         });
+
+        $this->announceFilled($filled, $host);
+
+        return $filled;
     }
 
     /**
      * Undo a fill: the cover's application becomes `$applicationStatus`
      * ("cancelled" = they dropped out → penalty), quota is refunded, request reopens.
      */
-    public function unfill(BackupRequest $request, string $applicationStatus): void
+    public function unfill(BackupRequest $request, string $applicationStatus, bool $announce = true): void
     {
+        $previousCover = $request->filler;
+
         DB::transaction(function () use ($request, $applicationStatus) {
             if ($request->counts_toward_quota) {
                 BackupQuota::for($request->filled_by_host_id, $request->quotaMonth())->decrement('quota_used');
@@ -199,6 +210,17 @@ class BackupService
                 'counts_toward_quota' => false,
             ]);
         });
+
+        if (! $announce) {
+            return;
+        }
+
+        // Removed by an admin (not dropped): tell the host they are off it
+        if ($previousCover && $applicationStatus !== 'cancelled') {
+            $this->notifier->toUsers($previousCover->user, 'backup_unassigned', "You no longer cover {$request->brand->name}", $this->window($request), '/host/backups', dm: true);
+        }
+
+        $this->announceOpen($request->fresh(), reopened: true);
     }
 
     /**
@@ -208,7 +230,7 @@ class BackupService
     {
         DB::transaction(function () use ($request, $status) {
             if ($request->status === 'filled') {
-                $this->unfill($request, 'rejected');
+                $this->unfill($request, 'rejected', announce: false);
             }
 
             $request->applications()->where('status', 'applied')->update(['status' => 'rejected', 'decided_at' => now()]);
@@ -224,10 +246,15 @@ class BackupService
      */
     public function autoProcess(): array
     {
-        $opened = BackupRequest::where('status', 'pending')
+        $unreviewed = BackupRequest::where('status', 'pending')
             ->where('auto_open_at', '<=', now())
             ->where('end_at', '>', now())
-            ->update(['status' => 'open', 'auto_approved' => true, 'approved_at' => now()]);
+            ->get();
+
+        foreach ($unreviewed as $request) {
+            $request->update(['status' => 'open', 'auto_approved' => true, 'approved_at' => now()]);
+            $this->announceOpen($request);
+        }
 
         $filled = 0;
         $due = BackupRequest::where('status', 'open')
@@ -236,17 +263,80 @@ class BackupService
             ->get();
 
         foreach ($due as $request) {
+            $picked = false;
             foreach ($this->rankedApplicants($request) as $application) {
                 try {
                     $this->fill($request, $application->applicant, auto: true);
                     $filled++;
+                    $picked = true;
                     break;
                 } catch (ValidationException) {
                     continue; // e.g. became busy or quota full since applying
                 }
             }
+
+            // Nobody (eligible) applied: warn the admins once
+            if (! $picked && ! $request->no_cover_alerted_at) {
+                $request->update(['no_cover_alerted_at' => now()]);
+                $this->announceNoCover($request);
+            }
         }
 
-        return ['opened' => $opened, 'filled' => $filled];
+        return ['opened' => $unreviewed->count(), 'filled' => $filled];
+    }
+
+    /** A host asked for cover; admins/operators decide. */
+    public function announceRequested(BackupRequest $request): void
+    {
+        $request->loadMissing(['brand', 'requester.user']);
+        $title = "{$request->requester->user->name} needs a backup";
+        $body = "{$request->brand->name} · {$this->window($request)}. Waiting for approval.";
+
+        $this->notifier->toUsers($this->notifier->staff(), 'backup_requested', $title, $body, '/operator/backups');
+        $this->notifier->toChannel('admin', 'backup_requested', $title, $body, '/operator/backups');
+    }
+
+    /** The request is open: every other host may apply. */
+    public function announceOpen(BackupRequest $request, bool $reopened = false): void
+    {
+        $request->loadMissing(['brand', 'requester.user']);
+        $title = ($reopened ? 'Backup needed again: ' : 'Backup needed: ').$request->brand->name;
+        $body = "{$this->window($request)} · for {$request->requester->user->name}. Apply on the Backup tab.";
+
+        $this->notifier->toUsers($this->notifier->hosts(exceptHostId: $request->requesting_host_id), 'backup_opened', $title, $body, '/host/backups');
+        $this->notifier->toChannel('backups', 'backup_opened', $title, $body, '/host/backups');
+    }
+
+    private function announceFilled(BackupRequest $request, HostProfile $cover): void
+    {
+        $request->loadMissing(['brand', 'requester.user']);
+        $cover->loadMissing('user');
+        $window = "{$request->brand->name} · {$this->window($request)}";
+
+        $this->notifier->toUsers($cover->user, 'backup_picked', "You're covering {$request->brand->name}", "{$window}, for {$request->requester->user->name}.", '/host/schedule', dm: true);
+        $this->notifier->toUsers($request->requester->user, 'backup_covered', 'Your backup is covered', "{$cover->user->name} covers {$window}.", '/host/backups', dm: true);
+
+        if ($request->auto_filled) {
+            $title = "Auto-picked {$cover->user->name}";
+            $body = "Covers {$request->requester->user->name} on {$window}; nobody picked before the deadline.";
+            $this->notifier->toUsers($this->notifier->admins(), 'backup_auto_picked', $title, $body, '/operator/backups');
+            $this->notifier->toChannel('admin', 'backup_auto_picked', $title, $body, '/operator/backups');
+        }
+    }
+
+    private function announceNoCover(BackupRequest $request): void
+    {
+        $request->loadMissing(['brand', 'requester.user']);
+        $title = "Nobody can cover {$request->requester->user->name}";
+        $body = "{$request->brand->name} · {$this->window($request)} starts soon and no eligible host applied. Assign someone by hand.";
+
+        $this->notifier->toUsers($this->notifier->staff(), 'backup_no_cover', $title, $body, '/operator/backups');
+        $this->notifier->toChannel('admin', 'backup_no_cover', $title, $body, '/operator/backups');
+    }
+
+    /** "Tue 6 Oct 14:00–16:00" */
+    private function window(BackupRequest $request): string
+    {
+        return $request->start_at->format('D j M H:i').'–'.$request->end_at->format('H:i');
     }
 }

@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
  */
 class AttendanceService
 {
-    public function __construct(private EventCalendar $events, private PayrollService $payroll)
+    public function __construct(private EventCalendar $events, private PayrollService $payroll, private Notifier $notifier)
     {
     }
 
@@ -256,6 +256,7 @@ class AttendanceService
                 $this->createWorkSession($report, $attendance, $report->duration_hours);
             } else {
                 $report->fill(['status' => 'flagged'])->save();
+                $this->announceFlagged($report, $attendance);
             }
 
             return $report;
@@ -319,6 +320,8 @@ class AttendanceService
 
         $report->update(['status' => 'rejected', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
 
+        $this->notifier->toUsers($report->host->user, 'report_rejected', 'Your live report was rejected', "{$report->brand->name}, {$report->attendance->scheduled_start_at->format('D j M H:i')}: {$note}", '/host/live', dm: true);
+
         return $report;
     }
 
@@ -344,5 +347,25 @@ class AttendanceService
         $this->payroll->assign($session);
 
         return $session;
+    }
+
+    /** A report needs a human decision. */
+    private function announceFlagged(LiveReport $report, Attendance $attendance): void
+    {
+        $labels = [
+            'late_report' => 'sent late',
+            'no_check_out' => 'no check-out',
+            'more_than_scheduled' => 'more time than scheduled',
+            'less_than_scheduled' => 'less time than scheduled',
+            'more_than_attended' => 'more time than checked in',
+        ];
+        $reasons = array_map(fn (string $reason) => $labels[$reason] ?? $reason, $report->flag_reasons ?? []);
+
+        $attendance->loadMissing(['host.user', 'brand']);
+        $title = "Report to review: {$attendance->host->user->name}";
+        $body = "{$attendance->brand->name}, {$attendance->scheduled_start_at->format('D j M H:i')}: ".implode(', ', $reasons).'.';
+
+        $this->notifier->toUsers($this->notifier->staff(), 'report_flagged', $title, $body, '/operator/reports');
+        $this->notifier->toChannel('admin', 'report_flagged', $title, $body, '/operator/reports');
     }
 }

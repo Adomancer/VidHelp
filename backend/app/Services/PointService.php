@@ -21,6 +21,10 @@ use Illuminate\Validation\ValidationException;
  */
 class PointService
 {
+    public function __construct(private Notifier $notifier)
+    {
+    }
+
     /**
      * The points period that contains a date, e.g. 2026-11-15 → [2026-10-01, 2026-12-31].
      *
@@ -88,7 +92,14 @@ class PointService
             ]);
 
             $balance = $this->recalculate($host, $start);
-            $this->issueWarningIfDue($host, $balance, $log);
+            $letter = $this->issueWarningIfDue($host, $balance, $log);
+
+            if ($log->points_change < 0) {
+                $this->announceDeduction($host, $log, $balance);
+            }
+            if ($letter) {
+                $this->announceWarning($host, $letter);
+            }
 
             return $log;
         });
@@ -179,7 +190,7 @@ class PointService
     {
         [$start] = $this->periodFor(today());
 
-        return WarningLetter::create([
+        $letter = WarningLetter::create([
             'host_id' => $host->id,
             'level' => $level,
             'period_start' => $start->toDateString(),
@@ -187,6 +198,34 @@ class PointService
             'issued_by' => $by->id,
             'issued_at' => now(),
         ]);
+        $this->announceWarning($host, $letter);
+
+        return $letter;
+    }
+
+    private function announceDeduction(HostProfile $host, PointLog $log, PointBalance $balance): void
+    {
+        $what = $log->violationType?->name ?? 'Point deduction';
+
+        $this->notifier->toUsers(
+            $host->user,
+            'points_deducted',
+            "{$log->points_change} points: {$what}",
+            trim(($log->reason ? "{$log->reason} " : '')."You now have {$balance->current_points} points."),
+            '/host/rating',
+            dm: true,
+        );
+    }
+
+    private function announceWarning(HostProfile $host, WarningLetter $letter): void
+    {
+        $host->loadMissing('user');
+
+        $this->notifier->toUsers($host->user, 'sp_issued', "You received SP{$letter->level}", $letter->reason, '/host/rating', dm: true);
+
+        $title = "SP{$letter->level} for {$host->user->name}";
+        $this->notifier->toUsers($this->notifier->admins(), 'sp_issued', $title, $letter->reason, '/admin/points');
+        $this->notifier->toChannel('admin', 'sp_issued', $title, $letter->reason, '/admin/points');
     }
 
     public function voidWarning(WarningLetter $letter, User $by): void

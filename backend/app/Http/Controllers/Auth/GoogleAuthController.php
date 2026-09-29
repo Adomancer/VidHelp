@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Facades\Socialite;
@@ -61,6 +62,7 @@ class GoogleAuthController extends Controller
                 'signup_source' => 'self_register',
             ]);
             $user->assignRole('host');
+            app(Notifier::class)->signupPending($user);
 
             return response()->json([
                 'message' => 'Account created. An admin needs to approve it before you can sign in.',

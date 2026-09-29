@@ -11,6 +11,7 @@ import FormAlert from "@/components/FormAlert";
 import SubmitButton from "@/components/SubmitButton";
 import TextField from "@/components/TextField";
 import UserAvatar from "@/components/UserAvatar";
+import DiscordConnect from "@/components/DiscordConnect";
 
 type HostProfileData = NonNullable<MyProfile["host_profile"]>;
 
@@ -36,6 +37,7 @@ export default function HostProfilePage() {
       {profile.data && <PersonalForm data={profile.data} onUpdated={applyUpdate} />}
       {host && <BrandsCard host={host} />}
       {host && <IdentityForm host={host} onUpdated={applyUpdate} />}
+      <DiscordConnect />
       <PasswordSection />
 
       <button

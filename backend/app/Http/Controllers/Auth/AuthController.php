@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,6 +34,7 @@ class AuthController extends Controller
 
         // Default role is host; an admin must approve the account before login
         $user->assignRole('host');
+        app(Notifier::class)->signupPending($user);
 
         return response()->json([
             'message' => 'Account created. An admin needs to approve it before you can sign in.',

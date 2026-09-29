@@ -29,6 +29,8 @@ use App\Http\Controllers\Host\BackupController as HostBackupController;
 use App\Http\Controllers\Operator\BackupController as OperatorBackupController;
 use App\Http\Controllers\Operator\ReportController;
 use App\Http\Controllers\Host\LiveController;
+use App\Http\Controllers\DiscordController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -59,6 +61,17 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Shared auth routes
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+
+    // In-app notifications (the bell) and Discord linking, for every role
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll']);
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
+    Route::get('/discord', [DiscordController::class, 'show']);
+    Route::get('/discord/connect-url', [DiscordController::class, 'connectUrl']);
+    Route::post('/discord/link', [DiscordController::class, 'link']);
+    Route::delete('/discord/link', [DiscordController::class, 'unlink']);
+    Route::post('/discord/test', [DiscordController::class, 'test']);
 
     /*
     |----------------------------------------------------------------------

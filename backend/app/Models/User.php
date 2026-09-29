@@ -66,6 +66,11 @@ class User extends Authenticatable
         });
     }
 
+    public function discordLink(): HasOne
+    {
+        return $this->hasOne(DiscordLink::class);
+    }
+
     public function hostProfile(): HasOne
     {
         return $this->hasOne(HostProfile::class);

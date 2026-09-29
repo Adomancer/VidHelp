@@ -552,20 +552,33 @@ erDiagram
     }
 
     NOTIFICATIONS {
-        uuid id PK
-        uuid user_id FK
-        string type "backup_open, backup_acc, complaint, sp"
+        uuid id PK "satu baris per pengiriman"
+        uuid user_id FK "null untuk pesan ke channel Discord"
+        string type "backup_opened, backup_picked, report_flagged, sp_issued, slip_ready, ..."
+        string title
+        string body
+        string link "halaman frontend, mis. /host/backups"
         json payload
         enum channel "web, discord_channel, discord_dm"
-        enum status "pending, sent, failed"
+        string target "id channel Discord untuk discord_channel"
+        enum status "pending, sent, failed, skipped"
+        tinyint attempts
+        string error
         datetime sent_at
+        datetime read_at "untuk notifikasi web"
+        datetime created_at
+        datetime updated_at
     }
 
     DISCORD_LINKS {
         uuid id PK
-        uuid user_id FK
-        string discord_user_id
+        uuid user_id FK,UK
+        string discord_user_id UK
+        string discord_username
+        string dm_channel_id "disimpan setelah DM pertama"
         datetime linked_at
+        datetime created_at
+        datetime updated_at
     }
 
     SYSTEM_SETTINGS {

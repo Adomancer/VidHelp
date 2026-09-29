@@ -103,6 +103,7 @@ class BackupController extends Controller
         }
 
         $backup->update(['status' => 'open', 'approved_by' => $request->user()->id, 'approved_at' => now()]);
+        $this->backups->announceOpen($backup);
 
         return response()->json(['message' => 'Approved. Hosts can now apply.']);
     }

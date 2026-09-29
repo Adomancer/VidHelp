@@ -2,6 +2,7 @@
 
 use App\Models\HostProfile;
 use App\Services\BackupService;
+use App\Services\Notifier;
 use App\Services\PayrollService;
 use App\Services\PointService;
 use Illuminate\Foundation\Inspiring;
@@ -39,3 +40,10 @@ Artisan::command('payroll:roll-periods', function (PayrollService $payroll) {
 })->purpose('Move ended payment periods to waiting_payment and open current periods');
 
 Schedule::command('payroll:roll-periods')->dailyAt('00:05');
+
+Artisan::command('notifications:retry-discord', function (Notifier $notifier) {
+    $retried = $notifier->retry();
+    $this->info("Retried {$retried} Discord message(s).");
+})->purpose('Resend Discord messages that failed or were never sent');
+
+Schedule::command('notifications:retry-discord')->everyFiveMinutes();
