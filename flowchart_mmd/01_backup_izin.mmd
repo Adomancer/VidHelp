@@ -1,0 +1,26 @@
+flowchart TD
+    A([Host A butuh izin / backup]) --> B[Isi form request:<br/>alasan + lampiran]
+    B --> C{Jenis request?}
+    C -->|Umum| D[Tampil di Bursa Backup<br/>Status: OPEN]
+    C -->|Langsung ke nama tertentu| E{Min. 2 nama<br/>dan maks. batas?}
+    E -->|Tidak| B
+    E -->|Ya| F[Notifikasi Discord<br/>ke host yang dipilih]
+    D --> G[Host B apply ambil]
+    F --> G
+    G --> H{Host B valid?}
+    H -->|Bentrok jadwal| X1[Ditolak sistem]
+    H -->|Nonaktif / banned| X1
+    H -->|Valid| I[Status: PENDING]
+    I --> J[Super Admin cek detail:<br/>brand, jam, catatan masalah,<br/>lampiran surat sakit]
+    J --> K{Keputusan}
+    K -->|Tolak| L[Request kembali OPEN /<br/>host diberi notifikasi]
+    K -->|ACC| M[Nama di jadwal otomatis berganti]
+    K -->|Tidak respons<br/>sampai H-30 menit| N[Auto-ACC]
+    N --> M
+    M --> O[Jam masuk kolom BK<br/>payment host pengganti]
+    O --> P[Notifikasi status approval<br/>via Discord]
+    P --> Q([Selesai])
+    L --> D
+
+    R([Kondisi darurat]) --> S[Super Admin buat request<br/>atas nama host]
+    S --> D

@@ -29,7 +29,7 @@ class BackupController extends Controller
 
         return response()->json([
             'requests' => BackupRequest::where('requesting_host_id', $host->id)
-                ->with(['brand:id,name', 'filler.user', 'attachments'])
+                ->with(['brand:id,name', 'filler.user', 'attachments', 'nominees.host.user'])
                 ->latest('start_at')
                 ->limit(30)
                 ->get(),
@@ -45,16 +45,17 @@ class BackupController extends Controller
     }
 
     /**
-     * "Backup needs": open requests from other hosts, with whether I can apply.
+     * "Backup needs": requests from other hosts still taking applicants (open to everyone,
+     * or naming specific hosts), with whether I can apply. Ones that name me come first.
      */
     public function needs(Request $request): JsonResponse
     {
         $host = $this->host($request);
 
-        $needs = BackupRequest::where('status', 'open')
-            ->where('end_at', '>', now())
+        $needs = BackupRequest::whereIn('status', ['open', 'pending'])
+            ->where('start_at', '>', now())
             ->where('requesting_host_id', '!=', $host->id)
-            ->with(['brand:id,name', 'requester.user', 'applications' => fn ($q) => $q->where('applicant_host_id', $host->id)])
+            ->with(['brand:id,name', 'requester.user', 'nominees.host.user', 'applications' => fn ($q) => $q->where('applicant_host_id', $host->id)])
             ->orderBy('start_at')
             ->get()
             ->map(function (BackupRequest $backup) use ($host) {
@@ -62,17 +63,21 @@ class BackupController extends Controller
 
                 return [
                     ...$backup->publicSummary(),
+                    'asked_me' => $backup->nominees->contains('nominee_host_id', $host->id),
                     'same_brand' => $this->backups->isSameBrand($host, $backup),
                     'my_application' => $mine?->only('id', 'status'),
                     'ineligible_reason' => $mine?->status === 'applied' ? null : $this->backups->ineligibleReason($host, $backup),
                 ];
-            });
+            })
+            ->sortByDesc('asked_me')
+            ->values();
 
         return response()->json(['needs' => $needs]);
     }
 
     /**
-     * My slot occurrences in the next 14 days that don't have a backup request yet.
+     * My slot occurrences in the next 14 days that I can still request a backup for
+     * (far enough ahead, and without a request yet).
      */
     public function slots(Request $request): JsonResponse
     {
@@ -90,12 +95,13 @@ class BackupController extends Controller
             ->map(fn (BackupRequest $backup) => $backup->slot_id.'|'.$backup->backup_date->toDateString())
             ->flip();
 
+        $earliest = now()->addHours(config('vidhelp.backup.request_min_hours_before'));
         $occurrences = [];
         for ($day = CarbonImmutable::today(); $day->lt(today()->addDays(14)); $day = $day->addDay()) {
             foreach ($slots as $slot) {
                 [$start, $end] = $slot->occurrenceOn($day);
                 $runs = $slot->runsOn($day) && ! $this->events->replacing($slot->assignment->brand_id, $day);
-                if ($runs && $end->isFuture() && ! $taken->has($slot->id.'|'.$day->toDateString())) {
+                if ($runs && $start->gte($earliest) && ! $taken->has($slot->id.'|'.$day->toDateString())) {
                     $occurrences[] = [
                         'slot_id' => $slot->id,
                         'date' => $day->toDateString(),
@@ -113,32 +119,62 @@ class BackupController extends Controller
     }
 
     /**
-     * Ask for a backup for one occurrence of my slot. Waits for admin approval.
+     * Hosts I could name for a direct request on one occurrence of my slot, free ones first.
+     */
+    public function candidates(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'slot_id' => 'required|uuid',
+            'backup_date' => 'required|date_format:Y-m-d',
+        ]);
+
+        $draft = $this->backups->draft($this->mySlot($request, $validated['slot_id']), $validated['backup_date']);
+
+        return response()->json([
+            'candidates' => $this->backups->candidates($draft)
+                ->map(fn (array $candidate) => collect($candidate)->only('host_id', 'name', 'avatar_url', 'same_brand', 'eligible', 'ineligible_reason')),
+        ]);
+    }
+
+    /**
+     * Ask for a backup for one occurrence of my slot: open to every host, or only to the
+     * hosts I name (direct). It shows on the backup board right away.
      */
     public function store(Request $request): JsonResponse
     {
-        $host = $this->host($request);
-
         $validated = $request->validate([
             'slot_id' => 'required|uuid',
             'backup_date' => 'required|date_format:Y-m-d',
             'reason_type' => 'required|in:sick,permit,other',
             'reason' => 'nullable|string|max:1000',
+            'request_type' => 'nullable|in:open,direct',
+            'host_ids' => [
+                'exclude_unless:request_type,direct', 'required', 'array',
+                'min:'.config('vidhelp.backup.direct_min_hosts'), 'max:'.config('vidhelp.backup.direct_max_hosts'),
+            ],
+            'host_ids.*' => 'uuid|distinct',
+            'letter' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
+        ], [
+            'host_ids.required' => 'Choose the hosts you want to ask.',
+            'host_ids.min' => 'Choose at least :min hosts.',
+            'host_ids.max' => 'Choose at most :max hosts.',
         ]);
 
-        $slot = ScheduleSlot::whereKey($validated['slot_id'])
-            ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
-            ->first() ?? throw ValidationException::withMessages(['slot_id' => ['Choose one of your own slots.']]);
-
         $backup = $this->backups->create(
-            $slot,
+            $this->mySlot($request, $validated['slot_id']),
             $validated['backup_date'],
             ['reason_type' => $validated['reason_type'], 'reason' => $validated['reason'] ?? null],
             $request->user(),
-            approved: false,
+            byStaff: false,
+            nomineeIds: $validated['host_ids'] ?? [],
+            letter: $request->file('letter'),
         );
 
-        return response()->json(['request' => $backup->load('brand:id,name'), 'message' => 'Backup requested. Waiting for admin approval.'], 201);
+        $message = $backup->request_type === 'direct'
+            ? 'Backup requested. The hosts you chose were asked to cover it.'
+            : 'Backup requested. Other hosts can apply now.';
+
+        return response()->json(['request' => $backup->load(['brand:id,name', 'attachments', 'nominees.host.user']), 'message' => $message], 201);
     }
 
     /**
@@ -149,7 +185,7 @@ class BackupController extends Controller
         $this->ensureOwnRequest($request, $backup);
 
         if (! in_array($backup->status, ['pending', 'open'])) {
-            return response()->json(['message' => 'A cover has already been picked. Ask an admin to cancel it.'], 422);
+            return response()->json(['message' => 'A cover has already been approved. Ask an admin to cancel it.'], 422);
         }
 
         $this->backups->close($backup, 'cancelled');
@@ -165,53 +201,29 @@ class BackupController extends Controller
         $this->ensureOwnRequest($request, $backup);
         $request->validate(['letter' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120']);
 
-        $file = $request->file('letter');
-        $backup->attachments()->create([
-            'file_path' => $file->store('backup-letters', 'local'),
-            'original_name' => $file->getClientOriginalName(),
-            'mime_type' => $file->getMimeType(),
-            'size_kb' => (int) ceil($file->getSize() / 1024),
-            'uploaded_by' => $request->user()->id,
-        ]);
+        $this->backups->attachLetter($backup, $request->file('letter'), $request->user());
 
         return response()->json(['request' => $backup->fresh(['brand:id,name', 'attachments']), 'message' => 'Letter uploaded']);
     }
 
     /**
-     * Offer to cover an open request.
+     * Offer to cover a request. The admin approves or rejects it.
      */
     public function apply(Request $request, BackupRequest $backup): JsonResponse
     {
-        $host = $this->host($request);
+        $this->backups->apply($backup, $this->host($request));
 
-        if (! $backup->isOpenForApplications()) {
-            return response()->json(['message' => 'This backup is no longer open.'], 422);
-        }
-        if ($reason = $this->backups->ineligibleReason($host, $backup)) {
-            return response()->json(['message' => $reason], 422);
-        }
-
-        $backup->applications()->updateOrCreate(
-            ['applicant_host_id' => $host->id],
-            ['status' => 'applied', 'decided_at' => null]
-        );
-
-        return response()->json(['message' => 'Applied. An admin will pick who covers it.']);
+        return response()->json(['message' => 'Applied. Waiting for an admin to approve it.']);
     }
 
     /**
-     * Take back my application before I'm picked.
+     * Take back my application before the admin decides.
      */
     public function withdraw(Request $request, BackupRequest $backup): JsonResponse
     {
-        $updated = $backup->applications()
-            ->where('applicant_host_id', $this->host($request)->id)
-            ->where('status', 'applied')
-            ->update(['status' => 'withdrawn', 'decided_at' => now()]);
+        $this->backups->withdraw($backup, $this->host($request));
 
-        return $updated
-            ? response()->json(['message' => 'Application withdrawn'])
-            : response()->json(['message' => 'You have no pending application for this backup.'], 422);
+        return response()->json(['message' => 'Application withdrawn']);
     }
 
     /**
@@ -236,6 +248,15 @@ class BackupController extends Controller
     private function host(Request $request): HostProfile
     {
         return $request->user()->hostProfile ?? abort(404, 'You do not have a host profile.');
+    }
+
+    /** One of my own slots (on an active assignment). */
+    private function mySlot(Request $request, string $slotId): ScheduleSlot
+    {
+        return ScheduleSlot::whereKey($slotId)
+            ->with('assignment')
+            ->whereHas('assignment', fn ($q) => $q->where('host_id', $this->host($request)->id)->where('status', 'active'))
+            ->first() ?? throw ValidationException::withMessages(['slot_id' => ['Choose one of your own slots.']]);
     }
 
     private function ensureOwnRequest(Request $request, BackupRequest $backup): void

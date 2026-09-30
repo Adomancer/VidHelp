@@ -14,7 +14,7 @@ const REFRESH_MS = 60_000;
 
 const attentionItems: { key: keyof AdminDashboard["attention"]; label: string; href: string }[] = [
   { key: "pending_signups", label: "Sign-ups to approve", href: "/admin/users" },
-  { key: "backups_pending", label: "Backup requests to approve", href: "/admin/backups" },
+  { key: "backups_pending", label: "Backup applicants to decide on", href: "/admin/backups" },
   { key: "backups_uncovered_soon", label: "Backups with no cover, starting within 24 h", href: "/admin/backups" },
   { key: "reports_flagged", label: "Flagged live reports", href: "/admin/reports" },
   { key: "reports_missing", label: "Live reports overdue", href: "/admin/reports" },

@@ -1,0 +1,20 @@
+flowchart TD
+    A([Host minta gaji duluan / kasbon]) --> B[Finance input catatan kasbon:<br/>host, nominal, jumlah cicilan,<br/>potongan per periode default Rp50.000]
+    B --> C{Ada kasbon lama<br/>belum lunas?}
+    C -->|Ya| D[Akumulasi dengan kasbon baru]
+    C -->|Tidak| E[Buat tabel cicilan]
+    D --> E
+    E --> F[Periode payment berjalan]
+    F --> G[Potong cicilan<br/>brand dicatat saat dipotong]
+    G --> H[Hitung estimasi gaji =<br/>gaji periode - potongan]
+    H --> I{Hasil minus?}
+    I -->|Ya| J[⚠️ Ditandai sistem<br/>penanganan belum dibahas]
+    I -->|Tidak| K[Rincian tampil di slip gaji]
+    J --> K
+    K --> L[Upload bukti bayar]
+    L --> M{Cicilan lunas?}
+    M -->|Belum| F
+    M -->|Ya| N([Kasbon Lunas])
+    O[Host minta ubah potongan] --> P[Host informasi dulu]
+    P --> Q[Hanya Finance yang edit potongan]
+    Q --> G

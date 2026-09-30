@@ -273,12 +273,11 @@ erDiagram
         datetime end_at
         enum reason_type "sick, permit, other"
         string reason
-        enum status "pending, open, filled, cancelled, rejected"
-        uuid approved_by FK "null jika auto"
+        enum request_type "open (semua host boleh apply), direct (hanya nominee)"
+        enum status "open (belum ada pelamar), pending (pelamar menunggu keputusan admin), filled, cancelled, rejected (data lama)"
+        uuid approved_by FK "admin yang ACC host pengganti; null jika auto-ACC"
         datetime approved_at
-        boolean auto_approved "pending otomatis jadi open setelah auto_open_at"
-        datetime auto_open_at "created_at + 30 menit"
-        datetime auto_fill_at "start_at - 30 menit: sistem pilih pelamar terbaik"
+        datetime auto_fill_at "start_at - 30 menit: sistem ACC pelamar terbaik"
         boolean auto_filled
         boolean counts_toward_quota "true jika host pengganti beda brand"
         boolean letter_penalty_applied "poin sudah dipotong karena surat sakit telat"
@@ -290,10 +289,11 @@ erDiagram
     }
 
     BACKUP_NOMINEES {
-        uuid id PK "belum diimplementasi"
-        uuid backup_request_id FK
-        uuid nominee_host_id FK
-        enum response "pending, accepted, declined"
+        uuid id PK "host yang dipilih langsung (min 2, maks backup.direct_max_hosts)"
+        uuid backup_request_id FK "unik per (request, host)"
+        uuid nominee_host_id FK "jawaban nominee = apply di BACKUP_APPLICATIONS"
+        datetime created_at
+        datetime updated_at
     }
 
     BACKUP_APPLICATIONS {

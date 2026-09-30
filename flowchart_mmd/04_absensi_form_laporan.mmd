@@ -1,0 +1,16 @@
+flowchart TD
+    A([Host mulai live]) --> B[Tekan tombol Mulai<br/>tanda keaktifan]
+    B --> C[Live berjalan]
+    C --> D[Tekan End Live]
+    D --> E[Wajib isi form laporan<br/>pilih nama dari master jadwal]
+    E --> F{Isi dalam 24 jam<br/>sejak absen?}
+    F -->|Ya| G[Upload bukti:<br/>screenshot / data OBS]
+    F -->|Tidak| H[Pengingat batas 24 jam]
+    H --> E
+    G --> I[Data masuk tabel/sheet real-time]
+    I --> J{Seat dibagi<br/>beberapa host?}
+    J -->|Ya| K[Tiap host terekam<br/>misal 2+2+2+2 jam]
+    J -->|Tidak| L[Rekap jam host]
+    K --> L
+    L --> M[Jam terakumulasi<br/>ke modul Payment]
+    N[Lupa absen:<br/>tanpa konsekuensi potongan] -.-> B

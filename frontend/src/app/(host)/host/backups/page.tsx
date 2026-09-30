@@ -1,15 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { errorMessage, hostBackupApi, settingsApi, type BackupNeed, type BackupReason, type BackupRequest } from "@/lib/api";
+import {
+  errorMessage,
+  hostBackupApi,
+  settingsApi,
+  type BackupNeed,
+  type BackupReason,
+  type BackupRequest,
+  type BackupRequestType,
+} from "@/lib/api";
 import { formatDateTime, formatDuration, formatWindow } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
-import { BackupStatusBadge, LetterBadge, reasonLabels } from "@/components/BackupBadges";
+import { BackupStatusBadge, LetterBadge, reasonLabels, RequestTypeBadge } from "@/components/BackupBadges";
 import Card from "@/components/Card";
 import FormAlert from "@/components/FormAlert";
 import SubmitButton from "@/components/SubmitButton";
+import UserAvatar from "@/components/UserAvatar";
 
 type Tab = "needs" | "mine";
 
@@ -62,7 +71,14 @@ export default function HostBackupsPage() {
       {tab === "needs" ? (
         <NeedsTab covers={mine.data?.covers ?? []} needs={needs.data?.needs} quota={mine.data?.quota} act={act} />
       ) : (
-        <MineTab requests={mine.data?.requests} act={act} onRequested={() => mine.reload()} />
+        <MineTab
+          requests={mine.data?.requests}
+          act={act}
+          onRequested={(message) => {
+            setNotice({ tone: "success", text: message });
+            mine.reload();
+          }}
+        />
       )}
     </div>
   );
@@ -129,8 +145,9 @@ function NeedsTab({
 
         return (
           <Card key={need.id}>
+            {need.asked_me && <p className="text-xs font-medium text-purple-200">{need.requester_name} asked you to cover this</p>}
             <div className="flex items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <p className="text-white font-medium">{need.brand.name}</p>
                 <p className="text-sm text-purple-200">{formatWindow(need.start_at, need.end_at)}</p>
                 <p className="text-xs text-gray-400 mt-1">
@@ -156,7 +173,8 @@ function NeedsTab({
                 </button>
               )}
             </div>
-            {applied && <p className="text-xs text-green-300">You applied. An admin will choose who covers it.</p>}
+            {!need.asked_me && <RequestTypeBadge names={need.nominee_names} />}
+            {applied && <p className="text-xs text-green-300">You applied. Waiting for an admin to approve.</p>}
             {!applied && need.ineligible_reason && <p className="text-xs text-gray-400">{need.ineligible_reason}</p>}
           </Card>
         );
@@ -165,7 +183,7 @@ function NeedsTab({
   );
 }
 
-function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; act: Act; onRequested: () => void }) {
+function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; act: Act; onRequested: (message: string) => void }) {
   const { token } = useAuth();
   const [formOpen, setFormOpen] = useState(false);
 
@@ -173,9 +191,9 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
     <div className="space-y-4">
       {formOpen ? (
         <RequestForm
-          onDone={() => {
+          onDone={(message) => {
             setFormOpen(false);
-            onRequested();
+            onRequested(message);
           }}
           onCancel={() => setFormOpen(false)}
         />
@@ -194,7 +212,7 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
       {requests?.map((backup) => (
         <Card key={backup.id}>
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-white font-medium">{backup.brand.name}</p>
               <p className="text-sm text-purple-200">{formatWindow(backup.start_at, backup.end_at)}</p>
               <p className="text-xs text-gray-400 mt-1">
@@ -205,12 +223,13 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
             <BackupStatusBadge status={backup.status} />
           </div>
 
+          <RequestTypeBadge names={backup.nominees?.map((nominee) => nominee.host.user.name) ?? []} />
+
           {backup.status === "filled" && backup.filler && (
             <p className="text-sm text-green-300">Covered by {backup.filler.user.name}</p>
           )}
-          {backup.status === "pending" && backup.auto_open_at && (
-            <p className="text-xs text-gray-400">Opens to other hosts automatically at {formatDateTime(backup.auto_open_at)} if no admin replies.</p>
-          )}
+          {backup.status === "open" && <p className="text-xs text-gray-400">Waiting for hosts to apply.</p>}
+          {backup.status === "pending" && <p className="text-xs text-gray-400">Someone applied. An admin will approve who covers it.</p>}
 
           {backup.letter_status !== "not_needed" && (
             <div className="flex flex-wrap items-center gap-3">
@@ -248,24 +267,42 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
   );
 }
 
-function RequestForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+const requestTypes: { value: BackupRequestType; label: string; hint: string }[] = [
+  { value: "open", label: "Anyone", hint: "Every host can apply." },
+  { value: "direct", label: "Choose hosts", hint: "Only the hosts you pick can apply." },
+];
+
+function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
-  const letterHours = useApiData("public-settings", () => settingsApi.public(token)).data?.settings["backup.sick_letter_grace_hours"];
+  const settings = useApiData("public-settings", () => settingsApi.public(token)).data?.settings;
   const slots = useApiData("backup-slots", () => hostBackupApi.slots(token));
   const [reasonType, setReasonType] = useState<BackupReason>("sick");
+  const [requestType, setRequestType] = useState<BackupRequestType>("open");
+  const [pickedOccurrence, setPickedOccurrence] = useState("");
+  const [hostIds, setHostIds] = useState<string[]>([]);
 
-  const { loading, errors, error, handleSubmit } = useApiForm((data) => {
-    const [slotId, date] = formValue(data, "occurrence").split("|");
-    return hostBackupApi.request(token, {
-      slot_id: slotId,
-      backup_date: date,
-      reason_type: reasonType,
-      reason: formValue(data, "reason") || null,
-    });
-  }, onDone);
+  const firstSlot = slots.data?.slots[0];
+  const occurrence = pickedOccurrence || (firstSlot ? `${firstSlot.slot_id}|${firstSlot.date}` : "");
+  const [slotId, date] = occurrence.split("|");
+
+  const { loading, errors, error, handleSubmit } = useApiForm(
+    (data) => {
+      const letter = data.get("letter");
+      return hostBackupApi.request(token, {
+        slot_id: slotId,
+        backup_date: date,
+        reason_type: reasonType,
+        reason: formValue(data, "reason") || null,
+        request_type: requestType,
+        host_ids: hostIds,
+        letter: letter instanceof File && letter.size > 0 ? letter : null,
+      });
+    },
+    ({ message }) => onDone(message)
+  );
 
   return (
-    <Card title="Request a backup" description="Pick the session you can't do. An admin approves it, then other hosts can apply.">
+    <Card title="Request a backup" description="Pick the session you can't do. It goes on the backup board right away; an admin approves who covers it.">
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
@@ -274,15 +311,29 @@ function RequestForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
             Session
           </label>
           {slots.data?.slots.length === 0 ? (
-            <p className="text-sm text-gray-400">You have no sessions in the next 14 days.</p>
+            <p className="text-sm text-gray-400">You have no sessions you can still request a backup for.</p>
           ) : (
-            <select id="occurrence" name="occurrence" className="w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white">
+            <select
+              id="occurrence"
+              value={occurrence}
+              onChange={(event) => {
+                setPickedOccurrence(event.target.value);
+                setHostIds([]); // who is free depends on the session
+              }}
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white"
+            >
               {slots.data?.slots.map((slot) => (
                 <option key={`${slot.slot_id}|${slot.date}`} value={`${slot.slot_id}|${slot.date}`}>
                   {formatWindow(slot.start_at, slot.end_at)} · {slot.brand.name}
                 </option>
               ))}
             </select>
+          )}
+          {settings && (
+            <p className="text-xs text-gray-400">
+              Request at least {formatDuration(settings["backup.request_min_hours_before"])} before the session. For anything sooner, contact an
+              admin.
+            </p>
           )}
           {(errors.backup_date || errors.slot_id) && <p className="text-sm text-red-300">{errors.backup_date ?? errors.slot_id}</p>}
         </div>
@@ -301,11 +352,6 @@ function RequestForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
               </button>
             ))}
           </div>
-          {reasonType === "sick" && (
-            <p className="text-xs text-gray-400">
-              You&apos;ll need to upload a doctor&apos;s letter{letterHours ? ` within ${formatDuration(letterHours)}` : ""} after the session starts.
-            </p>
-          )}
         </fieldset>
 
         <div className="space-y-1">
@@ -321,6 +367,54 @@ function RequestForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
           />
         </div>
 
+        <div className="space-y-1">
+          <label htmlFor="letter" className="block text-sm font-medium text-gray-200">
+            {reasonType === "sick" ? "Doctor's letter" : "Attachment"} (optional now)
+          </label>
+          <input
+            id="letter"
+            name="letter"
+            type="file"
+            accept="image/*,application/pdf"
+            className="block w-full text-sm text-gray-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-800 file:text-gray-200"
+          />
+          {reasonType === "sick" && settings && (
+            <p className="text-xs text-gray-400">
+              If you don&apos;t have it yet, upload it within {formatDuration(settings["backup.sick_letter_grace_hours"])} after the session
+              starts, or you lose points.
+            </p>
+          )}
+          {errors.letter && <p className="text-sm text-red-300">{errors.letter}</p>}
+        </div>
+
+        <fieldset className="space-y-2">
+          <legend className="block text-sm font-medium text-gray-200">Who can cover it</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {requestTypes.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setRequestType(option.value)}
+                className={`py-2 rounded-lg text-sm ${requestType === option.value ? "bg-purple-600 text-white" : "bg-slate-800 text-gray-300"}`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400">{requestTypes.find((option) => option.value === requestType)?.hint}</p>
+          {requestType === "direct" && occurrence && settings && (
+            <NomineePicker
+              slotId={slotId}
+              date={date}
+              min={settings["backup.direct_min_hosts"]}
+              max={settings["backup.direct_max_hosts"]}
+              selected={hostIds}
+              onChange={setHostIds}
+            />
+          )}
+          {errors.host_ids && <p className="text-sm text-red-300">{errors.host_ids}</p>}
+        </fieldset>
+
         <div className="flex gap-3">
           <SubmitButton loading={loading}>Send request</SubmitButton>
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
@@ -329,5 +423,63 @@ function RequestForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
         </div>
       </form>
     </Card>
+  );
+}
+
+/** Tick the hosts to ask; busy or unavailable hosts can't be picked. */
+function NomineePicker({
+  slotId,
+  date,
+  min,
+  max,
+  selected,
+  onChange,
+}: {
+  slotId: string;
+  date: string;
+  min: number;
+  max: number;
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const { token } = useAuth();
+  const candidates = useApiData(`nominees-${slotId}-${date}`, () => hostBackupApi.candidates(token, slotId, date));
+  const full = selected.length >= max;
+
+  function toggle(hostId: string) {
+    onChange(selected.includes(hostId) ? selected.filter((id) => id !== hostId) : [...selected, hostId]);
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-300">
+        Chosen {selected.length} · pick {min} to {max} hosts
+      </p>
+      {candidates.error && <FormAlert tone="error">{candidates.error}</FormAlert>}
+      {candidates.loading && !candidates.data && <p className="text-xs text-gray-400">Loading hosts…</p>}
+      <ul className="max-h-64 overflow-y-auto space-y-1.5">
+        {candidates.data?.candidates.map((candidate) => {
+          const checked = selected.includes(candidate.host_id);
+          const disabled = !candidate.eligible || (full && !checked);
+
+          return (
+            <li key={candidate.host_id}>
+              <label
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 ${checked ? "bg-purple-600/20 border border-purple-400/40" : "bg-slate-800/60 border border-transparent"} ${disabled ? "opacity-50" : "cursor-pointer"}`}
+              >
+                <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(candidate.host_id)} className="accent-purple-500" />
+                <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="w-7 h-7" />
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm text-white truncate">{candidate.name}</span>
+                  <span className="block text-xs text-gray-400 truncate">
+                    {candidate.ineligible_reason ?? (candidate.same_brand ? "Your brand" : "Other brand")}
+                  </span>
+                </span>
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

@@ -98,7 +98,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 | Service | Responsible for |
 | --- | --- |
 | `AttendanceService` | A host's sessions, check-in/out, live reports, auto-approval, turning approved reports into paid work sessions |
-| `BackupService` | Backup requests: approve, open, apply, pick or auto-pick a cover, quota, sick letters |
+| `BackupService` | Backup requests (open to all or to named hosts), who may cover, admin approves or rejects applicants, auto-approval before the slot, quota, sick letters |
 | `EventService` / `EventCalendar` | Special events (PD, double date): blocks hosts claim, which regular slots they replace |
 | `HostCalendar` | When a host or brand is busy (slots, covers, events), used to prevent clashes |
 | `PointService` | Points per 3-month period, violations, penalties, automatic SP1–SP3 |
@@ -113,7 +113,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 
 | Command | When | Does |
 | --- | --- | --- |
-| `backups:auto-process` | every minute | opens unreviewed backup requests, auto-picks covers |
+| `backups:auto-process` | every minute | approves the best applicant for requests about to start that nobody decided on |
 | `points:apply-penalties` | every 10 min | deducts points for late or missing sick letters |
 | `notifications:retry-discord` | every 5 min | resends failed Discord messages |
 | `payroll:roll-periods` | 00:05 | closes ended pay periods, opens new ones |

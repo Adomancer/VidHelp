@@ -82,7 +82,6 @@ class NotificationTest extends TestCase
         $id = $this->actingAs($this->requester->user)->postJson('/api/host/backups', [
             'slot_id' => $this->slot->id, 'backup_date' => '2026-10-06', 'reason_type' => 'permit',
         ])->assertCreated()->json('request.id');
-        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$id}/approve")->assertOk();
 
         return BackupRequest::findOrFail($id);
     }
@@ -111,12 +110,10 @@ class NotificationTest extends TestCase
 
         $this->assertNotNull($this->web($this->other->user, 'backup_opened'));
         $this->assertNull($this->web($this->requester->user, 'backup_opened'));
-        $this->assertNotNull($this->web($this->admin, 'backup_requested'));
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/channels/chan-backups/messages')
             && $request['embeds'][0]['title'] === 'Backup needed: Brand A'
             && $request['embeds'][0]['url'] === 'http://localhost:3000/host/backups');
-        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/channels/chan-admin/messages'));
         $this->assertSame(0, AppNotification::where('channel', 'discord_channel')->where('status', '!=', 'sent')->count());
     }
 

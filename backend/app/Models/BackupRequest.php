@@ -15,13 +15,13 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 /**
  * A host can't make one occurrence of their slot and needs someone to cover it.
  *
- * pending → (admin approves, or auto after auto_open_at) → open → (admin picks,
- * or best applicant auto-picked at auto_fill_at) → filled. Also: rejected, cancelled.
+ * open (no applicants yet) ⇄ pending (applicants wait for the admin's decision) → filled
+ * (admin ACCs one, or the best applicant is auto-picked at auto_fill_at). Also: cancelled
+ * (and rejected, only on older requests). request_type "direct" = only the nominees may apply.
  */
 #[Fillable([
     'slot_id', 'brand_id', 'requesting_host_id', 'created_by', 'backup_date', 'start_at', 'end_at',
-    'reason_type', 'reason', 'status', 'approved_by', 'approved_at', 'auto_approved', 'auto_open_at',
-    'auto_fill_at', 'auto_filled', 'counts_toward_quota', 'letter_penalty_applied', 'no_cover_alerted_at', 'filled_by_host_id', 'filled_at', 'cancelled_at',
+    'reason_type', 'reason', 'request_type', 'status', 'approved_by', 'approved_at', 'auto_fill_at', 'auto_filled', 'counts_toward_quota', 'letter_penalty_applied', 'no_cover_alerted_at', 'filled_by_host_id', 'filled_at', 'cancelled_at',
 ])]
 #[Appends(['letter_status', 'letter_due_at'])]
 class BackupRequest extends Model
@@ -35,11 +35,9 @@ class BackupRequest extends Model
             'start_at' => 'datetime',
             'end_at' => 'datetime',
             'approved_at' => 'datetime',
-            'auto_open_at' => 'datetime',
             'auto_fill_at' => 'datetime',
             'filled_at' => 'datetime',
             'cancelled_at' => 'datetime',
-            'auto_approved' => 'boolean',
             'auto_filled' => 'boolean',
             'counts_toward_quota' => 'boolean',
             'letter_penalty_applied' => 'boolean',
@@ -72,6 +70,16 @@ class BackupRequest extends Model
         return $this->hasMany(BackupApplication::class);
     }
 
+    public function nominees(): HasMany
+    {
+        return $this->hasMany(BackupNominee::class);
+    }
+
+    public function isNominated(HostProfile $host): bool
+    {
+        return $this->nominees()->where('nominee_host_id', $host->id)->exists();
+    }
+
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'owner')->latest();
@@ -97,7 +105,19 @@ class BackupRequest extends Model
             'start_at' => $this->start_at,
             'end_at' => $this->end_at,
             'status' => $this->status,
+            'request_type' => $this->request_type,
+            'nominee_names' => $this->nomineeNames(),
         ];
+    }
+
+    /** Names of the hosts a direct request asked (empty for open requests). */
+    public function nomineeNames(): array
+    {
+        if ($this->request_type !== 'direct') {
+            return [];
+        }
+
+        return $this->loadMissing('nominees.host.user')->nominees->map(fn (BackupNominee $nominee) => $nominee->host->user->name)->values()->all();
     }
 
     /**
@@ -114,9 +134,10 @@ class BackupRequest extends Model
         ];
     }
 
+    /** Hosts may apply (or withdraw) until the slot starts. */
     public function isOpenForApplications(): bool
     {
-        return $this->status === 'open' && $this->end_at->isFuture();
+        return in_array($this->status, ['open', 'pending'], true) && $this->start_at->isFuture();
     }
 
     /** Sick requests need a doctor's letter by start + grace hours. */
