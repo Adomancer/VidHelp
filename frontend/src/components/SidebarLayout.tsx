@@ -3,12 +3,23 @@ import type { RoleName } from "@/lib/api";
 import { RequireAuth } from "./AuthProvider";
 import NotificationBell from "./NotificationBell";
 import SidebarAccount from "./SidebarAccount";
+import SidebarNav from "./SidebarNav";
+
+export interface SidebarLink {
+  href: string;
+  label: string;
+}
+
+export interface SidebarGroup {
+  group: string;
+  items: SidebarLink[];
+}
 
 interface SidebarLayoutProps {
   panel: string;
   accentClass: string;
   roles: RoleName[];
-  links: { href: string; label: string }[];
+  links: SidebarLink[] | SidebarGroup[];
   children: React.ReactNode;
 }
 
@@ -25,17 +36,11 @@ export default function SidebarLayout({ panel, accentClass, roles, links, childr
             </div>
             <NotificationBell align="left" />
           </div>
-          <nav className="flex-1 space-y-2">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="block px-4 py-2 rounded-lg text-gray-300 hover:bg-slate-800 hover:text-white transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
+
+          <nav className="flex-1 space-y-1 overflow-y-auto">
+            <SidebarNav links={links} />
           </nav>
+
           <SidebarAccount />
         </aside>
 
@@ -44,3 +49,4 @@ export default function SidebarLayout({ panel, accentClass, roles, links, childr
     </RequireAuth>
   );
 }
+
