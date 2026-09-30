@@ -3,24 +3,18 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Services\DashboardService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
+    public function __construct(private DashboardService $dashboard) {}
+
     /**
-     * Admin overview dashboard.
+     * Admin overview: what needs attention, today's sessions, brand progress, recent hours, people.
      */
     public function index(): JsonResponse
     {
-        $stats = [
-            'total_hosts' => User::role('host')->count(),
-            'active_hosts' => User::role('host')->where('status', 'active')->count(),
-            'total_operators' => User::role('operator')->count(),
-            'total_users' => User::count(),
-        ];
-
-        return response()->json(['stats' => $stats]);
+        return response()->json($this->dashboard->admin());
     }
 }

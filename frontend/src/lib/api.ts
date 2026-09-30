@@ -311,6 +311,62 @@ export const settingsApi = {
     api<Message & { groups: SettingGroup[] }>("/admin/settings", { method: "PUT", body: JSON.stringify({ values }), token }),
 };
 
+/*
+|--------------------------------------------------------------------------
+| Dashboards
+|--------------------------------------------------------------------------
+*/
+/** live · done · late (started, no check-in) · missed (ended, no check-in) · upcoming */
+export type SessionState = "live" | "done" | "late" | "missed" | "upcoming";
+
+export interface TodaySession {
+  host: { id: string; name: string };
+  brand: { id: string; name: string };
+  role: "own" | "cover" | "event";
+  event_name: string | null;
+  covered_for: string | null;
+  start_at: string;
+  end_at: string;
+  check_in_at: string | null;
+  state: SessionState;
+}
+
+export interface BrandProgress {
+  id: string;
+  name: string;
+  /** Null when the brand has no payroll start date yet. */
+  period: { id: string; start: string; end: string; status: PeriodStatus; days_left: number } | null;
+  worked_hours?: number;
+  carried_in_hours?: number;
+  achieved_hours?: number;
+  carried_out_hours?: number;
+  target_hours?: number;
+  /** Estimated host pay for the period so far (rupiah). */
+  total_amount?: number;
+  /** Sum of GMV on approved live reports; null if GMV isn't a report field. */
+  gmv?: number | null;
+}
+
+export interface AdminDashboard {
+  attention: {
+    pending_signups: number;
+    backups_pending: number;
+    backups_uncovered_soon: number;
+    reports_flagged: number;
+    reports_missing: number;
+    periods_to_request: number;
+    periods_awaiting_brand: number;
+  };
+  today: { sessions: TodaySession[]; counts: Partial<Record<SessionState, number>> };
+  brands: BrandProgress[];
+  hours_by_day: { date: string; hours: number }[];
+  people: { active_hosts: number; operators: number; admins: number; warning_letters: number; points_period: { start: string } };
+}
+
+export const dashboardApi = {
+  admin: (token: string) => api<AdminDashboard>("/admin/dashboard", { token }),
+};
+
 export interface AuditFilters {
   action?: string;
   target_table?: string;
