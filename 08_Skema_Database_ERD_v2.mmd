@@ -74,7 +74,7 @@ erDiagram
     SALARY_SLIPS ||--o{ CASH_ADVANCE_INSTALLMENTS : "deducts"
 
     %% ===== G. KONFIGURASI =====
-    SYSTEM_SETTINGS
+    USERS ||--o{ SYSTEM_SETTINGS : "updates"
 
     ROLES {
         bigint id PK "spatie"
@@ -583,9 +583,11 @@ erDiagram
     }
 
     SYSTEM_SETTINGS {
-        string key PK "max_points, sp_thresholds, auto_approve_minutes, backup_quota_max, sick_letter_grace_hours"
-        json value
+        uuid id PK
+        string key UK "path in config/vidhelp.php, e.g. backup.quota_per_month, points.sp_thresholds.1"
+        json value "admin override; no row = config default"
         uuid updated_by FK
+        datetime created_at
         datetime updated_at
     }
 

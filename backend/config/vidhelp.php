@@ -4,8 +4,9 @@
 |--------------------------------------------------------------------------
 | VidHelp business rules
 |--------------------------------------------------------------------------
-| Defaults for rules the agency may tune. These move to the SYSTEM_SETTINGS
-| table (editable by admin) later.
+| Defaults for rules the agency may tune. The ones listed in
+| App\Services\SettingsService::DEFINITIONS can be changed by an admin on the
+| Settings page; those saved values (system_settings table) override these.
 */
 
 return [

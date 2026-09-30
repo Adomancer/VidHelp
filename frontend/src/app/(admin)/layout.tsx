@@ -20,6 +20,7 @@ const links = [
   { href: "/admin/ratings", label: "Ratings" },
   { href: "/admin/payroll", label: "Payroll" },
   { href: "/admin/audit", label: "Audit Log" },
+  { href: "/admin/settings", label: "Settings" },
   { href: "/admin/security", label: "Security" },
 ];
 

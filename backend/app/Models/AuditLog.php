@@ -71,7 +71,7 @@ class AuditLog extends Model
     private static function labelFor(Model $target): ?string
     {
         $attributes = $target->getAttributes();
-        $label = $attributes['name'] ?? $attributes['title'] ?? $attributes['email'] ?? null;
+        $label = $attributes['name'] ?? $attributes['title'] ?? $attributes['email'] ?? $attributes['key'] ?? null;
 
         return is_string($label) ? Str::limit($label, 250, '') : null;
     }

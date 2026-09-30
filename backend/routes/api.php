@@ -33,6 +33,8 @@ use App\Http\Controllers\DiscordController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -88,6 +90,9 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
     Route::delete('/discord/link', [DiscordController::class, 'unlink']);
     Route::post('/discord/test', [DiscordController::class, 'test']);
 
+    // Rule numbers shown in help texts
+    Route::get('/settings', [SettingsController::class, 'index']);
+
     /*
     |----------------------------------------------------------------------
     | Admin Routes
@@ -106,6 +111,10 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
         // Audit trail
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
+
+        // Business rules (overrides of config/vidhelp.php)
+        Route::get('/settings', [AdminSettingsController::class, 'index']);
+        Route::put('/settings', [AdminSettingsController::class, 'update']);
 
         // Brands (create/edit; listing is in the operator group)
         Route::post('/brands', [BrandController::class, 'store']);

@@ -1,0 +1,238 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { errorMessage, fieldErrors, settingsApi, type Setting, type SettingGroup, type SettingValue } from "@/lib/api";
+import { formatDate } from "@/lib/format";
+import { useApiData } from "@/lib/useApiData";
+import { TWO_FACTOR_SETUP_PATH } from "@/lib/auth";
+import { useAuth } from "@/components/AuthProvider";
+import Card from "@/components/Card";
+import FormAlert from "@/components/FormAlert";
+
+const TWO_FACTOR_KEY = "two_factor.required_for_admins";
+
+/** Inputs keep text while typing; numbers are parsed on save. */
+type Draft = Record<string, string | boolean>;
+
+function toDraft(value: SettingValue): string | boolean {
+  return typeof value === "boolean" ? value : String(value);
+}
+
+function fromDraft(value: string | boolean): SettingValue | string {
+  if (typeof value === "boolean") return value;
+  return value.trim() !== "" && Number.isFinite(Number(value)) ? Number(value) : value;
+}
+
+function showValue(setting: Setting, value: SettingValue): string {
+  if (typeof value === "boolean") return value ? "On" : "Off";
+  return setting.unit ? `${value} ${setting.unit}` : String(value);
+}
+
+export default function AdminSettingsPage() {
+  const { token } = useAuth();
+  const settings = useApiData("admin-settings", () => settingsApi.all(token));
+  const [saved, setSaved] = useState<{ version: number; message: string } | null>(null);
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <p className="text-sm text-gray-400 mt-1">
+          Business rules the whole app follows. Changes apply right away and are recorded in the Audit Log.
+        </p>
+      </div>
+
+      {settings.error && <FormAlert tone="error">{settings.error}</FormAlert>}
+      {saved && <FormAlert tone="success">{saved.message}</FormAlert>}
+
+      {settings.data && (
+        <SettingsForm
+          // A fresh form after each save, filled from what the server stored
+          key={saved?.version ?? 0}
+          groups={settings.data.groups}
+          onSaved={(groups, message) => {
+            settings.setData({ groups });
+            setSaved((current) => ({ version: (current?.version ?? 0) + 1, message }));
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (groups: SettingGroup[], message: string) => void }) {
+  const { token, user } = useAuth();
+  const router = useRouter();
+  const all = groups.flatMap((group) => group.settings);
+  const [draft, setDraft] = useState<Draft>(() => Object.fromEntries(all.map((setting) => [setting.key, toDraft(setting.value)])));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const changed = all.filter((setting) => fromDraft(draft[setting.key]) !== setting.value);
+  const turningOn2fa = draft[TWO_FACTOR_KEY] === true && all.find((setting) => setting.key === TWO_FACTOR_KEY)?.value === false;
+
+  async function save() {
+    setSaving(true);
+    setErrors({});
+    setError(null);
+    try {
+      const values = Object.fromEntries(changed.map((setting) => [setting.key, fromDraft(draft[setting.key])])) as Record<string, SettingValue>;
+      const result = await settingsApi.save(token, values);
+      if (turningOn2fa && !user.two_factor_enabled) {
+        router.replace(TWO_FACTOR_SETUP_PATH); // this admin is now required to set it up
+        return;
+      }
+      onSaved(result.groups, result.message);
+    } catch (caught) {
+      const fields = fieldErrors(caught);
+      setErrors(fields);
+      if (Object.keys(fields).length === 0) setError(errorMessage(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 pb-4">
+      {groups.map((group) => (
+        <Card key={group.key} title={group.label}>
+          <div className="divide-y divide-slate-800 -my-2">
+            {group.settings.map((setting) => (
+              <SettingRow
+                key={setting.key}
+                setting={setting}
+                value={draft[setting.key]}
+                error={errors[setting.key]}
+                onChange={(value) => setDraft({ ...draft, [setting.key]: value })}
+              />
+            ))}
+          </div>
+        </Card>
+      ))}
+
+      {changed.length > 0 && (
+        <div className="sticky bottom-4 z-10 rounded-xl border border-purple-500/40 bg-slate-900/95 backdrop-blur p-4 space-y-3 shadow-2xl">
+          {error && <FormAlert tone="error">{error}</FormAlert>}
+          {turningOn2fa && (
+            <FormAlert tone="warning">
+              Admins without two-factor sign-in{user.two_factor_enabled ? "" : ", including you,"} will have to set it up before they can do
+              anything else.
+            </FormAlert>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-gray-200">
+              {changed.length} unsaved change{changed.length === 1 ? "" : "s"}
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  setDraft(Object.fromEntries(all.map((setting) => [setting.key, toDraft(setting.value)])));
+                  setErrors({});
+                  setError(null);
+                }}
+                className="px-4 py-2 rounded-lg border border-slate-700 text-sm text-gray-300 hover:bg-slate-800 disabled:opacity-50"
+              >
+                Discard
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={save}
+                className="px-4 py-2 rounded-lg bg-purple-600 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SettingRow({
+  setting,
+  value,
+  error,
+  onChange,
+}: {
+  setting: Setting;
+  value: string | boolean;
+  error?: string;
+  onChange: (value: string | boolean) => void;
+}) {
+  const isDefault = fromDraft(value) === setting.default;
+  const inputClass = `rounded-lg bg-slate-950 border px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-purple-500 ${
+    error ? "border-red-400" : "border-slate-700"
+  }`;
+
+  return (
+    <div className="py-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 sm:max-w-md">
+        <label htmlFor={setting.key} className="block text-sm font-medium text-white">
+          {setting.label}
+        </label>
+        <p className="text-xs text-gray-400 mt-1">{setting.help}</p>
+        <p className="text-xs mt-1">
+          {setting.changed_at ? (
+            <span className="text-purple-300">
+              Changed{setting.changed_by && <> by {setting.changed_by}</>} on {formatDate(setting.changed_at)} · default{" "}
+              {showValue(setting, setting.default)}
+            </span>
+          ) : (
+            <span className="text-gray-500">Default value</span>
+          )}
+        </p>
+        {error && <p className="text-sm text-red-300 mt-1">{error}</p>}
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        {setting.type === "bool" ? (
+          <button
+            id={setting.key}
+            type="button"
+            role="switch"
+            aria-checked={value === true}
+            onClick={() => onChange(value !== true)}
+            className={`relative w-11 h-6 rounded-full transition-colors ${value === true ? "bg-purple-600" : "bg-slate-700"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${value === true ? "translate-x-5" : ""}`} />
+          </button>
+        ) : setting.options ? (
+          <select id={setting.key} value={String(value)} onChange={(event) => onChange(event.target.value)} className={inputClass}>
+            {setting.options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            id={setting.key}
+            type="number"
+            inputMode="numeric"
+            min={setting.min}
+            max={setting.max}
+            value={String(value)}
+            onChange={(event) => onChange(event.target.value)}
+            aria-invalid={error ? true : undefined}
+            className={`w-24 text-right ${inputClass}`}
+          />
+        )}
+        {setting.unit && setting.type !== "bool" && <span className="text-sm text-gray-400 w-16">{setting.unit}</span>}
+        <button
+          type="button"
+          onClick={() => onChange(toDraft(setting.default))}
+          disabled={isDefault}
+          className="text-xs text-purple-300 hover:text-white disabled:invisible"
+        >
+          Use default
+        </button>
+      </div>
+    </div>
+  );
+}

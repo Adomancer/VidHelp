@@ -262,6 +262,55 @@ export const adminApi = {
   },
 };
 
+/*
+|--------------------------------------------------------------------------
+| Settings (admin-editable business rules)
+|--------------------------------------------------------------------------
+*/
+export type SettingValue = number | boolean;
+
+export interface Setting {
+  /** Path under config/vidhelp.php, e.g. "backup.quota_per_month". */
+  key: string;
+  label: string;
+  help: string;
+  type: "int" | "bool";
+  min?: number;
+  max?: number;
+  /** Allowed values when only a few make sense (e.g. reset every 1, 2, 3, 4, 6 or 12 months). */
+  options?: number[];
+  unit?: string;
+  value: SettingValue;
+  default: SettingValue;
+  /** Set when an admin changed it from the default. */
+  changed_at: string | null;
+  changed_by: string | null;
+}
+
+export interface SettingGroup {
+  key: string;
+  label: string;
+  settings: Setting[];
+}
+
+/** Rule numbers shown in help texts, readable by every signed-in user. */
+export interface PublicSettings {
+  "backup.auto_open_after_minutes": number;
+  "backup.auto_fill_before_minutes": number;
+  "backup.sick_letter_grace_hours": number;
+  "backup.quota_per_month": number;
+}
+
+export const settingsApi = {
+  public: (token: string) => api<{ settings: PublicSettings }>("/settings", { token }),
+
+  all: (token: string) => api<{ groups: SettingGroup[] }>("/admin/settings", { token }),
+
+  /** Only the changed keys; a value equal to the default removes the override. */
+  save: (token: string, values: Record<string, SettingValue>) =>
+    api<Message & { groups: SettingGroup[] }>("/admin/settings", { method: "PUT", body: JSON.stringify({ values }), token }),
+};
+
 export interface AuditFilters {
   action?: string;
   target_table?: string;

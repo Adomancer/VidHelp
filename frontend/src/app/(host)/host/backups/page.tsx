@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { errorMessage, hostBackupApi, type BackupNeed, type BackupReason, type BackupRequest } from "@/lib/api";
-import { formatDateTime, formatWindow } from "@/lib/format";
+import { errorMessage, hostBackupApi, settingsApi, type BackupNeed, type BackupReason, type BackupRequest } from "@/lib/api";
+import { formatDateTime, formatDuration, formatWindow } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
@@ -250,6 +250,7 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
 
 function RequestForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const { token } = useAuth();
+  const letterHours = useApiData("public-settings", () => settingsApi.public(token)).data?.settings["backup.sick_letter_grace_hours"];
   const slots = useApiData("backup-slots", () => hostBackupApi.slots(token));
   const [reasonType, setReasonType] = useState<BackupReason>("sick");
 
@@ -300,7 +301,11 @@ function RequestForm({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
               </button>
             ))}
           </div>
-          {reasonType === "sick" && <p className="text-xs text-gray-400">You&apos;ll need to upload a doctor&apos;s letter within 24 hours after the session starts.</p>}
+          {reasonType === "sick" && (
+            <p className="text-xs text-gray-400">
+              You&apos;ll need to upload a doctor&apos;s letter{letterHours ? ` within ${formatDuration(letterHours)}` : ""} after the session starts.
+            </p>
+          )}
         </fieldset>
 
         <div className="space-y-1">

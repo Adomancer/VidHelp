@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\BackupRequest;
 use App\Models\User;
+use App\Services\SettingsService;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
@@ -15,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // One instance per request so it remembers the config defaults it overrode
+        $this->app->singleton(SettingsService::class);
     }
 
     /**
@@ -23,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Admin-edited business rules (Settings page) override config/vidhelp.php
+        $this->app->make(SettingsService::class)->apply();
+
         // Short owner_type names in the attachments table (not enforced, so Spatie/Sanctum keep class names)
         Relation::morphMap([
             'backup_request' => BackupRequest::class,
