@@ -13,7 +13,7 @@ import { formatDateTime, formatTimeRange, formatWindow, isoWeekday, toDateInput 
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "./AuthProvider";
-import { BackupStatusBadge, LetterBadge, reasonLabels } from "./BackupBadges";
+import { BackupStatusBadge, LetterBadge, reasonLabels, RequestTypeBadge } from "./BackupBadges";
 import Card from "./Card";
 import FormAlert from "./FormAlert";
 import SubmitButton from "./SubmitButton";
@@ -22,14 +22,14 @@ import UserAvatar from "./UserAvatar";
 type Tab = "pending" | "open" | "filled" | "closed";
 
 const tabs: { value: Tab; label: string }[] = [
-  { value: "pending", label: "To approve" },
-  { value: "open", label: "Needs a cover" },
+  { value: "pending", label: "To decide" },
+  { value: "open", label: "No applicants yet" },
   { value: "filled", label: "Covered" },
   { value: "closed", label: "History" },
 ];
 
 /**
- * Admin/operator backup desk: approve absences, pick covers, handle emergencies.
+ * Admin/operator backup desk: approve or reject applicants, assign covers in emergencies.
  */
 export default function BackupDesk() {
   const { token } = useAuth();
@@ -108,6 +108,8 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
   const [choosing, setChoosing] = useState(false);
   const [letterError, setLetterError] = useState<string | null>(null);
   const running = new Date(backup.end_at) > new Date();
+  const waiting = backup.status === "open" || backup.status === "pending";
+  const nomineeNames = backup.nominees?.map((nominee) => nominee.host.user.name) ?? [];
 
   async function openLetter() {
     // Open the tab during the click (popup blockers), then point it at the downloaded file
@@ -134,7 +136,10 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
             {backup.reason && <span className="text-gray-400"> · {backup.reason}</span>}
           </p>
         </div>
-        <BackupStatusBadge status={backup.status} />
+        <div className="flex flex-wrap gap-2">
+          <RequestTypeBadge names={nomineeNames} />
+          <BackupStatusBadge status={backup.status} />
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
@@ -148,13 +153,11 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
             )}
           </span>
         )}
-        {backup.status === "pending" && backup.auto_open_at && <span>Opens automatically {formatDateTime(backup.auto_open_at)}</span>}
-        {backup.status === "open" && (
+        {waiting && (
           <span>
-            {backup.applicants_count ?? 0} applied · best applicant auto-picked {formatDateTime(backup.auto_fill_at)}
+            {backup.applicants_count ?? 0} applied · best applicant approved automatically {formatDateTime(backup.auto_fill_at)}
           </span>
         )}
-        {backup.auto_approved && <span>Auto-approved</span>}
       </div>
       {letterError && <FormAlert tone="error">{letterError}</FormAlert>}
 
@@ -162,26 +165,16 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
         <div className="flex items-center gap-2 text-sm text-green-300">
           <UserAvatar user={backup.filler.user} size="w-6 h-6" />
           Covered by {backup.filler.user.name}
-          {backup.auto_filled && <span className="text-xs text-gray-400">(auto-picked)</span>}
+          {backup.auto_filled && <span className="text-xs text-gray-400">(approved automatically)</span>}
           {backup.counts_toward_quota && <span className="text-xs text-gray-400">· other brand, uses quota</span>}
         </div>
       )}
 
       {running && (
         <div className="flex flex-wrap gap-2">
-          {backup.status === "pending" && (
-            <>
-              <ActionButton primary onClick={() => act(() => operatorBackupApi.approve(token, backup.id))}>
-                Approve
-              </ActionButton>
-              <ActionButton onClick={() => confirm("Reject this request?") && act(() => operatorBackupApi.reject(token, backup.id))}>
-                Reject
-              </ActionButton>
-            </>
-          )}
-          {backup.status === "open" && (
+          {waiting && (
             <ActionButton primary onClick={() => setChoosing(!choosing)}>
-              {choosing ? "Close" : "Choose cover"}
+              {choosing ? "Close" : backup.status === "pending" ? "Review applicants" : "Assign a cover"}
             </ActionButton>
           )}
           {backup.status === "filled" && (
@@ -197,7 +190,7 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
         </div>
       )}
 
-      {choosing && backup.status === "open" && <CoverPicker backup={backup} act={act} />}
+      {choosing && waiting && <CoverPicker backup={backup} act={act} />}
     </Card>
   );
 }
@@ -224,16 +217,19 @@ function CoverPicker({ backup, act }: { backup: BackupRequest; act: Act }) {
   );
 
   const pick = (candidate: BackupCandidate) => act(() => operatorBackupApi.assign(token, backup.id, candidate.host_id));
+  const reject = (candidate: BackupCandidate) =>
+    confirm(`Reject ${candidate.name}? If nobody else applied, the request is open again.`) &&
+    act(() => operatorBackupApi.rejectApplicant(token, backup.id, candidate.host_id));
 
   return (
     <div className="space-y-3 border-t border-slate-800 pt-3">
       <p className="text-xs text-gray-400">Applicants, best first (highest rating, then same brand, then who applied earliest):</p>
       {applicants.data?.applicants.length === 0 && <p className="text-sm text-gray-400">Nobody has applied yet.</p>}
-      <CandidateList candidates={applicants.data?.applicants ?? []} onPick={pick} />
+      <CandidateList candidates={applicants.data?.applicants ?? []} onPick={pick} onReject={reject} />
 
       {showEveryone ? (
         <>
-          <p className="text-xs text-gray-400">All hosts (for emergencies; they don&apos;t need to have applied):</p>
+          <p className="text-xs text-gray-400">All hosts (for emergencies; they don&apos;t need to have applied or be named):</p>
           <CandidateList candidates={everyone.data?.candidates ?? []} onPick={pick} />
         </>
       ) : (
@@ -245,7 +241,16 @@ function CoverPicker({ backup, act }: { backup: BackupRequest; act: Act }) {
   );
 }
 
-function CandidateList({ candidates, onPick }: { candidates: BackupCandidate[]; onPick: (candidate: BackupCandidate) => void }) {
+function CandidateList({
+  candidates,
+  onPick,
+  onReject,
+}: {
+  candidates: BackupCandidate[];
+  onPick: (candidate: BackupCandidate) => void;
+  /** Only for applicants */
+  onReject?: (candidate: BackupCandidate) => void;
+}) {
   return (
     <ul className="space-y-2">
       {candidates.map((candidate) => (
@@ -259,13 +264,22 @@ function CandidateList({ candidates, onPick }: { candidates: BackupCandidate[]; 
               {candidate.ineligible_reason && <span className="text-red-300"> · {candidate.ineligible_reason}</span>}
             </p>
           </div>
+          {onReject && (
+            <button
+              type="button"
+              onClick={() => onReject(candidate)}
+              className="px-3 py-1 rounded-md border border-slate-600 text-gray-300 text-sm hover:bg-slate-700"
+            >
+              Reject
+            </button>
+          )}
           <button
             type="button"
             disabled={!candidate.eligible}
             onClick={() => onPick(candidate)}
             className="px-3 py-1 rounded-md bg-green-600 text-white text-sm hover:bg-green-500 disabled:opacity-30"
           >
-            Pick
+            Approve
           </button>
         </li>
       ))}
@@ -296,7 +310,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
   const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
 
   return (
-    <Card title="Request a backup for a host" description="Opens immediately, no approval step.">
+    <Card title="Request a backup for a host" description="Opens on the board immediately, also for a session starting soon.">
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">

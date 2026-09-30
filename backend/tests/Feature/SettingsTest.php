@@ -54,19 +54,19 @@ class SettingsTest extends TestCase
 
     public function test_saved_value_overrides_config_and_is_audited(): void
     {
-        $this->save(['backup.auto_open_after_minutes' => 45])
+        $this->save(['backup.request_min_hours_before' => 48])
             ->assertOk()
             ->assertJsonPath('message', 'Setting saved.');
 
         $this->rebootConfig();
-        $this->assertSame(45, config('vidhelp.backup.auto_open_after_minutes'));
+        $this->assertSame(48, config('vidhelp.backup.request_min_hours_before'));
 
-        $row = SystemSetting::where('key', 'backup.auto_open_after_minutes')->sole();
+        $row = SystemSetting::where('key', 'backup.request_min_hours_before')->sole();
         $this->assertSame($this->admin->id, $row->updated_by);
 
         $audit = AuditLog::where(['action' => 'create', 'target_table' => 'system_settings'])->sole();
-        $this->assertSame('backup.auto_open_after_minutes', $audit->target_label);
-        $this->assertSame(45, $audit->new_value['value']);
+        $this->assertSame('backup.request_min_hours_before', $audit->target_label);
+        $this->assertSame(48, $audit->new_value['value']);
 
         $this->getJson('/api/admin/settings')
             ->assertJsonPath('groups.0.settings.1.changed_by', 'Boss');
@@ -139,7 +139,9 @@ class SettingsTest extends TestCase
         $this->actingAs($host)->getJson('/api/settings')
             ->assertOk()
             ->assertJsonPath('settings', [
-                'backup.auto_open_after_minutes' => 30,
+                'backup.request_min_hours_before' => 24,
+                'backup.direct_min_hosts' => 2,
+                'backup.direct_max_hosts' => 5,
                 'backup.auto_fill_before_minutes' => 30,
                 'backup.sick_letter_grace_hours' => 24,
                 'backup.quota_per_month' => 3,

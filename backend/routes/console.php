@@ -22,9 +22,9 @@ Artisan::command('hosts:sync-rate-categories', function () {
 Schedule::command('hosts:sync-rate-categories')->dailyAt('00:10');
 
 Artisan::command('backups:auto-process', function (BackupService $backups) {
-    ['opened' => $opened, 'filled' => $filled] = $backups->autoProcess();
-    $this->info("Opened {$opened} unreviewed request(s), auto-picked a cover for {$filled}.");
-})->purpose('Open backup requests nobody reviewed and pick covers for ones about to start');
+    $filled = $backups->autoProcess();
+    $this->info("Auto-picked a cover for {$filled} request(s).");
+})->purpose('Pick the best applicant for backup requests about to start that nobody decided on');
 
 Schedule::command('backups:auto-process')->everyMinute();
 

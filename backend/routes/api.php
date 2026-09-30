@@ -178,14 +178,13 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         // Schedule Management
         Route::apiResource('/schedules', ScheduleController::class)->except('show');
 
-        // Backups: approve requests, pick who covers
+        // Backups: approve or reject applicants, assign a cover directly in emergencies
         Route::get('/backups', [OperatorBackupController::class, 'index']);
         Route::post('/backups', [OperatorBackupController::class, 'store']);
         Route::get('/backups/{backup}/applicants', [OperatorBackupController::class, 'applicants']);
         Route::get('/backups/{backup}/candidates', [OperatorBackupController::class, 'candidates']);
         Route::get('/backups/{backup}/letter', [OperatorBackupController::class, 'letter']);
-        Route::post('/backups/{backup}/approve', [OperatorBackupController::class, 'approve']);
-        Route::post('/backups/{backup}/reject', [OperatorBackupController::class, 'reject']);
+        Route::post('/backups/{backup}/reject-applicant', [OperatorBackupController::class, 'rejectApplicant']);
         Route::post('/backups/{backup}/cancel', [OperatorBackupController::class, 'cancel']);
         Route::post('/backups/{backup}/assign', [OperatorBackupController::class, 'assign']);
         Route::post('/backups/{backup}/unassign', [OperatorBackupController::class, 'unassign']);
@@ -223,10 +222,11 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::get('/availability', [AvailabilityController::class, 'show']);
         Route::put('/availability', [AvailabilityController::class, 'update']);
 
-        // Backups: request cover for my slot, apply to cover others
+        // Backups: request cover for my slot (open or to named hosts), apply to cover others
         Route::get('/backups', [HostBackupController::class, 'index']);
         Route::get('/backups/needs', [HostBackupController::class, 'needs']);
         Route::get('/backups/slots', [HostBackupController::class, 'slots']);
+        Route::get('/backups/candidates', [HostBackupController::class, 'candidates']);
         Route::post('/backups', [HostBackupController::class, 'store']);
         Route::post('/backups/{backup}/cancel', [HostBackupController::class, 'cancel']);
         Route::post('/backups/{backup}/letter', [HostBackupController::class, 'uploadLetter']);

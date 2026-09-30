@@ -15,10 +15,15 @@ return [
         // Cross-brand covers a host may do per month (same-brand covers are free)
         'quota_per_month' => (int) env('BACKUP_QUOTA_PER_MONTH', 3),
 
-        // A request nobody approved/rejected opens by itself after this many minutes
-        'auto_open_after_minutes' => (int) env('BACKUP_AUTO_OPEN_AFTER_MINUTES', 30),
+        // Hosts must request a backup at least this many hours before the slot starts
+        // (closer to the slot, only an admin/operator can open one: emergencies)
+        'request_min_hours_before' => (int) env('BACKUP_REQUEST_MIN_HOURS_BEFORE', 24),
 
-        // This many minutes before the slot, the best applicant is picked if nobody chose yet
+        // A request to specific hosts must name at least / at most this many
+        'direct_min_hosts' => 2,
+        'direct_max_hosts' => (int) env('BACKUP_DIRECT_MAX_HOSTS', 5),
+
+        // This many minutes before the slot, the best applicant is picked if the admin didn't decide yet
         'auto_fill_before_minutes' => (int) env('BACKUP_AUTO_FILL_BEFORE_MINUTES', 30),
 
         // Sick letter is due this many hours after the slot starts

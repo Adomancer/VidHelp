@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AppNotification;
 use App\Models\BackupApplication;
 use App\Models\BackupQuota;
 use App\Models\BackupRequest;
@@ -45,7 +46,7 @@ class BackupTest extends TestCase
     {
         parent::setUp();
 
-        $this->travelTo(CarbonImmutable::parse('2026-10-05 10:00')); // Monday
+        $this->travelTo(CarbonImmutable::parse('2026-10-05 10:00')); // Monday, 28 hours before the slot
         $this->seed([RoleSeeder::class, HostRateCategorySeeder::class]);
         $this->admin = User::where('email', 'admin@vidhelp.com')->firstOrFail();
 
@@ -77,9 +78,9 @@ class BackupTest extends TestCase
         return $user->hostProfile;
     }
 
-    private function assign(HostProfile $host, Brand $brand): HostBrandAssignment
+    private function assign(HostProfile $host, Brand $brand, string $status = 'active'): HostBrandAssignment
     {
-        return HostBrandAssignment::create(['host_id' => $host->id, 'brand_id' => $brand->id, 'status' => 'active']);
+        return HostBrandAssignment::create(['host_id' => $host->id, 'brand_id' => $brand->id, 'status' => $status]);
     }
 
     private function slotFor(HostBrandAssignment $assignment, int $day, string $start, string $end): ScheduleSlot
@@ -100,13 +101,15 @@ class BackupTest extends TestCase
         ]);
     }
 
-    /** An approved (open) request. */
+    /** A request on the board (open to every host). */
     private function openRequest(array $overrides = []): BackupRequest
     {
-        $backup = BackupRequest::findOrFail($this->request($overrides)->assertCreated()->json('request.id'));
-        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/approve")->assertOk();
+        return BackupRequest::findOrFail($this->request($overrides)->assertCreated()->json('request.id'));
+    }
 
-        return $backup->fresh();
+    private function apply(HostProfile $host, BackupRequest $backup)
+    {
+        return $this->actingAs($host->user)->postJson("/api/host/backups/{$backup->id}/apply");
     }
 
     private function useQuota(HostProfile $host, int $used): void
@@ -114,17 +117,29 @@ class BackupTest extends TestCase
         BackupQuota::for($host->id, '2026-10')->update(['quota_used' => $used]);
     }
 
-    public function test_host_requests_a_backup_for_one_occurrence(): void
+    private function notified(User $user, string $type): bool
+    {
+        return AppNotification::where('user_id', $user->id)->where('channel', 'web')->where('type', $type)->exists();
+    }
+
+    public function test_host_request_goes_straight_to_the_board(): void
     {
         $this->request()
             ->assertCreated()
-            ->assertJsonPath('request.status', 'pending')
+            ->assertJsonPath('request.status', 'open')
+            ->assertJsonPath('request.request_type', 'open')
             ->assertJsonPath('request.backup_date', self::TUESDAY);
 
         $backup = BackupRequest::firstOrFail();
         $this->assertSame('2026-10-06 14:00', $backup->start_at->format('Y-m-d H:i'));
-        $this->assertSame('2026-10-05 10:30', $backup->auto_open_at->format('Y-m-d H:i'));
         $this->assertSame('2026-10-06 13:30', $backup->auto_fill_at->format('Y-m-d H:i'));
+
+        $this->actingAs($this->sameBrand->user)->getJson('/api/host/backups/needs')
+            ->assertJsonCount(1, 'needs')
+            ->assertJsonPath('needs.0.same_brand', true)
+            ->assertJsonPath('needs.0.ineligible_reason', null)
+            ->assertJsonMissingPath('needs.0.reason');
+        $this->assertTrue($this->notified($this->sameBrand->user, 'backup_opened'));
     }
 
     public function test_request_must_match_a_real_occurrence_of_my_slot(): void
@@ -140,20 +155,17 @@ class BackupTest extends TestCase
         $this->request()->assertJsonValidationErrors('backup_date'); // duplicate
     }
 
-    public function test_only_approved_requests_show_as_needs_and_without_the_reason(): void
+    public function test_host_must_request_at_least_a_day_ahead_but_staff_can_any_time(): void
     {
-        $this->request()->assertCreated();
+        $this->travelTo(CarbonImmutable::parse('2026-10-05 14:01')); // 23h59m before the slot
 
-        $this->actingAs($this->sameBrand->user)->getJson('/api/host/backups/needs')->assertJsonCount(0, 'needs');
+        $this->request()->assertJsonValidationErrors(['backup_date' => 'at least 24 hours']);
+        $slots = $this->actingAs($this->requester->user)->getJson('/api/host/backups/slots')->json('slots');
+        $this->assertSame(['2026-10-13'], array_column($slots, 'date')); // next Tuesday is still far enough ahead
 
-        $backup = BackupRequest::firstOrFail();
-        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/approve")->assertOk();
-
-        $this->actingAs($this->sameBrand->user)->getJson('/api/host/backups/needs')
-            ->assertJsonCount(1, 'needs')
-            ->assertJsonPath('needs.0.same_brand', true)
-            ->assertJsonPath('needs.0.ineligible_reason', null)
-            ->assertJsonMissingPath('needs.0.reason');
+        $this->actingAs($this->admin)->postJson('/api/operator/backups', [
+            'slot_id' => $this->slot->id, 'backup_date' => self::TUESDAY, 'reason_type' => 'sick',
+        ])->assertCreated()->assertJsonPath('request.status', 'open');
     }
 
     public function test_host_live_at_that_time_cannot_apply(): void
@@ -161,7 +173,7 @@ class BackupTest extends TestCase
         $backup = $this->openRequest();
         $this->slotFor($this->otherBrand->assignments()->first(), 2, '15:00', '17:00');
 
-        $this->actingAs($this->otherBrand->user)->postJson("/api/host/backups/{$backup->id}/apply")
+        $this->apply($this->otherBrand, $backup)
             ->assertUnprocessable()
             ->assertJsonPath('message', 'Live on Brand B (Tue 15:00-17:00).');
     }
@@ -172,7 +184,20 @@ class BackupTest extends TestCase
         $backup = $this->openRequest(['slot_id' => $morning->id, 'backup_date' => '2026-10-07']);
         $this->slotFor($this->otherBrand->assignments()->first(), 2, '23:00', '02:00'); // Tue night → Wed 02:00
 
-        $this->actingAs($this->otherBrand->user)->postJson("/api/host/backups/{$backup->id}/apply")->assertUnprocessable();
+        $this->apply($this->otherBrand, $backup)->assertUnprocessable();
+    }
+
+    public function test_host_banned_from_the_brand_cannot_cover_it(): void
+    {
+        $backup = $this->openRequest();
+        $this->assign($this->otherBrand, $this->brandA, 'banned');
+
+        $this->apply($this->otherBrand, $backup)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'Banned from Brand A.');
+
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->otherBrand->id])
+            ->assertJsonValidationErrors('host_id');
     }
 
     public function test_cross_brand_quota_blocks_applying_but_same_brand_is_free(): void
@@ -181,18 +206,135 @@ class BackupTest extends TestCase
         $this->useQuota($this->otherBrand, 3);
         $this->useQuota($this->sameBrand, 3);
 
-        $this->actingAs($this->otherBrand->user)->postJson("/api/host/backups/{$backup->id}/apply")
+        $this->apply($this->otherBrand, $backup)
             ->assertUnprocessable()
             ->assertJsonPath('message', 'Monthly cross-brand backup quota used (3/3).');
 
-        $this->actingAs($this->sameBrand->user)->postJson("/api/host/backups/{$backup->id}/apply")->assertOk();
+        $this->apply($this->sameBrand, $backup)->assertOk();
     }
 
-    public function test_admin_picks_a_cross_brand_applicant_and_quota_is_used(): void
+    public function test_first_applicant_makes_it_pending_and_alerts_staff_until_withdrawn(): void
     {
         $backup = $this->openRequest();
-        $this->actingAs($this->otherBrand->user)->postJson("/api/host/backups/{$backup->id}/apply")->assertOk();
-        $this->actingAs($this->sameBrand->user)->postJson("/api/host/backups/{$backup->id}/apply")->assertOk();
+
+        $this->apply($this->sameBrand, $backup)->assertOk();
+        $this->assertSame('pending', $backup->fresh()->status);
+        $this->assertTrue($this->notified($this->admin, 'backup_applied'));
+
+        // Still on the board: others may apply until the admin decides
+        $this->actingAs($this->otherBrand->user)->getJson('/api/host/backups/needs')->assertJsonCount(1, 'needs');
+
+        $this->actingAs($this->sameBrand->user)->postJson("/api/host/backups/{$backup->id}/withdraw")->assertOk();
+        $this->assertSame('open', $backup->fresh()->status);
+    }
+
+    public function test_rejecting_the_only_applicant_reopens_the_request(): void
+    {
+        $backup = $this->openRequest();
+        $this->apply($this->sameBrand, $backup)->assertOk();
+        $this->apply($this->otherBrand, $backup)->assertOk();
+
+        $reject = fn (HostProfile $host) => $this->actingAs($this->admin)
+            ->postJson("/api/operator/backups/{$backup->id}/reject-applicant", ['host_id' => $host->id]);
+
+        $reject($this->sameBrand)->assertOk();
+        $this->assertSame('pending', $backup->fresh()->status); // brand B host still waits
+        $this->assertTrue($this->notified($this->sameBrand->user, 'backup_not_picked'));
+
+        $reject($this->otherBrand)->assertOk();
+        $this->assertSame('open', $backup->fresh()->status);
+        $this->assertTrue($this->notified($this->requester->user, 'backup_reopened'));
+
+        $reject($this->otherBrand)->assertUnprocessable(); // nothing left to reject
+        $this->apply($this->sameBrand, $backup)->assertOk(); // may try again
+    }
+
+    public function test_host_cannot_apply_to_two_backups_at_the_same_time(): void
+    {
+        $first = $this->openRequest();
+
+        $other = $this->host();
+        $otherSlot = $this->slotFor($this->assign($other, $this->brandB), 2, '15:00', '16:00');
+        $second = BackupRequest::findOrFail($this->actingAs($other->user)->postJson('/api/host/backups', [
+            'slot_id' => $otherSlot->id, 'backup_date' => self::TUESDAY, 'reason_type' => 'sick',
+        ])->assertCreated()->json('request.id'));
+
+        $this->apply($this->sameBrand, $first)->assertOk();
+        $this->apply($this->sameBrand, $second)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'You already applied to cover Brand A at that time. Withdraw that one first.');
+    }
+
+    public function test_applications_close_when_the_slot_starts(): void
+    {
+        $backup = $this->openRequest();
+        $this->travelTo(CarbonImmutable::parse('2026-10-06 14:00'));
+
+        $this->apply($this->sameBrand, $backup)->assertUnprocessable()->assertJsonPath('message', 'This backup is no longer open.');
+        $this->actingAs($this->sameBrand->user)->getJson('/api/host/backups/needs')->assertJsonCount(0, 'needs');
+    }
+
+    public function test_direct_request_names_two_to_five_hosts_who_are_free(): void
+    {
+        $direct = fn (array $ids) => $this->request(['request_type' => 'direct', 'host_ids' => $ids]);
+
+        $direct([$this->sameBrand->id])->assertJsonValidationErrors(['host_ids' => 'at least 2']);
+        $direct([])->assertJsonValidationErrors('host_ids');
+        $direct(collect(range(1, 6))->map(fn () => $this->host()->id)->all())->assertJsonValidationErrors(['host_ids' => 'at most 5']);
+        $direct([$this->sameBrand->id, $this->requester->id])->assertJsonValidationErrors(['host_ids' => 'your own request']);
+
+        $this->slotFor($this->otherBrand->assignments()->first(), 2, '15:00', '17:00');
+        $direct([$this->sameBrand->id, $this->otherBrand->id])
+            ->assertJsonValidationErrors(['host_ids' => "{$this->otherBrand->user->name} can't cover it: Live on Brand B"]);
+
+        $this->assertSame(0, BackupRequest::count());
+    }
+
+    public function test_only_nominees_can_apply_to_a_direct_request(): void
+    {
+        $nominee = $this->host();
+        $this->assign($nominee, $this->brandB);
+
+        $backup = BackupRequest::findOrFail($this->request([
+            'request_type' => 'direct', 'host_ids' => [$this->sameBrand->id, $nominee->id],
+        ])->assertCreated()->assertJsonPath('request.request_type', 'direct')->json('request.id'));
+
+        $this->assertTrue($this->notified($nominee->user, 'backup_asked'));
+        $this->assertFalse($this->notified($this->otherBrand->user, 'backup_opened'));
+
+        // Everyone sees it on the board; only nominees can take it
+        $this->actingAs($this->otherBrand->user)->getJson('/api/host/backups/needs')
+            ->assertJsonPath('needs.0.request_type', 'direct')
+            ->assertJsonPath('needs.0.asked_me', false)
+            ->assertJsonPath('needs.0.ineligible_reason', "Only the hosts {$this->requester->user->name} asked can take this one.");
+        $this->apply($this->otherBrand, $backup)->assertUnprocessable();
+
+        $this->actingAs($nominee->user)->getJson('/api/host/backups/needs')->assertJsonPath('needs.0.asked_me', true);
+        $this->apply($nominee, $backup)->assertOk();
+
+        // An admin can still assign someone else in an emergency
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->otherBrand->id])->assertOk();
+    }
+
+    public function test_host_sees_who_is_free_to_name(): void
+    {
+        $this->slotFor($this->otherBrand->assignments()->first(), 2, '15:00', '17:00');
+
+        $candidates = collect($this->actingAs($this->requester->user)->getJson('/api/host/backups/candidates?'.http_build_query([
+            'slot_id' => $this->slot->id, 'backup_date' => self::TUESDAY,
+        ]))->assertOk()->json('candidates'));
+
+        $this->assertTrue($candidates->firstWhere('host_id', $this->sameBrand->id)['eligible']);
+        $this->assertFalse($candidates->firstWhere('host_id', $this->otherBrand->id)['eligible']);
+        $this->assertNull($candidates->firstWhere('host_id', $this->requester->id));
+        $this->assertArrayNotHasKey('rating', $candidates->first());
+    }
+
+    public function test_admin_approves_a_cross_brand_applicant_and_quota_is_used(): void
+    {
+        $backup = $this->openRequest();
+        $this->apply($this->otherBrand, $backup)->assertOk();
+        $this->apply($this->sameBrand, $backup)->assertOk();
 
         $this->actingAs($this->admin)->getJson("/api/operator/backups/{$backup->id}/applicants")
             ->assertJsonPath('applicants.0.host_id', $this->sameBrand->id); // same brand ranked first
@@ -200,6 +342,7 @@ class BackupTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->otherBrand->id])
             ->assertOk()
             ->assertJsonPath('request.status', 'filled')
+            ->assertJsonPath('request.approved_by', $this->admin->id)
             ->assertJsonPath('request.counts_toward_quota', true);
 
         $this->assertSame(1, BackupQuota::for($this->otherBrand->id, '2026-10')->quota_used);
@@ -222,6 +365,17 @@ class BackupTest extends TestCase
         $this->assertTrue($application->penalty_applied); // processed; the deduction itself is tested in PointsTest
     }
 
+    public function test_dropped_cover_goes_back_to_pending_when_others_still_wait(): void
+    {
+        $backup = $this->openRequest();
+        $this->apply($this->sameBrand, $backup)->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->otherBrand->id])->assertOk();
+
+        $this->actingAs($this->otherBrand->user)->postJson("/api/host/backups/{$backup->id}/drop")->assertOk();
+
+        $this->assertSame('pending', $backup->fresh()->status);
+    }
+
     public function test_cover_cannot_overlap_another_cover(): void
     {
         $first = $this->openRequest();
@@ -232,37 +386,21 @@ class BackupTest extends TestCase
         $second = BackupRequest::findOrFail($this->actingAs($other->user)->postJson('/api/host/backups', [
             'slot_id' => $otherSlot->id, 'backup_date' => self::TUESDAY, 'reason_type' => 'sick',
         ])->assertCreated()->json('request.id'));
-        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$second->id}/approve")->assertOk();
 
         $this->actingAs($this->admin)->postJson("/api/operator/backups/{$second->id}/assign", ['host_id' => $this->otherBrand->id])
             ->assertJsonValidationErrors('host_id');
     }
 
-    public function test_unreviewed_request_opens_automatically_after_30_minutes(): void
-    {
-        $this->request()->assertCreated();
-
-        $this->travel(29)->minutes();
-        $this->artisan('backups:auto-process')->assertSuccessful();
-        $this->assertSame('pending', BackupRequest::firstOrFail()->status);
-
-        $this->travel(2)->minutes();
-        $this->artisan('backups:auto-process')->assertSuccessful();
-        $backup = BackupRequest::firstOrFail();
-        $this->assertSame('open', $backup->status);
-        $this->assertTrue($backup->auto_approved);
-    }
-
-    public function test_best_applicant_is_picked_30_minutes_before_start(): void
+    public function test_best_applicant_is_approved_30_minutes_before_start_if_nobody_decided(): void
     {
         $backup = $this->openRequest();
-        $this->actingAs($this->otherBrand->user)->postJson("/api/host/backups/{$backup->id}/apply")->assertOk(); // applied first
+        $this->apply($this->otherBrand, $backup)->assertOk(); // applied first
         $this->travel(5)->minutes();
-        $this->actingAs($this->sameBrand->user)->postJson("/api/host/backups/{$backup->id}/apply")->assertOk();
+        $this->apply($this->sameBrand, $backup)->assertOk();
 
         $this->travelTo(CarbonImmutable::parse('2026-10-06 13:29'));
         $this->artisan('backups:auto-process');
-        $this->assertSame('open', $backup->fresh()->status);
+        $this->assertSame('pending', $backup->fresh()->status);
 
         $this->travelTo(CarbonImmutable::parse('2026-10-06 13:30'));
         $this->artisan('backups:auto-process');
@@ -270,10 +408,24 @@ class BackupTest extends TestCase
         $backup->refresh();
         $this->assertSame('filled', $backup->status);
         $this->assertTrue($backup->auto_filled);
+        $this->assertNull($backup->approved_by);
         $this->assertSame($this->sameBrand->id, $backup->filled_by_host_id); // same brand beats earlier cross-brand
     }
 
-    public function test_requester_cancels_before_but_not_after_a_cover_is_picked(): void
+    public function test_rejected_applicant_is_never_auto_approved(): void
+    {
+        $backup = $this->openRequest();
+        $this->apply($this->sameBrand, $backup)->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/reject-applicant", ['host_id' => $this->sameBrand->id])->assertOk();
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-06 13:30'));
+        $this->artisan('backups:auto-process');
+
+        $this->assertSame('open', $backup->fresh()->status);
+        $this->assertNotNull($backup->fresh()->no_cover_alerted_at);
+    }
+
+    public function test_requester_cancels_before_but_not_after_a_cover_is_approved(): void
     {
         $backup = $this->openRequest();
         $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->sameBrand->id])->assertOk();
@@ -299,6 +451,23 @@ class BackupTest extends TestCase
         ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('request.letter_status', 'uploaded');
 
         $this->actingAs($this->admin)->get("/api/operator/backups/{$backup->id}/letter")->assertOk();
+    }
+
+    public function test_sick_letter_can_come_with_the_request(): void
+    {
+        Storage::fake('local');
+
+        $this->actingAs($this->requester->user)->post('/api/host/backups', [
+            'slot_id' => $this->slot->id,
+            'backup_date' => self::TUESDAY,
+            'reason_type' => 'sick',
+            'request_type' => 'direct',
+            'host_ids' => [$this->sameBrand->id, $this->otherBrand->id],
+            'letter' => UploadedFile::fake()->create('surat-dokter.pdf', 100, 'application/pdf'),
+        ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('request.letter_status', 'uploaded')
+            ->assertJsonCount(2, 'request.nominees');
     }
 
     public function test_operator_requests_on_behalf_and_it_opens_immediately(): void

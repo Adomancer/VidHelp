@@ -36,15 +36,20 @@ class SettingsService
             'label' => 'Cross-brand covers per host per month',
             'help' => 'Covering a shift of your own brand never counts. A change also applies to this month.',
         ],
-        'backup.auto_open_after_minutes' => [
-            'group' => 'backups', 'type' => 'int', 'min' => 1, 'max' => 1440, 'unit' => 'minutes',
-            'label' => 'Open unreviewed requests after',
-            'help' => 'A backup request nobody approved or rejected opens to hosts by itself after this long.',
+        'backup.request_min_hours_before' => [
+            'group' => 'backups', 'type' => 'int', 'min' => 0, 'max' => 336, 'unit' => 'hours',
+            'label' => 'Hosts request a backup at least',
+            'help' => 'Before the session starts. Closer to the session, only an admin or operator can open a request (emergencies).',
+        ],
+        'backup.direct_max_hosts' => [
+            'group' => 'backups', 'type' => 'int', 'min' => 2, 'max' => 20, 'unit' => 'hosts',
+            'label' => 'Most hosts a named request can ask',
+            'help' => 'A host who asks specific people to cover must name at least 2 and at most this many.',
         ],
         'backup.auto_fill_before_minutes' => [
             'group' => 'backups', 'type' => 'int', 'min' => 0, 'max' => 1440, 'unit' => 'minutes',
-            'label' => 'Auto-pick a cover before the session',
-            'help' => 'If nobody picked a cover yet, the best applicant is picked this long before the session starts.',
+            'label' => 'Auto-approve a cover before the session',
+            'help' => 'If the admin has not decided yet, the best applicant is approved automatically this long before the session starts.',
         ],
         'backup.sick_letter_grace_hours' => [
             'group' => 'backups', 'type' => 'int', 'min' => 1, 'max' => 168, 'unit' => 'hours',
@@ -105,7 +110,9 @@ class SettingsService
 
     /** Settings any signed-in user may read (the numbers shown in help texts). */
     public const PUBLIC_KEYS = [
-        'backup.auto_open_after_minutes',
+        'backup.request_min_hours_before',
+        'backup.direct_min_hosts',
+        'backup.direct_max_hosts',
         'backup.auto_fill_before_minutes',
         'backup.sick_letter_grace_hours',
         'backup.quota_per_month',

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
 use App\Models\BackupApplication;
-use App\Models\BackupQuota;
 use App\Models\BackupRequest;
 use App\Models\HostProfile;
 use App\Models\ScheduleSlot;
@@ -21,7 +20,8 @@ class BackupController extends Controller
     }
 
     /**
-     * Requests by tab: pending | open | filled (upcoming) | closed (past, cancelled, rejected).
+     * Requests by tab: pending (applicants wait for a decision) | open (no applicants yet)
+     * | filled (upcoming) | closed (past, cancelled, rejected).
      */
     public function index(Request $request): JsonResponse
     {
@@ -29,7 +29,7 @@ class BackupController extends Controller
         $tab = $request->status ?? 'pending';
 
         $requests = BackupRequest::query()
-            ->with(['brand:id,name', 'requester.user', 'filler.user', 'attachments'])
+            ->with(['brand:id,name', 'requester.user', 'filler.user', 'attachments', 'nominees.host.user'])
             ->withCount(['applications as applicants_count' => fn ($q) => $q->where('status', 'applied')])
             ->when($tab === 'closed', fn ($q) => $q->where(fn ($q) => $q
                 ->whereIn('status', ['cancelled', 'rejected'])
@@ -49,7 +49,7 @@ class BackupController extends Controller
     {
         return response()->json([
             'applicants' => $this->backups->rankedApplicants($backup)
-                ->map(fn (BackupApplication $application) => $this->candidate($application->applicant, $backup) + [
+                ->map(fn (BackupApplication $application) => $this->backups->candidate($application->applicant, $backup) + [
                     'applied_at' => $application->created_at,
                 ]),
         ]);
@@ -60,21 +60,12 @@ class BackupController extends Controller
      */
     public function candidates(BackupRequest $backup): JsonResponse
     {
-        $candidates = HostProfile::query()
-            ->where('status', 'active')
-            ->whereKeyNot($backup->requesting_host_id)
-            ->whereHas('user', fn ($q) => $q->where('status', 'active'))
-            ->with(['user', 'latestRating'])
-            ->get()
-            ->map(fn (HostProfile $host) => $this->candidate($host, $backup))
-            ->sortBy([['eligible', 'desc'], ['same_brand', 'desc'], ['name', 'asc']])
-            ->values();
-
-        return response()->json(['candidates' => $candidates]);
+        return response()->json(['candidates' => $this->backups->candidates($backup)]);
     }
 
     /**
-     * Request a backup on a host's behalf (e.g. they called in sick). Opens immediately.
+     * Request a backup on a host's behalf (e.g. they called in sick). Opens immediately,
+     * also for a session starting soon.
      */
     public function store(Request $request): JsonResponse
     {
@@ -90,33 +81,22 @@ class BackupController extends Controller
             $validated['backup_date'],
             ['reason_type' => $validated['reason_type'], 'reason' => $validated['reason'] ?? null],
             $request->user(),
-            approved: true,
+            byStaff: true,
         );
 
         return response()->json(['request' => $backup, 'message' => 'Backup request opened'], 201);
     }
 
-    public function approve(Request $request, BackupRequest $backup): JsonResponse
+    /**
+     * Turn an applicant down. With nobody else waiting, the request is open again.
+     */
+    public function rejectApplicant(Request $request, BackupRequest $backup): JsonResponse
     {
-        if ($backup->status !== 'pending') {
-            return response()->json(['message' => 'Only pending requests can be approved.'], 422);
-        }
+        $validated = $request->validate(['host_id' => 'required|exists:host_profiles,id']);
 
-        $backup->update(['status' => 'open', 'approved_by' => $request->user()->id, 'approved_at' => now()]);
-        $this->backups->announceOpen($backup);
+        $this->backups->rejectApplicant($backup, HostProfile::findOrFail($validated['host_id']));
 
-        return response()->json(['message' => 'Approved. Hosts can now apply.']);
-    }
-
-    public function reject(BackupRequest $backup): JsonResponse
-    {
-        if (! in_array($backup->status, ['pending', 'open'])) {
-            return response()->json(['message' => 'Only pending or open requests can be rejected.'], 422);
-        }
-
-        $this->backups->close($backup, 'rejected');
-
-        return response()->json(['message' => 'Request rejected']);
+        return response()->json(['message' => 'Applicant rejected']);
     }
 
     /**
@@ -134,15 +114,15 @@ class BackupController extends Controller
     }
 
     /**
-     * Pick who covers it: an applicant, or any free host directly.
+     * ACC who covers it: an applicant, or any free host directly (emergencies).
      */
     public function assign(Request $request, BackupRequest $backup): JsonResponse
     {
         $validated = $request->validate(['host_id' => 'required|exists:host_profiles,id']);
 
-        $backup = $this->backups->fill($backup, HostProfile::findOrFail($validated['host_id']));
+        $backup = $this->backups->fill($backup, HostProfile::findOrFail($validated['host_id']), $request->user());
 
-        return response()->json(['request' => $backup->load('filler.user'), 'message' => 'Backup host assigned']);
+        return response()->json(['request' => $backup->load('filler.user'), 'message' => 'Backup host approved']);
     }
 
     /**
@@ -168,22 +148,5 @@ class BackupController extends Controller
         abort_unless($attachment && Storage::disk('local')->exists($attachment->file_path), 404, 'No letter uploaded.');
 
         return Storage::disk('local')->response($attachment->file_path, $attachment->original_name);
-    }
-
-    private function candidate(HostProfile $host, BackupRequest $backup): array
-    {
-        $reason = $this->backups->ineligibleReason($host, $backup);
-        $quota = BackupQuota::peek($host->id, $backup->quotaMonth());
-
-        return [
-            'host_id' => $host->id,
-            'name' => $host->user->name,
-            'avatar_url' => $host->user->avatar_url,
-            'same_brand' => $this->backups->isSameBrand($host, $backup),
-            'rating' => $host->latestRating?->rating,
-            'eligible' => $reason === null,
-            'ineligible_reason' => $reason,
-            'quota' => $quota->only('quota_used', 'quota_max'),
-        ];
     }
 }
