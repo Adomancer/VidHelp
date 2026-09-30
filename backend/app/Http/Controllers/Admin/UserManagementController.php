@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\AccountService;
 use App\Services\Notifier;
 use App\Services\TwoFactorService;
 use Illuminate\Http\JsonResponse;
@@ -12,6 +13,12 @@ use Illuminate\Http\Request;
 
 class UserManagementController extends Controller
 {
+    public const ROLES = 'host,operator,finance,admin';
+
+    public function __construct(private AccountService $accounts)
+    {
+    }
+
     /**
      * List all users with their roles.
      */
@@ -30,6 +37,26 @@ class UserManagementController extends Controller
     }
 
     /**
+     * Create an account (e.g. a host who doesn't sign up themselves). Active straight away.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:8',
+            'role' => 'required|in:'.self::ROLES,
+        ]);
+
+        $user = $this->accounts->create($validated, $request->user());
+
+        return response()->json([
+            'user' => $user->load('roles'),
+            'message' => "Account created. {$user->name} can sign in now.",
+        ], 201);
+    }
+
+    /**
      * Show a single user.
      */
     public function show(User $user): JsonResponse
@@ -40,21 +67,21 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Update user details and role.
+     * Update user details and role. Status changes go through activate/deactivate/archive.
      */
     public function update(Request $request, User $user): JsonResponse
     {
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
-            'status' => 'sometimes|in:pending,active,inactive,archived',
-            'role' => 'sometimes|string|exists:roles,name',
+            'role' => 'sometimes|in:'.self::ROLES,
         ]);
 
         if (isset($validated['role'])) {
             $before = $user->getRoleNames()->all();
-            $user->syncRoles([$validated['role']]);
             if ($before !== [$validated['role']]) {
+                $this->accounts->ensureRoleCanChange($user, $request->user());
+                $user->syncRoles([$validated['role']]);
                 AuditLog::record('role_change', $user, old: ['roles' => $before], new: ['roles' => [$validated['role']]]);
             }
             unset($validated['role']);
@@ -70,18 +97,39 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Deactivate a user.
+     * Deactivate a user for now (e.g. leave): signed out, can't sign in, schedule stays.
      */
     public function deactivate(Request $request, User $user): JsonResponse
     {
-        if ($user->is($request->user())) {
-            return response()->json(['message' => 'You cannot deactivate your own account.'], 422);
-        }
-
-        $user->update(['status' => 'inactive']);
-        $user->tokens()->delete(); // Revoke all tokens
+        $this->accounts->setStatus($user, 'inactive', $request->user());
 
         return response()->json(['message' => 'User deactivated']);
+    }
+
+    /**
+     * Archive a user who left (the "delete" button): signed out and taken off the schedule.
+     */
+    public function archive(Request $request, User $user): JsonResponse
+    {
+        $this->accounts->setStatus($user, 'archived', $request->user());
+
+        return response()->json(['message' => "{$user->name} was archived and taken off the schedule from today."]);
+    }
+
+    /**
+     * Delete an archived user permanently (anonymized): only when banned from a brand
+     * or at the host's own request.
+     */
+    public function erase(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => 'required|in:banned,host_request',
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $this->accounts->erase($user, $validated['reason'], $validated['note'] ?? null, $request->user());
+
+        return response()->json(['message' => 'Personal data deleted. Work and pay history stay, without the name.']);
     }
 
     /**
@@ -91,12 +139,11 @@ class UserManagementController extends Controller
     {
         $firstApproval = $user->approved_at === null;
 
+        $this->accounts->setStatus($user, 'active', $request->user());
         $user->update([
-            'status' => 'active',
             'approved_by' => $user->approved_by ?? $request->user()->id,
             'approved_at' => $user->approved_at ?? now(),
         ]);
-        $user->ensureHostProfile();
 
         if ($firstApproval) {
             AuditLog::record('approve', $user);

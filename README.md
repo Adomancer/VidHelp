@@ -50,9 +50,10 @@ DB_CONNECTION=mysql DB_DATABASE=vidhelp_test php artisan test
 | --- | --- | --- |
 | **Admin** | Everything, plus users, KTP/bank data, payroll, settings, audit log | Desktop sidebar (purple) |
 | **Operator** | Schedules, backups, live reports, events, points | Desktop sidebar |
+| **Finance** | Payroll and kasbon only | Desktop sidebar |
 | **Host** | Own schedule, check-in and live report, backups, score, pay, profile | Mobile bottom nav |
 
-New sign-ups (email or Google) are **pending hosts** until an admin approves them on Users.
+New sign-ups (email or Google) are **pending hosts** until an admin approves them on Users; admins can also create accounts there, active straight away. **Deactivate** is temporary (can't sign in, schedule stays); **Archive** is for someone who left (slots end today, their backups are released); an archived account can be **deleted permanently** when the host is banned from a brand or asked for it, which anonymizes their personal data but keeps hours and pay history.
 
 ---
 
@@ -81,7 +82,8 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 
 | Path | What's there |
 | --- | --- |
-| `app/Http/Controllers/Admin/` | Users, hosts (KTP/bank), brands, rate levels, points corrections, ratings, payroll, kasbon, settings, audit log, dashboard |
+| `app/Http/Controllers/Admin/` | Users, hosts (KTP/bank), brands, rate levels, points corrections, ratings, settings, audit log, dashboard |
+| `app/Http/Controllers/Finance/` | Payroll and kasbon (admin and finance) |
 | `app/Http/Controllers/Operator/` | Hosts and assignments, schedules, backups, live reports, events, points, dashboard |
 | `app/Http/Controllers/Host/` | Profile, my schedule, availability, backups, live check-in/report, events, score, pay |
 | `app/Http/Controllers/Auth/` | Login, register, Google sign-in, password reset, 2FA code step |
@@ -107,6 +109,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 | `Notifier` / `DiscordClient` | Bell notifications, Discord channel posts and DMs, retries |
 | `TwoFactorService` / `Totp` | Admin two-factor sign-in, recovery codes |
 | `SettingsService` | Admin-editable rules layered over `config/vidhelp.php` |
+| `AccountService` | Accounts made by admins, deactivate / archive (takes a host off the schedule), delete permanently (anonymize) |
 | `DashboardService` | Dashboard figures: what needs attention, today's sessions, brand progress, hours per day |
 
 ### Scheduled jobs
@@ -134,7 +137,8 @@ Base URL `http://localhost:8000/api`. Send `Accept: application/json` and, once 
 | `/auth/me`, `/auth/logout` | Signed in | current user (with `roles`), sign out |
 | `/two-factor` | Admin | status, `setup`, `confirm`, `recovery-codes`, turn off |
 | `/notifications`, `/discord`, `/settings` | Any active user | bell list and unread count, Discord link, public rule numbers |
-| `/admin/...` | Admin | `dashboard`, `users`, `hosts/{id}`, `brands`, `rate-categories`, `points/...`, `warning-letters`, `violation-types`, `ratings`, `payroll/...`, `cash-advances`, `settings`, `audit-logs` |
+| `/admin/...` | Admin | `dashboard`, `users` (+ `archive`, `erase`), `hosts/{id}`, `brands`, `rate-categories`, `points/...`, `warning-letters`, `violation-types`, `ratings`, `settings`, `audit-logs` |
+| `/finance/...` | Finance, admin | `brands`, `hosts`, `payroll/...`, `cash-advances` |
 | `/operator/...` | Operator, admin | `dashboard`, `hosts`, `brands`, `assignments`, `schedules`, `backups/...`, `reports/...`, `events/...`, `points/...` |
 | `/host/...` | Any active user | `profile`, `schedules`, `availability`, `backups/...`, `live/...`, `events/...`, `performance`, `pay` |
 

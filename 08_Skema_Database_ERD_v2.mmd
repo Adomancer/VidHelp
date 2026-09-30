@@ -127,12 +127,13 @@ erDiagram
         string password "nullable, hash only; null untuk akun Google-only"
         string google_id UK "nullable, sub dari Google"
         string avatar "nullable, URL Google atau path upload; foto profil semua role (pengganti photo_path)"
-        enum status "pending, active, inactive, archived"
+        enum status "pending, active, inactive (sementara, jadwal tetap), archived (resign, jadwal dihentikan); status host_profiles ikut ini"
         enum signup_source "admin_created, self_register"
         uuid approved_by FK
         datetime approved_at
         boolean two_factor_enabled
         datetime last_login_at
+        datetime erased_at "hapus permanen: data pribadi dianonimkan, riwayat kerja & gaji tetap"
         string remember_token
         datetime created_at
         datetime updated_at

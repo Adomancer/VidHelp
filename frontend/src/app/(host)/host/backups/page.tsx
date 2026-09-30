@@ -301,6 +301,25 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
     ({ message }) => onDone(message)
   );
 
+  // Nothing to request for (yet): no form, so it can't be sent without a session
+  if (!occurrence) {
+    return (
+      <Card title="Request a backup">
+        {slots.error && <FormAlert tone="error">{slots.error}</FormAlert>}
+        <p className="text-sm text-gray-400">{slots.data ? "You have no sessions you can still request a backup for." : "Loading your sessions…"}</p>
+        {slots.data && settings && (
+          <p className="text-xs text-gray-400">
+            Sessions less than {formatDuration(settings["backup.request_min_hours_before"])} away aren&apos;t listed. For a last-minute absence,
+            contact an admin.
+          </p>
+        )}
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-xl text-gray-300 hover:bg-slate-800">
+          Close
+        </button>
+      </Card>
+    );
+  }
+
   return (
     <Card title="Request a backup" description="Pick the session you can't do. It goes on the backup board right away; an admin approves who covers it.">
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -310,32 +329,28 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
           <label htmlFor="occurrence" className="block text-sm font-medium text-gray-200">
             Session
           </label>
-          {slots.data?.slots.length === 0 ? (
-            <p className="text-sm text-gray-400">You have no sessions you can still request a backup for.</p>
-          ) : (
-            <select
-              id="occurrence"
-              value={occurrence}
-              onChange={(event) => {
-                setPickedOccurrence(event.target.value);
-                setHostIds([]); // who is free depends on the session
-              }}
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white"
-            >
-              {slots.data?.slots.map((slot) => (
-                <option key={`${slot.slot_id}|${slot.date}`} value={`${slot.slot_id}|${slot.date}`}>
-                  {formatWindow(slot.start_at, slot.end_at)} · {slot.brand.name}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            id="occurrence"
+            value={occurrence}
+            onChange={(event) => {
+              setPickedOccurrence(event.target.value);
+              setHostIds([]); // who is free depends on the session
+            }}
+            className="w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white"
+          >
+            {slots.data?.slots.map((slot) => (
+              <option key={`${slot.slot_id}|${slot.date}`} value={`${slot.slot_id}|${slot.date}`}>
+                {formatWindow(slot.start_at, slot.end_at)} · {slot.brand.name}
+              </option>
+            ))}
+          </select>
           {settings && (
             <p className="text-xs text-gray-400">
               Request at least {formatDuration(settings["backup.request_min_hours_before"])} before the session. For anything sooner, contact an
               admin.
             </p>
           )}
-          {(errors.backup_date || errors.slot_id) && <p className="text-sm text-red-300">{errors.backup_date ?? errors.slot_id}</p>}
+          {(errors.slot_id || errors.backup_date) && <p className="text-sm text-red-300">{errors.slot_id ?? errors.backup_date}</p>}
         </div>
 
         <fieldset className="space-y-1">

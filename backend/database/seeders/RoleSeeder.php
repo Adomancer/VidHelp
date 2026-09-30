@@ -60,6 +60,13 @@ class RoleSeeder extends Seeder
             'manage-backup-hosts',
         ]);
 
+        // Payroll and kasbon only (no users, settings or schedules)
+        $finance = Role::firstOrCreate(['name' => 'finance']);
+        $finance->givePermissionTo([
+            'view-finance',
+            'manage-finance',
+        ]);
+
         $host = Role::firstOrCreate(['name' => 'host']);
         $host->givePermissionTo([
             'view-own-schedule',

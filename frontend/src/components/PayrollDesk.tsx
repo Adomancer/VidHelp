@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { errorMessage, operatorApi, payrollApi, pointsApi, scheduleApi, type PeriodListItem, type PeriodStatus } from "@/lib/api";
+import { usePathname } from "next/navigation";
+import { errorMessage, payrollApi, type PeriodListItem, type PeriodStatus } from "@/lib/api";
 import { formatDate, formatDuration, formatRupiah } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
@@ -58,7 +59,7 @@ export default function PayrollDesk() {
 
 function Periods() {
   const { token } = useAuth();
-  const brands = useApiData("brands", () => operatorApi.brands(token));
+  const brands = useApiData("payroll-brands", () => payrollApi.brands(token));
   const [brandId, setBrandId] = useState("");
   const periods = useApiData(`periods-${brandId}`, () => payrollApi.periods(token, brandId));
   const [selected, setSelected] = useState<string | null>(null);
@@ -70,8 +71,8 @@ function Periods() {
     <div className="space-y-4">
       {withoutStart.length > 0 && (
         <FormAlert tone="warning">
-          No payroll start date yet for {withoutStart.map((brand) => brand.name).join(", ")}. Set it on the Brands page so their hours get
-          periods.
+          No payroll start date yet for {withoutStart.map((brand) => brand.name).join(", ")}. An admin sets it on the Brands page so their
+          hours get periods.
         </FormAlert>
       )}
       {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
@@ -152,6 +153,8 @@ function PeriodRow({ period, selected, onClick }: { period: PeriodListItem; sele
 function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (text: string, tone?: "success" | "error") => void }) {
   const { token } = useAuth();
   const detail = useApiData(`period-${periodId}`, () => payrollApi.period(token, periodId));
+  // The desk is shared by the admin and finance panels; slips open in the same panel
+  const slipsPath = usePathname().startsWith("/finance") ? "/finance/payroll/slips" : "/admin/payroll/slips";
 
   async function act(action: () => Promise<{ message: string }>) {
     try {
@@ -284,7 +287,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                   {slip.advance_deduction > 0 && ` − ${formatRupiah(slip.advance_deduction)} kasbon`}
                 </span>
                 <span className="font-medium text-green-300">{formatRupiah(slip.net_amount)}</span>
-                <Link href={`/admin/payroll/slips/${slip.id}`} className="text-xs text-purple-300 hover:text-white">
+                <Link href={`${slipsPath}/${slip.id}`} className="text-xs text-purple-300 hover:text-white">
                   View
                 </Link>
               </li>
@@ -307,7 +310,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brandId: string; onDone: (message: string) => void }) {
   const { token } = useAuth();
-  const hosts = useApiData(`brand-hosts-${brandId}`, () => scheduleApi.brandHosts(token, brandId));
+  const hosts = useApiData(`payroll-hosts-${brandId}`, () => payrollApi.hosts(token, brandId));
   const [direction, setDirection] = useState<1 | -1>(1);
   const [hours, setHours] = useState(1);
   const input = "px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
@@ -336,9 +339,9 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
       <label className="space-y-1">
         <span className="block text-xs text-gray-400">Host</span>
         <select name="host_id" className={`${input} w-full`}>
-          {hosts.data?.assignments.map((assignment) => (
-            <option key={assignment.host_id} value={assignment.host_id}>
-              {assignment.host.user.name}
+          {hosts.data?.hosts.map((host) => (
+            <option key={host.host_id} value={host.host_id}>
+              {host.name}
             </option>
           ))}
         </select>
@@ -467,7 +470,7 @@ function Kasbon() {
 
 function AdvanceForm({ onDone }: { onDone: (message: string) => void }) {
   const { token } = useAuth();
-  const hosts = useApiData("points-hosts-all", () => pointsApi.hosts(token));
+  const hosts = useApiData("payroll-hosts-all", () => payrollApi.hosts(token));
   const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
 
   const { loading, errors, error, handleSubmit } = useApiForm(

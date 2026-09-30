@@ -43,6 +43,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'approved_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'erased_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_enabled' => 'boolean',
         ];
