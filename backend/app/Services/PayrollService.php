@@ -222,7 +222,7 @@ class PayrollService
                 'requested_by' => $by->id,
                 'requested_at' => now(),
                 'status' => 'requested',
-                'exported_report_url' => "/api/admin/payroll/periods/{$period->id}/export",
+                'exported_report_url' => "/api/finance/payroll/periods/{$period->id}/export",
             ]);
         });
     }

@@ -29,7 +29,6 @@ class HostController extends Controller
             'phone' => 'sometimes|nullable|regex:/^\+?[0-9 \-]{8,20}$/',
             'guardian_phone' => 'sometimes|nullable|regex:/^\+?[0-9 \-]{8,20}$/',
             'join_date' => 'sometimes|date|before_or_equal:today',
-            'status' => 'sometimes|in:active,inactive,archived,banned',
             'rate_category_id' => 'sometimes|nullable|exists:host_rate_categories,id',
         ]);
 

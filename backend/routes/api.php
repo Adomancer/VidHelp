@@ -5,8 +5,8 @@ use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
-use App\Http\Controllers\Admin\PayrollController;
-use App\Http\Controllers\Admin\CashAdvanceController;
+use App\Http\Controllers\Finance\PayrollController;
+use App\Http\Controllers\Finance\CashAdvanceController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\HostController as AdminHostController;
 use App\Http\Controllers\Admin\RateCategoryController;
@@ -101,12 +101,15 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
     Route::prefix('admin')->middleware('role:admin')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 
-        // User Management
+        // User Management: create, approve, deactivate (temporary), archive (resigned), delete permanently
         Route::get('/users', [UserManagementController::class, 'index']);
+        Route::post('/users', [UserManagementController::class, 'store']);
         Route::get('/users/{user}', [UserManagementController::class, 'show']);
         Route::put('/users/{user}', [UserManagementController::class, 'update']);
         Route::post('/users/{user}/deactivate', [UserManagementController::class, 'deactivate']);
         Route::post('/users/{user}/activate', [UserManagementController::class, 'activate']);
+        Route::post('/users/{user}/archive', [UserManagementController::class, 'archive']);
+        Route::post('/users/{user}/erase', [UserManagementController::class, 'erase']);
         Route::post('/users/{user}/two-factor/reset', [UserManagementController::class, 'resetTwoFactor']);
 
         // Audit trail
@@ -143,6 +146,16 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::put('/violation-types/{violationType}', [ViolationTypeController::class, 'update']);
         Route::get('/ratings', [RatingController::class, 'index']);
         Route::put('/ratings', [RatingController::class, 'upsert']);
+    });
+
+    /*
+    |----------------------------------------------------------------------
+    | Finance Routes (payroll and kasbon)
+    |----------------------------------------------------------------------
+    */
+    Route::prefix('finance')->middleware('role:finance|admin')->group(function () {
+        Route::get('/brands', [PayrollController::class, 'brands']);
+        Route::get('/hosts', [PayrollController::class, 'hosts']);
 
         // Payroll: periods per brand, adjustments, payment requests, salary slips
         Route::get('/payroll/periods', [PayrollController::class, 'periods']);

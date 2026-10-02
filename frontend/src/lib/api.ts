@@ -83,7 +83,7 @@ export function errorMessage(error: unknown): string {
 */
 export type UserStatus = "pending" | "active" | "inactive" | "archived";
 
-export type RoleName = "admin" | "operator" | "host";
+export type RoleName = "admin" | "operator" | "finance" | "host";
 
 export interface AuthUser {
   id: string;
@@ -99,6 +99,8 @@ export interface AuthUser {
   two_factor_setup_required?: boolean;
   approved_at: string | null;
   last_login_at: string | null;
+  /** Set once an admin deleted the account permanently (personal data wiped). */
+  erased_at: string | null;
   created_at: string;
   roles: { name: RoleName }[];
 }
@@ -229,6 +231,9 @@ export interface Paginated<T> {
   total: number;
 }
 
+/** Why an account may be deleted permanently. */
+export type EraseReason = "banned" | "host_request";
+
 export const adminApi = {
   users: (token: string, params: { status?: UserStatus; search?: string; page?: number }) => {
     const query = new URLSearchParams();
@@ -239,11 +244,24 @@ export const adminApi = {
     return api<Paginated<AuthUser>>(`/admin/users?${query}`, { token });
   },
 
+  /** An account made by an admin: active straight away. */
+  createUser: (token: string, data: { name: string; email: string; password: string; role: RoleName }) =>
+    api<{ user: AuthUser } & Message>("/admin/users", { method: "POST", body: JSON.stringify(data), token }),
+
   activateUser: (token: string, id: string) =>
     api<Message>(`/admin/users/${id}/activate`, { method: "POST", token }),
 
+  /** Temporary (e.g. leave): can't sign in, schedule stays. */
   deactivateUser: (token: string, id: string) =>
     api<Message>(`/admin/users/${id}/deactivate`, { method: "POST", token }),
+
+  /** Resigned: can't sign in, taken off the schedule from today. */
+  archiveUser: (token: string, id: string) =>
+    api<Message>(`/admin/users/${id}/archive`, { method: "POST", token }),
+
+  /** Delete an archived account permanently: personal data wiped, work and pay history kept. */
+  eraseUser: (token: string, id: string, data: { reason: EraseReason; note: string | null }) =>
+    api<Message>(`/admin/users/${id}/erase`, { method: "POST", body: JSON.stringify(data), token }),
 
   setRole: (token: string, id: string, role: RoleName) =>
     api<{ user: AuthUser }>(`/admin/users/${id}`, {
@@ -503,7 +521,8 @@ export interface AdminHostDetail extends HostListItem {
   sensitive_data: (SensitiveDataMasked & { ktp_number: string | null; bank_account: string | null }) | null;
 }
 
-export type AdminHostInput = Partial<Pick<HostProfile, "phone" | "guardian_phone" | "join_date" | "status" | "rate_category_id">>;
+/** Host status follows the account's (Users page), so it isn't set here. */
+export type AdminHostInput = Partial<Pick<HostProfile, "phone" | "guardian_phone" | "join_date" | "rate_category_id">>;
 
 export const hostApi = {
   profile: (token: string) => api<MyProfile>("/host/profile", { token }),
@@ -1200,27 +1219,33 @@ export interface CashAdvance {
 }
 
 export const payrollApi = {
+  /** Brands with their payroll start date (finance can't use the operator brand list). */
+  brands: (token: string) =>
+    api<{ brands: Pick<Brand, "id" | "name" | "status" | "payroll_start_date">[] }>("/finance/brands", { token }),
+  /** Active hosts to pick for kasbon or an adjustment; with brandId, only that brand's. */
+  hosts: (token: string, brandId = "") =>
+    api<{ hosts: { host_id: string; name: string }[] }>(`/finance/hosts${brandId ? `?brand_id=${brandId}` : ""}`, { token }),
   periods: (token: string, brandId = "") =>
-    api<{ periods: PeriodListItem[] }>(`/admin/payroll/periods${brandId ? `?brand_id=${brandId}` : ""}`, { token }),
+    api<{ periods: PeriodListItem[] }>(`/finance/payroll/periods${brandId ? `?brand_id=${brandId}` : ""}`, { token }),
   period: (token: string, id: string) =>
     api<{ period: PaymentPeriod; summary: PeriodSummary; hosts: HostPayRow[]; adjustments: HourAdjustment[]; slips: SalarySlipRow[] }>(
-      `/admin/payroll/periods/${id}`,
+      `/finance/payroll/periods/${id}`,
       { token }
     ),
   addAdjustment: (token: string, periodId: string, data: { host_id: string; sessions_added: number; hours_added: number; notes: string }) =>
-    post(`/admin/payroll/periods/${periodId}/adjustments`, token, data),
-  removeAdjustment: (token: string, id: string) => api<Message>(`/admin/payroll/adjustments/${id}`, { method: "DELETE", token }),
-  requestPayment: (token: string, periodId: string) => post(`/admin/payroll/periods/${periodId}/request`, token),
-  markPaid: (token: string, periodId: string) => post(`/admin/payroll/periods/${periodId}/paid`, token),
-  exportUrl: (token: string, periodId: string) => apiFileUrl(`/admin/payroll/periods/${periodId}/export`, token),
-  slip: (token: string, id: string) => api<{ slip: SlipDetail }>(`/admin/payroll/slips/${id}`, { token }),
+    post(`/finance/payroll/periods/${periodId}/adjustments`, token, data),
+  removeAdjustment: (token: string, id: string) => api<Message>(`/finance/payroll/adjustments/${id}`, { method: "DELETE", token }),
+  requestPayment: (token: string, periodId: string) => post(`/finance/payroll/periods/${periodId}/request`, token),
+  markPaid: (token: string, periodId: string) => post(`/finance/payroll/periods/${periodId}/paid`, token),
+  exportUrl: (token: string, periodId: string) => apiFileUrl(`/finance/payroll/periods/${periodId}/export`, token),
+  slip: (token: string, id: string) => api<{ slip: SlipDetail }>(`/finance/payroll/slips/${id}`, { token }),
   advances: (token: string, status: "open" | "paid" | "" = "") =>
-    api<{ advances: CashAdvance[] }>(`/admin/cash-advances${status ? `?status=${status}` : ""}`, { token }),
+    api<{ advances: CashAdvance[] }>(`/finance/cash-advances${status ? `?status=${status}` : ""}`, { token }),
   createAdvance: (
     token: string,
     data: { host_id: string; type: CashAdvance["type"]; total_amount: number; installment_count: number; notes: string | null }
-  ) => post("/admin/cash-advances", token, data),
-  removeAdvance: (token: string, id: string) => api<Message>(`/admin/cash-advances/${id}`, { method: "DELETE", token }),
+  ) => post("/finance/cash-advances", token, data),
+  removeAdvance: (token: string, id: string) => api<Message>(`/finance/cash-advances/${id}`, { method: "DELETE", token }),
 };
 
 export interface MyPay {

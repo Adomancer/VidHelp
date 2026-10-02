@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { adminHostsApi, errorMessage, operatorApi, type AdminHostDetail, type HostStatus, type RateCategory } from "@/lib/api";
+import { adminHostsApi, errorMessage, operatorApi, type AdminHostDetail, type RateCategory } from "@/lib/api";
 import { formatDate, formatRupiah, formatTenure } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
@@ -72,7 +72,6 @@ function SettingsForm({ host, rates, onSaved }: { host: AdminHostDetail; rates: 
         phone: formValue(data, "phone") || null,
         guardian_phone: formValue(data, "guardian_phone") || null,
         join_date: formValue(data, "join_date"),
-        status: formValue(data, "status") as HostStatus,
         rate_category_id: formValue(data, "rate_category_id") || null,
       }),
     ({ host: updated }) => {
@@ -100,12 +99,17 @@ function SettingsForm({ host, rates, onSaved }: { host: AdminHostDetail; rates: 
         <TextField label="Phone" name="phone" type="tel" defaultValue={host.phone ?? ""} error={errors.phone} />
         <TextField label="Guardian phone" name="guardian_phone" type="tel" defaultValue={host.guardian_phone ?? ""} error={errors.guardian_phone} />
         <TextField label="Join date" name="join_date" type="date" defaultValue={host.join_date.slice(0, 10)} error={errors.join_date} />
-        <SelectField
-          label="Host status"
-          name="status"
-          defaultValue={host.status}
-          options={["active", "inactive", "archived", "banned"].map((value) => ({ value, label: value }))}
-        />
+        <div className="space-y-1">
+          <span className="block text-sm font-medium text-gray-200">Status</span>
+          <p className="text-sm text-white capitalize">{host.status}</p>
+          <p className="text-xs text-gray-400">
+            Follows the account. Deactivate or archive it on the{" "}
+            <Link href="/admin/users" className="text-purple-300 hover:text-white">
+              Users
+            </Link>{" "}
+            page.
+          </p>
+        </div>
         <div className="sm:col-span-2">
           <SelectField
             label="Rate level"

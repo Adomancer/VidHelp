@@ -348,9 +348,11 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
           <input name="reason" maxLength={1000} className={input} />
         </label>
         <div className="sm:col-span-2 flex gap-3">
-          <div className="w-40">
-            <SubmitButton loading={loading}>Open request</SubmitButton>
-          </div>
+          {daySlots.length > 0 && (
+            <div className="w-40">
+              <SubmitButton loading={loading}>Open request</SubmitButton>
+            </div>
+          )}
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
             Cancel
           </button>

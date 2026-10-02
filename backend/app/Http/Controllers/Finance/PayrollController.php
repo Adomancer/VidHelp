@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
+use App\Models\Brand;
+use App\Models\HostProfile;
 use App\Models\HourAdjustment;
 use App\Models\PaymentPeriod;
 use App\Models\SalarySlip;
@@ -16,6 +18,35 @@ class PayrollController extends Controller
 {
     public function __construct(private PayrollService $payroll)
     {
+    }
+
+    /**
+     * Brands with their payroll start (for the brand filter and the "no start date" warning).
+     */
+    public function brands(): JsonResponse
+    {
+        return response()->json([
+            'brands' => Brand::orderBy('name')->get(['id', 'name', 'status', 'payroll_start_date']),
+        ]);
+    }
+
+    /**
+     * Active hosts to pick for kasbon or an hour adjustment; with brand_id, only that brand's hosts.
+     */
+    public function hosts(Request $request): JsonResponse
+    {
+        $request->validate(['brand_id' => 'nullable|uuid']);
+
+        $hosts = HostProfile::query()
+            ->where('status', 'active')
+            ->when($request->brand_id, fn ($q, $id) => $q->whereHas('assignments', fn ($q) => $q->where('brand_id', $id)->where('status', 'active')))
+            ->with('user:id,name')
+            ->get()
+            ->map(fn (HostProfile $host) => ['host_id' => $host->id, 'name' => $host->user->name])
+            ->sortBy('name')
+            ->values();
+
+        return response()->json(['hosts' => $hosts]);
     }
 
     /**
