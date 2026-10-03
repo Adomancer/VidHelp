@@ -9,6 +9,7 @@ import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import DurationInput from "./DurationInput";
 import FormAlert from "./FormAlert";
+import ToggleGroup from "./ToggleGroup";
 import UserAvatar from "./UserAvatar";
 
 type Tab = "flagged" | "missing" | "approved" | "rejected";
@@ -47,18 +48,7 @@ export default function ReportReview() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap gap-2">
-        {tabs.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => setTab(option.value)}
-            className={`px-4 py-2 rounded-lg text-sm ${tab === option.value ? "bg-purple-600 text-white" : "bg-slate-900 text-gray-300 hover:bg-slate-800"}`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      <ToggleGroup options={tabs} value={tab} onChange={setTab} />
 
       {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
       {(reports.error || missing.error) && <FormAlert tone="error">{reports.error ?? missing.error}</FormAlert>}

@@ -20,7 +20,7 @@ use Illuminate\Support\Carbon;
  * valid between effective_from and effective_to.
  */
 #[Fillable([
-    'assignment_id', 'day_of_week', 'slot_type', 'start_time', 'end_time',
+    'assignment_id', 'previous_slot_id', 'day_of_week', 'slot_type', 'start_time', 'end_time',
     'is_locked', 'status', 'effective_from', 'effective_to',
 ])]
 class ScheduleSlot extends Model
@@ -75,6 +75,31 @@ class ScheduleSlot extends Model
         return $this->belongsTo(HostBrandAssignment::class, 'assignment_id');
     }
 
+    /** The slot this one continues after an edit that applied from a later date. */
+    public function previous(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'previous_slot_id');
+    }
+
+    /**
+     * This slot's id and those of the slots it continues, newest first.
+     *
+     * @return list<string>
+     */
+    public function lineageIds(): array
+    {
+        $ids = [$this->id];
+        $previousId = $this->previous_slot_id;
+
+        // Bounded so a broken chain can't loop forever
+        while ($previousId && count($ids) < 50 && ! in_array($previousId, $ids, true)) {
+            $ids[] = $previousId;
+            $previousId = static::whereKey($previousId)->value('previous_slot_id');
+        }
+
+        return $ids;
+    }
+
     /**
      * Slots in effect on a given date.
      */
@@ -101,13 +126,14 @@ class ScheduleSlot extends Model
      * Other active slots this one would clash with: same brand (one host live at a time)
      * or same host (can't be in two places), overlapping in both time of week and period.
      */
-    public function conflicts(): Collection
+    public function conflicts(?string $ignoreId = null): Collection
     {
         $assignment = $this->assignment;
+        $ignoreId ??= $this->exists ? $this->getKey() : null;
 
         return static::query()
             ->with(['assignment.brand', 'assignment.host.user'])
-            ->when($this->exists, fn ($q) => $q->whereKeyNot($this->getKey()))
+            ->when($ignoreId, fn ($q) => $q->whereKeyNot($ignoreId))
             ->activeDuring($this->effective_from, $this->effective_to)
             ->whereHas('assignment', fn ($q) => $q
                 ->where('brand_id', $assignment->brand_id)
@@ -175,19 +201,21 @@ class ScheduleSlot extends Model
     }
 
     /**
-     * Stop the slot from today on. Slots that haven't started yet are deleted;
-     * ones that already ran keep their history and just end yesterday.
+     * Stop the slot from a date on (default today). Slots that haven't started by then
+     * are deleted; ones that already ran keep their history and end the day before.
      */
-    public function retire(): void
+    public function retire(?CarbonInterface $from = null): void
     {
-        if ($this->effective_from->gte(today())) {
+        $from = Carbon::parse($from ?? today())->startOfDay();
+
+        if ($this->effective_from->gte($from)) {
             $this->delete();
 
             return;
         }
 
-        if ($this->effective_to === null || $this->effective_to->gte(today())) {
-            $this->update(['effective_to' => today()->subDay()]);
+        if ($this->effective_to === null || $this->effective_to->gte($from)) {
+            $this->update(['effective_to' => $from->copy()->subDay()]);
         }
     }
 

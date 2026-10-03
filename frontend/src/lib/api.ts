@@ -606,6 +606,8 @@ export type DayOfWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export interface ScheduleSlot {
   id: string;
   assignment_id: string;
+  /** The slot this one continues after an edit that applied from a later date. */
+  previous_slot_id: string | null;
   day_of_week: DayOfWeek;
   slot_type: "regular" | "pd";
   /** "HH:MM" */
@@ -640,9 +642,35 @@ export interface BrandHost extends Omit<Assignment, "brand"> {
   host: HostProfile & { user: AuthUser; availability: AvailabilityRange[] };
 }
 
+/** An existing slot that a new or edited one would clash with. */
+export interface SlotConflict {
+  id: string;
+  host_name: string;
+  brand_name: string;
+  /** The same host elsewhere; otherwise another host on the same brand. */
+  same_host: boolean;
+  day_of_week: DayOfWeek;
+  start_time: string;
+  end_time: string;
+}
+
+/** One audit row about a slot; values are raw columns ("14:00:00", "2026-10-06 00:00:00"). */
+export interface SlotHistoryEntry {
+  id: string;
+  action: "create" | "update" | "delete";
+  target_id: string;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  created_at: string;
+  user: { id: string; name: string } | null;
+}
+
 export const scheduleApi = {
-  list: (token: string, params: { brand_id?: string; host_id?: string; on?: string }) => {
-    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as [string, string][]);
+  /** Slots in effect on `on`, or on any of the `days` days from it. */
+  list: (token: string, params: { brand_id?: string; host_id?: string; on?: string; days?: number }) => {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, value]) => value).map(([key, value]) => [key, String(value)])
+    );
     return api<{ slots: ScheduleSlot[]; backups: SlotBackupMarker[]; replacing_events: ReplacingEvent[] }>(`/operator/schedules?${query}`, { token });
   },
 
@@ -651,11 +679,28 @@ export const scheduleApi = {
   create: (token: string, data: SlotInput) =>
     api<{ slot: ScheduleSlot }>("/operator/schedules", { method: "POST", body: JSON.stringify(data), token }),
 
-  update: (token: string, id: string, data: Partial<SlotInput>) =>
-    api<{ slot: ScheduleSlot }>(`/operator/schedules/${id}`, { method: "PUT", body: JSON.stringify(data), token }),
+  /**
+   * With `apply_from` after the slot started, the slot ends the day before and the
+   * changes continue as a new slot (`previous` = the ended one); otherwise edited in place.
+   */
+  update: (token: string, id: string, data: Partial<SlotInput> & { apply_from?: string }) =>
+    api<{ slot: ScheduleSlot; previous?: ScheduleSlot }>(`/operator/schedules/${id}`, { method: "PUT", body: JSON.stringify(data), token }),
 
-  /** Ends the slot from today on (deletes it if it hasn't started yet). */
-  remove: (token: string, id: string) => api<Message>(`/operator/schedules/${id}`, { method: "DELETE", token }),
+  /** Ends the slot from today (or `from`) on; deletes it if it hasn't started by then. */
+  remove: (token: string, id: string, from?: string) =>
+    api<Message>(`/operator/schedules/${id}${from ? `?from=${from}` : ""}`, { method: "DELETE", token }),
+
+  conflicts: (token: string, params: Omit<SlotInput, "slot_type"> & { ignore_id?: string }) => {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, value]) => value !== null && value !== undefined && value !== "").map(([key, value]) => [key, String(value)])
+    );
+    return api<{ conflicts: SlotConflict[] }>(`/operator/schedules/conflicts?${query}`, { token });
+  },
+
+  history: (token: string, id: string) => api<{ history: SlotHistoryEntry[] }>(`/operator/schedules/${id}/history`, { token }),
+
+  /** Take back a slot just added, or an edit that continued a slot (`slot` = the one it continued). */
+  undo: (token: string, id: string) => api<{ slot: ScheduleSlot | null } & Message>(`/operator/schedules/${id}/undo`, { method: "POST", token }),
 
   /** Admin only. */
   lock: (token: string, id: string, isLocked: boolean) =>
@@ -829,7 +874,12 @@ export const hostBackupApi = {
 export const operatorBackupApi = {
   list: (token: string, status: "pending" | "open" | "filled" | "closed") =>
     api<{ requests: BackupRequest[] }>(`/operator/backups?status=${status}`, { token }),
-  create: (token: string, data: BackupRequestInput) => post<{ request: BackupRequest } & Message>("/operator/backups", token, data),
+  /** With `host_id`, that host covers it right away. */
+  create: (token: string, data: BackupRequestInput & { host_id?: string | null }) =>
+    post<{ request: BackupRequest } & Message>("/operator/backups", token, data),
+  /** Who could cover one session of a slot, before a request exists (free hosts first). */
+  slotCandidates: (token: string, slotId: string, date: string) =>
+    api<{ candidates: BackupCandidate[] }>(`/operator/backups/candidates?slot_id=${slotId}&backup_date=${date}`, { token }),
   applicants: (token: string, id: string) => api<{ applicants: BackupCandidate[] }>(`/operator/backups/${id}/applicants`, { token }),
   candidates: (token: string, id: string) => api<{ candidates: BackupCandidate[] }>(`/operator/backups/${id}/candidates`, { token }),
   /** Turn an applicant down; with nobody else waiting, the request is open again. */

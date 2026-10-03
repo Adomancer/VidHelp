@@ -4,8 +4,8 @@ export default function AdminSchedulesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Schedules</h1>
-        <p className="text-sm text-gray-400 mt-1">Open a slot to lock it. Operators can&apos;t change or remove locked slots.</p>
+        <h1 className="text-2xl font-bold text-white">Jadwal</h1>
+        <p className="text-sm text-gray-400 mt-1">Siapa live, kapan, di brand mana. Klik slot untuk melihat detail, mengatur backup, atau menguncinya agar Operator tidak bisa mengubahnya.</p>
       </div>
       <ScheduleBoard isAdmin />
     </div>

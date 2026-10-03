@@ -7,7 +7,7 @@ export function formatRupiah(value: string | number): string {
 
 /** "2026-09-28" → "28 Sep 2026" */
 export function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** 13 → "1 yr 1 mo" */
@@ -17,18 +17,18 @@ export function formatTenure(joinDate: string): string {
   const months = Math.max(0, (now.getFullYear() - joined.getFullYear()) * 12 + now.getMonth() - joined.getMonth() - (now.getDate() < joined.getDate() ? 1 : 0));
   const years = Math.floor(months / 12);
 
-  if (years === 0) return `${months} mo`;
-  return months % 12 === 0 ? `${years} yr` : `${years} yr ${months % 12} mo`;
+  if (years === 0) return `${months} bln`;
+  return months % 12 === 0 ? `${years} thn` : `${years} thn ${months % 12} bln`;
 }
 
 export const DAYS = [
-  { value: 1, short: "Mon", long: "Monday" },
-  { value: 2, short: "Tue", long: "Tuesday" },
-  { value: 3, short: "Wed", long: "Wednesday" },
-  { value: 4, short: "Thu", long: "Thursday" },
-  { value: 5, short: "Fri", long: "Friday" },
-  { value: 6, short: "Sat", long: "Saturday" },
-  { value: 7, short: "Sun", long: "Sunday" },
+  { value: 1, short: "Sen", long: "Senin" },
+  { value: 2, short: "Sel", long: "Selasa" },
+  { value: 3, short: "Rab", long: "Rabu" },
+  { value: 4, short: "Kam", long: "Kamis" },
+  { value: 5, short: "Jum", long: "Jumat" },
+  { value: 6, short: "Sab", long: "Sabtu" },
+  { value: 7, short: "Min", long: "Minggu" },
 ] as const;
 
 /** ISO weekday (1 = Monday ... 7 = Sunday) of a local date. */
@@ -71,18 +71,18 @@ export function carriedInto<T extends { day_of_week: number; crosses_midnight: b
 
 /** "2026-10-06T07:00:00Z" → "Tue 6 Oct" (local time) */
 export function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
 }
 
 /** "14:00" (local time) */
 export function formatClock(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 }
 
 /** "Tue 6 Oct, 14:00–16:00" or "Tue 6 Oct, 23:00 – Wed 02:00" */
 export function formatWindow(startIso: string, endIso: string): string {
   const sameDay = new Date(startIso).toDateString() === new Date(endIso).toDateString();
-  const end = sameDay ? formatClock(endIso) : ` ${new Date(endIso).toLocaleDateString("en-GB", { weekday: "short" })} ${formatClock(endIso)}`;
+  const end = sameDay ? formatClock(endIso) : ` ${new Date(endIso).toLocaleDateString("id-ID", { weekday: "short" })} ${formatClock(endIso)}`;
   return `${formatDay(startIso)}, ${formatClock(startIso)}${sameDay ? "–" : " –"}${end}`;
 }
 
@@ -103,7 +103,7 @@ export function dateOfWeekday(from: string, day: number): string {
 
 /** "2026-10-06" → "6 Oct" */
 export function formatShortDate(date: string): string {
-  return new Date(`${date}T00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return new Date(`${date}T00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 }
 
 /** 0.33 → "20 min", 2 → "2 h", 2.5 → "2 h 30 min" */
