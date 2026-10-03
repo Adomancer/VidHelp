@@ -16,6 +16,7 @@ import { useAuth } from "./AuthProvider";
 import { BackupStatusBadge, LetterBadge, reasonLabels, RequestTypeBadge } from "./BackupBadges";
 import Card from "./Card";
 import FormAlert from "./FormAlert";
+import Modal from "./Modal";
 import SubmitButton from "./SubmitButton";
 import UserAvatar from "./UserAvatar";
 
@@ -310,7 +311,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
   const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
 
   return (
-    <Card title="Request a backup for a host" description="Opens on the board immediately, also for a session starting soon.">
+    <Modal title="Request a backup for a host" description="Opens on the board immediately, also for a session starting soon." onClose={onCancel}>
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -358,6 +359,6 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
           </button>
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }

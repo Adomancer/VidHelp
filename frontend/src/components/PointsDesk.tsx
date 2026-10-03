@@ -8,6 +8,7 @@ import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import FormAlert from "./FormAlert";
+import Modal from "./Modal";
 import PointsMeter, { SpBadge } from "./PointsMeter";
 import SubmitButton from "./SubmitButton";
 import UserAvatar from "./UserAvatar";
@@ -139,21 +140,25 @@ function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: b
         </div>
         <PointsMeter points={data.points} opening={data.opening_points} thresholds={data.thresholds} />
         <div className="flex flex-wrap gap-2">
-          <ToggleButton active={form === "violation"} onClick={() => setForm(form === "violation" ? null : "violation")}>
-            Record violation
-          </ToggleButton>
-          <ToggleButton active={form === "complaint"} onClick={() => setForm(form === "complaint" ? null : "complaint")}>
-            Brand complaint
-          </ToggleButton>
-          {isAdmin && (
-            <ToggleButton active={form === "sp"} onClick={() => setForm(form === "sp" ? null : "sp")}>
-              Issue SP by hand
-            </ToggleButton>
-          )}
+          <ActionButton onClick={() => setForm("violation")}>Record violation</ActionButton>
+          <ActionButton onClick={() => setForm("complaint")}>Brand complaint</ActionButton>
+          {isAdmin && <ActionButton onClick={() => setForm("sp")}>Issue SP by hand</ActionButton>}
         </div>
-        {form === "violation" && <ViolationForm hostId={hostId} onDone={done} />}
-        {form === "complaint" && <ComplaintForm hostId={hostId} onDone={done} />}
-        {form === "sp" && <WarningForm hostId={hostId} onDone={done} />}
+        {form === "violation" && (
+          <Modal title={`Record violation · ${data.host.user.name}`} onClose={() => setForm(null)}>
+            <ViolationForm hostId={hostId} onDone={done} onCancel={() => setForm(null)} />
+          </Modal>
+        )}
+        {form === "complaint" && (
+          <Modal title={`Brand complaint · ${data.host.user.name}`} onClose={() => setForm(null)}>
+            <ComplaintForm hostId={hostId} onDone={done} onCancel={() => setForm(null)} />
+          </Modal>
+        )}
+        {form === "sp" && (
+          <Modal title={`Issue SP by hand · ${data.host.user.name}`} onClose={() => setForm(null)}>
+            <WarningForm hostId={hostId} onDone={done} onCancel={() => setForm(null)} />
+          </Modal>
+        )}
       </Card>
 
       <Card title="This period">
@@ -230,13 +235,9 @@ function WarningsCard({ data, isAdmin, act }: { data: PointsHostDetail; isAdmin:
   );
 }
 
-function ToggleButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function ActionButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-sm ${active ? "bg-purple-600 text-white" : "border border-slate-700 text-gray-300 hover:bg-slate-800"}`}
-    >
+    <button type="button" onClick={onClick} className="px-3 py-1.5 rounded-lg text-sm border border-slate-700 text-gray-300 hover:bg-slate-800">
       {children}
     </button>
   );
@@ -244,7 +245,22 @@ function ToggleButton({ active, onClick, children }: { active: boolean; onClick:
 
 const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
 
-function ViolationForm({ hostId, onDone }: { hostId: string; onDone: (message: string) => void }) {
+type FormProps = { hostId: string; onDone: (message: string) => void; onCancel: () => void };
+
+function FormButtons({ loading, label, onCancel }: { loading: boolean; label: string; onCancel: () => void }) {
+  return (
+    <div className="sm:col-span-full flex gap-3">
+      <div className="w-40">
+        <SubmitButton loading={loading}>{label}</SubmitButton>
+      </div>
+      <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+        Cancel
+      </button>
+    </div>
+  );
+}
+
+function ViolationForm({ hostId, onDone, onCancel }: FormProps) {
   const { token } = useAuth();
   const types = useApiData("violation-types", () => pointsApi.violationTypes(token));
   const [typeId, setTypeId] = useState("");
@@ -263,7 +279,7 @@ function ViolationForm({ hostId, onDone }: { hostId: string; onDone: (message: s
   );
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 border-t border-slate-800 pt-3" noValidate>
+    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2" noValidate>
       {error && (
         <div className="sm:col-span-2">
           <FormAlert tone="error">{error}</FormAlert>
@@ -293,14 +309,12 @@ function ViolationForm({ hostId, onDone }: { hostId: string; onDone: (message: s
         <span className="block text-xs text-gray-400">What happened</span>
         <input name="reason" maxLength={255} className={input} />
       </label>
-      <div className="w-40">
-        <SubmitButton loading={loading}>Record</SubmitButton>
-      </div>
+      <FormButtons loading={loading} label="Record" onCancel={onCancel} />
     </form>
   );
 }
 
-function ComplaintForm({ hostId, onDone }: { hostId: string; onDone: (message: string) => void }) {
+function ComplaintForm({ hostId, onDone, onCancel }: FormProps) {
   const { token } = useAuth();
   const brands = useApiData("brands", () => operatorApi.brands(token));
 
@@ -317,7 +331,7 @@ function ComplaintForm({ hostId, onDone }: { hostId: string; onDone: (message: s
   );
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 border-t border-slate-800 pt-3" noValidate>
+    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2" noValidate>
       {error && (
         <div className="sm:col-span-2">
           <FormAlert tone="error">{error}</FormAlert>
@@ -346,16 +360,12 @@ function ComplaintForm({ hostId, onDone }: { hostId: string; onDone: (message: s
         <span className="block text-xs text-gray-400">Date</span>
         <input name="occurred_on" type="date" defaultValue={toDateInput()} max={toDateInput()} className={input} />
       </label>
-      <div className="flex items-end">
-        <div className="w-40">
-          <SubmitButton loading={loading}>Record</SubmitButton>
-        </div>
-      </div>
+      <FormButtons loading={loading} label="Record" onCancel={onCancel} />
     </form>
   );
 }
 
-function WarningForm({ hostId, onDone }: { hostId: string; onDone: (message: string) => void }) {
+function WarningForm({ hostId, onDone, onCancel }: FormProps) {
   const { token } = useAuth();
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) =>
@@ -368,9 +378,9 @@ function WarningForm({ hostId, onDone }: { hostId: string; onDone: (message: str
   );
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-[8rem_1fr_auto] items-end border-t border-slate-800 pt-3" noValidate>
+    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-[8rem_1fr]" noValidate>
       {error && (
-        <div className="sm:col-span-3">
+        <div className="sm:col-span-2">
           <FormAlert tone="error">{error}</FormAlert>
         </div>
       )}
@@ -387,9 +397,7 @@ function WarningForm({ hostId, onDone }: { hostId: string; onDone: (message: str
         <input name="reason" maxLength={255} className={input} />
         {errors.reason && <span className="text-xs text-red-300">{errors.reason}</span>}
       </label>
-      <div className="w-32">
-        <SubmitButton loading={loading}>Issue</SubmitButton>
-      </div>
+      <FormButtons loading={loading} label="Issue" onCancel={onCancel} />
     </form>
   );
 }

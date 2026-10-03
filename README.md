@@ -170,7 +170,7 @@ Times are sent as ISO 8601 in Asia/Jakarta (WIB). Durations are hours as decimal
 | `src/app/(admin)/admin/` | Admin pages; `layout.tsx` holds the sidebar links |
 | `src/app/(operator)/operator/` | Operator pages; own sidebar |
 | `src/app/(host)/host/` | Host pages; mobile bottom nav in `layout.tsx` |
-| `src/components/` | Shared pieces: `Card`, `FormAlert`, `TextField`, `SelectField`, `SubmitButton`, badges, and the big "desk" components that several pages share (`BackupDesk`, `PayrollDesk`, `PointsDesk`, `ReportReview`, `ScheduleBoard`, `EventManager`) |
+| `src/components/` | Shared pieces: `Card`, `Modal`, `FormAlert`, `TextField`, `SelectField`, `SubmitButton`, badges, and the big "desk" components that several pages share (`BackupDesk`, `PayrollDesk`, `PointsDesk`, `ReportReview`, `ScheduleBoard`, `EventManager`) |
 | `src/lib/api.ts` | **Every API call and its TypeScript types**, grouped (`authApi`, `hostApi`, `scheduleApi`, `payrollApi`, `dashboardApi`, …) |
 | `src/lib/useApiData.ts` | Load data for a page: `{ data, error, loading, reload, setData }` |
 | `src/lib/useApiForm.ts` | Submit a form: puts 422 errors under each field, other errors in `error` |
@@ -216,6 +216,7 @@ This is **Next.js 16**, which differs from older versions. Check `frontend/node_
 ### UI rules
 
 - **Look:** dark slate background (`bg-slate-950`, cards `bg-slate-900 border-slate-800`), white headings, `text-gray-400` for secondary text, purple for actions and accents. Reuse `Card`, `FormAlert`, `TextField`, `SubmitButton` instead of new styles.
+- **Add and edit forms open in a `Modal`**, never inline on the page: render `{open && <Modal title onClose>…</Modal>}` with the form inside, plus a Cancel button next to the submit button. See `CreateAccountForm` on the Users page.
 - **Host pages are mobile-first:** design for a phone width first, then desktop.
 - **Never hardcode a business number** in text (like "30 minutes" or "24 hours"). Read it from `settingsApi.public()`; see `components/BackupTimingNote.tsx`.
 - **Durations** always as hours and minutes (`formatDuration`), money as rupiah (`formatRupiah`).

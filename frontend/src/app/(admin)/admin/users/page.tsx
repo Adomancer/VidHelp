@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { adminApi, errorMessage, type AuthUser, type EraseReason, type Paginated, type RoleName, type UserStatus } from "@/lib/api";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
-import Card from "@/components/Card";
 import FormAlert from "@/components/FormAlert";
+import Modal from "@/components/Modal";
 import SelectField from "@/components/SelectField";
 import SubmitButton from "@/components/SubmitButton";
 import TextField from "@/components/TextField";
@@ -83,11 +83,9 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-white">User Management</h1>
-        {!creating && (
-          <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-sm text-white hover:bg-purple-500">
-            Create account
-          </button>
-        )}
+        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-sm text-white hover:bg-purple-500">
+          Create account
+        </button>
       </div>
 
       {creating && (
@@ -323,7 +321,11 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
   );
 
   return (
-    <Card title="Create account" description="The account is active straight away. Give the person their email and password to sign in.">
+    <Modal
+      title="Create account"
+      description="The account is active straight away. Give the person their email and password to sign in."
+      onClose={onCancel}
+    >
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -343,7 +345,7 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
           </button>
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }
 
@@ -365,9 +367,10 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
   );
 
   return (
-    <Card
+    <Modal
       title={`Delete ${user.name} permanently`}
       description="Wipes sign-in, contact details, KTP, bank details, photos and sick letters. Hours, points and salary slips stay, without the name. This can't be undone."
+      onClose={onCancel}
     >
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
@@ -386,6 +389,6 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
           </button>
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }

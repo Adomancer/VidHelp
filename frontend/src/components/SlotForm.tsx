@@ -5,8 +5,8 @@ import { errorMessage, scheduleApi, type BrandHost, type ScheduleSlot, type Slot
 import { DAYS, formatTimeRange, toDateInput } from "@/lib/format";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "./AuthProvider";
-import Card from "./Card";
 import FormAlert from "./FormAlert";
+import Modal from "./Modal";
 import SelectField from "./SelectField";
 import SubmitButton from "./SubmitButton";
 import TextField from "./TextField";
@@ -59,17 +59,17 @@ export default function SlotForm({ hosts, slot, day, isAdmin, onDone, onCancel }
 
   if (hosts.length === 0 && !slot) {
     return (
-      <Card title="Add slot">
+      <Modal title="Add slot" onClose={onCancel}>
         <p className="text-sm text-gray-400">No hosts are assigned to this brand yet. Assign hosts on the Hosts page first.</p>
         <button type="button" onClick={onCancel} className="text-sm text-purple-300 hover:text-white">
           Close
         </button>
-      </Card>
+      </Modal>
     );
   }
 
   return (
-    <Card title={slot ? "Edit slot" : "Add slot"}>
+    <Modal title={slot ? "Edit slot" : "Add slot"} onClose={onCancel}>
       {readOnly && <FormAlert tone="warning">This slot is locked. Only an admin can change or remove it.</FormAlert>}
       {actionError && <FormAlert tone="error">{actionError}</FormAlert>}
 
@@ -149,6 +149,6 @@ export default function SlotForm({ hosts, slot, day, isAdmin, onDone, onCancel }
           )}
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }

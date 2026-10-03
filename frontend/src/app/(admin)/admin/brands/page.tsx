@@ -6,8 +6,8 @@ import { formatDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
-import Card from "@/components/Card";
 import FormAlert from "@/components/FormAlert";
+import Modal from "@/components/Modal";
 import SelectField from "@/components/SelectField";
 import SubmitButton from "@/components/SubmitButton";
 import TextField from "@/components/TextField";
@@ -112,7 +112,7 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
   }, onDone);
 
   return (
-    <Card title={brand ? `Edit ${brand.name}` : "New brand"}>
+    <Modal title={brand ? `Edit ${brand.name}` : "New brand"} onClose={onCancel} wide>
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -187,6 +187,6 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           </button>
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }
