@@ -33,7 +33,7 @@ class TwoFactorController extends Controller
         $codes = $this->twoFactor->confirm($user, $request->code);
 
         return response()->json([
-            'message' => 'Two-factor authentication is on.',
+            'message' => 'Verifikasi dua langkah aktif.',
             'recovery_codes' => $codes,
             'user' => $user->fresh()->forSession(),
         ]);
@@ -44,7 +44,7 @@ class TwoFactorController extends Controller
         $request->validate(['code' => 'required|string']);
 
         return response()->json([
-            'message' => 'New recovery codes created. The old ones no longer work.',
+            'message' => 'Kode pemulihan baru dibuat. Kode lama sudah tidak berlaku.',
             'recovery_codes' => $this->twoFactor->regenerateRecoveryCodes($request->user(), $request->code),
         ]);
     }
@@ -54,6 +54,6 @@ class TwoFactorController extends Controller
         $request->validate(['code' => 'required|string']);
         $this->twoFactor->disable($request->user(), $request->code);
 
-        return response()->json(['message' => 'Two-factor authentication is off.']);
+        return response()->json(['message' => 'Verifikasi dua langkah dimatikan.']);
     }
 }

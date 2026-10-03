@@ -59,11 +59,11 @@ class AccountService
     public function setStatus(User $user, string $status, User $by): void
     {
         if ($user->erased_at) {
-            $this->fail('status', 'This account was deleted permanently.');
+            $this->fail('status', 'Akun ini sudah dihapus permanen.');
         }
         // The acting admin stays active, so this also means there is always an admin left
         if ($status !== 'active' && $user->is($by)) {
-            $this->fail('status', 'You cannot deactivate or archive your own account.');
+            $this->fail('status', 'Kamu tidak bisa menonaktifkan atau mengarsipkan akunmu sendiri.');
         }
 
         DB::transaction(function () use ($user, $status) {
@@ -88,7 +88,7 @@ class AccountService
     public function ensureRoleCanChange(User $user, User $by): void
     {
         if ($user->is($by)) {
-            $this->fail('role', 'You cannot change your own role.');
+            $this->fail('role', 'Kamu tidak bisa mengubah peranmu sendiri.');
         }
     }
 
@@ -101,15 +101,15 @@ class AccountService
     public function erase(User $user, string $reason, ?string $note, User $by): void
     {
         if ($user->status !== 'archived' || $user->erased_at) {
-            $this->fail('reason', $user->erased_at ? 'This account was already deleted.' : 'Archive the account first.');
+            $this->fail('reason', $user->erased_at ? 'Akun ini sudah dihapus.' : 'Arsipkan akunnya dulu.');
         }
 
         $host = $user->hostProfile;
         if ($reason === 'banned' && ! $host?->assignments()->where('status', 'banned')->exists()) {
-            $this->fail('reason', 'This host is not banned from any brand.');
+            $this->fail('reason', 'Host ini tidak diblokir dari brand mana pun.');
         }
 
-        $label = 'Deleted user '.substr($user->id, 0, 8);
+        $label = 'Pengguna terhapus '.substr($user->id, 0, 8);
         $oldEmail = $user->email;
         $sensitiveId = $host?->sensitiveData?->id;
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { adminHostsApi, operatorApi, type BrandInput, type BrandSummary } from "@/lib/api";
 import { formatDate } from "@/lib/format";
+import { statusLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
@@ -21,15 +22,15 @@ export default function AdminBrandsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Brands</h1>
-          <p className="text-sm text-gray-400 mt-1">Hosts are assigned to brands on the operator Hosts page.</p>
+          <h1 className="text-2xl font-bold text-white">Brand</h1>
+          <p className="text-sm text-gray-400 mt-1">Host ditugaskan ke brand di halaman Host milik operator.</p>
         </div>
         <button
           type="button"
           onClick={() => setEditing("new")}
           className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500"
         >
-          New brand
+          Brand baru
         </button>
       </div>
 
@@ -52,9 +53,9 @@ export default function AdminBrandsPage() {
           <thead className="text-left text-gray-400 border-b border-slate-800">
             <tr>
               <th className="px-4 py-3 font-medium">Brand</th>
-              <th className="px-4 py-3 font-medium">Target / period</th>
-              <th className="px-4 py-3 font-medium">Payment cycle</th>
-              <th className="px-4 py-3 font-medium">Hosts</th>
+              <th className="px-4 py-3 font-medium">Target / periode</th>
+              <th className="px-4 py-3 font-medium">Siklus pembayaran</th>
+              <th className="px-4 py-3 font-medium">Host</th>
               <th className="px-4 py-3 font-medium">Leader</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3" />
@@ -67,30 +68,30 @@ export default function AdminBrandsPage() {
                   {brand.name}
                   {brand.is_obs && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-xs">OBS</span>}
                 </td>
-                <td className="px-4 py-3">{brand.target_hours_per_period} h</td>
+                <td className="px-4 py-3">{brand.target_hours_per_period} jam</td>
                 <td className="px-4 py-3">
-                  {brand.payment_cycle_days} days
+                  {brand.payment_cycle_days} hari
                   <span className="block text-xs text-gray-500">
-                    {brand.payroll_start_date ? `from ${formatDate(brand.payroll_start_date)}` : "payroll not started"}
+                    {brand.payroll_start_date ? `mulai ${formatDate(brand.payroll_start_date)}` : "penggajian belum dimulai"}
                   </span>
                 </td>
                 <td className="px-4 py-3">{brand.active_hosts_count}</td>
                 <td className="px-4 py-3">{brand.leader?.name ?? <span className="text-gray-500">—</span>}</td>
-                <td className="px-4 py-3 capitalize">{brand.status}</td>
+                <td className="px-4 py-3">{statusLabel(brand.status)}</td>
                 <td className="px-4 py-3 text-right">
                   <button
                     type="button"
                     onClick={() => setEditing(brand)}
                     className="px-3 py-1.5 rounded-md border border-slate-700 text-gray-300 hover:bg-slate-800"
                   >
-                    Edit
+                    Ubah
                   </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {brands.data?.brands.length === 0 && <p className="px-4 py-8 text-center text-gray-400">No brands yet.</p>}
+        {brands.data?.brands.length === 0 && <p className="px-4 py-8 text-center text-gray-400">Belum ada brand.</p>}
       </div>
     </div>
   );
@@ -112,16 +113,16 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
   }, onDone);
 
   return (
-    <Modal title={brand ? `Edit ${brand.name}` : "New brand"} onClose={onCancel} wide>
+    <Modal title={brand ? `Ubah ${brand.name}` : "Brand baru"} onClose={onCancel} wide>
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
             <FormAlert tone="error">{error}</FormAlert>
           </div>
         )}
-        <TextField label="Name" name="name" defaultValue={brand?.name} required error={errors.name} />
+        <TextField label="Nama" name="name" defaultValue={brand?.name} required error={errors.name} />
         <TextField
-          label="Target hours per period"
+          label="Target jam per periode"
           name="target_hours_per_period"
           type="number"
           min={1}
@@ -130,7 +131,7 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           error={errors.target_hours_per_period}
         />
         <TextField
-          label="Payment cycle (days)"
+          label="Siklus pembayaran (hari)"
           name="payment_cycle_days"
           type="number"
           min={1}
@@ -139,7 +140,7 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           error={errors.payment_cycle_days}
         />
         <TextField
-          label="Payroll start (first period begins)"
+          label="Mulai penggajian (awal periode pertama)"
           name="payroll_start_date"
           type="date"
           defaultValue={brand?.payroll_start_date ?? ""}
@@ -151,14 +152,14 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
             name="status"
             defaultValue={brand.status}
             options={[
-              { value: "active", label: "Active" },
-              { value: "inactive", label: "Inactive" },
+              { value: "active", label: "Aktif" },
+              { value: "inactive", label: "Nonaktif" },
             ]}
           />
         )}
         <label className="flex items-center gap-2 text-sm text-gray-200 sm:col-span-2">
           <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="accent-purple-500" />
-          OBS brand (streamed with OBS)
+          Brand OBS (live pakai OBS)
         </label>
         <div className="space-y-1.5 sm:col-span-2">
           <label htmlFor="product_knowledge" className="block text-sm font-medium text-gray-200">
@@ -169,21 +170,21 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
             name="product_knowledge"
             rows={8}
             defaultValue={brand?.product_knowledge ?? ""}
-            placeholder="Products, prices, promos, talking points, links to catalogs…"
+            placeholder="Produk, harga, promo, poin penting saat live, link katalog…"
             aria-invalid={errors.product_knowledge ? true : undefined}
             className={`w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border text-white outline-none focus:ring-2 focus:ring-purple-500 ${
               errors.product_knowledge ? "border-red-400" : "border-white/15"
             }`}
           />
-          <p className="text-xs text-gray-400">Hosts assigned to this brand see this on their Brands page. Links are clickable.</p>
+          <p className="text-xs text-gray-400">Host yang ditugaskan ke brand ini melihatnya di halaman Brand mereka. Link bisa diklik.</p>
           {errors.product_knowledge && <p className="text-sm text-red-300">{errors.product_knowledge}</p>}
         </div>
         <div className="flex gap-3 sm:col-span-2">
           <div className="w-40">
-            <SubmitButton loading={loading}>Save</SubmitButton>
+            <SubmitButton loading={loading}>Simpan</SubmitButton>
           </div>
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
-            Cancel
+            Batal
           </button>
         </div>
       </form>

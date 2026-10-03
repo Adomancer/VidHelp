@@ -18,10 +18,10 @@ import ToggleGroup from "./ToggleGroup";
 type Notice = { tone: "success" | "error"; text: string } | null;
 
 const statusStyles: Record<PeriodStatus, [string, string]> = {
-  in_progress: ["In progress", "bg-blue-500/15 text-blue-200"],
-  waiting_payment: ["Ready to request", "bg-yellow-500/15 text-yellow-200"],
-  requested: ["Waiting for brand", "bg-purple-500/15 text-purple-200"],
-  paid: ["Paid", "bg-green-500/15 text-green-300"],
+  in_progress: ["Berjalan", "bg-blue-500/15 text-blue-200"],
+  waiting_payment: ["Siap ditagihkan", "bg-yellow-500/15 text-yellow-200"],
+  requested: ["Menunggu brand", "bg-purple-500/15 text-purple-200"],
+  paid: ["Lunas", "bg-green-500/15 text-green-300"],
 };
 
 export function PeriodBadge({ status }: { status: PeriodStatus }) {
@@ -39,7 +39,7 @@ export default function PayrollDesk() {
     <div className="space-y-4">
       <ToggleGroup
         options={[
-          ["periods", "Payment periods"],
+          ["periods", "Periode pembayaran"],
           ["kasbon", "Kasbon"],
         ] as const}
         value={tab}
@@ -64,8 +64,8 @@ function Periods() {
     <div className="space-y-4">
       {withoutStart.length > 0 && (
         <FormAlert tone="warning">
-          No payroll start date yet for {withoutStart.map((brand) => brand.name).join(", ")}. An admin sets it on the Brands page so their
-          hours get periods.
+          Belum ada tanggal mulai penggajian untuk {withoutStart.map((brand) => brand.name).join(", ")}. Admin mengaturnya di halaman Brand supaya
+          jam mereka masuk ke periode.
         </FormAlert>
       )}
       {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
@@ -80,7 +80,7 @@ function Periods() {
         aria-label="Brand"
         className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white"
       >
-        <option value="">All brands</option>
+        <option value="">Semua brand</option>
         {brands.data?.brands.map((brand) => (
           <option key={brand.id} value={brand.id}>
             {brand.name}
@@ -92,11 +92,11 @@ function Periods() {
         <table className="w-full text-sm">
           <thead className="text-left text-gray-400 border-b border-slate-800">
             <tr>
-              <th className="px-4 py-3 font-medium">Brand · period</th>
+              <th className="px-4 py-3 font-medium">Brand · periode</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Worked</th>
-              <th className="px-4 py-3 font-medium">Billable</th>
-              <th className="px-4 py-3 font-medium text-right">Host pay</th>
+              <th className="px-4 py-3 font-medium">Jam kerja</th>
+              <th className="px-4 py-3 font-medium">Ditagihkan</th>
+              <th className="px-4 py-3 font-medium text-right">Gaji host</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
@@ -105,7 +105,7 @@ function Periods() {
             ))}
           </tbody>
         </table>
-        {periods.data?.periods.length === 0 && <p className="px-4 py-8 text-center text-gray-400">No payment periods yet.</p>}
+        {periods.data?.periods.length === 0 && <p className="px-4 py-8 text-center text-gray-400">Belum ada periode pembayaran.</p>}
       </div>
 
       {selected && (
@@ -128,7 +128,7 @@ function PeriodRow({ period, selected, onClick }: { period: PeriodListItem; sele
       <td className="px-4 py-3">
         <p className="text-white">{period.brand?.name}</p>
         <p className="text-xs text-gray-400">
-          {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host{period.hosts === 1 ? "" : "s"}
+          {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
         </p>
       </td>
       <td className="px-4 py-3">
@@ -136,7 +136,7 @@ function PeriodRow({ period, selected, onClick }: { period: PeriodListItem; sele
       </td>
       <td className="px-4 py-3 whitespace-nowrap">{formatDuration(period.worked_hours)}</td>
       <td className="px-4 py-3 whitespace-nowrap">
-        {formatDuration(period.achieved_hours)} <span className="text-xs text-gray-500">/ {period.target_hours} h</span>
+        {formatDuration(period.achieved_hours)} <span className="text-xs text-gray-500">/ {period.target_hours} jam</span>
       </td>
       <td className="px-4 py-3 text-right whitespace-nowrap">{formatRupiah(period.total_amount)}</td>
     </tr>
@@ -170,7 +170,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
   }
 
   if (detail.error) return <FormAlert tone="error">{detail.error}</FormAlert>;
-  if (!detail.data) return <p className="text-gray-400">Loading…</p>;
+  if (!detail.data) return <p className="text-gray-400">Memuat…</p>;
   const { period, summary, pending_reports: pendingReports, requests, hosts, adjustments, slips } = detail.data;
   const locked = period.status === "requested" || period.status === "paid";
 
@@ -189,31 +189,31 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
               <button
                 type="button"
                 disabled={pendingReports > 0}
-                onClick={() => confirm("Lock this period and request payment? Hours and rates are frozen.") && act(() => payrollApi.requestPayment(token, period.id))}
+                onClick={() => confirm("Kunci periode ini dan ajukan pembayaran? Jam dan tarif akan dibekukan.") && act(() => payrollApi.requestPayment(token, period.id))}
                 className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Request payment
+                Ajukan pembayaran
               </button>
             )}
             {locked && (
               <button type="button" onClick={download} className="px-3 py-1.5 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800">
-                Brand report (CSV)
+                Laporan brand (CSV)
               </button>
             )}
             {period.status === "requested" && (
               <button
                 type="button"
-                onClick={() => confirm("The brand has paid? Salary slips are created and kasbon is deducted.") && act(() => payrollApi.markPaid(token, period.id))}
+                onClick={() => confirm("Brand sudah membayar? Slip gaji akan dibuat dan kasbon dipotong.") && act(() => payrollApi.markPaid(token, period.id))}
                 className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm hover:bg-green-500"
               >
-                Mark as paid
+                Tandai lunas
               </button>
             )}
             {period.status === "requested" && (
               <InlineAction
-                label="Cancel request"
-                placeholder="Why? e.g. wrong hours for a host"
-                submitLabel="Cancel request"
+                label="Batalkan pengajuan"
+                placeholder="Kenapa? mis. jam host salah"
+                submitLabel="Batalkan pengajuan"
                 required
                 buttonClass="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 text-sm hover:bg-red-500/10"
                 onSubmit={(reason) => act(() => payrollApi.cancelRequest(token, period.id, reason))}
@@ -224,43 +224,43 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
 
         {period.status !== "paid" && pendingReports > 0 && (
           <FormAlert tone="warning">
-            {pendingReports} live report{pendingReports === 1 ? "" : "s"} in this period {pendingReports === 1 ? "is" : "are"} still waiting for review. Payment
-            can be requested once operators approve or reject {pendingReports === 1 ? "it" : "them"}.
+            {pendingReports} laporan live di periode ini masih menunggu dicek. Pembayaran
+            bisa diajukan setelah operator menyetujui atau menolaknya.
           </FormAlert>
         )}
 
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-          <Stat label="Target" value={`${summary.target_hours} h`} />
-          <Stat label="Worked (all hosts)" value={formatDuration(summary.worked_hours)} />
-          <Stat label="Carried in" value={formatDuration(summary.carried_in_hours)} />
-          <Stat label="Billable to brand" value={formatDuration(summary.achieved_hours)} />
-          <Stat label="Carried to next period" value={formatDuration(summary.carried_out_hours)} />
-          <Stat label="Host pay" value={formatRupiah(summary.total_amount)} />
+          <Stat label="Target" value={`${summary.target_hours} jam`} />
+          <Stat label="Jam kerja (semua host)" value={formatDuration(summary.worked_hours)} />
+          <Stat label="Bawaan periode lalu" value={formatDuration(summary.carried_in_hours)} />
+          <Stat label="Ditagihkan ke brand" value={formatDuration(summary.achieved_hours)} />
+          <Stat label="Dibawa ke periode berikutnya" value={formatDuration(summary.carried_out_hours)} />
+          <Stat label="Gaji host" value={formatRupiah(summary.total_amount)} />
         </dl>
-        {period.status === "in_progress" && <p className="text-xs text-gray-400">Pay is an estimate at today&apos;s rates until payment is requested.</p>}
+        {period.status === "in_progress" && <p className="text-xs text-gray-400">Gaji masih perkiraan dengan tarif hari ini sampai pembayaran diajukan.</p>}
         {period.status === "requested" && (
           <p className="text-xs text-gray-400">
-            Cancelling unlocks the period so hours can be corrected; request again afterwards. Hours approved while it was locked stay in the next period.
+            Membatalkan akan membuka kunci periode supaya jam bisa dikoreksi; ajukan lagi setelahnya. Jam yang disetujui saat periode terkunci tetap di periode berikutnya.
           </p>
         )}
       </Card>
 
       {requests.some((request) => request.status === "cancelled") && (
-        <Card title="Request history">
+        <Card title="Riwayat pengajuan">
           <ul className="space-y-2 text-sm">
             {requests.map((request) => (
               <li key={request.id} className="rounded-lg bg-slate-800 px-3 py-2">
                 <p className="text-gray-200">
-                  Requested {formatDate(request.requested_at)}
-                  {request.requester ? ` by ${request.requester.name}` : ""}
+                  Diajukan {formatDate(request.requested_at)}
+                  {request.requester ? ` oleh ${request.requester.name}` : ""}
                   {request.status === "cancelled" ? (
                     <span className="text-red-300">
                       {" "}
-                      · cancelled {request.cancelled_at ? formatDate(request.cancelled_at) : ""}
-                      {request.canceller ? ` by ${request.canceller.name}` : ""}
+                      · dibatalkan {request.cancelled_at ? formatDate(request.cancelled_at) : ""}
+                      {request.canceller ? ` oleh ${request.canceller.name}` : ""}
                     </span>
                   ) : (
-                    <span className="text-gray-400"> · {request.status === "paid" ? "paid" : "current"}</span>
+                    <span className="text-gray-400"> · {request.status === "paid" ? "lunas" : "aktif"}</span>
                   )}
                 </p>
                 {request.cancel_reason && <p className="text-xs text-gray-400">{request.cancel_reason}</p>}
@@ -270,8 +270,8 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
         </Card>
       )}
 
-      <Card title="Hosts">
-        {hosts.length === 0 && <p className="text-sm text-gray-400">No approved hours yet.</p>}
+      <Card title="Host">
+        {hosts.length === 0 && <p className="text-sm text-gray-400">Belum ada jam yang disetujui.</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <tbody className="divide-y divide-slate-800">
@@ -279,13 +279,13 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                 <tr key={host.host_id} className="text-gray-200">
                   <td className="py-2 text-white">{host.name}</td>
                   <td className="py-2">
-                    {host.session_count} session{host.session_count === 1 ? "" : "s"}
+                    {host.session_count} sesi
                   </td>
                   <td className="py-2 whitespace-nowrap">{formatDuration(host.hours)}</td>
                   <td className="py-2 whitespace-nowrap text-gray-400">× {formatRupiah(host.rate_per_hour)}</td>
                   <td className="py-2 text-right whitespace-nowrap">
                     {formatRupiah(host.amount)}
-                    {host.estimate && <span className="text-xs text-gray-500"> est.</span>}
+                    {host.estimate && <span className="text-xs text-gray-500"> perkiraan</span>}
                   </td>
                 </tr>
               ))}
@@ -294,8 +294,8 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
         </div>
       </Card>
 
-      <Card title="Adjustments" description="Add or remove time for a host, e.g. a live cut short by an outage.">
-        {adjustments.length === 0 && <p className="text-sm text-gray-400">None.</p>}
+      <Card title="Penyesuaian" description="Tambah atau kurangi waktu host, mis. live terpotong karena gangguan.">
+        {adjustments.length === 0 && <p className="text-sm text-gray-400">Tidak ada.</p>}
         <ul className="space-y-2">
           {adjustments.map((adjustment) => (
             <li key={adjustment.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 px-3 py-2 text-sm">
@@ -303,12 +303,12 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
               <span className={adjustment.hours_added < 0 ? "text-red-300" : "text-green-300"}>
                 {adjustment.hours_added < 0 ? "−" : "+"}
                 {formatDuration(Math.abs(adjustment.hours_added))}
-                {adjustment.sessions_added !== 0 && `, ${adjustment.sessions_added > 0 ? "+" : ""}${adjustment.sessions_added} session(s)`}
+                {adjustment.sessions_added !== 0 && `, ${adjustment.sessions_added > 0 ? "+" : ""}${adjustment.sessions_added} sesi`}
               </span>
               <span className="flex-1 min-w-32 text-gray-400">{adjustment.notes}</span>
               {!locked && (
                 <button type="button" onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))} className="text-xs text-red-300 hover:text-red-200">
-                  Remove
+                  Hapus
                 </button>
               )}
             </li>
@@ -318,7 +318,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
       </Card>
 
       {slips.length > 0 && (
-        <Card title="Salary slips">
+        <Card title="Slip gaji">
           <ul className="space-y-2">
             {slips.map((slip) => (
               <li key={slip.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 px-3 py-2 text-sm">
@@ -327,10 +327,10 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                   {formatRupiah(slip.gross_amount)}
                   {slip.advance_deduction > 0 && ` − ${formatRupiah(slip.advance_deduction)} kasbon`}
                 </span>
-                {(slip.skipped_deductions?.length ?? 0) > 0 && <span className="text-xs text-yellow-300">kasbon skipped (pay too low)</span>}
+                {(slip.skipped_deductions?.length ?? 0) > 0 && <span className="text-xs text-yellow-300">kasbon dilewati (gaji tidak cukup)</span>}
                 <span className="font-medium text-green-300">{formatRupiah(slip.net_amount)}</span>
                 <Link href={`${slipsPath}/${slip.id}`} className="text-xs text-purple-300 hover:text-white">
-                  View
+                  Lihat
                 </Link>
               </li>
             ))}
@@ -400,7 +400,7 @@ function InlineAction({
         {submitLabel}
       </button>
       <button type="button" onClick={() => setOpen(false)} className="text-xs text-gray-400 hover:text-white">
-        Back
+        Kembali
       </button>
     </form>
   );
@@ -454,30 +454,30 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
         </select>
       </label>
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Add or remove</span>
+        <span className="block text-xs text-gray-400">Tambah atau kurangi</span>
         <select value={direction} onChange={(event) => setDirection(Number(event.target.value) as 1 | -1)} className={`${input} w-full`}>
-          <option value={1}>Add time</option>
-          <option value={-1}>Remove time</option>
+          <option value={1}>Tambah waktu</option>
+          <option value={-1}>Kurangi waktu</option>
         </select>
       </label>
-      <DurationInput label="Time" hours={hours} onChange={setHours} error={errors.hours_added} compact />
+      <DurationInput label="Waktu" hours={hours} onChange={setHours} error={errors.hours_added} compact />
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Sessions (optional)</span>
+        <span className="block text-xs text-gray-400">Sesi (opsional)</span>
         <input name="sessions" type="number" min={0} max={50} defaultValue={0} className={`${input} w-24`} />
       </label>
       <label className="space-y-1 sm:col-span-2">
-        <span className="block text-xs text-gray-400">Reason</span>
+        <span className="block text-xs text-gray-400">Alasan</span>
         <input name="notes" maxLength={255} className={`${input} w-full`} />
         {errors.notes && <span className="block text-xs text-red-300">{errors.notes}</span>}
       </label>
       <div className="w-44">
-        <SubmitButton loading={loading}>Save adjustment</SubmitButton>
+        <SubmitButton loading={loading}>Simpan penyesuaian</SubmitButton>
       </div>
     </form>
   );
 }
 
-const advanceTypes = { early_payment: "Early payment", loan: "Loan" } as const;
+const advanceTypes = { early_payment: "Gaji di muka", loan: "Pinjaman" } as const;
 
 function installmentColor(installment: CashAdvance["installments"][number]): string {
   if (installment.status === "deducted") return "bg-green-500";
@@ -511,12 +511,12 @@ function Kasbon() {
           aria-label="Status"
           className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white"
         >
-          <option value="open">Still being paid back</option>
-          <option value="paid">Paid back</option>
-          <option value="">All</option>
+          <option value="open">Masih dicicil</option>
+          <option value="paid">Sudah lunas</option>
+          <option value="">Semua</option>
         </select>
         <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500">
-          Record kasbon
+          Catat kasbon
         </button>
       </div>
 
@@ -534,7 +534,7 @@ function Kasbon() {
 
       {advances.data?.advances.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">No kasbon here.</p>
+          <p className="text-sm text-gray-400">Tidak ada kasbon.</p>
         </Card>
       )}
       {advances.data?.advances.map((advance) => {
@@ -555,28 +555,28 @@ function Kasbon() {
                 </p>
               </div>
               <span className="text-sm text-gray-300">
-                {paidCount}/{advance.installment_count} installments · {formatRupiah(advance.remaining_amount)} left
+                {paidCount}/{advance.installment_count} cicilan · sisa {formatRupiah(advance.remaining_amount)}
               </span>
             </div>
             <div className="flex gap-1">
               {advance.installments.map((installment) => (
                 <span
                   key={installment.id}
-                  title={`${installment.seq}: ${formatRupiah(installment.amount)}${installment.skip_count > 0 ? ` · skipped ${installment.skip_count}×` : ""}`}
+                  title={`${installment.seq}: ${formatRupiah(installment.amount)}${installment.skip_count > 0 ? ` · dilewati ${installment.skip_count}×` : ""}`}
                   className={`h-2 flex-1 rounded-full ${installmentColor(installment)}`}
                 />
               ))}
             </div>
             {skipped && (
               <p className="text-xs text-yellow-300">
-                Installment {skipped.seq} ({formatRupiah(skipped.amount)}) was skipped on {skipped.skip_count} slip{skipped.skip_count === 1 ? "" : "s"}: pay was too
-                low. Consider rescheduling into smaller installments.
+                Cicilan {skipped.seq} ({formatRupiah(skipped.amount)}) dilewati di {skipped.skip_count} slip karena gaji tidak
+                cukup. Pertimbangkan menjadwal ulang jadi cicilan yang lebih kecil.
               </p>
             )}
             {advance.settled_at && (
               <p className="text-xs text-gray-400">
-                Paid back directly on {formatDate(advance.settled_at)}
-                {advance.settler ? ` (recorded by ${advance.settler.name})` : ""}
+                Dilunasi langsung pada {formatDate(advance.settled_at)}
+                {advance.settler ? ` (dicatat oleh ${advance.settler.name})` : ""}
                 {advance.settled_note ? ` · ${advance.settled_note}` : ""}
               </p>
             )}
@@ -584,16 +584,16 @@ function Kasbon() {
               {advance.status !== "paid" && (
                 <>
                   <InlineAction
-                    label="Paid back directly"
-                    placeholder="Note (optional), e.g. cash on 3 Oct"
-                    submitLabel="Mark paid back"
+                    label="Dilunasi langsung"
+                    placeholder="Catatan (opsional), mis. tunai tgl 3 Okt"
+                    submitLabel="Tandai lunas"
                     buttonClass="text-xs text-green-300 hover:text-green-200"
                     onSubmit={(note) => act(() => payrollApi.settleAdvance(token, advance.id, note || null))}
                   />
                   <InlineAction
-                    label="Reschedule"
-                    placeholder="Installments"
-                    submitLabel="Spread the rest"
+                    label="Jadwal ulang"
+                    placeholder="Jumlah cicilan"
+                    submitLabel="Bagi sisanya"
                     type="number"
                     required
                     buttonClass="text-xs text-purple-300 hover:text-white"
@@ -604,10 +604,10 @@ function Kasbon() {
               {paidCount === 0 && (
                 <button
                   type="button"
-                  onClick={() => confirm("Remove this kasbon?") && act(() => payrollApi.removeAdvance(token, advance.id))}
+                  onClick={() => confirm("Hapus kasbon ini?") && act(() => payrollApi.removeAdvance(token, advance.id))}
                   className="text-xs text-red-300 hover:text-red-200"
                 >
-                  Remove (recorded by mistake)
+                  Hapus (salah catat)
                 </button>
               )}
             </div>
@@ -636,7 +636,7 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
   );
 
   return (
-    <Modal title="Record kasbon" description="Paid back in equal installments from the host's next salary slips (any brand)." onClose={onCancel}>
+    <Modal title="Catat kasbon" description="Dicicil sama rata dari slip gaji host berikutnya (brand apa pun)." onClose={onCancel}>
       <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -654,32 +654,32 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-xs text-gray-400">Type</span>
+          <span className="block text-xs text-gray-400">Jenis</span>
           <select name="type" className={input}>
-            <option value="loan">Loan</option>
-            <option value="early_payment">Early payment</option>
+            <option value="loan">Pinjaman</option>
+            <option value="early_payment">Gaji di muka</option>
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-xs text-gray-400">Amount (Rp)</span>
+          <span className="block text-xs text-gray-400">Jumlah (Rp)</span>
           <input name="total_amount" type="number" min={1000} step={1000} className={input} />
           {errors.total_amount && <span className="block text-xs text-red-300">{errors.total_amount}</span>}
         </label>
         <label className="space-y-1">
-          <span className="block text-xs text-gray-400">Installments</span>
+          <span className="block text-xs text-gray-400">Jumlah cicilan</span>
           <input name="installment_count" type="number" min={1} max={24} defaultValue={1} className={input} />
           {errors.installment_count && <span className="block text-xs text-red-300">{errors.installment_count}</span>}
         </label>
         <label className="space-y-1 sm:col-span-2">
-          <span className="block text-xs text-gray-400">Notes</span>
+          <span className="block text-xs text-gray-400">Catatan</span>
           <input name="notes" maxLength={255} className={input} />
         </label>
         <div className="sm:col-span-2 flex gap-3">
           <div className="w-40">
-            <SubmitButton loading={loading}>Record</SubmitButton>
+            <SubmitButton loading={loading}>Catat</SubmitButton>
           </div>
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
-            Cancel
+            Batal
           </button>
         </div>
       </form>

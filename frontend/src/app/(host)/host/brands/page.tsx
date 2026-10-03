@@ -30,12 +30,12 @@ export default function HostBrandsPage() {
 
   return (
     <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-white">My Brands</h1>
+      <h1 className="text-xl font-bold text-white">Brand Saya</h1>
       {brands.error && <FormAlert tone="error">{brands.error}</FormAlert>}
 
       {brands.data?.brands.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">You aren&apos;t assigned to a brand yet.</p>
+          <p className="text-sm text-gray-400">Kamu belum ditugaskan ke brand mana pun.</p>
         </Card>
       )}
 
@@ -44,7 +44,7 @@ export default function HostBrandsPage() {
           {brand.product_knowledge ? (
             <Linkified text={brand.product_knowledge} />
           ) : (
-            <p className="text-sm text-gray-400">No product knowledge yet. Ask your operator.</p>
+            <p className="text-sm text-gray-400">Belum ada product knowledge. Tanyakan ke operator kamu.</p>
           )}
         </Card>
       ))}

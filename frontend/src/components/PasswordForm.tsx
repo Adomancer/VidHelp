@@ -30,10 +30,10 @@ export default function PasswordForm() {
   return (
     <section className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
       <div>
-        <h2 className="text-white font-medium">{user.has_password ? "Change password" : "Set a password"}</h2>
+        <h2 className="text-white font-medium">{user.has_password ? "Ganti kata sandi" : "Buat kata sandi"}</h2>
         {!user.has_password && (
           <p className="text-sm text-gray-400 mt-1">
-            You sign in with Google. Set a password if you also want to sign in with your email.
+            Kamu masuk dengan Google. Buat kata sandi kalau kamu juga mau masuk dengan email.
           </p>
         )}
       </div>
@@ -43,12 +43,12 @@ export default function PasswordForm() {
         {saved && <FormAlert tone="success">{saved}</FormAlert>}
 
         {user.has_password && (
-          <TextField label="Current password" name="current_password" type="password" autoComplete="current-password" required error={errors.current_password} />
+          <TextField label="Kata sandi saat ini" name="current_password" type="password" autoComplete="current-password" required error={errors.current_password} />
         )}
-        <TextField label="New password" name="password" type="password" autoComplete="new-password" minLength={8} required error={errors.password} />
-        <TextField label="Confirm new password" name="password_confirmation" type="password" autoComplete="new-password" required />
+        <TextField label="Kata sandi baru" name="password" type="password" autoComplete="new-password" minLength={8} required error={errors.password} />
+        <TextField label="Ulangi kata sandi baru" name="password_confirmation" type="password" autoComplete="new-password" required />
 
-        <SubmitButton loading={loading}>Save password</SubmitButton>
+        <SubmitButton loading={loading}>Simpan kata sandi</SubmitButton>
       </form>
     </section>
   );

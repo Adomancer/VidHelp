@@ -67,8 +67,8 @@ class Notifier
     /** Someone signed up (email or Google) and waits for approval. */
     public function signupPending(User $user): void
     {
-        $title = "New sign-up: {$user->name}";
-        $body = "{$user->email} is waiting for approval.";
+        $title = "Pendaftar baru: {$user->name}";
+        $body = "{$user->email} menunggu persetujuan.";
 
         $this->toUsers($this->admins(), 'signup_pending', $title, $body, '/admin/users');
         $this->toChannel('admin', 'signup_pending', $title, $body, '/admin/users');
@@ -148,26 +148,26 @@ class Notifier
     public function testDm(User $user): ?string
     {
         if (! $this->discord->configured()) {
-            return 'Discord is not configured on the server.';
+            return 'Discord belum dikonfigurasi di server.';
         }
 
         try {
             $this->discord->postMessage($this->dmChannel($user->discordLink->discord_user_id), [
-                'content' => "Hi {$user->name}! VidHelp notifications will arrive here.",
+                'content' => "Halo {$user->name}! Notifikasi VidHelp akan masuk ke sini.",
             ]);
 
             return null;
         } catch (Throwable $e) {
             report($e);
 
-            return 'Discord refused the message. Make sure you are in the agency server and allow direct messages from server members.';
+            return 'Discord menolak pesannya. Pastikan kamu sudah bergabung di server agensi dan mengizinkan pesan langsung dari anggota server.';
         }
     }
 
     private function send(AppNotification $notification): void
     {
         if (! $this->discord->configured() || ! $notification->target) {
-            $notification->update(['status' => 'skipped', 'error' => 'Discord is not configured.']);
+            $notification->update(['status' => 'skipped', 'error' => 'Discord belum dikonfigurasi.']);
 
             return;
         }

@@ -60,7 +60,7 @@ export default function NotificationBell({ align = "right" }: { align?: "left" |
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-label={unread > 0 ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"}
         className="relative w-9 h-9 rounded-full flex items-center justify-center text-gray-300 hover:bg-slate-800 hover:text-white"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -80,17 +80,17 @@ export default function NotificationBell({ align = "right" }: { align?: "left" |
           }`}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-            <p className="text-sm font-medium text-white">Notifications</p>
+            <p className="text-sm font-medium text-white">Notifikasi</p>
             {unread > 0 && (
               <button type="button" onClick={readAll} className="text-xs text-purple-300 hover:text-white">
-                Mark all read
+                Tandai semua dibaca
               </button>
             )}
           </div>
           <ul className="max-h-96 overflow-y-auto divide-y divide-slate-800">
-            {list.loading && !list.data?.notifications.length && <li className="px-4 py-6 text-center text-sm text-gray-400">Loading…</li>}
+            {list.loading && !list.data?.notifications.length && <li className="px-4 py-6 text-center text-sm text-gray-400">Memuat…</li>}
             {list.data && !list.loading && list.data.notifications.length === 0 && (
-              <li className="px-4 py-6 text-center text-sm text-gray-400">Nothing yet.</li>
+              <li className="px-4 py-6 text-center text-sm text-gray-400">Belum ada notifikasi.</li>
             )}
             {list.data?.notifications.map((notification) => (
               <li key={notification.id}>

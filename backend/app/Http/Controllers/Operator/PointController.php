@@ -120,7 +120,7 @@ class PointController extends Controller
             ['occurred_on' => $validated['occurred_on'] ?? today()->toDateString()],
         );
 
-        return $this->recorded($log, 'Violation recorded');
+        return $this->recorded($log, 'Pelanggaran dicatat');
     }
 
     /**
@@ -149,7 +149,7 @@ class PointController extends Controller
         if (! $type) {
             return response()->json([
                 'complaint' => $complaint,
-                'message' => 'Complaint recorded (the brand complaint penalty is switched off).',
+                'message' => 'Komplain dicatat (penalti komplain brand sedang dimatikan).',
             ], 201);
         }
 
@@ -163,7 +163,7 @@ class PointController extends Controller
             ['brand_complaint_id' => $complaint->id, 'occurred_on' => $validated['occurred_on'] ?? today()->toDateString()],
         );
 
-        return $this->recorded($log, 'Complaint recorded');
+        return $this->recorded($log, 'Komplain dicatat');
     }
 
     private function recorded(PointLog $log, string $message): JsonResponse
@@ -176,8 +176,8 @@ class PointController extends Controller
             'points' => $points,
             'warning_letter' => $letter,
             'message' => $letter
-                ? "{$message}. Points are now {$points}: SP{$letter->level} was issued automatically."
-                : "{$message}. Points are now {$points}.",
+                ? "{$message}. Poin sekarang {$points}: SP{$letter->level} terbit otomatis."
+                : "{$message}. Poin sekarang {$points}.",
         ], 201);
     }
 }

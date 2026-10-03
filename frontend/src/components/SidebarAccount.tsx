@@ -21,7 +21,7 @@ export default function SidebarAccount() {
         onClick={logout}
         className="w-full px-4 py-2 rounded-lg text-sm text-gray-300 border border-slate-700 hover:bg-slate-800 hover:text-white transition-colors"
       >
-        Log out
+        Keluar
       </button>
     </div>
   );

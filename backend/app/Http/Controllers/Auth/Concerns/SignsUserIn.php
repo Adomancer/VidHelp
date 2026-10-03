@@ -21,7 +21,7 @@ trait SignsUserIn
             return response()->json([
                 'two_factor' => true,
                 'challenge_token' => $twoFactor->startChallenge($user, $method, $tokenName),
-                'message' => 'Enter the 6-digit code from your authenticator app.',
+                'message' => 'Masukkan kode 6 digit dari aplikasi authenticator kamu.',
             ]);
         }
 

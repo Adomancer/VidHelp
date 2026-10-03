@@ -130,7 +130,7 @@ class PointService
     public function void(PointLog $log, User $by): PointBalance
     {
         if ($log->voided_at) {
-            throw ValidationException::withMessages(['log' => ['This entry was already cancelled.']]);
+            throw ValidationException::withMessages(['log' => ['Catatan ini sudah dibatalkan.']]);
         }
 
         $log->update(['voided_at' => now(), 'voided_by' => $by->id]);
@@ -170,7 +170,7 @@ class PointService
             'point_log_id' => $log->id,
             'level' => $reached,
             'period_start' => $balance->period_start->toDateString(),
-            'reason' => "Points fell to {$balance->current_points} (SP{$reached} at {$threshold} or below).",
+            'reason' => "Poin turun ke {$balance->current_points} (SP{$reached} di {$threshold} atau kurang).",
             'issued_at' => now(),
         ]);
     }
@@ -205,13 +205,13 @@ class PointService
 
     private function announceDeduction(HostProfile $host, PointLog $log, PointBalance $balance): void
     {
-        $what = $log->violationType?->name ?? 'Point deduction';
+        $what = $log->violationType?->name ?? 'Potongan poin';
 
         $this->notifier->toUsers(
             $host->user,
             'points_deducted',
-            "{$log->points_change} points: {$what}",
-            trim(($log->reason ? "{$log->reason} " : '')."You now have {$balance->current_points} points."),
+            "{$log->points_change} poin: {$what}",
+            trim(($log->reason ? "{$log->reason} " : '')."Poinmu sekarang {$balance->current_points}."),
             '/host/rating',
             dm: true,
         );
@@ -221,9 +221,9 @@ class PointService
     {
         $host->loadMissing('user');
 
-        $this->notifier->toUsers($host->user, 'sp_issued', "You received SP{$letter->level}", $letter->reason, '/host/rating', dm: true);
+        $this->notifier->toUsers($host->user, 'sp_issued', "Kamu mendapat SP{$letter->level}", $letter->reason, '/host/rating', dm: true);
 
-        $title = "SP{$letter->level} for {$host->user->name}";
+        $title = "SP{$letter->level} untuk {$host->user->name}";
         $this->notifier->toUsers($this->notifier->admins(), 'sp_issued', $title, $letter->reason, '/admin/points');
         $this->notifier->toChannel('admin', 'sp_issued', $title, $letter->reason, '/admin/points');
     }
@@ -231,7 +231,7 @@ class PointService
     public function voidWarning(WarningLetter $letter, User $by): void
     {
         if ($letter->voided_at) {
-            throw ValidationException::withMessages(['letter' => ['This SP was already cancelled.']]);
+            throw ValidationException::withMessages(['letter' => ['SP ini sudah dibatalkan.']]);
         }
 
         $letter->update(['voided_at' => now(), 'voided_by' => $by->id]);
@@ -253,7 +253,7 @@ class PointService
                 $application->applicant,
                 $type,
                 'backup_cancel',
-                "Dropped the backup for {$request->brand->name} on {$request->start_at->format('d M H:i')}.",
+                "Membatalkan backup di {$request->brand->name} pada {$request->start_at->translatedFormat('d M H:i')}.",
                 null,
             );
         }
@@ -288,7 +288,7 @@ class PointService
                     $request->requester,
                     $type,
                     'late_attachment',
-                    "Sick letter for {$request->brand->name} on {$request->start_at->format('d M')} was late or missing.",
+                    "Surat sakit untuk {$request->brand->name} pada {$request->start_at->translatedFormat('d M')} terlambat atau tidak ada.",
                     null,
                     extra: ['occurred_on' => $request->letter_due_at->toDateString()],
                 );

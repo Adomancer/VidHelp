@@ -412,7 +412,7 @@ class PayrollTest extends TestCase
             ->getContent();
 
         $this->assertStringContainsString($this->host->user->name, $csv);
-        $this->assertStringContainsString('Billable hours (target 10)', $csv);
+        $this->assertStringContainsString('Jam yang ditagihkan (target 10)', $csv);
     }
 
     public function test_host_sees_estimate_slips_and_only_their_own_slip(): void

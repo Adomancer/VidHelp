@@ -35,7 +35,7 @@ async function request(endpoint: string, options: FetchOptions = {}): Promise<Re
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, error.message || "API request failed", error);
+    throw new ApiError(response.status, error.message || "Permintaan ke server gagal", error);
   }
 
   return response;
@@ -85,7 +85,7 @@ export function fieldErrors(error: unknown): Record<string, string> {
 
 /** A message to show the user for any failed request. */
 export function errorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : "Could not reach the server. Is the backend running?";
+  return error instanceof ApiError ? error.message : "Tidak bisa terhubung ke server. Apakah backend sudah berjalan?";
 }
 
 /*

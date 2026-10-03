@@ -37,15 +37,15 @@ export default function LoginForm() {
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
         <TextField label="Email" name="email" type="email" autoComplete="email" required error={errors.email} />
-        <TextField label="Password" name="password" type="password" autoComplete="current-password" required error={errors.password} />
+        <TextField label="Kata sandi" name="password" type="password" autoComplete="current-password" required error={errors.password} />
 
         <div className="text-right">
           <Link href="/forgot-password" className="text-sm text-purple-300 hover:text-white">
-            Forgot password?
+            Lupa kata sandi?
           </Link>
         </div>
 
-        <SubmitButton loading={loading}>Sign in</SubmitButton>
+        <SubmitButton loading={loading}>Masuk</SubmitButton>
       </form>
 
       <Divider />
@@ -58,7 +58,7 @@ export function Divider() {
   return (
     <div className="flex items-center gap-3 text-xs text-gray-400">
       <span className="h-px flex-1 bg-white/15" />
-      or
+      atau
       <span className="h-px flex-1 bg-white/15" />
     </div>
   );

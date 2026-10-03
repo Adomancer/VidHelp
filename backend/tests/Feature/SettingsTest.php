@@ -56,7 +56,7 @@ class SettingsTest extends TestCase
     {
         $this->save(['backup.request_min_hours_before' => 48])
             ->assertOk()
-            ->assertJsonPath('message', 'Setting saved.');
+            ->assertJsonPath('message', 'Pengaturan disimpan.');
 
         $this->rebootConfig();
         $this->assertSame(48, config('vidhelp.backup.request_min_hours_before'));
@@ -100,10 +100,10 @@ class SettingsTest extends TestCase
     {
         $this->save(['points.sp_thresholds.2' => 80])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['points.sp_thresholds.2' => 'SP2 must be below SP1 (75).']);
+            ->assertJsonValidationErrors(['points.sp_thresholds.2' => 'SP2 harus lebih kecil dari SP1 (75).']);
 
         $this->save(['points.starting_points' => 70])
-            ->assertJsonValidationErrors(['points.sp_thresholds.1' => 'SP1 must be below the starting points (70).']);
+            ->assertJsonValidationErrors(['points.sp_thresholds.1' => 'SP1 harus lebih kecil dari poin awal (70).']);
 
         $this->save(['points.sp_thresholds.1' => 90, 'points.sp_thresholds.2' => 80, 'points.sp_thresholds.3' => 70])->assertOk();
         $this->assertSame(2, app(PointService::class)->levelFor(80));

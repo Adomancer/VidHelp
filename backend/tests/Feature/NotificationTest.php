@@ -97,7 +97,7 @@ class NotificationTest extends TestCase
             'name' => 'Nina', 'email' => 'nina@host.com', 'password' => 'secret123', 'password_confirmation' => 'secret123',
         ])->assertCreated();
 
-        $this->assertSame('New sign-up: Nina', $this->web($this->admin, 'signup_pending')->title);
+        $this->assertSame('Pendaftar baru: Nina', $this->web($this->admin, 'signup_pending')->title);
         $this->assertSame('skipped', AppNotification::where('channel', 'discord_channel')->value('status'));
         Http::assertNothingSent();
     }
@@ -112,7 +112,7 @@ class NotificationTest extends TestCase
         $this->assertNull($this->web($this->requester->user, 'backup_opened'));
 
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/channels/chan-backups/messages')
-            && $request['embeds'][0]['title'] === 'Backup needed: Brand A'
+            && $request['embeds'][0]['title'] === 'Butuh backup: Brand A'
             && $request['embeds'][0]['url'] === 'http://localhost:3000/host/backups');
         $this->assertSame(0, AppNotification::where('channel', 'discord_channel')->where('status', '!=', 'sent')->count());
     }
@@ -125,7 +125,7 @@ class NotificationTest extends TestCase
 
         $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->other->id])->assertOk();
 
-        $this->assertSame("You're covering Brand A", $this->web($this->other->user, 'backup_picked')->title);
+        $this->assertSame('Kamu menggantikan di Brand A', $this->web($this->other->user, 'backup_picked')->title);
         $this->assertNotNull($this->web($this->requester->user, 'backup_covered'));
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/users/@me/channels') && $request['recipient_id'] === '555');
         Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/channels/dm-555/messages'));
@@ -176,10 +176,10 @@ class NotificationTest extends TestCase
         ])->assertCreated();
 
         $deduction = $this->web($this->requester->user, 'points_deducted');
-        $this->assertSame('-30 points: Telat', $deduction->title);
-        $this->assertSame('Late 45 minutes You now have 70 points.', $deduction->body);
-        $this->assertSame('You received SP1', $this->web($this->requester->user, 'sp_issued')->title);
-        $this->assertStringStartsWith('SP1 for ', $this->web($this->admin, 'sp_issued')->title);
+        $this->assertSame('-30 poin: Telat', $deduction->title);
+        $this->assertSame('Late 45 minutes Poinmu sekarang 70.', $deduction->body);
+        $this->assertSame('Kamu mendapat SP1', $this->web($this->requester->user, 'sp_issued')->title);
+        $this->assertStringStartsWith('SP1 untuk ', $this->web($this->admin, 'sp_issued')->title);
     }
 
     public function test_new_event_tells_the_brands_hosts(): void
@@ -190,7 +190,7 @@ class NotificationTest extends TestCase
         ])->assertCreated();
 
         $notification = $this->web($this->other->user, 'event_opened');
-        $this->assertSame('New event: PD 10.10 (Brand A)', $notification->title);
+        $this->assertSame('Event baru: PD 10.10 (Brand A)', $notification->title);
         $this->assertSame('/host/events', $notification->link);
     }
 
@@ -201,7 +201,7 @@ class NotificationTest extends TestCase
 
         $this->actingAs($this->admin)->postJson("/api/admin/users/{$user->id}/activate")->assertOk();
 
-        $this->assertSame('Your account is approved', $this->web($user, 'account_approved')->title);
+        $this->assertSame('Akunmu sudah disetujui', $this->web($user, 'account_approved')->title);
     }
 
     public function test_bell_lists_counts_and_marks_read(): void

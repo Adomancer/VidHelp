@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { adminHostsApi, errorMessage, operatorApi, type AdminHostDetail, type RateCategory } from "@/lib/api";
 import { formatDate, formatRupiah, formatTenure } from "@/lib/format";
+import { statusLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import AssignmentEditor from "@/components/AssignmentEditor";
@@ -24,14 +25,14 @@ export default function AdminHostDetailPage() {
   const brands = useApiData("brands", () => operatorApi.brands(token));
 
   if (host.error && !host.data) return <FormAlert tone="error">{host.error}</FormAlert>;
-  if (!host.data) return <p className="text-gray-400">Loading…</p>;
+  if (!host.data) return <p className="text-gray-400">Memuat…</p>;
 
   const detail = host.data.host;
 
   return (
     <div className="space-y-6 max-w-3xl">
       <Link href="/admin/hosts" className="text-sm text-purple-300 hover:text-white">
-        ← All hosts
+        ← Semua host
       </Link>
 
       <div className="flex items-center gap-4">
@@ -46,14 +47,14 @@ export default function AdminHostDetailPage() {
       {rates.data ? (
         <SettingsForm host={detail} rates={rates.data.rate_categories} onSaved={(updated) => host.setData({ host: updated })} />
       ) : (
-        <Card title="Host settings">
-          {rates.error ? <FormAlert tone="error">{rates.error}</FormAlert> : <p className="text-sm text-gray-400">Loading…</p>}
+        <Card title="Pengaturan host">
+          {rates.error ? <FormAlert tone="error">{rates.error}</FormAlert> : <p className="text-sm text-gray-400">Memuat…</p>}
         </Card>
       )}
 
       <SensitiveCard host={detail} />
 
-      <Card title="Brands" description="★ Leader — a brand has at most one.">
+      <Card title="Brand" description="★ Leader — satu brand maksimal punya satu leader.">
         {brands.data && (
           <AssignmentEditor hostId={detail.id} assignments={detail.assignments} brands={brands.data.brands} onChanged={host.reload} />
         )}
@@ -80,10 +81,10 @@ function SettingsForm({ host, rates, onSaved }: { host: AdminHostDetail; rates: 
     }
   );
 
-  const current = host.rate_category ? `${host.rate_category.name}, ${formatRupiah(host.rate_category.rate_per_hour)}/h` : "none";
+  const current = host.rate_category ? `${host.rate_category.name}, ${formatRupiah(host.rate_category.rate_per_hour)}/jam` : "belum ada";
 
   return (
-    <Card title="Host settings">
+    <Card title="Pengaturan host">
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -92,42 +93,42 @@ function SettingsForm({ host, rates, onSaved }: { host: AdminHostDetail; rates: 
         )}
         {saved && (
           <div className="sm:col-span-2">
-            <FormAlert tone="success">Saved.</FormAlert>
+            <FormAlert tone="success">Tersimpan.</FormAlert>
           </div>
         )}
 
-        <TextField label="Phone" name="phone" type="tel" defaultValue={host.phone ?? ""} error={errors.phone} />
-        <TextField label="Guardian phone" name="guardian_phone" type="tel" defaultValue={host.guardian_phone ?? ""} error={errors.guardian_phone} />
-        <TextField label="Join date" name="join_date" type="date" defaultValue={host.join_date.slice(0, 10)} error={errors.join_date} />
+        <TextField label="No. HP" name="phone" type="tel" defaultValue={host.phone ?? ""} error={errors.phone} />
+        <TextField label="No. HP wali" name="guardian_phone" type="tel" defaultValue={host.guardian_phone ?? ""} error={errors.guardian_phone} />
+        <TextField label="Tanggal bergabung" name="join_date" type="date" defaultValue={host.join_date.slice(0, 10)} error={errors.join_date} />
         <div className="space-y-1">
           <span className="block text-sm font-medium text-gray-200">Status</span>
-          <p className="text-sm text-white capitalize">{host.status}</p>
+          <p className="text-sm text-white">{statusLabel(host.status)}</p>
           <p className="text-xs text-gray-400">
-            Follows the account. Deactivate or archive it on the{" "}
+            Mengikuti status akun. Nonaktifkan atau arsipkan di halaman{" "}
             <Link href="/admin/users" className="text-purple-300 hover:text-white">
-              Users
-            </Link>{" "}
-            page.
+              Pengguna
+            </Link>
+            .
           </p>
         </div>
         <div className="sm:col-span-2">
           <SelectField
-            label="Rate level"
+            label="Level tarif"
             name="rate_category_id"
             defaultValue={host.rate_category_overridden ? (host.rate_category_id ?? "") : ""}
             error={errors.rate_category_id}
             options={[
-              { value: "", label: "Automatic by tenure" },
-              ...rates.map((rate) => ({ value: rate.id, label: `${rate.name} (set by hand)` })),
+              { value: "", label: "Otomatis sesuai masa kerja" },
+              ...rates.map((rate) => ({ value: rate.id, label: `${rate.name} (diatur manual)` })),
             ]}
           />
           <p className="text-xs text-gray-400 mt-1">
-            Now: {current} · with the agency {formatTenure(host.join_date)} (since {formatDate(host.join_date)})
+            Saat ini: {current} · di agensi {formatTenure(host.join_date)} (sejak {formatDate(host.join_date)})
           </p>
         </div>
 
         <div className="w-40">
-          <SubmitButton loading={loading}>Save</SubmitButton>
+          <SubmitButton loading={loading}>Simpan</SubmitButton>
         </div>
       </form>
     </Card>
@@ -149,19 +150,19 @@ function SensitiveCard({ host }: { host: AdminHostDetail }) {
   }
 
   const rows: [string, string | null | undefined][] = [
-    ["KTP number", data?.ktp_number],
+    ["Nomor KTP", data?.ktp_number],
     ["Bank", data?.bank_name],
-    ["Account number", data?.bank_account],
-    ["Account holder", data?.account_holder_name],
+    ["Nomor rekening", data?.bank_account],
+    ["Nama pemilik rekening", data?.account_holder_name],
   ];
 
   return (
-    <Card title="KTP & bank" description="Entered by the host. Only admins can see these values.">
+    <Card title="KTP & bank" description="Diisi oleh host. Hanya admin yang bisa melihat data ini.">
       <dl className="grid gap-3 sm:grid-cols-2">
         {rows.map(([label, value]) => (
           <div key={label}>
             <dt className="text-xs text-gray-400">{label}</dt>
-            <dd className="text-white font-mono">{value || <span className="text-gray-500 font-sans">not filled in</span>}</dd>
+            <dd className="text-white font-mono">{value || <span className="text-gray-500 font-sans">belum diisi</span>}</dd>
           </div>
         ))}
       </dl>
@@ -170,14 +171,14 @@ function SensitiveCard({ host }: { host: AdminHostDetail }) {
       {data?.has_ktp_image ? (
         ktpUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- private blob URL
-          <img src={ktpUrl} alt="KTP photo" className="max-h-80 rounded-lg border border-slate-700" />
+          <img src={ktpUrl} alt="Foto KTP" className="max-h-80 rounded-lg border border-slate-700" />
         ) : (
           <button type="button" onClick={showKtp} className="px-4 py-2 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800">
-            Show KTP photo
+            Lihat foto KTP
           </button>
         )
       ) : (
-        <p className="text-sm text-gray-500">No KTP photo uploaded.</p>
+        <p className="text-sm text-gray-500">Belum ada foto KTP.</p>
       )}
     </Card>
   );

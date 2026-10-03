@@ -217,6 +217,7 @@ This is **Next.js 16**, which differs from older versions. Check `frontend/node_
 
 - **Look:** dark slate background (`bg-slate-950`, cards `bg-slate-900 border-slate-800`), white headings, `text-gray-400` for secondary text, purple for actions and accents. Reuse `Card`, `FormAlert`, `TextField`, `SubmitButton` instead of new styles.
 - **Add and edit forms open in a `Modal`**, never inline on the page: render `{open && <Modal title onClose>…</Modal>}` with the form inside, plus a Cancel button next to the submit button. See `CreateAccountForm` on the Users page.
+- **All UI text is in Bahasa Indonesia**, including API messages, notifications and Excel/CSV headers. Status values from the API (`active`, `pending`, …) are shown through `statusLabel()` / `roleLabel()` in `src/lib/labels.ts`. Laravel validation messages and field names are in `backend/lang/id/validation.php` (`APP_LOCALE=id`); dates in backend messages use `translatedFormat()` so day and month names come out in Indonesian.
 - **Host pages are mobile-first:** design for a phone width first, then desktop.
 - **Never hardcode a business number** in text (like "30 minutes" or "24 hours"). Read it from `settingsApi.public()`; see `components/BackupTimingNote.tsx`.
 - **Durations** always as hours and minutes (`formatDuration`), money as rupiah (`formatRupiah`).

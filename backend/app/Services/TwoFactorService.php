@@ -69,7 +69,7 @@ class TwoFactorService
     public function beginSetup(User $user): array
     {
         if ($user->two_factor_enabled) {
-            throw ValidationException::withMessages(['code' => ['Two-factor authentication is already on.']]);
+            throw ValidationException::withMessages(['code' => ['Verifikasi dua langkah sudah aktif.']]);
         }
 
         $secret = Totp::generateSecret();
@@ -96,12 +96,12 @@ class TwoFactorService
     {
         $record = $this->record($user);
         if (! $record || $record->is_enabled) {
-            throw ValidationException::withMessages(['code' => ['Start the setup again.']]);
+            throw ValidationException::withMessages(['code' => ['Mulai pengaturan dari awal lagi.']]);
         }
 
         $step = Totp::verify($record->secret_key_encrypted, $code);
         if ($step === null) {
-            throw ValidationException::withMessages(['code' => ['That code is not right. Check the time on your phone and try the newest code.']]);
+            throw ValidationException::withMessages(['code' => ['Kode itu salah. Cek jam di HP kamu dan coba kode terbaru.']]);
         }
 
         $codes = $this->newRecoveryCodes();
@@ -178,7 +178,7 @@ class TwoFactorService
     public function disable(User $user, string $code): void
     {
         if ($this->isRequired($user)) {
-            throw ValidationException::withMessages(['code' => ['Two-factor authentication is required for your account and cannot be turned off.']]);
+            throw ValidationException::withMessages(['code' => ['Verifikasi dua langkah wajib untuk akunmu dan tidak bisa dimatikan.']]);
         }
 
         $this->requireCode($user, $code);
@@ -193,7 +193,7 @@ class TwoFactorService
     public function reset(User $user, User $by): void
     {
         if ($user->is($by)) {
-            throw ValidationException::withMessages(['user' => ['You cannot reset your own two-factor authentication.']]);
+            throw ValidationException::withMessages(['user' => ['Kamu tidak bisa mereset verifikasi dua langkah milikmu sendiri.']]);
         }
 
         $this->turnOff($user);
@@ -231,7 +231,7 @@ class TwoFactorService
         $user = $pending ? User::find($pending['user_id']) : null;
 
         if (! $user) {
-            throw ValidationException::withMessages(['challenge_token' => ['This sign-in has expired. Please sign in again.']]);
+            throw ValidationException::withMessages(['challenge_token' => ['Sesi masuk ini sudah kedaluwarsa. Silakan masuk lagi.']]);
         }
 
         if ($reason = $user->loginBlockedReason()) {
@@ -245,12 +245,12 @@ class TwoFactorService
 
             if ($attempts >= config('vidhelp.two_factor.challenge_attempts')) {
                 Cache::forget($key);
-                throw ValidationException::withMessages(['challenge_token' => ['Too many wrong codes. Please sign in again.']]);
+                throw ValidationException::withMessages(['challenge_token' => ['Terlalu banyak kode salah. Silakan masuk lagi.']]);
             }
 
             Cache::put($key, ['attempts' => $attempts] + $pending, now()->addMinutes(config('vidhelp.two_factor.challenge_minutes')));
             throw ValidationException::withMessages([
-                filled($code) ? 'code' : 'recovery_code' => [filled($code) ? 'That code is not right.' : 'That recovery code is not right or was already used.'],
+                filled($code) ? 'code' : 'recovery_code' => [filled($code) ? 'Kode itu salah.' : 'Kode pemulihan itu salah atau sudah pernah dipakai.'],
             ]);
         }
 
@@ -262,7 +262,7 @@ class TwoFactorService
     private function requireCode(User $user, string $code): void
     {
         if (! $this->verify($user, $code, null)) {
-            throw ValidationException::withMessages(['code' => ['That code is not right.']]);
+            throw ValidationException::withMessages(['code' => ['Kode itu salah.']]);
         }
     }
 

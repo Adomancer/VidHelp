@@ -101,7 +101,7 @@ class PayrollController extends Controller
             'notes' => 'required|string|max:255',
         ]);
         if ((int) $validated['sessions_added'] === 0 && (float) $validated['hours_added'] == 0.0) {
-            throw ValidationException::withMessages(['hours_added' => ['Add or remove some hours or sessions.']]);
+            throw ValidationException::withMessages(['hours_added' => ['Tambah atau kurangi jam atau sesi.']]);
         }
 
         $adjustment = $period->adjustments()->create([
@@ -110,7 +110,7 @@ class PayrollController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
-        return response()->json(['adjustment' => $adjustment, 'message' => 'Adjustment added'], 201);
+        return response()->json(['adjustment' => $adjustment, 'message' => 'Penyesuaian ditambahkan'], 201);
     }
 
     public function destroyAdjustment(HourAdjustment $adjustment): JsonResponse
@@ -119,14 +119,14 @@ class PayrollController extends Controller
 
         $adjustment->delete();
 
-        return response()->json(['message' => 'Adjustment removed']);
+        return response()->json(['message' => 'Penyesuaian dihapus']);
     }
 
     public function requestPayment(Request $request, PaymentPeriod $period): JsonResponse
     {
         $this->payroll->requestPayment($period, $request->user());
 
-        return response()->json(['message' => 'Period locked and payment requested. Download the report for the brand.']);
+        return response()->json(['message' => 'Periode dikunci dan pembayaran diajukan. Unduh laporan untuk brand.']);
     }
 
     /**
@@ -138,14 +138,14 @@ class PayrollController extends Controller
 
         $this->payroll->cancelRequest($period, $request->user(), $validated['reason']);
 
-        return response()->json(['message' => 'Request cancelled; the period is open for changes again.']);
+        return response()->json(['message' => 'Pengajuan dibatalkan; periode bisa diubah lagi.']);
     }
 
     public function markPaid(PaymentPeriod $period): JsonResponse
     {
         $slips = $this->payroll->markPaid($period);
 
-        return response()->json(['message' => "Marked as paid; {$slips->count()} salary slip(s) created."]);
+        return response()->json(['message' => "Ditandai lunas; {$slips->count()} slip gaji dibuat."]);
     }
 
     /**
@@ -169,7 +169,7 @@ class PayrollController extends Controller
     private function ensureOpen(PaymentPeriod $period): void
     {
         if ($period->isLocked()) {
-            throw ValidationException::withMessages(['period' => ['This period is locked; payment was already requested.']]);
+            throw ValidationException::withMessages(['period' => ['Periode ini terkunci; pembayaran sudah diajukan.']]);
         }
     }
 }

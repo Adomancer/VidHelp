@@ -40,7 +40,7 @@ class HostController extends Controller
         $host->syncRateCategory(); // no-op when overridden
         $host->save();
 
-        return response()->json(['host' => $this->load($host), 'message' => 'Host updated']);
+        return response()->json(['host' => $this->load($host), 'message' => 'Host diperbarui']);
     }
 
     /**
@@ -49,7 +49,7 @@ class HostController extends Controller
     public function ktpImage(HostProfile $host): StreamedResponse
     {
         $path = $host->sensitiveData?->ktp_image_path;
-        abort_unless($path && Storage::disk('local')->exists($path), 404, 'No KTP photo uploaded.');
+        abort_unless($path && Storage::disk('local')->exists($path), 404, 'Belum ada foto KTP.');
 
         return Storage::disk('local')->response($path);
     }

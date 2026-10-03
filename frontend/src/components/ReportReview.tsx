@@ -15,10 +15,10 @@ import UserAvatar from "./UserAvatar";
 type Tab = "flagged" | "missing" | "approved" | "rejected";
 
 const tabs: { value: Tab; label: string }[] = [
-  { value: "flagged", label: "To review" },
-  { value: "missing", label: "Missing reports" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
+  { value: "flagged", label: "Perlu dicek" },
+  { value: "missing", label: "Laporan belum masuk" },
+  { value: "approved", label: "Disetujui" },
+  { value: "rejected", label: "Ditolak" },
 ];
 
 /**
@@ -66,7 +66,7 @@ export default function ReportReview() {
                       {attendance.host?.user.name} · {attendance.brand?.name}
                     </p>
                     <p className="text-sm text-gray-400">
-                      {formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)} · report was due {formatDateTime(attendance.report_due_at)}
+                      {formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)} · batas laporan {formatDateTime(attendance.report_due_at)}
                     </p>
                   </div>
                 </div>
@@ -89,7 +89,7 @@ export default function ReportReview() {
 function Empty() {
   return (
     <Card>
-      <p className="text-sm text-gray-400">Nothing here.</p>
+      <p className="text-sm text-gray-400">Tidak ada data.</p>
     </Card>
   );
 }
@@ -116,12 +116,12 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
       </div>
 
       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-        <Stat label="Scheduled" value={formatDuration(report.scheduled_hours)} />
+        <Stat label="Dijadwalkan" value={formatDuration(report.scheduled_hours)} />
         <Stat
-          label="Checked in"
+          label="Check-in"
           value={`${formatClock(attendance.check_in_at)}–${attendance.check_out_at ? formatClock(attendance.check_out_at) : "?"}${report.attended_hours !== null ? ` (${formatDuration(report.attended_hours)})` : ""}`}
         />
-        <Stat label="Reported" value={`${formatDuration(report.duration_hours)} · ${report.session_count} session${report.session_count === 1 ? "" : "s"}`} />
+        <Stat label="Dilaporkan" value={`${formatDuration(report.duration_hours)} · ${report.session_count} sesi`} />
         {Object.entries(report.metrics ?? {}).map(([key, value]) => (
           <Stat key={key} label={metricLabel(key)} value={value === null ? "—" : formatMetric(key, value)} />
         ))}
@@ -141,9 +141,9 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
 
       {report.status === "flagged" ? (
         <div className="flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3">
-          <DurationInput label="Time to pay" hours={hours} onChange={setHours} compact />
+          <DurationInput label="Waktu yang dibayar" hours={hours} onChange={setHours} compact />
           <label className="flex-1 min-w-40 space-y-1">
-            <span className="block text-xs text-gray-400">Note (required to reject)</span>
+            <span className="block text-xs text-gray-400">Catatan (wajib untuk menolak)</span>
             <input value={note} onChange={(event) => setNote(event.target.value)} maxLength={255} className={`${input} w-full`} />
           </label>
           <button
@@ -151,7 +151,7 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
             onClick={() => act(() => reportApi.approve(token, report.id, { duration_hours: hours, review_note: note || null }))}
             className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm hover:bg-green-500"
           >
-            Approve
+            Setujui
           </button>
           <button
             type="button"
@@ -159,12 +159,12 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
             onClick={() => act(() => reportApi.reject(token, report.id, note))}
             className="px-4 py-2 rounded-lg border border-red-400/40 text-red-300 text-sm hover:bg-red-500/10 disabled:opacity-40"
           >
-            Reject
+            Tolak
           </button>
         </div>
       ) : (
         <p className="text-xs text-gray-400">
-          {report.reviewer ? `${report.status === "approved" ? "Approved" : "Rejected"} by ${report.reviewer.name}` : "Auto-approved"}
+          {report.reviewer ? `${report.status === "approved" ? "Disetujui" : "Ditolak"} oleh ${report.reviewer.name}` : "Disetujui otomatis"}
           {report.reviewed_at && ` · ${formatDateTime(report.reviewed_at)}`}
           {report.review_note && ` · “${report.review_note}”`}
         </p>

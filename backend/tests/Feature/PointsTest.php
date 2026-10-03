@@ -258,11 +258,11 @@ class PointsTest extends TestCase
                 ->assertDownload('ratings-2026-10.xlsx')
         );
 
-        $this->assertSame(['Ratings', 'Point history', 'SP history'], array_keys($sheets));
-        $rating = collect($sheets['Ratings'])->firstWhere(0, $name);
+        $this->assertSame(['Rating', 'Riwayat poin', 'Riwayat SP'], array_keys($sheets));
+        $rating = collect($sheets['Rating'])->firstWhere(0, $name);
         $this->assertEquals([$name, 1, 4.8, 4.2, 'Good', $this->admin->name], $rating);
-        $this->assertEquals([$name, 'Telat', -5, 'Late 20 minutes'], array_slice($sheets['Point history'][1], 1, 4));
-        $this->assertSame([$name, 'SP1', 'Repeated no-show', $this->admin->name, 'No'], array_slice($sheets['SP history'][1], 1));
+        $this->assertEquals([$name, 'Telat', -5, 'Late 20 minutes'], array_slice($sheets['Riwayat poin'][1], 1, 4));
+        $this->assertSame([$name, 'SP1', 'Repeated no-show', $this->admin->name, 'Tidak'], array_slice($sheets['Riwayat SP'][1], 1));
     }
 
     public function test_admin_sees_a_hosts_full_point_and_sp_history(): void

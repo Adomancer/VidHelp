@@ -6,7 +6,7 @@ export default function GoogleCallbackPage() {
   return (
     <AuthCard>
       {/* useSearchParams needs a Suspense boundary */}
-      <Suspense fallback={<p className="text-center text-gray-300">Signing you in…</p>}>
+      <Suspense fallback={<p className="text-center text-gray-300">Sedang masuk…</p>}>
         <GoogleCallback />
       </Suspense>
     </AuthCard>

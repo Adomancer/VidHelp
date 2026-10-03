@@ -9,7 +9,7 @@ import FormAlert from "@/components/FormAlert";
 import PointsMeter, { SpBadge } from "@/components/PointsMeter";
 
 function monthLabel(monthYear: string): string {
-  return new Date(`${monthYear}-01T00:00`).toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  return new Date(`${monthYear}-01T00:00`).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 }
 
 /** My points this period, my warning letters and my monthly ratings. */
@@ -20,26 +20,26 @@ export default function HostScorePage() {
 
   return (
     <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-white">My Score</h1>
+      <h1 className="text-xl font-bold text-white">Skor Saya</h1>
       {performance.error && <FormAlert tone="error">{performance.error}</FormAlert>}
 
       {data && (
         <>
           <Card>
             <p className="text-xs text-gray-400">
-              Points {formatDate(data.period.start)} – {formatDate(data.period.end)}. Back to {data.opening_points} when the next period
-              starts.
+              Poin {formatDate(data.period.start)} – {formatDate(data.period.end)}. Kembali ke {data.opening_points} saat periode berikutnya
+              dimulai.
             </p>
             <PointsMeter points={data.points} opening={data.opening_points} thresholds={data.thresholds} />
           </Card>
 
-          <Card title="Deductions this period">
-            {data.logs.length === 0 && <p className="text-sm text-gray-400">None, keep it up!</p>}
+          <Card title="Potongan periode ini">
+            {data.logs.length === 0 && <p className="text-sm text-gray-400">Tidak ada, pertahankan!</p>}
             <ul className="space-y-2">
               {data.logs.map((log) => (
                 <li key={log.id} className="rounded-lg bg-slate-800 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-white">{log.violation_type?.name ?? "Adjustment"}</span>
+                    <span className="text-sm text-white">{log.violation_type?.name ?? "Penyesuaian"}</span>
                     <span className={`text-sm font-medium ${log.points_change < 0 ? "text-red-300" : "text-green-300"}`}>
                       {log.points_change > 0 ? "+" : ""}
                       {log.points_change}
@@ -55,7 +55,7 @@ export default function HostScorePage() {
           </Card>
 
           {data.warning_letters.length > 0 && (
-            <Card title="Warning letters">
+            <Card title="Surat peringatan">
               <ul className="space-y-2">
                 {data.warning_letters.map((letter) => (
                   <li key={letter.id} className="flex items-start gap-3">
@@ -70,8 +70,8 @@ export default function HostScorePage() {
             </Card>
           )}
 
-          <Card title="Monthly ratings">
-            {data.ratings.length === 0 && <p className="text-sm text-gray-400">You haven&apos;t been rated yet.</p>}
+          <Card title="Rating bulanan">
+            {data.ratings.length === 0 && <p className="text-sm text-gray-400">Kamu belum pernah dinilai.</p>}
             <ul className="space-y-2">
               {data.ratings.map((rating) => (
                 <li key={rating.id} className="flex items-center justify-between gap-3">

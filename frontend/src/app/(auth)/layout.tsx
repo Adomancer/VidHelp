@@ -5,8 +5,8 @@ import "../globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "VidHelp - Login",
-  description: "Sign in to VidHelp Agency Management",
+  title: "VidHelp - Masuk",
+  description: "Masuk ke VidHelp Agency Management",
 };
 
 export default function AuthLayout({

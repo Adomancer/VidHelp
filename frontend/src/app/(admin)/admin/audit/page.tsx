@@ -8,21 +8,50 @@ import { useAuth } from "@/components/AuthProvider";
 import FormAlert from "@/components/FormAlert";
 
 const actionLabels: Record<string, string> = {
-  create: "Created",
-  update: "Updated",
-  delete: "Deleted",
-  approve: "Approved",
-  role_change: "Role changed",
-  login: "Signed in",
-  login_failed: "Failed sign-in",
-  logout: "Signed out",
-  two_factor_enabled: "2FA turned on",
-  two_factor_disabled: "2FA turned off",
-  two_factor_reset: "2FA reset",
-  two_factor_failed: "Wrong 2FA code",
-  recovery_code_used: "Recovery code used",
-  recovery_codes_regenerated: "New recovery codes",
+  create: "Dibuat",
+  update: "Diubah",
+  delete: "Dihapus",
+  approve: "Disetujui",
+  role_change: "Peran diubah",
+  login: "Masuk",
+  login_failed: "Gagal masuk",
+  logout: "Keluar",
+  two_factor_enabled: "2FA diaktifkan",
+  two_factor_disabled: "2FA dimatikan",
+  two_factor_reset: "2FA direset",
+  two_factor_failed: "Kode 2FA salah",
+  recovery_code_used: "Kode pemulihan dipakai",
+  recovery_codes_regenerated: "Kode pemulihan baru",
 };
+
+const tableLabels: Record<string, string> = {
+  users: "Pengguna",
+  host_profiles: "Profil host",
+  host_sensitive_data: "Data KTP & bank",
+  host_rate_categories: "Level tarif",
+  brands: "Brand",
+  host_brand_assignments: "Penugasan brand",
+  schedule_slots: "Slot jadwal",
+  special_events: "Event khusus",
+  event_slot_claims: "Blok event",
+  backup_requests: "Permintaan backup",
+  attendances: "Absensi",
+  live_reports: "Laporan live",
+  point_logs: "Catatan poin",
+  warning_letters: "Surat peringatan",
+  violation_types: "Jenis pelanggaran",
+  brand_complaints: "Komplain brand",
+  host_ratings: "Rating host",
+  payment_periods: "Periode pembayaran",
+  payment_requests: "Pengajuan pembayaran",
+  hour_adjustments: "Penyesuaian jam",
+  salary_slips: "Slip gaji",
+  cash_advances: "Kasbon",
+  discord_links: "Akun Discord",
+  system_settings: "Pengaturan",
+};
+
+const tableLabel = (table: string) => tableLabels[table] ?? humanize(table);
 
 function actionTone(action: string): string {
   if (action === "delete" || action.endsWith("_failed") || action === "two_factor_reset" || action === "two_factor_disabled") {
@@ -43,7 +72,7 @@ function humanize(value: string): string {
 
 function showValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "boolean") return value ? "yes" : "no";
+  if (typeof value === "boolean") return value ? "ya" : "tidak";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
@@ -69,8 +98,8 @@ export default function AuditLogPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Audit Log</h1>
-        <p className="text-sm text-gray-400 mt-1">Every sign-in and every change to important records: who, when, what changed, and from where.</p>
+        <h1 className="text-2xl font-bold text-white">Log Audit</h1>
+        <p className="text-sm text-gray-400 mt-1">Setiap aktivitas masuk dan setiap perubahan data penting: siapa, kapan, apa yang berubah, dan dari mana.</p>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -85,7 +114,7 @@ export default function AuditLogPage() {
             name="search"
             type="search"
             defaultValue={filters.search}
-            placeholder="Search person, record or IP…"
+            placeholder="Cari orang, data, atau IP…"
             className="w-64 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
           />
         </form>
@@ -93,9 +122,9 @@ export default function AuditLogPage() {
           value={filters.action ?? ""}
           onChange={(event) => change("action", event.target.value)}
           className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white"
-          aria-label="Action"
+          aria-label="Aksi"
         >
-          <option value="">All actions</option>
+          <option value="">Semua aksi</option>
           {result.data?.actions.map((action) => (
             <option key={action} value={action}>
               {actionLabel(action)}
@@ -106,17 +135,17 @@ export default function AuditLogPage() {
           value={filters.target_table ?? ""}
           onChange={(event) => change("target_table", event.target.value)}
           className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white"
-          aria-label="Record type"
+          aria-label="Jenis data"
         >
-          <option value="">All records</option>
+          <option value="">Semua data</option>
           {result.data?.target_tables.map((table) => (
             <option key={table} value={table}>
-              {humanize(table)}
+              {tableLabel(table)}
             </option>
           ))}
         </select>
         <label className="text-xs text-gray-400">
-          From
+          Dari
           <input
             type="date"
             value={filters.from ?? ""}
@@ -125,7 +154,7 @@ export default function AuditLogPage() {
           />
         </label>
         <label className="text-xs text-gray-400">
-          To
+          Sampai
           <input
             type="date"
             value={filters.to ?? ""}
@@ -135,16 +164,16 @@ export default function AuditLogPage() {
         </label>
         {Object.values(filters).some(Boolean) && (
           <button type="button" onClick={() => applyFilters({})} className="px-3 py-2 text-sm text-purple-300 hover:text-white">
-            Clear filters
+            Hapus filter
           </button>
         )}
       </div>
 
       {scoped && (
         <FormAlert tone="warning">
-          Showing the history of {filters.target_id ? "one record" : "one person"} only.{" "}
+          Hanya menampilkan riwayat {filters.target_id ? "satu data" : "satu orang"}.{" "}
           <button type="button" onClick={() => applyFilters({ ...filters, target_id: undefined, user_id: undefined })} className="underline">
-            Show everything
+            Tampilkan semua
           </button>
         </FormAlert>
       )}
@@ -154,10 +183,10 @@ export default function AuditLogPage() {
         <table className="w-full text-sm">
           <thead className="text-left text-gray-400 border-b border-slate-800">
             <tr>
-              <th className="px-4 py-3 font-medium">When</th>
-              <th className="px-4 py-3 font-medium">Who</th>
-              <th className="px-4 py-3 font-medium">Action</th>
-              <th className="px-4 py-3 font-medium">Record</th>
+              <th className="px-4 py-3 font-medium">Waktu</th>
+              <th className="px-4 py-3 font-medium">Siapa</th>
+              <th className="px-4 py-3 font-medium">Aksi</th>
+              <th className="px-4 py-3 font-medium">Data</th>
               <th className="px-4 py-3 font-medium">IP</th>
             </tr>
           </thead>
@@ -178,13 +207,13 @@ export default function AuditLogPage() {
                           applyFilters({ ...filters, user_id: log.user!.id });
                         }}
                         className="text-left hover:text-purple-300"
-                        title="Show everything this person did"
+                        title="Tampilkan semua yang dilakukan orang ini"
                       >
                         <span className="block text-white">{log.user.name}</span>
                         <span className="block text-xs text-gray-400">{log.user.email}</span>
                       </button>
                     ) : (
-                      <span className="text-gray-400">{log.action === "login_failed" ? "Unknown" : "System"}</span>
+                      <span className="text-gray-400">{log.action === "login_failed" ? "Tidak dikenal" : "Sistem"}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -199,9 +228,9 @@ export default function AuditLogPage() {
                           if (log.target_id) applyFilters({ ...filters, target_table: log.target_table!, target_id: log.target_id });
                         }}
                         className="text-left hover:text-purple-300"
-                        title="Show the history of this record"
+                        title="Tampilkan riwayat data ini"
                       >
-                        <span className="block text-gray-400 text-xs">{humanize(log.target_table)}</span>
+                        <span className="block text-gray-400 text-xs">{tableLabel(log.target_table)}</span>
                         <span className="block text-white">{log.target_label ?? log.target_id?.slice(0, 8)}</span>
                       </button>
                     ) : (
@@ -222,20 +251,20 @@ export default function AuditLogPage() {
           </tbody>
         </table>
 
-        {logs && logs.data.length === 0 && <p className="px-4 py-8 text-center text-gray-400">Nothing recorded for these filters.</p>}
+        {logs && logs.data.length === 0 && <p className="px-4 py-8 text-center text-gray-400">Tidak ada catatan untuk filter ini.</p>}
       </div>
 
       {logs && logs.last_page > 1 && (
         <div className="flex items-center justify-between text-sm text-gray-400">
           <span>
-            Page {logs.current_page} of {logs.last_page} · {logs.total} entries
+            Halaman {logs.current_page} dari {logs.last_page} · {logs.total} catatan
           </span>
           <div className="flex gap-2">
             <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
-              Previous
+              Sebelumnya
             </button>
             <button type="button" disabled={page >= logs.last_page} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
-              Next
+              Berikutnya
             </button>
           </div>
         </div>
@@ -256,9 +285,9 @@ function Details({ log }: { log: AuditLogEntry }) {
         <table className="text-sm">
           <thead className="text-left text-xs text-gray-400">
             <tr>
-              <th className="pr-6 pb-1 font-medium">Field</th>
-              {showBefore && <th className="pr-6 pb-1 font-medium">Before</th>}
-              {showAfter && <th className="pb-1 font-medium">{showBefore ? "After" : "Value"}</th>}
+              <th className="pr-6 pb-1 font-medium">Kolom</th>
+              {showBefore && <th className="pr-6 pb-1 font-medium">Sebelum</th>}
+              {showAfter && <th className="pb-1 font-medium">{showBefore ? "Sesudah" : "Nilai"}</th>}
             </tr>
           </thead>
           <tbody>
@@ -272,13 +301,13 @@ function Details({ log }: { log: AuditLogEntry }) {
           </tbody>
         </table>
       ) : (
-        <p className="text-sm text-gray-400">No field details for this entry.</p>
+        <p className="text-sm text-gray-400">Tidak ada detail kolom untuk catatan ini.</p>
       )}
       <p className="text-xs text-gray-500">
-        {log.target_id && <>Record id {log.target_id} · </>}
-        {log.user_agent ?? "Unknown browser"}
+        {log.target_id && <>ID data {log.target_id} · </>}
+        {log.user_agent ?? "Browser tidak dikenal"}
       </p>
-      <p className="text-xs text-gray-500">&quot;[hidden]&quot; means the field changed but its value (password, KTP, bank number) is never stored in the log.</p>
+      <p className="text-xs text-gray-500">&quot;[hidden]&quot; berarti kolom itu berubah, tapi nilainya (kata sandi, KTP, nomor rekening) tidak pernah disimpan di log.</p>
     </div>
   );
 }

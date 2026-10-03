@@ -44,14 +44,14 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
   if (done) {
     return (
       <div className="space-y-4">
-        <FormAlert tone="success">Two-factor authentication is on.</FormAlert>
+        <FormAlert tone="success">Verifikasi dua langkah sudah aktif.</FormAlert>
         <RecoveryCodes codes={done.codes} />
         <button
           type="button"
           onClick={() => onDone(done.user)}
           className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500"
         >
-          I saved my recovery codes
+          Kode pemulihan sudah saya simpan
         </button>
       </div>
     );
@@ -61,9 +61,9 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
     return (
       <div className="space-y-4">
         <ol className="list-decimal list-inside space-y-1 text-sm text-gray-300">
-          <li>Install an authenticator app on your phone: Google Authenticator, Microsoft Authenticator or Authy.</li>
-          <li>Scan the QR code shown on the next step.</li>
-          <li>Type the 6-digit code from the app to finish.</li>
+          <li>Pasang aplikasi authenticator di HP kamu: Google Authenticator, Microsoft Authenticator atau Authy.</li>
+          <li>Scan kode QR yang muncul di langkah berikutnya.</li>
+          <li>Ketik kode 6 digit dari aplikasi untuk menyelesaikan.</li>
         </ol>
         {startError && <FormAlert tone="error">{startError}</FormAlert>}
         <button
@@ -72,7 +72,7 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
           disabled={starting}
           className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500 disabled:opacity-60"
         >
-          {starting ? "Please wait…" : "Start setup"}
+          {starting ? "Tunggu sebentar…" : "Mulai pengaturan"}
         </button>
       </div>
     );
@@ -80,23 +80,23 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-      <p className="text-sm text-gray-300">Scan this with your authenticator app:</p>
+      <p className="text-sm text-gray-300">Scan kode ini dengan aplikasi authenticator kamu:</p>
       <div className="flex justify-center">
         <div className="p-3 rounded-xl bg-white">
           <QRCodeSVG value={secret.otpauth_url} size={184} marginSize={0} />
         </div>
       </div>
       <details className="text-sm text-gray-400">
-        <summary className="cursor-pointer hover:text-white">Can&apos;t scan? Enter the key by hand</summary>
+        <summary className="cursor-pointer hover:text-white">Tidak bisa scan? Masukkan kuncinya manual</summary>
         <p className="mt-2 font-mono text-white break-all select-all bg-slate-950 border border-slate-700 rounded-lg px-3 py-2">
           {secret.secret.match(/.{1,4}/g)?.join(" ")}
         </p>
-        <p className="mt-1 text-xs">Choose &quot;time based&quot; if the app asks.</p>
+        <p className="mt-1 text-xs">Pilih &quot;time based&quot; (berbasis waktu) kalau aplikasi bertanya.</p>
       </details>
 
       {error && <FormAlert tone="error">{error}</FormAlert>}
       <TextField
-        label="6-digit code from the app"
+        label="Kode 6 digit dari aplikasi"
         name="code"
         inputMode="numeric"
         autoComplete="one-time-code"
@@ -108,7 +108,7 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
         required
         error={errors.code}
       />
-      <SubmitButton loading={loading}>Turn on 2FA</SubmitButton>
+      <SubmitButton loading={loading}>Aktifkan 2FA</SubmitButton>
     </form>
   );
 }

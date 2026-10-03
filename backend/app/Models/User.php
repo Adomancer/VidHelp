@@ -134,8 +134,8 @@ class User extends Authenticatable
     {
         return match ($this->status) {
             'active' => null,
-            'pending' => 'Your account is waiting for admin approval.',
-            default => 'Your account has been deactivated.',
+            'pending' => 'Akunmu sedang menunggu persetujuan admin.',
+            default => 'Akunmu sudah dinonaktifkan.',
         };
     }
 

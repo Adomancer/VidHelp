@@ -26,9 +26,9 @@ class EventService
 
         $event = SpecialEvent::create([...$attributes, 'status' => 'active', 'created_by' => $by->id])->load('brand');
 
-        $title = "New event: {$event->name} ({$event->brand->name})";
-        $days = $event->start_date->format('j M').($event->end_date->equalTo($event->start_date) ? '' : ' – '.$event->end_date->format('j M'));
-        $body = "{$days}, {$event->daily_start_time}–{$event->daily_end_time}. Grab your blocks in the Event menu (max {$event->max_slots_per_host}).";
+        $title = "Event baru: {$event->name} ({$event->brand->name})";
+        $days = $event->start_date->translatedFormat('j M').($event->end_date->equalTo($event->start_date) ? '' : ' – '.$event->end_date->translatedFormat('j M'));
+        $body = "{$days}, {$event->daily_start_time}–{$event->daily_end_time}. Ambil blokmu di menu Event (maks {$event->max_slots_per_host}).";
         $this->notifier->toUsers($this->notifier->hosts($event->brand_id), 'event_opened', $title, $body, '/host/events');
         $this->notifier->toChannel('backups', 'event_opened', $title, $body, '/host/events');
 
@@ -115,33 +115,33 @@ class EventService
             $event = SpecialEvent::lockForUpdate()->findOrFail($event->id);
 
             if ($event->status !== 'active') {
-                $this->fail('This event was cancelled.');
+                $this->fail('Event ini sudah dibatalkan.');
             }
 
-            [$blockStart, $blockEnd] = $event->blockAt($start) ?? $this->fail("That is not one of this event's blocks.");
+            [$blockStart, $blockEnd] = $event->blockAt($start) ?? $this->fail("Itu bukan salah satu blok event ini.");
 
             if (($asManager ? $blockEnd : $blockStart)->lte(now())) {
-                $this->fail($asManager ? 'This block has already ended.' : 'This block has already started.');
+                $this->fail($asManager ? 'Blok ini sudah selesai.' : 'Blok ini sudah dimulai.');
             }
 
             if (! $asManager) {
                 $onBrand = $host->assignments()->where('brand_id', $event->brand_id)->where('status', 'active')->exists();
                 if (! $onBrand) {
-                    $this->fail("Only hosts of {$event->brand->name} can claim these blocks.");
+                    $this->fail("Hanya host {$event->brand->name} yang bisa mengambil blok ini.");
                 }
 
                 $held = EventSlotClaim::active()->where('event_id', $event->id)->where('host_id', $host->id)->count();
                 if ($held >= $event->max_slots_per_host) {
-                    $this->fail("You already hold the maximum of {$event->max_slots_per_host} blocks for this event.");
+                    $this->fail("Kamu sudah mengambil maksimal {$event->max_slots_per_host} blok untuk event ini.");
                 }
             }
 
             $current = EventSlotClaim::active()->where('event_id', $event->id)->where('start_at', $blockStart)->first();
             if ($current?->host_id === $host->id) {
-                $this->fail('This block is already held by this host.');
+                $this->fail('Blok ini sudah dipegang host tersebut.');
             }
             if ($current && ! $asManager) {
-                $this->fail('Someone already claimed this block.');
+                $this->fail('Blok ini sudah diambil orang lain.');
             }
 
             if (! $event->open_full_schedule) {
@@ -175,13 +175,13 @@ class EventService
     public function release(EventSlotClaim $claim, bool $asManager = false): void
     {
         if ($claim->status !== 'active') {
-            $this->fail('This block is no longer held.');
+            $this->fail('Blok ini sudah tidak dipegang siapa pun.');
         }
         if (($asManager ? $claim->end_at : $claim->start_at)->lte(now())) {
-            $this->fail($asManager ? 'This block has already ended.' : 'This block has already started.');
+            $this->fail($asManager ? 'Blok ini sudah selesai.' : 'Blok ini sudah dimulai.');
         }
         if (Attendance::where('event_claim_id', $claim->id)->exists()) {
-            $this->fail('The host already checked in for this block.');
+            $this->fail('Host sudah check-in untuk blok ini.');
         }
 
         $claim->update(['status' => 'cancelled']);
@@ -197,7 +197,7 @@ class EventService
             ->first();
 
         if ($clash) {
-            throw ValidationException::withMessages(['start_date' => ["{$clash->name} already runs for this brand on some of these days."]]);
+            throw ValidationException::withMessages(['start_date' => ["{$clash->name} sudah berjalan untuk brand ini di sebagian hari tersebut."]]);
         }
     }
 

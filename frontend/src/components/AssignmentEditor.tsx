@@ -39,7 +39,7 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
     <div className="space-y-3">
       {error && <FormAlert tone="error">{error}</FormAlert>}
 
-      {assignments.length === 0 && <p className="text-sm text-gray-400">Not assigned to any brand yet.</p>}
+      {assignments.length === 0 && <p className="text-sm text-gray-400">Belum ditugaskan ke brand mana pun.</p>}
 
       <ul className="space-y-2">
         {assignments.map((assignment) => (
@@ -63,12 +63,12 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
               onChange={(event) =>
                 run(() => operatorApi.updateAssignment(token, assignment.id, { status: event.target.value as AssignmentStatus }))
               }
-              aria-label={`Status for ${assignment.brand.name}`}
+              aria-label={`Status di ${assignment.brand.name}`}
               className="bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm text-white"
             >
-              <option value="active">active</option>
-              <option value="inactive">inactive</option>
-              <option value="banned">banned</option>
+              <option value="active">aktif</option>
+              <option value="inactive">nonaktif</option>
+              <option value="banned">diblokir</option>
             </select>
           </li>
         ))}
@@ -79,10 +79,10 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
           <select
             value={brandId}
             onChange={(event) => setBrandId(event.target.value)}
-            aria-label="Brand to add"
+            aria-label="Brand yang ditambahkan"
             className="flex-1 bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-sm text-white"
           >
-            <option value="">Add to brand…</option>
+            <option value="">Tambahkan ke brand…</option>
             {available.map((brand) => (
               <option key={brand.id} value={brand.id}>
                 {brand.name}
@@ -95,7 +95,7 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
             onClick={() => run(() => operatorApi.assign(token, { host_id: hostId, brand_id: brandId }).then(() => setBrandId("")))}
             className="px-3 py-1.5 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50"
           >
-            Add
+            Tambah
           </button>
         </div>
       )}

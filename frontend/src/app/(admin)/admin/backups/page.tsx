@@ -5,7 +5,7 @@ export default function AdminBackupsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Backups</h1>
+        <h1 className="text-2xl font-bold text-white">Backup</h1>
         <BackupTimingNote />
       </div>
       <BackupDesk />

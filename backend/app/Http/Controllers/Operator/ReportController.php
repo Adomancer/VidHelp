@@ -70,7 +70,7 @@ class ReportController extends Controller
             $validated['review_note'] ?? null,
         );
 
-        return response()->json(['message' => 'Report approved']);
+        return response()->json(['message' => 'Laporan disetujui']);
     }
 
     public function reject(Request $request, LiveReport $report): JsonResponse
@@ -79,6 +79,6 @@ class ReportController extends Controller
 
         $this->attendance->reject($report, $request->user(), $validated['review_note']);
 
-        return response()->json(['message' => 'Report rejected']);
+        return response()->json(['message' => 'Laporan ditolak']);
     }
 }

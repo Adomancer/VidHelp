@@ -3,17 +3,17 @@ import SidebarLayout from "@/components/SidebarLayout";
 
 export const metadata: Metadata = {
   title: "VidHelp Finance",
-  description: "VidHelp payroll and kasbon",
+  description: "Penggajian dan kasbon VidHelp",
 };
 
 const links = [
-  { href: "/finance/payroll", label: "Payroll & Kasbon" },
-  { href: "/finance/security", label: "Security" },
+  { href: "/finance/payroll", label: "Penggajian & Kasbon" },
+  { href: "/finance/security", label: "Keamanan" },
 ];
 
 export default function FinanceLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarLayout panel="Finance Panel" accentClass="text-emerald-400" roles={["finance", "admin"]} links={links}>
+    <SidebarLayout panel="Panel Finance" accentClass="text-emerald-400" roles={["finance", "admin"]} links={links}>
       {children}
     </SidebarLayout>
   );

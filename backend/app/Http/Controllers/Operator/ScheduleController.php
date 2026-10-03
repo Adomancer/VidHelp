@@ -75,7 +75,7 @@ class ScheduleController extends Controller
         $this->ensureNoConflicts($slot);
         $slot->save();
 
-        return response()->json(['slot' => $this->load($slot), 'message' => 'Slot added'], 201);
+        return response()->json(['slot' => $this->load($slot), 'message' => 'Slot ditambahkan'], 201);
     }
 
     /**
@@ -143,7 +143,7 @@ class ScheduleController extends Controller
         $this->ensureNoConflicts($schedule);
         $schedule->save();
 
-        return response()->json(['slot' => $this->load($schedule), 'message' => 'Slot updated']);
+        return response()->json(['slot' => $this->load($schedule), 'message' => 'Slot diperbarui']);
     }
 
     /**
@@ -156,7 +156,7 @@ class ScheduleController extends Controller
         $request->validate(['from' => 'nullable|date|after_or_equal:today']);
         $schedule->retire($request->date('from'));
 
-        return response()->json(['message' => 'Slot removed']);
+        return response()->json(['message' => 'Slot dihapus']);
     }
 
     /**
@@ -173,7 +173,7 @@ class ScheduleController extends Controller
             || (! $previous && BackupRequest::where('slot_id', $schedule->id)->exists());
 
         if ($tooLate) {
-            return response()->json(['message' => 'This change can no longer be undone.'], 422);
+            return response()->json(['message' => 'Perubahan ini sudah tidak bisa diurungkan.'], 422);
         }
 
         DB::transaction(function () use ($schedule, $previous) {
@@ -185,7 +185,7 @@ class ScheduleController extends Controller
             $previous?->update(['effective_to' => $this->endBeforeEdit($previous, $schedule)]);
         });
 
-        return response()->json(['slot' => $previous ? $this->load($previous) : null, 'message' => 'Change undone']);
+        return response()->json(['slot' => $previous ? $this->load($previous) : null, 'message' => 'Perubahan diurungkan']);
     }
 
     /**
@@ -199,7 +199,7 @@ class ScheduleController extends Controller
 
         return response()->json([
             'slot' => $this->load($schedule),
-            'message' => $validated['is_locked'] ? 'Slot locked' : 'Slot unlocked',
+            'message' => $validated['is_locked'] ? 'Slot dikunci' : 'Kunci slot dibuka',
         ]);
     }
 
@@ -209,7 +209,7 @@ class ScheduleController extends Controller
     private function continueFrom(Request $request, ScheduleSlot $schedule, Carbon $applyFrom): JsonResponse
     {
         if ($schedule->effective_to && $schedule->effective_to->lt($applyFrom)) {
-            throw ValidationException::withMessages(['apply_from' => ['This slot has already ended by that date.']]);
+            throw ValidationException::withMessages(['apply_from' => ['Slot ini sudah berakhir sebelum tanggal itu.']]);
         }
 
         $next = $schedule->replicate(['crosses_midnight']);
@@ -230,7 +230,7 @@ class ScheduleController extends Controller
         return response()->json([
             'slot' => $this->load($next),
             'previous' => $this->load($schedule),
-            'message' => 'Slot updated',
+            'message' => 'Slot diperbarui',
         ]);
     }
 
@@ -265,20 +265,20 @@ class ScheduleController extends Controller
             'effective_from' => 'sometimes|date',
             'effective_to' => 'sometimes|nullable|date',
         ], [
-            'assignment_id.exists' => 'Choose a host who is active on this brand.',
+            'assignment_id.exists' => 'Pilih host yang aktif di brand ini.',
         ]);
 
         // Cross-field checks against the merged (existing + new) values
         $start = $validated['start_time'] ?? $slot->start_time;
         $end = $validated['end_time'] ?? $slot->end_time;
         if ($start === $end) {
-            throw ValidationException::withMessages(['end_time' => ['End time must differ from start time.']]);
+            throw ValidationException::withMessages(['end_time' => ['Jam selesai harus berbeda dari jam mulai.']]);
         }
 
         $from = $validated['effective_from'] ?? $slot->effective_from?->toDateString();
         $to = array_key_exists('effective_to', $validated) ? $validated['effective_to'] : $slot->effective_to?->toDateString();
         if ($to !== null && $to < $from) {
-            throw ValidationException::withMessages(['effective_to' => ['The end date must be on or after the start date.']]);
+            throw ValidationException::withMessages(['effective_to' => ['Tanggal akhir harus sama dengan atau setelah tanggal mulai.']]);
         }
 
         return $validated;
@@ -293,7 +293,7 @@ class ScheduleController extends Controller
             $brand = $clash->assignment->brand->name;
 
             throw ValidationException::withMessages([
-                'start_time' => ["Clashes with {$who} on {$brand} ({$clash->label()})."],
+                'start_time' => ["Bentrok dengan {$who} di {$brand} ({$clash->label()})."],
             ]);
         }
     }
@@ -303,7 +303,7 @@ class ScheduleController extends Controller
         abort_if(
             $slot->is_locked && ! $request->user()->hasRole('admin'),
             403,
-            'This slot is locked. Only an admin can change it.'
+            'Slot ini dikunci. Hanya admin yang bisa mengubahnya.'
         );
     }
 

@@ -23,12 +23,12 @@ export default function PointsMeter({ points, opening, thresholds }: { points: n
     <div className="space-y-2">
       <div className="flex items-baseline gap-2">
         <span className="text-3xl font-bold text-white">{points}</span>
-        <span className="text-sm text-gray-400">/ {opening} points</span>
+        <span className="text-sm text-gray-400">/ {opening} poin</span>
       </div>
       <div className="relative h-3 rounded-full bg-slate-800">
         <div className={`h-3 rounded-full ${tone}`} style={{ width: pct(points) }} />
         {Object.entries(thresholds).map(([level, threshold]) => (
-          <div key={level} className="absolute -top-1 h-5 w-px bg-slate-400" style={{ left: pct(threshold) }} title={`SP${level} at ${threshold}`} />
+          <div key={level} className="absolute -top-1 h-5 w-px bg-slate-400" style={{ left: pct(threshold) }} title={`SP${level} di ${threshold}`} />
         ))}
       </div>
       <div className="relative h-4 text-[11px] text-gray-400">

@@ -21,12 +21,12 @@ export default function ForgotPasswordForm() {
       {error && <FormAlert tone="error">{error}</FormAlert>}
 
       <p className="text-sm text-gray-300">
-        Enter your email and we&apos;ll send you a link to set a new password. This also works if you
-        signed up with Google and never had a password.
+        Masukkan email kamu, nanti kami kirim link untuk membuat kata sandi baru. Ini juga bisa dipakai kalau kamu
+        daftar lewat Google dan belum pernah punya kata sandi.
       </p>
       <TextField label="Email" name="email" type="email" autoComplete="email" required error={errors.email} />
 
-      <SubmitButton loading={loading}>Send reset link</SubmitButton>
+      <SubmitButton loading={loading}>Kirim link reset</SubmitButton>
     </form>
   );
 }

@@ -16,8 +16,8 @@ function dayLabel(date: string): { day: string; month: string; full: string } {
   const value = new Date(`${date}T00:00`);
   return {
     day: String(value.getDate()),
-    month: value.toLocaleDateString("en-GB", { month: "short" }),
-    full: value.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }),
+    month: value.toLocaleDateString("id-ID", { month: "short" }),
+    full: value.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" }),
   };
 }
 
@@ -38,7 +38,7 @@ export default function HoursChart({ days }: { days: { date: string; hours: numb
         <div className="relative w-9 shrink-0 text-right text-[11px] text-gray-500" style={{ height: PLOT_HEIGHT }}>
           {ticks.map((tick) => (
             <span key={tick} className="absolute right-0 leading-none" style={{ bottom: `${(tick / top) * 100}%`, transform: "translateY(50%)" }}>
-              {tick} h
+              {tick} j
             </span>
           ))}
         </div>
@@ -65,7 +65,7 @@ export default function HoursChart({ days }: { days: { date: string; hours: numb
                       className={`pointer-events-none absolute bottom-full mb-1 ${tooltipSide} z-10 hidden group-hover:block whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs shadow-xl`}
                     >
                       <span className="block text-gray-400">{label.full}</span>
-                      <span className="block text-white font-medium">{day.hours > 0 ? formatDuration(day.hours) : "No approved hours"}</span>
+                      <span className="block text-white font-medium">{day.hours > 0 ? formatDuration(day.hours) : "Belum ada jam yang disetujui"}</span>
                     </div>
                   </div>
                 );
@@ -90,11 +90,11 @@ export default function HoursChart({ days }: { days: { date: string; hours: numb
       </div>
 
       <table className="sr-only">
-        <caption>Approved live hours per day</caption>
+        <caption>Jam live yang disetujui per hari</caption>
         <thead>
           <tr>
-            <th>Day</th>
-            <th>Hours</th>
+            <th>Hari</th>
+            <th>Jam</th>
           </tr>
         </thead>
         <tbody>

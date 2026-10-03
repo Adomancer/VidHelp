@@ -50,7 +50,7 @@ class UserManagementController extends Controller
 
         return response()->json([
             'user' => $user->load('roles'),
-            'message' => "Account created. {$user->name} can sign in now.",
+            'message' => "Akun dibuat. {$user->name} sudah bisa masuk.",
         ], 201);
     }
 
@@ -90,7 +90,7 @@ class UserManagementController extends Controller
 
         return response()->json([
             'user' => $user->fresh()->load('roles'),
-            'message' => 'User updated successfully',
+            'message' => 'Pengguna berhasil diperbarui',
         ]);
     }
 
@@ -101,7 +101,7 @@ class UserManagementController extends Controller
     {
         $this->accounts->setStatus($user, 'inactive', $request->user());
 
-        return response()->json(['message' => 'User deactivated']);
+        return response()->json(['message' => 'Pengguna dinonaktifkan']);
     }
 
     /**
@@ -111,7 +111,7 @@ class UserManagementController extends Controller
     {
         $this->accounts->setStatus($user, 'archived', $request->user());
 
-        return response()->json(['message' => "{$user->name} was archived and taken off the schedule from today."]);
+        return response()->json(['message' => "{$user->name} diarsipkan dan dikeluarkan dari jadwal mulai hari ini."]);
     }
 
     /**
@@ -127,7 +127,7 @@ class UserManagementController extends Controller
 
         $this->accounts->erase($user, $validated['reason'], $validated['note'] ?? null, $request->user());
 
-        return response()->json(['message' => 'Personal data deleted. Work and pay history stay, without the name.']);
+        return response()->json(['message' => 'Data pribadi dihapus. Riwayat kerja dan gaji tetap ada tanpa nama.']);
     }
 
     /**
@@ -145,10 +145,10 @@ class UserManagementController extends Controller
 
         if ($firstApproval) {
             AuditLog::record('approve', $user);
-            $notifier->toUsers($user, 'account_approved', 'Your account is approved', 'Welcome to VidHelp! You can sign in now.', '/host/live', dm: true);
+            $notifier->toUsers($user, 'account_approved', 'Akunmu sudah disetujui', 'Selamat datang di VidHelp! Kamu sudah bisa masuk.', '/host/live', dm: true);
         }
 
-        return response()->json(['message' => 'User activated']);
+        return response()->json(['message' => 'Pengguna diaktifkan']);
     }
 
     /**
@@ -158,6 +158,6 @@ class UserManagementController extends Controller
     {
         $twoFactor->reset($user, $request->user());
 
-        return response()->json(['message' => "Two-factor authentication was reset for {$user->name}. They were signed out and will set it up again at the next sign-in."]);
+        return response()->json(['message' => "Verifikasi dua langkah {$user->name} sudah direset. Dia sudah dikeluarkan dan akan mengaturnya lagi saat masuk berikutnya."]);
     }
 }

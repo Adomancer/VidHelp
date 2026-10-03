@@ -51,8 +51,8 @@ export default function HostBackupsPage() {
       <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800">
         {(
           [
-            ["needs", "Backup needs"],
-            ["mine", "My requests"],
+            ["needs", "Butuh backup"],
+            ["mine", "Permintaan saya"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -104,23 +104,23 @@ function NeedsTab({
   return (
     <div className="space-y-4">
       {upcomingCovers.length > 0 && (
-        <Card title="You're covering">
+        <Card title="Kamu menggantikan">
           <ul className="space-y-2">
             {upcomingCovers.map((cover) => (
               <li key={cover.id} className="rounded-lg bg-green-500/10 border border-green-400/30 px-3 py-2 space-y-1">
                 <p className="text-white">{cover.brand.name}</p>
                 <p className="text-sm text-green-200">{formatWindow(cover.start_at, cover.end_at)}</p>
-                <p className="text-xs text-gray-400">for {cover.requester_name}</p>
+                <p className="text-xs text-gray-400">untuk {cover.requester_name}</p>
                 {new Date(cover.start_at) > new Date() && (
                   <button
                     type="button"
                     onClick={() =>
-                      confirm("Drop this backup? It will reopen for others and you will get a point penalty.") &&
+                      confirm("Batal jadi backup? Permintaan akan dibuka lagi untuk host lain dan kamu kena potongan poin.") &&
                       act(() => hostBackupApi.drop(token, cover.id))
                     }
                     className="text-xs text-red-300 hover:text-red-200"
                   >
-                    I can&apos;t make it
+                    Saya tidak bisa
                   </button>
                 )}
               </li>
@@ -131,13 +131,13 @@ function NeedsTab({
 
       {quota && (
         <p className="text-xs text-gray-400">
-          Helping other brands this month: {quota.quota_used}/{quota.quota_max}. Covering your own brand doesn&apos;t count.
+          Membantu brand lain bulan ini: {quota.quota_used}/{quota.quota_max}. Menggantikan di brand sendiri tidak dihitung.
         </p>
       )}
 
       {needs?.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">No one needs a backup right now.</p>
+          <p className="text-sm text-gray-400">Saat ini tidak ada yang butuh backup.</p>
         </Card>
       )}
 
@@ -146,13 +146,13 @@ function NeedsTab({
 
         return (
           <Card key={need.id}>
-            {need.asked_me && <p className="text-xs font-medium text-purple-200">{need.requester_name} asked you to cover this</p>}
+            {need.asked_me && <p className="text-xs font-medium text-purple-200">{need.requester_name} meminta kamu menggantikan sesi ini</p>}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-white font-medium">{need.brand.name}</p>
                 <p className="text-sm text-purple-200">{formatWindow(need.start_at, need.end_at)}</p>
                 <p className="text-xs text-gray-400 mt-1">
-                  for {need.requester_name} · {need.same_brand ? "your brand" : "other brand (uses quota)"}
+                  untuk {need.requester_name} · {need.same_brand ? "brand kamu" : "brand lain (memakai kuota)"}
                 </p>
               </div>
               {applied ? (
@@ -161,7 +161,7 @@ function NeedsTab({
                   onClick={() => act(() => hostBackupApi.withdraw(token, need.id))}
                   className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-gray-300 hover:bg-slate-800"
                 >
-                  Withdraw
+                  Tarik diri
                 </button>
               ) : (
                 <button
@@ -170,12 +170,12 @@ function NeedsTab({
                   onClick={() => act(() => hostBackupApi.apply(token, need.id))}
                   className="shrink-0 px-3 py-1.5 rounded-lg bg-purple-600 text-sm text-white hover:bg-purple-500 disabled:opacity-40"
                 >
-                  Apply
+                  Daftar
                 </button>
               )}
             </div>
             {!need.asked_me && <RequestTypeBadge names={need.nominee_names} />}
-            {applied && <p className="text-xs text-green-300">You applied. Waiting for an admin to approve.</p>}
+            {applied && <p className="text-xs text-green-300">Kamu sudah mendaftar. Menunggu persetujuan admin.</p>}
             {!applied && need.ineligible_reason && <p className="text-xs text-gray-400">{need.ineligible_reason}</p>}
           </Card>
         );
@@ -195,7 +195,7 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
         onClick={() => setFormOpen(true)}
         className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500"
       >
-        I need a backup
+        Saya butuh backup
       </button>
       {formOpen && (
         <RequestForm
@@ -207,7 +207,7 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
         />
       )}
 
-      {requests?.length === 0 && <p className="text-sm text-gray-400 text-center">You haven&apos;t requested a backup yet.</p>}
+      {requests?.length === 0 && <p className="text-sm text-gray-400 text-center">Kamu belum pernah mengajukan backup.</p>}
 
       {requests?.map((backup) => (
         <Card key={backup.id}>
@@ -226,19 +226,19 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
           <RequestTypeBadge names={backup.nominees?.map((nominee) => nominee.host.user.name) ?? []} />
 
           {backup.status === "filled" && backup.filler && (
-            <p className="text-sm text-green-300">Covered by {backup.filler.user.name}</p>
+            <p className="text-sm text-green-300">Digantikan {backup.filler.user.name}</p>
           )}
-          {backup.status === "open" && <p className="text-xs text-gray-400">Waiting for hosts to apply.</p>}
-          {backup.status === "pending" && <p className="text-xs text-gray-400">Someone applied. An admin will approve who covers it.</p>}
+          {backup.status === "open" && <p className="text-xs text-gray-400">Menunggu host mendaftar.</p>}
+          {backup.status === "pending" && <p className="text-xs text-gray-400">Sudah ada yang mendaftar. Admin akan memilih penggantinya.</p>}
 
           {backup.letter_status !== "not_needed" && (
             <div className="flex flex-wrap items-center gap-3">
               <LetterBadge status={backup.letter_status} />
               {backup.letter_status !== "uploaded" && backup.letter_due_at && (
-                <span className="text-xs text-gray-400">due {formatDateTime(backup.letter_due_at)}</span>
+                <span className="text-xs text-gray-400">batas {formatDateTime(backup.letter_due_at)}</span>
               )}
               <label className="text-xs text-purple-300 hover:text-white cursor-pointer">
-                {backup.letter_status === "uploaded" ? "Replace letter" : "Upload letter"}
+                {backup.letter_status === "uploaded" ? "Ganti surat" : "Unggah surat"}
                 <input
                   type="file"
                   accept="image/*,application/pdf"
@@ -255,10 +255,10 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
           {(backup.status === "pending" || backup.status === "open") && (
             <button
               type="button"
-              onClick={() => confirm("Cancel this backup request?") && act(() => hostBackupApi.cancel(token, backup.id))}
+              onClick={() => confirm("Batalkan permintaan backup ini?") && act(() => hostBackupApi.cancel(token, backup.id))}
               className="text-xs text-red-300 hover:text-red-200"
             >
-              Cancel request
+              Batalkan permintaan
             </button>
           )}
         </Card>
@@ -268,8 +268,8 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
 }
 
 const requestTypes: { value: BackupRequestType; label: string; hint: string }[] = [
-  { value: "open", label: "Anyone", hint: "Every host can apply." },
-  { value: "direct", label: "Choose hosts", hint: "Only the hosts you pick can apply." },
+  { value: "open", label: "Siapa saja", hint: "Semua host bisa mendaftar." },
+  { value: "direct", label: "Pilih host", hint: "Hanya host yang kamu pilih yang bisa mendaftar." },
 ];
 
 function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; onCancel: () => void }) {
@@ -304,30 +304,30 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
   // Nothing to request for (yet): no form, so it can't be sent without a session
   if (!occurrence) {
     return (
-      <Modal title="Request a backup" onClose={onCancel}>
+      <Modal title="Ajukan backup" onClose={onCancel}>
         {slots.error && <FormAlert tone="error">{slots.error}</FormAlert>}
-        <p className="text-sm text-gray-400">{slots.data ? "You have no sessions you can still request a backup for." : "Loading your sessions…"}</p>
+        <p className="text-sm text-gray-400">{slots.data ? "Tidak ada sesi yang masih bisa kamu ajukan backup." : "Memuat sesi kamu…"}</p>
         {slots.data && settings && (
           <p className="text-xs text-gray-400">
-            Sessions less than {formatDuration(settings["backup.request_min_hours_before"])} away aren&apos;t listed. For a last-minute absence,
-            contact an admin.
+            Sesi yang kurang dari {formatDuration(settings["backup.request_min_hours_before"])} lagi tidak ditampilkan. Kalau mendadak tidak bisa,
+            hubungi admin.
           </p>
         )}
         <button type="button" onClick={onCancel} className="px-4 py-2 rounded-xl text-gray-300 hover:bg-slate-800">
-          Close
+          Tutup
         </button>
       </Modal>
     );
   }
 
   return (
-    <Modal title="Request a backup" description="Pick the session you can't do. It goes on the backup board right away; an admin approves who covers it." onClose={onCancel}>
+    <Modal title="Ajukan backup" description="Pilih sesi yang tidak bisa kamu jalani. Langsung masuk ke papan backup; admin yang menyetujui penggantinya." onClose={onCancel}>
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
         <div className="space-y-1">
           <label htmlFor="occurrence" className="block text-sm font-medium text-gray-200">
-            Session
+            Sesi
           </label>
           <select
             id="occurrence"
@@ -346,7 +346,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
           </select>
           {settings && (
             <p className="text-xs text-gray-400">
-              Request at least {formatDuration(settings["backup.request_min_hours_before"])} before the session. For anything sooner, contact an
+              Ajukan paling lambat {formatDuration(settings["backup.request_min_hours_before"])} sebelum sesi. Kalau lebih mendadak, hubungi
               admin.
             </p>
           )}
@@ -354,7 +354,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         </div>
 
         <fieldset className="space-y-1">
-          <legend className="block text-sm font-medium text-gray-200">Reason</legend>
+          <legend className="block text-sm font-medium text-gray-200">Alasan</legend>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(reasonLabels) as BackupReason[]).map((value) => (
               <button
@@ -371,7 +371,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
 
         <div className="space-y-1">
           <label htmlFor="reason" className="block text-sm font-medium text-gray-200">
-            Details (optional)
+            Keterangan (opsional)
           </label>
           <textarea
             id="reason"
@@ -384,7 +384,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
 
         <div className="space-y-1">
           <label htmlFor="letter" className="block text-sm font-medium text-gray-200">
-            {reasonType === "sick" ? "Doctor's letter" : "Attachment"} (optional now)
+            {reasonType === "sick" ? "Surat dokter" : "Lampiran"} (boleh menyusul)
           </label>
           <input
             id="letter"
@@ -395,15 +395,15 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
           />
           {reasonType === "sick" && settings && (
             <p className="text-xs text-gray-400">
-              If you don&apos;t have it yet, upload it within {formatDuration(settings["backup.sick_letter_grace_hours"])} after the session
-              starts, or you lose points.
+              Kalau belum ada, unggah paling lambat {formatDuration(settings["backup.sick_letter_grace_hours"])} setelah sesi
+              dimulai, atau poinmu dipotong.
             </p>
           )}
           {errors.letter && <p className="text-sm text-red-300">{errors.letter}</p>}
         </div>
 
         <fieldset className="space-y-2">
-          <legend className="block text-sm font-medium text-gray-200">Who can cover it</legend>
+          <legend className="block text-sm font-medium text-gray-200">Siapa yang bisa menggantikan</legend>
           <div className="grid grid-cols-2 gap-2">
             {requestTypes.map((option) => (
               <button
@@ -431,9 +431,9 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         </fieldset>
 
         <div className="flex gap-3">
-          <SubmitButton loading={loading}>Send request</SubmitButton>
+          <SubmitButton loading={loading}>Kirim permintaan</SubmitButton>
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
-            Cancel
+            Batal
           </button>
         </div>
       </form>
@@ -468,10 +468,10 @@ function NomineePicker({
   return (
     <div className="space-y-2">
       <p className="text-xs text-gray-300">
-        Chosen {selected.length} · pick {min} to {max} hosts
+        Dipilih {selected.length} · pilih {min} sampai {max} host
       </p>
       {candidates.error && <FormAlert tone="error">{candidates.error}</FormAlert>}
-      {candidates.loading && !candidates.data && <p className="text-xs text-gray-400">Loading hosts…</p>}
+      {candidates.loading && !candidates.data && <p className="text-xs text-gray-400">Memuat host…</p>}
       <ul className="max-h-64 overflow-y-auto space-y-1.5">
         {candidates.data?.candidates.map((candidate) => {
           const checked = selected.includes(candidate.host_id);
@@ -487,7 +487,7 @@ function NomineePicker({
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm text-white truncate">{candidate.name}</span>
                   <span className="block text-xs text-gray-400 truncate">
-                    {candidate.ineligible_reason ?? (candidate.same_brand ? "Your brand" : "Other brand")}
+                    {candidate.ineligible_reason ?? (candidate.same_brand ? "Brand kamu" : "Brand lain")}
                   </span>
                 </span>
               </label>

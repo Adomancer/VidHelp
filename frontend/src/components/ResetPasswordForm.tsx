@@ -28,7 +28,7 @@ export default function ResetPasswordForm() {
   );
 
   if (!token || !email) {
-    return <FormAlert tone="error">This reset link is incomplete. Please request a new one.</FormAlert>;
+    return <FormAlert tone="error">Link reset ini tidak lengkap. Silakan minta link baru.</FormAlert>;
   }
 
   if (done) {
@@ -36,7 +36,7 @@ export default function ResetPasswordForm() {
       <div className="space-y-4 text-center">
         <FormAlert tone="success">{done}</FormAlert>
         <Link href="/login" className="inline-block text-sm text-purple-300 hover:text-white">
-          Go to login
+          Ke halaman masuk
         </Link>
       </div>
     );
@@ -49,12 +49,12 @@ export default function ResetPasswordForm() {
       {errors.email && <FormAlert tone="error">{errors.email}</FormAlert>}
 
       <p className="text-sm text-gray-300">
-        Setting a new password for <span className="text-white">{email}</span>
+        Membuat kata sandi baru untuk <span className="text-white">{email}</span>
       </p>
-      <TextField label="New password" name="password" type="password" autoComplete="new-password" minLength={8} required error={errors.password} />
-      <TextField label="Confirm new password" name="password_confirmation" type="password" autoComplete="new-password" required />
+      <TextField label="Kata sandi baru" name="password" type="password" autoComplete="new-password" minLength={8} required error={errors.password} />
+      <TextField label="Ulangi kata sandi baru" name="password_confirmation" type="password" autoComplete="new-password" required />
 
-      <SubmitButton loading={loading}>Reset password</SubmitButton>
+      <SubmitButton loading={loading}>Atur ulang kata sandi</SubmitButton>
     </form>
   );
 }

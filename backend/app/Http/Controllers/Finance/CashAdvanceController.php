@@ -54,7 +54,7 @@ class CashAdvanceController extends Controller
             $request->user(),
         );
 
-        return response()->json(['advance' => $advance, 'message' => 'Kasbon recorded'], 201);
+        return response()->json(['advance' => $advance, 'message' => 'Kasbon dicatat'], 201);
     }
 
     /**
@@ -66,7 +66,7 @@ class CashAdvanceController extends Controller
 
         $advance = $this->payroll->settleAdvance($advance, $request->user(), $validated['note'] ?? null);
 
-        return response()->json(['advance' => $advance, 'message' => 'Kasbon marked as paid back']);
+        return response()->json(['advance' => $advance, 'message' => 'Kasbon ditandai lunas']);
     }
 
     /**
@@ -78,7 +78,7 @@ class CashAdvanceController extends Controller
 
         $advance = $this->payroll->rescheduleAdvance($advance, (int) $validated['installment_count']);
 
-        return response()->json(['advance' => $advance, 'message' => 'Remaining installments rescheduled']);
+        return response()->json(['advance' => $advance, 'message' => 'Sisa cicilan dijadwal ulang']);
     }
 
     /**
@@ -87,11 +87,11 @@ class CashAdvanceController extends Controller
     public function destroy(CashAdvance $advance): JsonResponse
     {
         if ($advance->installments()->where('status', '!=', 'scheduled')->exists()) {
-            return response()->json(['message' => 'Part of this kasbon was already paid back; it can no longer be removed.'], 422);
+            return response()->json(['message' => 'Sebagian kasbon ini sudah dibayar; tidak bisa dihapus lagi.'], 422);
         }
 
         $advance->delete();
 
-        return response()->json(['message' => 'Kasbon removed']);
+        return response()->json(['message' => 'Kasbon dihapus']);
     }
 }

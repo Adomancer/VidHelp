@@ -4,9 +4,9 @@ import ResetPasswordForm from "@/components/ResetPasswordForm";
 
 export default function ResetPasswordPage() {
   return (
-    <AuthCard subtitle="Choose a new password">
+    <AuthCard subtitle="Buat kata sandi baru">
       {/* useSearchParams needs a Suspense boundary */}
-      <Suspense fallback={<p className="text-center text-gray-300">Loading…</p>}>
+      <Suspense fallback={<p className="text-center text-gray-300">Memuat…</p>}>
         <ResetPasswordForm />
       </Suspense>
     </AuthCard>

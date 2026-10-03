@@ -225,7 +225,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
 
   return (
     <Dialog
-      title={readOnly ? "Detail slot" : slot ? "Edit slot" : "Tambah slot"}
+      title={readOnly ? "Detail slot" : slot ? "Ubah slot" : "Tambah slot"}
       description={slot ? `${hostName} · ${describeWeekly(slot.day_of_week, slot.start_time, slot.end_time)}` : undefined}
       onClose={onClose}
       dirty={dirty && !saving}

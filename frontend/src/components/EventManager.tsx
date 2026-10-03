@@ -31,7 +31,7 @@ export default function EventManager() {
     <div className="space-y-4">
       <div className="flex justify-end">
         <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500">
-          New event
+          Event baru
         </button>
       </div>
 
@@ -51,7 +51,7 @@ export default function EventManager() {
 
       {events.data && active.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">No events yet. Create one for a PD or double-date campaign.</p>
+          <p className="text-sm text-gray-400">Belum ada event. Buat event untuk kampanye PD atau double date.</p>
         </Card>
       )}
 
@@ -91,7 +91,7 @@ function EventListButton({ event, selected, onClick }: { event: EventListItem; s
         {event.end_date !== event.start_date ? ` – ${formatDate(event.end_date)}` : ""}
       </p>
       <p className="text-xs text-gray-500">
-        {event.status === "cancelled" ? "cancelled" : `${event.claimed_blocks}/${event.total_blocks} blocks taken`}
+        {event.status === "cancelled" ? "dibatalkan" : `${event.claimed_blocks}/${event.total_blocks} blok terisi`}
       </p>
     </button>
   );
@@ -116,7 +116,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
   }
 
   if (detail.error) return <FormAlert tone="error">{detail.error}</FormAlert>;
-  if (!detail.data) return <p className="text-gray-400">Loading…</p>;
+  if (!detail.data) return <p className="text-gray-400">Memuat…</p>;
   const { event, blocks } = detail.data;
   const cancelled = event.status === "cancelled";
 
@@ -127,20 +127,20 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
           <div>
             <p className="text-lg text-white font-medium">{event.name}</p>
             <p className="text-sm text-gray-400">
-              {event.brand?.name} · daily {event.daily_start_time}–{event.daily_end_time} · blocks of {formatDuration(event.block_minutes / 60)} · max{" "}
+              {event.brand?.name} · setiap hari {event.daily_start_time}–{event.daily_end_time} · blok {formatDuration(event.block_minutes / 60)} · maks{" "}
               {event.max_slots_per_host} per host
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              {event.open_full_schedule ? "Replaces the regular schedule on these days." : "Runs next to the regular schedule; hours already scheduled can't be claimed."}
+              {event.open_full_schedule ? "Menggantikan jadwal reguler di hari-hari ini." : "Berjalan bersama jadwal reguler; jam yang sudah terjadwal tidak bisa diambil."}
             </p>
           </div>
           {!cancelled && (
             <button
               type="button"
-              onClick={() => confirm(`Cancel ${event.name}? Every claimed block is released.`) && act(() => eventApi.cancel(token, event.id))}
+              onClick={() => confirm(`Batalkan ${event.name}? Semua blok yang sudah diambil akan dilepas.`) && act(() => eventApi.cancel(token, event.id))}
               className="px-3 py-1.5 rounded-lg border border-red-400/40 text-red-300 text-sm hover:bg-red-500/10"
             >
-              Cancel event
+              Batalkan event
             </button>
           )}
         </div>
@@ -162,17 +162,17 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
                     ) : block.state === "unavailable" ? (
                       <span className="text-gray-500">{block.reason}</span>
                     ) : (
-                      <span className="text-gray-400">{block.state === "past" ? "not claimed" : "free"}</span>
+                      <span className="text-gray-400">{block.state === "past" ? "tidak diambil" : "kosong"}</span>
                     )}
                   </span>
                   {!cancelled && new Date(block.end_at) > new Date() && (
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setAssigning(assigning === block.start_at ? null : block.start_at)} className="text-xs text-purple-300 hover:text-white">
-                        {block.claim ? "Reassign" : "Assign"}
+                        {block.claim ? "Ganti host" : "Tunjuk host"}
                       </button>
                       {block.claim && (
                         <button type="button" onClick={() => act(() => eventApi.release(token, block.claim!.id))} className="text-xs text-red-300 hover:text-red-200">
-                          Release
+                          Lepas
                         </button>
                       )}
                     </div>
@@ -200,7 +200,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
                       }}
                       className="px-3 py-1.5 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-500"
                     >
-                      Give block
+                      Berikan blok
                     </button>
                   </div>
                 )}
@@ -231,19 +231,19 @@ function EventSettings({
   return (
     <div className="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-3 text-sm">
       <label className="flex items-center gap-2 text-gray-300">
-        Max blocks per host
+        Maks blok per host
         <input type="number" min={1} max={100} value={max} onChange={(event) => setMax(event.target.value)} className="w-16 px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-white" />
       </label>
       <label className="flex items-center gap-2 text-gray-300">
         <input type="checkbox" checked={full} onChange={(event) => setFull(event.target.checked)} className="accent-purple-500" />
-        Replace the regular schedule
+        Gantikan jadwal reguler
       </label>
       <button
         type="button"
         onClick={() => act(() => eventApi.update(token, eventId, { max_slots_per_host: Number(max), open_full_schedule: full }))}
         className="px-3 py-1 rounded-md border border-slate-700 text-gray-300 hover:bg-slate-800"
       >
-        Save
+        Simpan
       </button>
     </div>
   );
@@ -281,7 +281,7 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
   );
 
   return (
-    <Modal title="New event" description="Hosts of the brand claim the blocks, first come first served." onClose={onCancel} wide>
+    <Modal title="Event baru" description="Host dari brand ini mengambil blok, siapa cepat dia dapat." onClose={onCancel} wide>
       <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -301,32 +301,32 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
               ))}
           </select>
         )}
-        {field("Name", "name", <input name="name" placeholder="PD 10.10" maxLength={100} className={input} />)}
-        {field("First day", "start_date", <input name="start_date" type="date" defaultValue={toDateInput()} min={toDateInput()} className={input} />)}
-        {field("Last day", "end_date", <input name="end_date" type="date" defaultValue={toDateInput()} min={toDateInput()} className={input} />)}
-        {field("Opens each day at", "daily_start_time", <input name="daily_start_time" type="time" defaultValue="10:00" className={input} />)}
-        {field("Closes at (can be after midnight)", "daily_end_time", <input name="daily_end_time" type="time" defaultValue="22:00" className={input} />)}
+        {field("Nama", "name", <input name="name" placeholder="PD 10.10" maxLength={100} className={input} />)}
+        {field("Hari pertama", "start_date", <input name="start_date" type="date" defaultValue={toDateInput()} min={toDateInput()} className={input} />)}
+        {field("Hari terakhir", "end_date", <input name="end_date" type="date" defaultValue={toDateInput()} min={toDateInput()} className={input} />)}
+        {field("Buka setiap hari jam", "daily_start_time", <input name="daily_start_time" type="time" defaultValue="10:00" className={input} />)}
+        {field("Tutup jam (boleh lewat tengah malam)", "daily_end_time", <input name="daily_end_time" type="time" defaultValue="22:00" className={input} />)}
         {field(
-          "Block length",
+          "Durasi blok",
           "block_minutes",
           <div className="flex items-center gap-2">
-            <input name="block_hours" type="number" min={0} max={12} defaultValue={2} aria-label="Block hours" className={input} />
-            <span className="text-sm text-gray-400">h</span>
-            <input name="block_extra_minutes" type="number" min={0} max={59} step={15} defaultValue={0} aria-label="Block minutes" className={input} />
-            <span className="text-sm text-gray-400">min</span>
+            <input name="block_hours" type="number" min={0} max={12} defaultValue={2} aria-label="Jam per blok" className={input} />
+            <span className="text-sm text-gray-400">jam</span>
+            <input name="block_extra_minutes" type="number" min={0} max={59} step={15} defaultValue={0} aria-label="Menit per blok" className={input} />
+            <span className="text-sm text-gray-400">menit</span>
           </div>
         )}
-        {field("Max blocks per host", "max_slots_per_host", <input name="max_slots_per_host" type="number" min={1} max={100} defaultValue={3} className={input} />)}
+        {field("Maks blok per host", "max_slots_per_host", <input name="max_slots_per_host" type="number" min={1} max={100} defaultValue={3} className={input} />)}
         <label className="flex items-center gap-2 text-sm text-gray-200 sm:col-span-2">
           <input type="checkbox" name="open_full_schedule" className="accent-purple-500" />
-          Replace the brand&apos;s regular schedule on these days (&quot;jadwal dibuka kosong&quot;)
+          Gantikan jadwal reguler brand di hari-hari ini (&quot;jadwal dibuka kosong&quot;)
         </label>
         <div className="sm:col-span-2 flex gap-3">
           <div className="w-40">
-            <SubmitButton loading={loading}>Create event</SubmitButton>
+            <SubmitButton loading={loading}>Buat event</SubmitButton>
           </div>
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
-            Cancel
+            Batal
           </button>
         </div>
       </form>

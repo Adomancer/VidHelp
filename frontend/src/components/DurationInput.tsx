@@ -26,10 +26,10 @@ export default function DurationInput({ label, hours, onChange, error, compact =
     <fieldset className="space-y-1">
       <legend className={compact ? "block text-xs text-gray-400" : "block text-sm font-medium text-gray-200"}>{label}</legend>
       <div className="flex items-center gap-2">
-        <input type="number" min={0} max={24} value={h} onChange={(event) => set(Number(event.target.value), m)} aria-label={`${label} hours`} className={input} />
-        <span className="text-sm text-gray-400">h</span>
-        <input type="number" min={0} max={59} step={5} value={m} onChange={(event) => set(h, Number(event.target.value))} aria-label={`${label} minutes`} className={input} />
-        <span className="text-sm text-gray-400">min</span>
+        <input type="number" min={0} max={24} value={h} onChange={(event) => set(Number(event.target.value), m)} aria-label={`${label} jam`} className={input} />
+        <span className="text-sm text-gray-400">jam</span>
+        <input type="number" min={0} max={59} step={5} value={m} onChange={(event) => set(h, Number(event.target.value))} aria-label={`${label} menit`} className={input} />
+        <span className="text-sm text-gray-400">menit</span>
       </div>
       {error && <p className="text-sm text-red-300">{error}</p>}
     </fieldset>

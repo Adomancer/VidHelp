@@ -52,20 +52,20 @@ class EventController extends Controller
 
         $claim = $this->events->claim($event, $host, $request->date('start_at'), $request->user());
 
-        return response()->json(['claim' => $claim, 'message' => 'Block claimed. It appears on your Live page on the day.'], 201);
+        return response()->json(['claim' => $claim, 'message' => 'Blok diambil. Blok ini akan muncul di halaman Live pada harinya.'], 201);
     }
 
     public function cancel(Request $request, EventSlotClaim $claim): JsonResponse
     {
-        abort_unless($claim->host_id === $this->host($request)->id, 403, 'This is not your block.');
+        abort_unless($claim->host_id === $this->host($request)->id, 403, 'Ini bukan blokmu.');
 
         $this->events->release($claim);
 
-        return response()->json(['message' => 'Block released for other hosts.']);
+        return response()->json(['message' => 'Blok dilepas untuk host lain.']);
     }
 
     private function host(Request $request): HostProfile
     {
-        return $request->user()->hostProfile ?? abort(404, 'You do not have a host profile.');
+        return $request->user()->hostProfile ?? abort(404, 'Kamu tidak punya profil host.');
     }
 }

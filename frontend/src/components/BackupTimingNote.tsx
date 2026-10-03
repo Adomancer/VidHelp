@@ -12,13 +12,13 @@ export default function BackupTimingNote() {
 
   return (
     <p className="text-sm text-gray-400 mt-1">
-      Hosts post requests straight to the board; approve or reject who applies to cover them.
+      Host langsung memasang permintaan di papan backup; setujui atau tolak host yang mendaftar untuk menggantikan.
       {settings && (
         <>
           {" "}
-          If nobody decides, the best applicant is approved {formatDuration(settings["backup.auto_fill_before_minutes"] / 60)} before
-          the session. Hosts must ask {formatDuration(settings["backup.request_min_hours_before"])} ahead; for anything closer, request it
-          for them here.
+          Kalau belum ada keputusan, pendaftar terbaik otomatis disetujui {formatDuration(settings["backup.auto_fill_before_minutes"] / 60)} sebelum
+          sesi dimulai. Host harus mengajukan paling lambat {formatDuration(settings["backup.request_min_hours_before"])} sebelumnya; kalau lebih mepet, ajukan
+          untuk mereka di sini.
         </>
       )}
     </p>

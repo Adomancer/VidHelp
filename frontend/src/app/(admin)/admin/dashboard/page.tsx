@@ -13,21 +13,21 @@ import HoursChart from "@/components/HoursChart";
 const REFRESH_MS = 60_000;
 
 const attentionItems: { key: keyof AdminDashboard["attention"]; label: string; href: string }[] = [
-  { key: "pending_signups", label: "Sign-ups to approve", href: "/admin/users" },
-  { key: "backups_pending", label: "Backup applicants to decide on", href: "/admin/backups" },
-  { key: "backups_uncovered_soon", label: "Backups with no cover, starting within 24 h", href: "/admin/backups" },
-  { key: "reports_flagged", label: "Flagged live reports", href: "/admin/reports" },
-  { key: "reports_missing", label: "Live reports overdue", href: "/admin/reports" },
-  { key: "periods_to_request", label: "Pay periods ready to request", href: "/admin/payroll" },
-  { key: "periods_awaiting_brand", label: "Pay periods waiting for the brand", href: "/admin/payroll" },
+  { key: "pending_signups", label: "Pendaftar yang perlu disetujui", href: "/admin/users" },
+  { key: "backups_pending", label: "Pendaftar backup yang perlu diputuskan", href: "/admin/backups" },
+  { key: "backups_uncovered_soon", label: "Backup tanpa pengganti, mulai dalam 24 jam", href: "/admin/backups" },
+  { key: "reports_flagged", label: "Laporan live yang ditandai", href: "/admin/reports" },
+  { key: "reports_missing", label: "Laporan live terlambat", href: "/admin/reports" },
+  { key: "periods_to_request", label: "Periode gaji siap ditagihkan", href: "/admin/payroll" },
+  { key: "periods_awaiting_brand", label: "Periode gaji menunggu brand", href: "/admin/payroll" },
 ];
 
 const stateStyles: Record<SessionState, { label: string; className: string; dot: string }> = {
-  live: { label: "Live now", className: "bg-green-500/15 text-green-300", dot: "bg-green-400" },
-  late: { label: "Not checked in", className: "bg-yellow-500/15 text-yellow-200", dot: "bg-yellow-300" },
-  missed: { label: "Missed", className: "bg-red-500/15 text-red-300", dot: "bg-red-400" },
-  done: { label: "Done", className: "bg-slate-700 text-gray-300", dot: "bg-gray-400" },
-  upcoming: { label: "Upcoming", className: "bg-slate-800 text-gray-400", dot: "bg-gray-600" },
+  live: { label: "Sedang live", className: "bg-green-500/15 text-green-300", dot: "bg-green-400" },
+  late: { label: "Belum check-in", className: "bg-yellow-500/15 text-yellow-200", dot: "bg-yellow-300" },
+  missed: { label: "Terlewat", className: "bg-red-500/15 text-red-300", dot: "bg-red-400" },
+  done: { label: "Selesai", className: "bg-slate-700 text-gray-300", dot: "bg-gray-400" },
+  upcoming: { label: "Akan datang", className: "bg-slate-800 text-gray-400", dot: "bg-gray-600" },
 };
 
 const stateOrder: SessionState[] = ["live", "late", "missed", "upcoming", "done"];
@@ -50,12 +50,12 @@ export default function AdminDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
         <p className="text-sm text-gray-400 mt-1">
-          {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
 
       {dashboard.error && <FormAlert tone="error">{dashboard.error}</FormAlert>}
-      {!data && !dashboard.error && <p className="text-gray-400">Loading…</p>}
+      {!data && !dashboard.error && <p className="text-gray-400">Memuat…</p>}
 
       {data && (
         <>
@@ -80,10 +80,10 @@ function Attention({ attention }: { attention: AdminDashboard["attention"] }) {
 
   return (
     <section className="space-y-3">
-      <h2 className="text-white font-medium">Needs attention</h2>
+      <h2 className="text-white font-medium">Perlu perhatian</h2>
       {waiting.length === 0 ? (
         <p className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-4 text-sm text-gray-300">
-          <span className="text-green-300">✓</span> Nothing is waiting on you.
+          <span className="text-green-300">✓</span> Tidak ada yang perlu kamu tangani.
         </p>
       ) : (
         <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
@@ -115,9 +115,9 @@ function StateBadge({ state }: { state: SessionState }) {
 
 function Today({ sessions, counts }: { sessions: TodaySession[]; counts: AdminDashboard["today"]["counts"] }) {
   return (
-    <Card title="Today's sessions">
+    <Card title="Sesi hari ini">
       {sessions.length === 0 ? (
-        <p className="text-sm text-gray-400">No sessions scheduled today.</p>
+        <p className="text-sm text-gray-400">Tidak ada sesi terjadwal hari ini.</p>
       ) : (
         <>
           <div className="flex flex-wrap gap-2">
@@ -133,7 +133,7 @@ function Today({ sessions, counts }: { sessions: TodaySession[]; counts: AdminDa
             <table className="w-full text-sm">
               <thead className="text-left text-gray-400 border-b border-slate-800">
                 <tr>
-                  <th className="px-5 py-2 font-medium">Time</th>
+                  <th className="px-5 py-2 font-medium">Jam</th>
                   <th className="px-3 py-2 font-medium">Host</th>
                   <th className="px-3 py-2 font-medium">Brand</th>
                   <th className="px-5 py-2 font-medium">Status</th>
@@ -148,7 +148,7 @@ function Today({ sessions, counts }: { sessions: TodaySession[]; counts: AdminDa
                     <td className="px-3 py-2.5">
                       <span className="text-white">{session.host.name}</span>
                       {session.role === "cover" && session.covered_for && (
-                        <span className="block text-xs text-gray-400">covering {session.covered_for}</span>
+                        <span className="block text-xs text-gray-400">menggantikan {session.covered_for}</span>
                       )}
                       {session.role === "event" && session.event_name && (
                         <span className="block text-xs text-gray-400">event: {session.event_name}</span>
@@ -158,7 +158,7 @@ function Today({ sessions, counts }: { sessions: TodaySession[]; counts: AdminDa
                     <td className="px-5 py-2.5">
                       <StateBadge state={session.state} />
                       {session.check_in_at && session.state === "live" && (
-                        <span className="ml-2 text-xs text-gray-400">since {formatClock(session.check_in_at)}</span>
+                        <span className="ml-2 text-xs text-gray-400">sejak {formatClock(session.check_in_at)}</span>
                       )}
                     </td>
                   </tr>
@@ -174,19 +174,19 @@ function Today({ sessions, counts }: { sessions: TodaySession[]; counts: AdminDa
 
 function Brands({ brands }: { brands: BrandProgress[] }) {
   return (
-    <Card title="Brands this pay period" description="Approved hours against each brand's target. Host pay is an estimate at current rates until payment is requested.">
+    <Card title="Brand di periode gaji ini" description="Jam yang disetujui dibanding target tiap brand. Gaji host masih perkiraan dengan tarif saat ini sampai pembayaran diajukan.">
       {brands.length === 0 ? (
-        <p className="text-sm text-gray-400">No active brands yet.</p>
+        <p className="text-sm text-gray-400">Belum ada brand aktif.</p>
       ) : (
         <div className="overflow-x-auto -mx-5">
           <table className="w-full text-sm">
             <thead className="text-left text-gray-400 border-b border-slate-800">
               <tr>
                 <th className="px-5 py-2 font-medium">Brand</th>
-                <th className="px-3 py-2 font-medium">Period</th>
-                <th className="px-3 py-2 font-medium min-w-48">Hours vs target</th>
-                <th className="px-3 py-2 font-medium text-right">GMV reported</th>
-                <th className="px-5 py-2 font-medium text-right">Host pay (est.)</th>
+                <th className="px-3 py-2 font-medium">Periode</th>
+                <th className="px-3 py-2 font-medium min-w-48">Jam vs target</th>
+                <th className="px-3 py-2 font-medium text-right">GMV dilaporkan</th>
+                <th className="px-5 py-2 font-medium text-right">Gaji host (perkiraan)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -207,9 +207,9 @@ function BrandRow({ brand }: { brand: BrandProgress }) {
       <tr className="text-gray-200">
         <td className="px-5 py-3 text-white">{brand.name}</td>
         <td colSpan={4} className="px-3 py-3 text-gray-400">
-          No payroll start date yet.{" "}
+          Belum ada tanggal mulai penggajian.{" "}
           <Link href="/admin/brands" className="text-purple-300 hover:text-white">
-            Set it on Brands
+            Atur di halaman Brand
           </Link>
         </td>
       </tr>
@@ -227,22 +227,22 @@ function BrandRow({ brand }: { brand: BrandProgress }) {
       <td className="px-3 py-3 whitespace-nowrap">
         {formatShortDate(brand.period.start)} – {formatShortDate(brand.period.end)}
         <span className="block text-xs text-gray-400">
-          {daysLeft > 0 ? `${daysLeft} day${daysLeft === 1 ? "" : "s"} left` : "ended"}
+          {daysLeft > 0 ? `sisa ${daysLeft} hari` : "selesai"}
         </span>
       </td>
       <td className="px-3 py-3">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-white">{formatDuration(achieved)}</span>
-          <span className="text-xs text-gray-400">of {formatDuration(target)}</span>
+          <span className="text-xs text-gray-400">dari {formatDuration(target)}</span>
         </div>
-        <div className="mt-1.5 h-1.5 rounded-full bg-slate-800" role="progressbar" aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100} aria-label={`${brand.name} hours`}>
+        <div className="mt-1.5 h-1.5 rounded-full bg-slate-800" role="progressbar" aria-valuenow={Math.round(percent)} aria-valuemin={0} aria-valuemax={100} aria-label={`Jam ${brand.name}`}>
           <div className="h-full rounded-full bg-purple-500" style={{ width: `${percent}%` }} />
         </div>
         {(brand.carried_in_hours ?? 0) > 0 && (
-          <span className="block text-xs text-gray-400 mt-1">incl. {formatDuration(brand.carried_in_hours ?? 0)} carried in</span>
+          <span className="block text-xs text-gray-400 mt-1">termasuk {formatDuration(brand.carried_in_hours ?? 0)} bawaan periode lalu</span>
         )}
         {(brand.carried_out_hours ?? 0) > 0 && (
-          <span className="block text-xs text-gray-400 mt-1">{formatDuration(brand.carried_out_hours ?? 0)} over target, carries to next period</span>
+          <span className="block text-xs text-gray-400 mt-1">{formatDuration(brand.carried_out_hours ?? 0)} melebihi target, dibawa ke periode berikutnya</span>
         )}
       </td>
       <td className="px-3 py-3 text-right whitespace-nowrap">{brand.gmv == null ? "—" : formatRupiah(brand.gmv)}</td>
@@ -255,22 +255,22 @@ function HoursCard({ days }: { days: AdminDashboard["hours_by_day"] }) {
   const total = days.reduce((sum, day) => sum + day.hours, 0);
 
   return (
-    <Card title="Approved live hours, last 14 days" description={total > 0 ? `${formatDuration(total)} in total across all brands.` : undefined}>
-      {total > 0 ? <HoursChart days={days} /> : <p className="text-sm text-gray-400">No approved hours in the last 14 days.</p>}
+    <Card title="Jam live yang disetujui, 14 hari terakhir" description={total > 0 ? `Total ${formatDuration(total)} dari semua brand.` : undefined}>
+      {total > 0 ? <HoursChart days={days} /> : <p className="text-sm text-gray-400">Belum ada jam yang disetujui dalam 14 hari terakhir.</p>}
     </Card>
   );
 }
 
 function People({ people }: { people: AdminDashboard["people"] }) {
   const items = [
-    { label: "Active hosts", value: people.active_hosts, href: "/admin/hosts" },
-    { label: "Operators", value: people.operators, href: "/admin/users" },
-    { label: "Admins", value: people.admins, href: "/admin/users" },
-    { label: `SPs since ${formatDate(people.points_period.start)}`, value: people.warning_letters, href: "/admin/points" },
+    { label: "Host aktif", value: people.active_hosts, href: "/admin/hosts" },
+    { label: "Operator", value: people.operators, href: "/admin/users" },
+    { label: "Admin", value: people.admins, href: "/admin/users" },
+    { label: `SP sejak ${formatDate(people.points_period.start)}`, value: people.warning_letters, href: "/admin/points" },
   ];
 
   return (
-    <Card title="People">
+    <Card title="Orang">
       <div className="grid grid-cols-2 gap-3">
         {items.map((item) => (
           <Link key={item.label} href={item.href} className="rounded-lg bg-slate-950/60 border border-slate-800 p-3 hover:border-slate-700">

@@ -45,11 +45,11 @@ class GoogleAuthController extends Controller
         } catch (Throwable $e) {
             report($e);
 
-            return response()->json(['message' => 'Google sign-in failed. Please try again.'], 401);
+            return response()->json(['message' => 'Gagal masuk dengan Google. Silakan coba lagi.'], 401);
         }
 
         if (! ($googleUser->user['email_verified'] ?? false)) {
-            return response()->json(['message' => 'Your Google email address is not verified.'], 403);
+            return response()->json(['message' => 'Alamat email Google kamu belum terverifikasi.'], 403);
         }
 
         $user = User::where('google_id', $googleUser->getId())->first()
@@ -69,7 +69,7 @@ class GoogleAuthController extends Controller
             app(Notifier::class)->signupPending($user);
 
             return response()->json([
-                'message' => 'Account created. An admin needs to approve it before you can sign in.',
+                'message' => 'Akun dibuat. Admin perlu menyetujuinya dulu sebelum kamu bisa masuk.',
                 'status' => 'pending',
             ], 202);
         }

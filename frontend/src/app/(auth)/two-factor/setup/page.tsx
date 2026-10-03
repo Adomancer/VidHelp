@@ -11,7 +11,7 @@ import { hasAnyRole, homePathFor } from "@/lib/auth";
 export default function TwoFactorSetupPage() {
   return (
     <RequireAuth roles={["admin", "finance"]} allowTwoFactorSetup>
-      <AuthCard subtitle="Secure your account">
+      <AuthCard subtitle="Amankan akun kamu">
         <RequiredSetup />
       </AuthCard>
     </RequireAuth>
@@ -34,12 +34,12 @@ function RequiredSetup() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-300 text-center">
-        Admin and finance accounts handle personal data and payments, so they need two-factor authentication: after your password or
-        Google, you&apos;ll also enter a code from an app on your phone.
+        Akun admin dan finance mengelola data pribadi dan pembayaran, jadi wajib verifikasi dua langkah: setelah kata sandi atau
+        Google, kamu juga memasukkan kode dari aplikasi di HP.
       </p>
       <TwoFactorSetup onDone={(updated) => router.replace(homePathFor(updated))} />
       <button type="button" onClick={logout} className="w-full text-sm text-gray-400 hover:text-white">
-        Log out
+        Keluar
       </button>
     </div>
   );

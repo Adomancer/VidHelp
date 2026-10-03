@@ -35,11 +35,11 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       <div className="text-center space-y-1">
-        <p className="text-white font-medium">Two-factor authentication</p>
+        <p className="text-white font-medium">Verifikasi dua langkah</p>
         <p className="text-sm text-gray-300">
           {useRecovery
-            ? "Enter one of the recovery codes you saved when you set up 2FA. Each code works once."
-            : "Open your authenticator app and enter the 6-digit code for VidHelp."}
+            ? "Masukkan salah satu kode pemulihan yang kamu simpan saat mengatur 2FA. Setiap kode hanya bisa dipakai sekali."
+            : "Buka aplikasi authenticator kamu dan masukkan kode 6 digit untuk VidHelp."}
         </p>
       </div>
 
@@ -48,7 +48,7 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
         <FormAlert tone="error">
           {expired}{" "}
           <button type="button" onClick={onRestart} className="underline hover:text-white">
-            Sign in again
+            Masuk lagi
           </button>
         </FormAlert>
       )}
@@ -56,7 +56,7 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
       {useRecovery ? (
         <TextField
           key="recovery"
-          label="Recovery code"
+          label="Kode pemulihan"
           name="recovery_code"
           placeholder="XXXX-XXXX"
           autoComplete="off"
@@ -69,7 +69,7 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
       ) : (
         <TextField
           key="code"
-          label="Code"
+          label="Kode"
           name="code"
           inputMode="numeric"
           autoComplete="one-time-code"
@@ -83,14 +83,14 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
         />
       )}
 
-      <SubmitButton loading={loading}>Verify</SubmitButton>
+      <SubmitButton loading={loading}>Verifikasi</SubmitButton>
 
       <div className="flex justify-between text-sm">
         <button type="button" onClick={() => setUseRecovery(!useRecovery)} className="text-purple-300 hover:text-white">
-          {useRecovery ? "Use the app code instead" : "Lost your phone? Use a recovery code"}
+          {useRecovery ? "Pakai kode dari aplikasi" : "HP hilang? Pakai kode pemulihan"}
         </button>
         <button type="button" onClick={onRestart} className="text-gray-400 hover:text-white">
-          Cancel
+          Batal
         </button>
       </div>
     </form>

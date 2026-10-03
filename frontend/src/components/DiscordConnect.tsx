@@ -48,14 +48,14 @@ export default function DiscordConnect() {
   const link = status.data.link;
 
   return (
-    <Card title="Discord" description="Get direct messages from the VidHelp bot when you're picked for a backup, get an SP, or a salary slip is ready.">
+    <Card title="Discord" description="Dapatkan pesan langsung dari bot VidHelp saat kamu dipilih jadi backup, mendapat SP, atau slip gaji sudah siap.">
       {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
 
       {link ? (
         <div className="space-y-3">
           <p className="text-sm text-gray-200">
-            Connected as <span className="text-white font-medium">{link.discord_username}</span>
-            <span className="text-gray-400"> since {formatDate(link.linked_at)}</span>
+            Terhubung sebagai <span className="text-white font-medium">{link.discord_username}</span>
+            <span className="text-gray-400"> sejak {formatDate(link.linked_at)}</span>
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -64,7 +64,7 @@ export default function DiscordConnect() {
               onClick={() => run(() => discordApi.test(token))}
               className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-500 disabled:opacity-50"
             >
-              Send me a test message
+              Kirim pesan percobaan
             </button>
             <button
               type="button"
@@ -72,12 +72,12 @@ export default function DiscordConnect() {
               onClick={() => run(() => discordApi.unlink(token))}
               className="px-3 py-2 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800 disabled:opacity-50"
             >
-              Disconnect
+              Putuskan
             </button>
           </div>
           <p className="text-xs text-gray-400">
-            Not receiving messages? Join the agency Discord server and turn on &quot;Allow direct messages from server members&quot; in
-            its Privacy Settings.
+            Tidak menerima pesan? Gabung ke server Discord agensi dan aktifkan &quot;Allow direct messages from server members&quot; di
+            Privacy Settings server tersebut.
           </p>
         </div>
       ) : (
@@ -87,7 +87,7 @@ export default function DiscordConnect() {
           onClick={connect}
           className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 disabled:opacity-50"
         >
-          Connect Discord
+          Hubungkan Discord
         </button>
       )}
     </Card>

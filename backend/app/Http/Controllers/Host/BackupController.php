@@ -133,7 +133,7 @@ class BackupController extends Controller
             'candidates' => $this->backups->candidates($draft)
                 ->map(fn (array $candidate) => [
                     ...collect($candidate)->only('host_id', 'name', 'avatar_url', 'same_brand', 'eligible'),
-                    'ineligible_reason' => $candidate['eligible'] ? null : 'Not available',
+                    'ineligible_reason' => $candidate['eligible'] ? null : 'Tidak tersedia',
                 ]),
         ]);
     }
@@ -157,9 +157,9 @@ class BackupController extends Controller
             'host_ids.*' => 'uuid|distinct',
             'letter' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
         ], [
-            'host_ids.required' => 'Choose the hosts you want to ask.',
-            'host_ids.min' => 'Choose at least :min hosts.',
-            'host_ids.max' => 'Choose at most :max hosts.',
+            'host_ids.required' => 'Pilih host yang ingin kamu minta.',
+            'host_ids.min' => 'Pilih minimal :min host.',
+            'host_ids.max' => 'Pilih maksimal :max host.',
         ]);
 
         $backup = $this->backups->create(
@@ -173,8 +173,8 @@ class BackupController extends Controller
         );
 
         $message = $backup->request_type === 'direct'
-            ? 'Backup requested. The hosts you chose were asked to cover it.'
-            : 'Backup requested. Other hosts can apply now.';
+            ? 'Backup diajukan. Host yang kamu pilih sudah diminta untuk menggantikan.'
+            : 'Backup diajukan. Host lain sekarang bisa mendaftar.';
 
         return response()->json(['request' => $backup->load(['brand:id,name', 'attachments', 'nominees.host.user']), 'message' => $message], 201);
     }
@@ -187,12 +187,12 @@ class BackupController extends Controller
         $this->ensureOwnRequest($request, $backup);
 
         if (! in_array($backup->status, ['pending', 'open'])) {
-            return response()->json(['message' => 'A cover has already been approved. Ask an admin to cancel it.'], 422);
+            return response()->json(['message' => 'Pengganti sudah disetujui. Minta admin untuk membatalkannya.'], 422);
         }
 
         $this->backups->close($backup, 'cancelled');
 
-        return response()->json(['message' => 'Request cancelled']);
+        return response()->json(['message' => 'Permintaan dibatalkan']);
     }
 
     /**
@@ -205,7 +205,7 @@ class BackupController extends Controller
 
         $this->backups->attachLetter($backup, $request->file('letter'), $request->user());
 
-        return response()->json(['request' => $backup->fresh(['brand:id,name', 'attachments']), 'message' => 'Letter uploaded']);
+        return response()->json(['request' => $backup->fresh(['brand:id,name', 'attachments']), 'message' => 'Surat diunggah']);
     }
 
     /**
@@ -215,7 +215,7 @@ class BackupController extends Controller
     {
         $this->backups->apply($backup, $this->host($request));
 
-        return response()->json(['message' => 'Applied. Waiting for an admin to approve it.']);
+        return response()->json(['message' => 'Sudah mendaftar. Menunggu persetujuan admin.']);
     }
 
     /**
@@ -225,7 +225,7 @@ class BackupController extends Controller
     {
         $this->backups->withdraw($backup, $this->host($request));
 
-        return response()->json(['message' => 'Application withdrawn']);
+        return response()->json(['message' => 'Pendaftaran ditarik']);
     }
 
     /**
@@ -236,20 +236,20 @@ class BackupController extends Controller
         $host = $this->host($request);
 
         if ($backup->status !== 'filled' || $backup->filled_by_host_id !== $host->id) {
-            return response()->json(['message' => 'You are not covering this backup.'], 422);
+            return response()->json(['message' => 'Kamu tidak menggantikan di backup ini.'], 422);
         }
         if ($backup->start_at->isPast()) {
-            return response()->json(['message' => 'This backup has already started. Contact an admin.'], 422);
+            return response()->json(['message' => 'Backup ini sudah dimulai. Hubungi admin.'], 422);
         }
 
         $this->backups->unfill($backup, 'cancelled');
 
-        return response()->json(['message' => 'You dropped this backup. It is open for other hosts again, and a point penalty will apply.']);
+        return response()->json(['message' => 'Kamu batal menggantikan. Backup ini dibuka lagi untuk host lain, dan poinmu akan dipotong.']);
     }
 
     private function host(Request $request): HostProfile
     {
-        return $request->user()->hostProfile ?? abort(404, 'You do not have a host profile.');
+        return $request->user()->hostProfile ?? abort(404, 'Kamu tidak punya profil host.');
     }
 
     /** One of my own slots (on an active assignment). */
@@ -258,11 +258,11 @@ class BackupController extends Controller
         return ScheduleSlot::whereKey($slotId)
             ->with('assignment')
             ->whereHas('assignment', fn ($q) => $q->where('host_id', $this->host($request)->id)->where('status', 'active'))
-            ->first() ?? throw ValidationException::withMessages(['slot_id' => ['Choose one of your own slots.']]);
+            ->first() ?? throw ValidationException::withMessages(['slot_id' => ['Pilih salah satu slot milikmu.']]);
     }
 
     private function ensureOwnRequest(Request $request, BackupRequest $backup): void
     {
-        abort_unless($backup->requesting_host_id === $this->host($request)->id, 403, 'This is not your request.');
+        abort_unless($backup->requesting_host_id === $this->host($request)->id, 403, 'Ini bukan permintaanmu.');
     }
 }

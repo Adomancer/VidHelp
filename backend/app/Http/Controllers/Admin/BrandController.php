@@ -55,7 +55,7 @@ class BrandController extends Controller
             $payroll->periodFor($brand, today());
         }
 
-        return response()->json(['brand' => $brand, 'message' => 'Brand created'], 201);
+        return response()->json(['brand' => $brand, 'message' => 'Brand dibuat'], 201);
     }
 
     public function update(Request $request, Brand $brand, PayrollService $payroll): JsonResponse
@@ -68,7 +68,7 @@ class BrandController extends Controller
             : $brand->{$key});
         if (($moves('payroll_start_date') || $moves('payment_cycle_days')) && $brand->paymentPeriods()->exists()) {
             throw ValidationException::withMessages([
-                'payroll_start_date' => ['Payment periods already exist for this brand, so the payroll start date and cycle can no longer change.'],
+                'payroll_start_date' => ['Brand ini sudah punya periode pembayaran, jadi tanggal mulai penggajian dan siklusnya tidak bisa diubah lagi.'],
             ]);
         }
 
@@ -79,7 +79,7 @@ class BrandController extends Controller
             $payroll->periodFor($brand, today());
         }
 
-        return response()->json(['brand' => $brand, 'message' => 'Brand updated']);
+        return response()->json(['brand' => $brand, 'message' => 'Brand diperbarui']);
     }
 
     private function validated(Request $request, ?Brand $brand = null): array

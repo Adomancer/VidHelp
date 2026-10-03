@@ -25,13 +25,13 @@ class AssignmentController extends Controller
             ],
             'is_leader' => 'sometimes|boolean',
         ], [
-            'brand_id.unique' => 'This host is already assigned to that brand.',
-            'brand_id.exists' => 'Choose an active brand.',
+            'brand_id.unique' => 'Host ini sudah ditugaskan ke brand itu.',
+            'brand_id.exists' => 'Pilih brand yang aktif.',
         ]);
 
         $assignment = $this->save(new HostBrandAssignment(['status' => 'active']), $validated);
 
-        return response()->json(['assignment' => $assignment->load('brand'), 'message' => 'Host assigned'], 201);
+        return response()->json(['assignment' => $assignment->load('brand'), 'message' => 'Host ditugaskan'], 201);
     }
 
     /**
@@ -46,7 +46,7 @@ class AssignmentController extends Controller
 
         $assignment = $this->save($assignment, $validated);
 
-        return response()->json(['assignment' => $assignment->load('brand'), 'message' => 'Assignment updated']);
+        return response()->json(['assignment' => $assignment->load('brand'), 'message' => 'Penugasan diperbarui']);
     }
 
     /**

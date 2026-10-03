@@ -24,10 +24,10 @@ import UserAvatar from "./UserAvatar";
 type Tab = "pending" | "open" | "filled" | "closed";
 
 const tabs: { value: Tab; label: string }[] = [
-  { value: "pending", label: "To decide" },
-  { value: "open", label: "No applicants yet" },
-  { value: "filled", label: "Covered" },
-  { value: "closed", label: "History" },
+  { value: "pending", label: "Perlu diputuskan" },
+  { value: "open", label: "Belum ada pendaftar" },
+  { value: "filled", label: "Sudah ada pengganti" },
+  { value: "closed", label: "Riwayat" },
 ];
 
 /**
@@ -59,7 +59,7 @@ export default function BackupDesk() {
           onClick={() => setCreating(true)}
           className="px-4 py-2 rounded-lg border border-slate-700 text-sm text-gray-200 hover:bg-slate-800"
         >
-          Request for a host
+          Ajukan untuk host
         </button>
       </div>
 
@@ -81,7 +81,7 @@ export default function BackupDesk() {
       <div className={`space-y-3 ${requests.loading ? "opacity-60" : ""}`}>
         {requests.data?.requests.length === 0 && (
           <Card>
-            <p className="text-sm text-gray-400">Nothing here.</p>
+            <p className="text-sm text-gray-400">Tidak ada data.</p>
           </Card>
         )}
         {requests.data?.requests.map((backup) => (
@@ -139,14 +139,14 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
             <LetterBadge status={backup.letter_status} />
             {backup.letter_status === "uploaded" && (
               <button type="button" onClick={openLetter} className="text-purple-300 hover:text-white">
-                View
+                Lihat
               </button>
             )}
           </span>
         )}
         {waiting && (
           <span>
-            {backup.applicants_count ?? 0} applied · best applicant approved automatically {formatDateTime(backup.auto_fill_at)}
+            {backup.applicants_count ?? 0} mendaftar · pendaftar terbaik disetujui otomatis {formatDateTime(backup.auto_fill_at)}
           </span>
         )}
       </div>
@@ -155,9 +155,9 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
       {backup.status === "filled" && backup.filler && (
         <div className="flex items-center gap-2 text-sm text-green-300">
           <UserAvatar user={backup.filler.user} size="w-6 h-6" />
-          Covered by {backup.filler.user.name}
-          {backup.auto_filled && <span className="text-xs text-gray-400">(approved automatically)</span>}
-          {backup.counts_toward_quota && <span className="text-xs text-gray-400">· other brand, uses quota</span>}
+          Digantikan {backup.filler.user.name}
+          {backup.auto_filled && <span className="text-xs text-gray-400">(disetujui otomatis)</span>}
+          {backup.counts_toward_quota && <span className="text-xs text-gray-400">· brand lain, memakai kuota</span>}
         </div>
       )}
 
@@ -165,17 +165,17 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
         <div className="flex flex-wrap gap-2">
           {waiting && (
             <ActionButton primary onClick={() => setChoosing(!choosing)}>
-              {choosing ? "Close" : backup.status === "pending" ? "Review applicants" : "Assign a cover"}
+              {choosing ? "Tutup" : backup.status === "pending" ? "Cek pendaftar" : "Tunjuk pengganti"}
             </ActionButton>
           )}
           {backup.status === "filled" && (
-            <ActionButton onClick={() => confirm("Remove the cover (no penalty) and reopen?") && act(() => operatorBackupApi.unassign(token, backup.id))}>
-              Change cover
+            <ActionButton onClick={() => confirm("Lepas pengganti (tanpa penalti) dan buka lagi?") && act(() => operatorBackupApi.unassign(token, backup.id))}>
+              Ganti pengganti
             </ActionButton>
           )}
           {["pending", "open", "filled"].includes(backup.status) && (
-            <ActionButton onClick={() => confirm("Cancel this backup request entirely?") && act(() => operatorBackupApi.cancel(token, backup.id))}>
-              Cancel request
+            <ActionButton onClick={() => confirm("Batalkan seluruh permintaan backup ini?") && act(() => operatorBackupApi.cancel(token, backup.id))}>
+              Batalkan permintaan
             </ActionButton>
           )}
         </div>
@@ -209,23 +209,23 @@ function CoverPicker({ backup, act }: { backup: BackupRequest; act: Act }) {
 
   const pick = (candidate: BackupCandidate) => act(() => operatorBackupApi.assign(token, backup.id, candidate.host_id));
   const reject = (candidate: BackupCandidate) =>
-    confirm(`Reject ${candidate.name}? If nobody else applied, the request is open again.`) &&
+    confirm(`Tolak ${candidate.name}? Kalau tidak ada pendaftar lain, permintaan dibuka lagi.`) &&
     act(() => operatorBackupApi.rejectApplicant(token, backup.id, candidate.host_id));
 
   return (
     <div className="space-y-3 border-t border-slate-800 pt-3">
-      <p className="text-xs text-gray-400">Applicants, best first (highest rating, then same brand, then who applied earliest):</p>
-      {applicants.data?.applicants.length === 0 && <p className="text-sm text-gray-400">Nobody has applied yet.</p>}
+      <p className="text-xs text-gray-400">Pendaftar, terbaik di atas (rating tertinggi, lalu brand yang sama, lalu yang mendaftar paling awal):</p>
+      {applicants.data?.applicants.length === 0 && <p className="text-sm text-gray-400">Belum ada yang mendaftar.</p>}
       <CandidateList candidates={applicants.data?.applicants ?? []} onPick={pick} onReject={reject} />
 
       {showEveryone ? (
         <>
-          <p className="text-xs text-gray-400">All hosts (for emergencies; they don&apos;t need to have applied or be named):</p>
+          <p className="text-xs text-gray-400">Semua host (untuk darurat; tidak harus sudah mendaftar atau diminta):</p>
           <CandidateList candidates={everyone.data?.candidates ?? []} onPick={pick} />
         </>
       ) : (
         <button type="button" onClick={() => setShowEveryone(true)} className="text-sm text-purple-300 hover:text-white">
-          Assign someone who didn&apos;t apply…
+          Tunjuk host yang tidak mendaftar…
         </button>
       )}
     </div>
@@ -251,7 +251,7 @@ function CandidateList({
             <p className="text-sm text-white truncate">{candidate.name}</p>
             <p className="text-xs text-gray-400 truncate">
               {candidate.rating != null && <span className="text-yellow-200">★ {candidate.rating.toFixed(1)} · </span>}
-              {candidate.same_brand ? "Same brand" : `Other brand · quota ${candidate.quota.quota_used}/${candidate.quota.quota_max}`}
+              {candidate.same_brand ? "Brand yang sama" : `Brand lain · kuota ${candidate.quota.quota_used}/${candidate.quota.quota_max}`}
               {candidate.ineligible_reason && <span className="text-red-300"> · {candidate.ineligible_reason}</span>}
             </p>
           </div>
@@ -261,7 +261,7 @@ function CandidateList({
               onClick={() => onReject(candidate)}
               className="px-3 py-1 rounded-md border border-slate-600 text-gray-300 text-sm hover:bg-slate-700"
             >
-              Reject
+              Tolak
             </button>
           )}
           <button
@@ -270,7 +270,7 @@ function CandidateList({
             onClick={() => onPick(candidate)}
             className="px-3 py-1 rounded-md bg-green-600 text-white text-sm hover:bg-green-500 disabled:opacity-30"
           >
-            Approve
+            Setujui
           </button>
         </li>
       ))}
@@ -301,7 +301,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
   const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
 
   return (
-    <Modal title="Request a backup for a host" description="Opens on the board immediately, also for a session starting soon." onClose={onCancel}>
+    <Modal title="Ajukan backup untuk host" description="Langsung muncul di papan backup, juga untuk sesi yang akan segera mulai." onClose={onCancel}>
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -309,13 +309,13 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
           </div>
         )}
         <label className="space-y-1">
-          <span className="block text-sm text-gray-200">Date</span>
+          <span className="block text-sm text-gray-200">Tanggal</span>
           <input type="date" value={date} min={toDateInput()} onChange={(event) => event.target.value && setDate(event.target.value)} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="block text-sm text-gray-200">Session</span>
+          <span className="block text-sm text-gray-200">Sesi</span>
           <select name="slot_id" className={input} disabled={daySlots.length === 0}>
-            {daySlots.length === 0 && <option>No sessions that day</option>}
+            {daySlots.length === 0 && <option>Tidak ada sesi di hari itu</option>}
             {daySlots.map((slot) => (
               <option key={slot.id} value={slot.id}>
                 {slot.assignment.host?.user.name} · {slot.assignment.brand.name} · {formatTimeRange(slot.start_time, slot.end_time, slot.day_of_week)}
@@ -325,7 +325,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
           {(errors.slot_id || errors.backup_date) && <span className="block text-sm text-red-300">{errors.slot_id ?? errors.backup_date}</span>}
         </label>
         <label className="space-y-1">
-          <span className="block text-sm text-gray-200">Reason</span>
+          <span className="block text-sm text-gray-200">Alasan</span>
           <select value={reasonType} onChange={(event) => setReasonType(event.target.value as BackupReason)} className={input}>
             {(Object.keys(reasonLabels) as BackupReason[]).map((value) => (
               <option key={value} value={value}>
@@ -335,17 +335,17 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-sm text-gray-200">Details</span>
+          <span className="block text-sm text-gray-200">Keterangan</span>
           <input name="reason" maxLength={1000} className={input} />
         </label>
         <div className="sm:col-span-2 flex gap-3">
           {daySlots.length > 0 && (
             <div className="w-40">
-              <SubmitButton loading={loading}>Open request</SubmitButton>
+              <SubmitButton loading={loading}>Buka permintaan</SubmitButton>
             </div>
           )}
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
-            Cancel
+            Batal
           </button>
         </div>
       </form>
