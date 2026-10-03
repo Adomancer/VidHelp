@@ -28,9 +28,7 @@ use Illuminate\Validation\ValidationException;
  */
 class AccountService
 {
-    public function __construct(private BackupService $backups, private EventService $events)
-    {
-    }
+    public function __construct(private BackupService $backups, private EventService $events) {}
 
     /**
      * An account made by an admin: active straight away (no approval step).

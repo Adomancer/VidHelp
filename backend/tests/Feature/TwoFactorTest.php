@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Totp;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Tests\TestCase;
@@ -29,7 +30,7 @@ class TwoFactorTest extends TestCase
         $this->admin->assignRole('admin');
     }
 
-    private function login(string $email = 'boss@vidhelp.com'): \Illuminate\Testing\TestResponse
+    private function login(string $email = 'boss@vidhelp.com'): TestResponse
     {
         return $this->postJson('/api/auth/login', ['email' => $email, 'password' => 'password']);
     }
@@ -167,6 +168,24 @@ class TwoFactorTest extends TestCase
         $token = $this->login('host@vidhelp.com')->assertOk()->assertJsonPath('user.two_factor_setup_required', false)->json('token');
         $this->withToken($token)->getJson('/api/host/profile')->assertOk();
         $this->withToken($token)->postJson('/api/two-factor/setup')->assertForbidden();
+    }
+
+    public function test_finance_must_set_up_2fa_and_then_gets_a_code_step(): void
+    {
+        $finance = User::factory()->create(['email' => 'money@vidhelp.com']);
+        $finance->assignRole('finance');
+
+        $token = $this->login('money@vidhelp.com')->assertOk()->assertJsonPath('user.two_factor_setup_required', true)->json('token');
+        $this->withToken($token)->getJson('/api/finance/payroll/periods')
+            ->assertForbidden()
+            ->assertJsonPath('code', 'two_factor_setup_required');
+
+        $secret = $this->withToken($token)->postJson('/api/two-factor/setup')->assertOk()->json('secret');
+        $this->withToken($token)->postJson('/api/two-factor/confirm', ['code' => Totp::code($secret, Totp::step())])->assertOk();
+        $this->withToken($token)->getJson('/api/finance/payroll/periods')->assertOk();
+
+        $this->app['auth']->forgetGuards();
+        $this->login('money@vidhelp.com')->assertOk()->assertJson(['two_factor' => true])->assertJsonMissingPath('token');
     }
 
     public function test_required_2fa_cannot_be_turned_off_but_can_when_optional(): void

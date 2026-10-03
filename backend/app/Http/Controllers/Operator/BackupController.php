@@ -15,9 +15,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackupController extends Controller
 {
-    public function __construct(private BackupService $backups)
-    {
-    }
+    public function __construct(private BackupService $backups) {}
 
     /**
      * Requests by tab: pending (applicants wait for a decision) | open (no applicants yet)

@@ -14,9 +14,7 @@ use Illuminate\Http\Request;
  */
 class CashAdvanceController extends Controller
 {
-    public function __construct(private PayrollService $payroll)
-    {
-    }
+    public function __construct(private PayrollService $payroll) {}
 
     public function index(Request $request): JsonResponse
     {

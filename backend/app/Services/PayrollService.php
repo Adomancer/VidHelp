@@ -26,9 +26,7 @@ use Illuminate\Validation\ValidationException;
  */
 class PayrollService
 {
-    public function __construct(private Notifier $notifier)
-    {
-    }
+    public function __construct(private Notifier $notifier) {}
 
     /**
      * The brand's period containing `$date`, created on first use. Null before the brand's payroll start date.

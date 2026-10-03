@@ -68,8 +68,8 @@ return [
     ],
 
     'two_factor' => [
-        // Admins must set up an authenticator app before they can use the app
-        // (false = optional: admins may turn it on or off themselves)
+        // Admins and finance must set up an authenticator app before they can use the app
+        // (false = optional: they may turn it on or off themselves)
         'required_for_admins' => (bool) env('TWO_FACTOR_REQUIRED_FOR_ADMINS', true),
 
         // Name shown next to the account in the authenticator app

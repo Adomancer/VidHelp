@@ -27,8 +27,7 @@ class BackupService
         private HostCalendar $calendar,
         private EventCalendar $events,
         private Notifier $notifier,
-    ) {
-    }
+    ) {}
 
     /**
      * The (unsaved) request for one occurrence of a slot, after checking that occurrence exists.
@@ -163,6 +162,11 @@ class BackupService
     {
         if ($request->request_type === 'direct' && $host->id !== $request->requesting_host_id && ! $request->isNominated($host)) {
             return "Only the hosts {$request->requester->user->name} asked can take this one.";
+        }
+
+        // An admin's "no" sticks: no applying again (an admin can still assign them directly)
+        if ($request->exists && $request->applications()->where('applicant_host_id', $host->id)->where('status', 'rejected')->exists()) {
+            return 'An admin already turned down your offer for this backup.';
         }
 
         return $this->coverReason($host, $request);
@@ -424,6 +428,7 @@ class BackupService
         });
 
         $this->announceFilled($filled, $host);
+        $this->announceNotPicked($filled);
 
         return $filled;
     }
@@ -480,6 +485,11 @@ class BackupService
      */
     public function close(BackupRequest $request, string $status): void
     {
+        // Who to tell afterwards: the cover (taken off the session) and anyone still waiting
+        $cover = $request->status === 'filled' ? $request->filler?->user : null;
+        $waiting = $request->applications()->where('status', 'applied')->with('applicant.user')->get()
+            ->map(fn (BackupApplication $application) => $application->applicant->user);
+
         DB::transaction(function () use ($request, $status) {
             if ($request->status === 'filled') {
                 $this->unfill($request, 'rejected', announce: false);
@@ -488,6 +498,17 @@ class BackupService
             $request->applications()->where('status', 'applied')->update(['status' => 'rejected', 'decided_at' => now()]);
             $request->update(['status' => $status, 'cancelled_at' => $status === 'cancelled' ? now() : null]);
         });
+
+        $request->loadMissing(['brand', 'requester.user']);
+        $window = "{$request->brand->name} · {$this->window($request)}";
+        $title = "Backup cancelled: {$request->brand->name}";
+
+        if ($cover) {
+            $this->notifier->toUsers($cover, 'backup_cancelled', $title, "{$window}: {$request->requester->user->name} no longer needs a cover. You're off this session.", '/host/schedule', dm: true);
+        }
+        if ($waiting->isNotEmpty()) {
+            $this->notifier->toUsers($waiting, 'backup_cancelled', $title, "{$window}: the request was cancelled, so your offer is closed.", '/host/backups');
+        }
     }
 
     /**
@@ -580,6 +601,21 @@ class BackupService
             $this->notifier->toUsers($this->notifier->admins(), 'backup_auto_picked', $title, $body, '/operator/backups');
             $this->notifier->toChannel('admin', 'backup_auto_picked', $title, $body, '/operator/backups');
         }
+    }
+
+    /** Applicants still waiting when someone else got the cover: they stay on standby in case the cover drops out. */
+    private function announceNotPicked(BackupRequest $request): void
+    {
+        $others = $request->applications()->where('status', 'applied')->with('applicant.user')->get()
+            ->map(fn (BackupApplication $application) => $application->applicant->user);
+        if ($others->isEmpty()) {
+            return;
+        }
+
+        $request->loadMissing(['brand', 'requester.user']);
+        $body = "{$request->brand->name} · {$this->window($request)}, for {$request->requester->user->name}. You stay on the waiting list in case the cover drops out.";
+
+        $this->notifier->toUsers($others, 'backup_not_picked', "You weren't picked to cover {$request->brand->name}", $body, '/host/backups');
     }
 
     private function announceNoCover(BackupRequest $request): void

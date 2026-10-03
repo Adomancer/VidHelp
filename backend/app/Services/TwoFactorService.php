@@ -12,15 +12,19 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Authenticator-app two-factor sign-in. Only admins use it; when
- * vidhelp.two_factor.required_for_admins is on, an admin without it is limited to setting it up.
+ * Authenticator-app two-factor sign-in for the accounts that handle sensitive data or money:
+ * admins and finance. When vidhelp.two_factor.required_for_admins is on, such an account
+ * without it is limited to setting it up.
  */
 class TwoFactorService
 {
-    /** 2FA is for admins only. */
+    /** Roles that use 2FA: admins (KTP, bank, settings) and finance (payments). */
+    public const ROLES = ['admin', 'finance'];
+
+    /** 2FA is for admins and finance only. */
     public function appliesTo(User $user): bool
     {
-        return $user->hasRole('admin');
+        return $user->hasAnyRole(self::ROLES);
     }
 
     public function isRequired(User $user): bool
@@ -28,7 +32,7 @@ class TwoFactorService
         return $this->appliesTo($user) && config('vidhelp.two_factor.required_for_admins');
     }
 
-    /** Signed-in admin who still has to set 2FA up before doing anything else. */
+    /** Signed-in admin or finance user who still has to set 2FA up before doing anything else. */
     public function needsSetup(User $user): bool
     {
         return $this->isRequired($user) && ! $user->two_factor_enabled;
@@ -174,7 +178,7 @@ class TwoFactorService
     public function disable(User $user, string $code): void
     {
         if ($this->isRequired($user)) {
-            throw ValidationException::withMessages(['code' => ['Two-factor authentication is required for admins and cannot be turned off.']]);
+            throw ValidationException::withMessages(['code' => ['Two-factor authentication is required for your account and cannot be turned off.']]);
         }
 
         $this->requireCode($user, $code);

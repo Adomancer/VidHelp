@@ -16,9 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class BackupController extends Controller
 {
-    public function __construct(private BackupService $backups, private EventCalendar $events)
-    {
-    }
+    public function __construct(private BackupService $backups, private EventCalendar $events) {}
 
     /**
      * My own requests, the backups I'm covering, and this month's cross-brand quota.
@@ -130,9 +128,13 @@ class BackupController extends Controller
 
         $draft = $this->backups->draft($this->mySlot($request, $validated['slot_id']), $validated['backup_date']);
 
+        // Other hosts' reasons (banned, quota, their schedule) are theirs: hosts only see "not available"
         return response()->json([
             'candidates' => $this->backups->candidates($draft)
-                ->map(fn (array $candidate) => collect($candidate)->only('host_id', 'name', 'avatar_url', 'same_brand', 'eligible', 'ineligible_reason')),
+                ->map(fn (array $candidate) => [
+                    ...collect($candidate)->only('host_id', 'name', 'avatar_url', 'same_brand', 'eligible'),
+                    'ineligible_reason' => $candidate['eligible'] ? null : 'Not available',
+                ]),
         ]);
     }
 

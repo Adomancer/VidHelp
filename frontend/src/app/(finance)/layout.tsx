@@ -6,7 +6,10 @@ export const metadata: Metadata = {
   description: "VidHelp payroll and kasbon",
 };
 
-const links = [{ href: "/finance/payroll", label: "Payroll & Kasbon" }];
+const links = [
+  { href: "/finance/payroll", label: "Payroll & Kasbon" },
+  { href: "/finance/security", label: "Security" },
+];
 
 export default function FinanceLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -1,40 +1,40 @@
 <?php
 
+use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\BrandController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\HostController as AdminHostController;
+use App\Http\Controllers\Admin\PointAdminController;
+use App\Http\Controllers\Admin\RateCategoryController;
+use App\Http\Controllers\Admin\RatingController;
+use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\ViolationTypeController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
-use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Admin\UserManagementController;
-use App\Http\Controllers\Finance\PayrollController;
+use App\Http\Controllers\DiscordController;
 use App\Http\Controllers\Finance\CashAdvanceController;
-use App\Http\Controllers\Admin\BrandController;
-use App\Http\Controllers\Admin\HostController as AdminHostController;
-use App\Http\Controllers\Admin\RateCategoryController;
-use App\Http\Controllers\Operator\DashboardController as OperatorDashboardController;
-use App\Http\Controllers\Operator\ScheduleController;
-use App\Http\Controllers\Operator\HostController as OperatorHostController;
-use App\Http\Controllers\Operator\AssignmentController;
-use App\Http\Controllers\Operator\PointController;
-use App\Http\Controllers\Admin\PointAdminController;
-use App\Http\Controllers\Admin\ViolationTypeController;
-use App\Http\Controllers\Admin\RatingController;
-use App\Http\Controllers\Host\MyScheduleController;
-use App\Http\Controllers\Host\ProfileController;
-use App\Http\Controllers\Host\PerformanceController;
-use App\Http\Controllers\Host\PayController;
-use App\Http\Controllers\Host\EventController as HostEventController;
-use App\Http\Controllers\Operator\EventController as OperatorEventController;
+use App\Http\Controllers\Finance\PayrollController;
 use App\Http\Controllers\Host\AvailabilityController;
 use App\Http\Controllers\Host\BackupController as HostBackupController;
-use App\Http\Controllers\Operator\BackupController as OperatorBackupController;
-use App\Http\Controllers\Operator\ReportController;
+use App\Http\Controllers\Host\EventController as HostEventController;
 use App\Http\Controllers\Host\LiveController;
-use App\Http\Controllers\DiscordController;
+use App\Http\Controllers\Host\MyScheduleController;
+use App\Http\Controllers\Host\PayController;
+use App\Http\Controllers\Host\PerformanceController;
+use App\Http\Controllers\Host\ProfileController;
 use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\TwoFactorController;
-use App\Http\Controllers\Admin\AuditLogController;
-use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
+use App\Http\Controllers\Operator\AssignmentController;
+use App\Http\Controllers\Operator\BackupController as OperatorBackupController;
+use App\Http\Controllers\Operator\DashboardController as OperatorDashboardController;
+use App\Http\Controllers\Operator\EventController as OperatorEventController;
+use App\Http\Controllers\Operator\HostController as OperatorHostController;
+use App\Http\Controllers\Operator\PointController;
+use App\Http\Controllers\Operator\ReportController;
+use App\Http\Controllers\Operator\ScheduleController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\TwoFactorController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -66,8 +66,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
-    // My two-factor authentication (admins only). Reachable before 2FA is set up.
-    Route::prefix('two-factor')->middleware(['role:admin', 'throttle:20,1'])->group(function () {
+    // My two-factor authentication (admins and finance). Reachable before 2FA is set up.
+    Route::prefix('two-factor')->middleware(['role:admin|finance', 'throttle:20,1'])->group(function () {
         Route::get('/', [TwoFactorController::class, 'show']);
         Route::post('/setup', [TwoFactorController::class, 'setup']);
         Route::post('/confirm', [TwoFactorController::class, 'confirm']);

@@ -15,9 +15,7 @@ class UserManagementController extends Controller
 {
     public const ROLES = 'host,operator,finance,admin';
 
-    public function __construct(private AccountService $accounts)
-    {
-    }
+    public function __construct(private AccountService $accounts) {}
 
     /**
      * List all users with their roles.
@@ -73,7 +71,7 @@ class UserManagementController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,' . $user->id,
+            'email' => 'sometimes|email|unique:users,email,'.$user->id,
             'role' => 'sometimes|in:'.self::ROLES,
         ]);
 

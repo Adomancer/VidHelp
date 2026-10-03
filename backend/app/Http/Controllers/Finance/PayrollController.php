@@ -16,9 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PayrollController extends Controller
 {
-    public function __construct(private PayrollService $payroll)
-    {
-    }
+    public function __construct(private PayrollService $payroll) {}
 
     /**
      * Brands with their payroll start (for the brand filter and the "no start date" warning).

@@ -246,7 +246,59 @@ class BackupTest extends TestCase
         $this->assertTrue($this->notified($this->requester->user, 'backup_reopened'));
 
         $reject($this->otherBrand)->assertUnprocessable(); // nothing left to reject
-        $this->apply($this->sameBrand, $backup)->assertOk(); // may try again
+
+        // The admin's "no" sticks: a rejected host can't apply to this request again
+        $this->apply($this->sameBrand, $backup)
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.backup.0', 'An admin already turned down your offer for this backup.');
+        $this->actingAs($this->sameBrand->user)->getJson('/api/host/backups/needs')
+            ->assertJsonPath('needs.0.ineligible_reason', 'An admin already turned down your offer for this backup.');
+    }
+
+    public function test_rejected_host_who_tries_again_is_not_auto_approved(): void
+    {
+        $backup = $this->openRequest();
+        $this->apply($this->sameBrand, $backup)->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/reject-applicant", ['host_id' => $this->sameBrand->id])->assertOk();
+        $this->apply($this->sameBrand, $backup)->assertUnprocessable();
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-06 13:30'));
+        $this->artisan('backups:auto-process');
+
+        $this->assertSame('open', $backup->fresh()->status);
+
+        // The admin can still change their mind and assign them directly
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->sameBrand->id])->assertOk();
+    }
+
+    public function test_other_applicants_hear_they_were_not_picked_and_stay_on_standby(): void
+    {
+        $backup = $this->openRequest();
+        $this->apply($this->sameBrand, $backup)->assertOk();
+        $this->apply($this->otherBrand, $backup)->assertOk();
+
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->sameBrand->id])->assertOk();
+
+        $this->assertTrue($this->notified($this->otherBrand->user, 'backup_not_picked'));
+        $this->assertFalse($this->notified($this->sameBrand->user, 'backup_not_picked'));
+
+        // Standby: if the cover drops out, the other applicant is waiting again
+        $this->actingAs($this->sameBrand->user)->postJson("/api/host/backups/{$backup->id}/drop")->assertOk();
+        $this->assertSame('pending', $backup->fresh()->status);
+    }
+
+    public function test_cancelling_a_covered_request_tells_the_cover_and_anyone_waiting(): void
+    {
+        $backup = $this->openRequest();
+        $this->apply($this->sameBrand, $backup)->assertOk();
+        $this->apply($this->otherBrand, $backup)->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->sameBrand->id])->assertOk();
+
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/cancel")->assertOk();
+
+        $this->assertTrue($this->notified($this->sameBrand->user, 'backup_cancelled'));
+        $this->assertTrue($this->notified($this->otherBrand->user, 'backup_cancelled'));
+        $this->assertFalse($this->notified($this->requester->user, 'backup_cancelled'));
     }
 
     public function test_host_cannot_apply_to_two_backups_at_the_same_time(): void
@@ -328,6 +380,10 @@ class BackupTest extends TestCase
         $this->assertFalse($candidates->firstWhere('host_id', $this->otherBrand->id)['eligible']);
         $this->assertNull($candidates->firstWhere('host_id', $this->requester->id));
         $this->assertArrayNotHasKey('rating', $candidates->first());
+
+        // Another host's reason (here: their own slot then) stays private
+        $this->assertSame('Not available', $candidates->firstWhere('host_id', $this->otherBrand->id)['ineligible_reason']);
+        $this->assertNull($candidates->firstWhere('host_id', $this->sameBrand->id)['ineligible_reason']);
     }
 
     public function test_admin_approves_a_cross_brand_applicant_and_quota_is_used(): void

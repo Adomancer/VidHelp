@@ -33,7 +33,7 @@ npm install
 npm run dev                   # http://localhost:3000
 ```
 
-Sign in as **admin@vidhelp.com / password**. Admins must set up two-factor sign-in (an authenticator app) on first login.
+Sign in as **admin@vidhelp.com / password**. Admin and finance accounts must set up two-factor sign-in (an authenticator app) on first login.
 
 Tests run against a separate MySQL database named `vidhelp_test`:
 
@@ -50,7 +50,7 @@ DB_CONNECTION=mysql DB_DATABASE=vidhelp_test php artisan test
 | --- | --- | --- |
 | **Admin** | Everything, plus users, KTP/bank data, payroll, settings, audit log | Desktop sidebar (purple) |
 | **Operator** | Schedules, backups, live reports, events, points | Desktop sidebar |
-| **Finance** | Payroll and kasbon only | Desktop sidebar |
+| **Finance** | Payroll and kasbon only; two-factor sign-in required | Desktop sidebar |
 | **Host** | Own schedule, check-in and live report, backups, score, pay, profile | Mobile bottom nav |
 
 New sign-ups (email or Google) are **pending hosts** until an admin approves them on Users; admins can also create accounts there, active straight away. **Deactivate** is temporary (can't sign in, schedule stays); **Archive** is for someone who left (slots end today, their backups are released); an archived account can be **deleted permanently** when the host is banned from a brand or asked for it, which anonymizes their personal data but keeps hours and pay history.
@@ -107,7 +107,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 | `RatingService` | Monthly 1–5 host ratings and the suggested value |
 | `PayrollService` | Pay periods per brand, host pay, payment requests, salary slips, kasbon, CSV export |
 | `Notifier` / `DiscordClient` | Bell notifications, Discord channel posts and DMs, retries |
-| `TwoFactorService` / `Totp` | Admin two-factor sign-in, recovery codes |
+| `TwoFactorService` / `Totp` | Two-factor sign-in for admin and finance, recovery codes |
 | `SettingsService` | Admin-editable rules layered over `config/vidhelp.php` |
 | `AccountService` | Accounts made by admins, deactivate / archive (takes a host off the schedule), delete permanently (anonymize) |
 | `DashboardService` | Dashboard figures: what needs attention, today's sessions, brand progress, hours per day |
@@ -135,7 +135,7 @@ Base URL `http://localhost:8000/api`. Send `Accept: application/json` and, once 
 | --- | --- | --- |
 | `/auth` | Public, 10 req/min | `POST register`, `POST login`, `POST two-factor-challenge`, `GET google/redirect`, `GET google/callback`, `POST forgot-password`, `POST reset-password` |
 | `/auth/me`, `/auth/logout` | Signed in | current user (with `roles`), sign out |
-| `/two-factor` | Admin | status, `setup`, `confirm`, `recovery-codes`, turn off |
+| `/two-factor` | Admin, finance | status, `setup`, `confirm`, `recovery-codes`, turn off |
 | `/notifications`, `/discord`, `/settings` | Any active user | bell list and unread count, Discord link, public rule numbers |
 | `/admin/...` | Admin | `dashboard`, `users` (+ `archive`, `erase`), `hosts/{id}`, `brands`, `rate-categories`, `points/...`, `warning-letters`, `violation-types`, `ratings`, `settings`, `audit-logs` |
 | `/finance/...` | Finance, admin | `brands`, `hosts`, `payroll/...`, `cash-advances` |
@@ -152,7 +152,7 @@ Run `php artisan route:list --path=api` for every route with its controller meth
 | Validation or business rule failed | 422 | `{ "message": "...", "errors": { "field": ["Message"] } }` — show each under its field |
 | Wrong role | 403 | `{ "message": "..." }` |
 | Account no longer active | 403 | `{ "message": "...", "status": "inactive" }` — sign the user out |
-| Admin must set up 2FA first | 403 | `{ "code": "two_factor_setup_required" }` — send them to `/two-factor/setup` |
+| Admin or finance must set up 2FA first | 403 | `{ "code": "two_factor_setup_required" }` — send them to `/two-factor/setup` |
 | Token missing or revoked | 401 | sign the user out |
 | Login needs a 2FA code | 200 | `{ "two_factor": true, "challenge_token": "..." }` instead of a token |
 

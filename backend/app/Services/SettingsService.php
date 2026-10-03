@@ -98,8 +98,8 @@ class SettingsService
         ],
         'two_factor.required_for_admins' => [
             'group' => 'security', 'type' => 'bool',
-            'label' => 'Require two-factor sign-in for admins',
-            'help' => 'When on, an admin without 2FA must set it up before using the app, and cannot turn it off.',
+            'label' => 'Require two-factor sign-in for admins and finance',
+            'help' => 'When on, an admin or finance user without 2FA must set it up before using the app, and cannot turn it off.',
         ],
         'audit.keep_days' => [
             'group' => 'security', 'type' => 'int', 'min' => 0, 'max' => 3650, 'unit' => 'days',

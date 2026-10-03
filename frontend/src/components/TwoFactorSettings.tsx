@@ -11,7 +11,7 @@ import RecoveryCodes from "./RecoveryCodes";
 import TextField from "./TextField";
 import TwoFactorSetup from "./TwoFactorSetup";
 
-/** An admin's own 2FA: status, new recovery codes, and turning it off when it isn't required. */
+/** My own 2FA (admins and finance): status, new recovery codes, and turning it off when it isn't required. */
 export default function TwoFactorSettings() {
   const { token, user, setUser } = useAuth();
   const status = useApiData("two-factor-status", () => twoFactorApi.status(token));
@@ -61,7 +61,7 @@ export default function TwoFactorSettings() {
 
       {data && !data.enabled && (
         <>
-          {data.required && <FormAlert tone="warning">Required for admin accounts.</FormAlert>}
+          {data.required && <FormAlert tone="warning">Required for your account.</FormAlert>}
           <TwoFactorSetup
             onDone={(updated) => {
               setUser(updated);
@@ -118,7 +118,7 @@ export default function TwoFactorSettings() {
             </div>
             <p className="text-xs text-gray-400">
               {data.required
-                ? "2FA is required for admins, so it can't be turned off. Lost your phone? Sign in with a recovery code, or ask another admin to reset your 2FA."
+                ? "2FA is required for your account, so it can't be turned off. Lost your phone? Sign in with a recovery code, or ask another admin to reset your 2FA."
                 : "Lost your phone? Sign in with a recovery code, or ask another admin to reset your 2FA."}
             </p>
           </form>

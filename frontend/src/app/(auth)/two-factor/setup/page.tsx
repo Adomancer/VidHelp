@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import AuthCard from "@/components/AuthCard";
 import { RequireAuth, useAuth } from "@/components/AuthProvider";
 import TwoFactorSetup from "@/components/TwoFactorSetup";
-import { homePathFor } from "@/lib/auth";
+import { hasAnyRole, homePathFor } from "@/lib/auth";
 
-/** Admins land here after sign-in until they have set up 2FA. */
+/** Admins and finance land here after sign-in until they have set up 2FA. */
 export default function TwoFactorSetupPage() {
   return (
-    <RequireAuth roles={["admin"]} allowTwoFactorSetup>
-      <AuthCard subtitle="Secure your admin account">
+    <RequireAuth roles={["admin", "finance"]} allowTwoFactorSetup>
+      <AuthCard subtitle="Secure your account">
         <RequiredSetup />
       </AuthCard>
     </RequireAuth>
@@ -26,15 +26,15 @@ function RequiredSetup() {
 
   // Opened by hand after 2FA is already on: nothing to do here
   useEffect(() => {
-    if (alreadyOn) router.replace("/admin/security");
-  }, [alreadyOn, router]);
+    if (alreadyOn) router.replace(hasAnyRole(user, ["admin"]) ? "/admin/security" : "/finance/security");
+  }, [alreadyOn, router, user]);
 
   if (alreadyOn) return null;
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-gray-300 text-center">
-        Admin accounts can see KTP, bank and payroll data, so they need two-factor authentication: after your password or
+        Admin and finance accounts handle personal data and payments, so they need two-factor authentication: after your password or
         Google, you&apos;ll also enter a code from an app on your phone.
       </p>
       <TwoFactorSetup onDone={(updated) => router.replace(homePathFor(updated))} />

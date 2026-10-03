@@ -117,7 +117,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
           {error && <FormAlert tone="error">{error}</FormAlert>}
           {turningOn2fa && (
             <FormAlert tone="warning">
-              Admins without two-factor sign-in{user.two_factor_enabled ? "" : ", including you,"} will have to set it up before they can do
+              Admins and finance users without two-factor sign-in{user.two_factor_enabled ? "" : ", including you,"} will have to set it up before they can do
               anything else.
             </FormAlert>
           )}

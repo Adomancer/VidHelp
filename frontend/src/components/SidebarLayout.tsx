@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { RoleName } from "@/lib/api";
 import { RequireAuth } from "./AuthProvider";
 import NotificationBell from "./NotificationBell";
