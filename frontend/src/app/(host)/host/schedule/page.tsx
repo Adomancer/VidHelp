@@ -19,7 +19,6 @@ import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
 import BackupMarker, { markerFor } from "@/components/BackupMarker";
 import FormAlert from "@/components/FormAlert";
-import HostEvents from "@/components/HostEvents";
 
 export default function HostSchedulePage() {
   const { token, user } = useAuth();
@@ -41,7 +40,6 @@ export default function HostSchedulePage() {
         />
       )}
       {schedule.data && schedule.data.upcoming.length > 0 && <UpcomingList slots={schedule.data.upcoming} />}
-      {isHost && <HostEvents />}
       {isHost && <AvailabilityEditor />}
     </div>
   );

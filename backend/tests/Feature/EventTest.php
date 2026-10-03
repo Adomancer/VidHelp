@@ -282,6 +282,21 @@ class EventTest extends TestCase
             ->assertJsonPath('events.0.blocks.1.claim.host_name', $this->regular->user->name);
     }
 
+    public function test_host_only_sees_events_of_their_brands(): void
+    {
+        $this->event();
+        $elsewhere = $this->host($this->brandB);
+
+        $this->actingAs($elsewhere->user)->getJson('/api/host/events')
+            ->assertOk()
+            ->assertJsonCount(0, 'events')
+            ->assertJsonPath('my_brands', ['Brand B']);
+
+        $this->actingAs($this->other->user)->getJson('/api/host/events')
+            ->assertJsonCount(1, 'events')
+            ->assertJsonPath('my_brands', ['Brand A']);
+    }
+
     public function test_event_block_makes_the_host_busy_for_backups(): void
     {
         $event = $this->event(['name' => 'Tuesday', 'start_date' => '2026-10-06', 'end_date' => '2026-10-06', 'daily_end_time' => '14:00']);

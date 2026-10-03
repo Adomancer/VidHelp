@@ -189,7 +189,9 @@ class NotificationTest extends TestCase
             'daily_start_time' => '10:00', 'daily_end_time' => '16:00', 'block_minutes' => 120, 'max_slots_per_host' => 2,
         ])->assertCreated();
 
-        $this->assertSame('New event: PD 10.10 (Brand A)', $this->web($this->other->user, 'event_opened')->title);
+        $notification = $this->web($this->other->user, 'event_opened');
+        $this->assertSame('New event: PD 10.10 (Brand A)', $notification->title);
+        $this->assertSame('/host/events', $notification->link);
     }
 
     public function test_approving_an_account_tells_the_user(): void

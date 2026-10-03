@@ -41,7 +41,7 @@ export default function Toast({ toast, onDismiss }: { toast: (ToastMessage & { i
   }
 
   return (
-    <div aria-live="polite" className="fixed z-[60] bottom-4 inset-x-4 sm:inset-x-auto sm:right-6 sm:bottom-6 flex justify-center pointer-events-none">
+    <div aria-live="polite" className="fixed z-[60] top-4 inset-x-4 sm:top-auto sm:inset-x-auto sm:right-6 sm:bottom-6 flex justify-center pointer-events-none">
       {toast && (
         <div
           key={toast.id}

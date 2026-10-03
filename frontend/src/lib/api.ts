@@ -1194,8 +1194,10 @@ export const eventApi = {
   release: (token: string, claimId: string) => post(`/operator/event-claims/${claimId}/release`, token),
 
   // Hosts
-  mine: (token: string) => api<{ events: HostEvent[] }>("/host/events", { token }),
-  claim: (token: string, id: string, startAt: string) => post(`/host/events/${id}/claim`, token, { start_at: startAt }),
+  /** Events of my brands; `my_brands` = the brands whose events I'd see. */
+  mine: (token: string) => api<{ events: HostEvent[]; my_brands: string[] }>("/host/events", { token }),
+  claim: (token: string, id: string, startAt: string) =>
+    post<{ claim: { id: string } } & Message>(`/host/events/${id}/claim`, token, { start_at: startAt }),
   cancelClaim: (token: string, claimId: string) => post(`/host/event-claims/${claimId}/cancel`, token),
 };
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Host;
 
 use App\Http\Controllers\Controller;
+use App\Models\Brand;
 use App\Models\EventSlotClaim;
 use App\Models\HostProfile;
 use App\Models\SpecialEvent;
@@ -18,6 +19,7 @@ class EventController extends Controller
 
     /**
      * Running and upcoming events of my brands, with every block and whether I can claim it.
+     * `my_brands` tells a host with no events which brands they'd see events for.
      */
     public function index(Request $request): JsonResponse
     {
@@ -37,7 +39,10 @@ class EventController extends Controller
                 'blocks' => $this->events->blocks($event, $host),
             ]);
 
-        return response()->json(['events' => $events]);
+        return response()->json([
+            'events' => $events,
+            'my_brands' => Brand::whereIn('id', $brandIds)->orderBy('name')->pluck('name'),
+        ]);
     }
 
     public function claim(Request $request, SpecialEvent $event): JsonResponse

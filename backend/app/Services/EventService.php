@@ -28,9 +28,9 @@ class EventService
 
         $title = "New event: {$event->name} ({$event->brand->name})";
         $days = $event->start_date->format('j M').($event->end_date->equalTo($event->start_date) ? '' : ' – '.$event->end_date->format('j M'));
-        $body = "{$days}, {$event->daily_start_time}–{$event->daily_end_time}. Claim your blocks on the Schedule page (max {$event->max_slots_per_host}).";
-        $this->notifier->toUsers($this->notifier->hosts($event->brand_id), 'event_opened', $title, $body, '/host/schedule');
-        $this->notifier->toChannel('backups', 'event_opened', $title, $body, '/host/schedule');
+        $body = "{$days}, {$event->daily_start_time}–{$event->daily_end_time}. Grab your blocks in the Event menu (max {$event->max_slots_per_host}).";
+        $this->notifier->toUsers($this->notifier->hosts($event->brand_id), 'event_opened', $title, $body, '/host/events');
+        $this->notifier->toChannel('backups', 'event_opened', $title, $body, '/host/events');
 
         return $event;
     }
