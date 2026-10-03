@@ -137,10 +137,10 @@ Base URL `http://localhost:8000/api`. Send `Accept: application/json` and, once 
 | `/auth/me`, `/auth/logout` | Signed in | current user (with `roles`), sign out |
 | `/two-factor` | Admin, finance | status, `setup`, `confirm`, `recovery-codes`, turn off |
 | `/notifications`, `/discord`, `/settings` | Any active user | bell list and unread count, Discord link, public rule numbers |
-| `/admin/...` | Admin | `dashboard`, `users` (+ `archive`, `erase`), `hosts/{id}`, `brands`, `rate-categories`, `points/...`, `warning-letters`, `violation-types`, `ratings`, `settings`, `audit-logs` |
+| `/admin/...` | Admin | `dashboard`, `users` (+ `archive`, `erase`), `hosts/{id}`, `brands`, `rate-categories`, `points/...`, `warning-letters`, `violation-types`, `ratings` (+ `export` to Excel, `hosts/{id}/history`), `settings`, `audit-logs` |
 | `/finance/...` | Finance, admin | `brands`, `hosts`, `payroll/...`, `cash-advances` |
-| `/operator/...` | Operator, admin | `dashboard`, `hosts`, `brands`, `assignments`, `schedules`, `backups/...`, `reports/...`, `events/...`, `points/...` |
-| `/host/...` | Any active user | `profile`, `schedules`, `availability`, `backups/...`, `live/...`, `events/...`, `performance`, `pay` |
+| `/operator/...` | Operator, admin | `dashboard`, `hosts` (+ `export` to Excel), `brands`, `assignments`, `schedules`, `backups/...`, `reports/...`, `events/...`, `points/...` |
+| `/host/...` | Any active user | `profile`, `schedules`, `availability`, `brands` (product knowledge), `backups/...`, `live/...`, `events/...`, `performance`, `pay` |
 
 Run `php artisan route:list --path=api` for every route with its controller method.
 

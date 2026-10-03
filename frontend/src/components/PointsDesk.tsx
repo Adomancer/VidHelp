@@ -14,7 +14,7 @@ import UserAvatar from "./UserAvatar";
 
 type Notice = { tone: "success" | "error"; text: string } | null;
 
-const sourceLabels: Record<PointLog["source"], string> = {
+export const sourceLabels: Record<PointLog["source"], string> = {
   internal: "Violation",
   brand_complaint: "Brand complaint",
   backup_cancel: "Dropped backup (automatic)",

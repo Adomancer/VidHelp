@@ -1,3 +1,5 @@
+import { toDateInput } from "./format";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 interface FetchOptions extends RequestInit {
@@ -47,6 +49,16 @@ export async function api<T = unknown>(endpoint: string, options: FetchOptions =
 /** Download a protected file (e.g. a KTP photo) as an object URL for <img src>. */
 export async function apiFileUrl(endpoint: string, token: string): Promise<string> {
   return URL.createObjectURL(await (await request(endpoint, { token })).blob());
+}
+
+/** Download a protected file (e.g. an Excel export) and save it as `fileName`. */
+export async function downloadFile(endpoint: string, token: string, fileName: string): Promise<void> {
+  const url = await apiFileUrl(endpoint, token);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**
@@ -462,6 +474,8 @@ export interface Brand {
   id: string;
   name: string;
   is_obs: boolean;
+  /** What hosts assigned to the brand need to know (products, prices, talking points) */
+  product_knowledge?: string | null;
   target_hours_per_period: number;
   payment_cycle_days: number;
   /** First day of the first payment period; later periods follow back to back */
@@ -546,7 +560,12 @@ export const hostApi = {
     body.append("ktp_image", image);
     return api<MyProfile & Message>("/host/profile/ktp-image", { method: "POST", body, token });
   },
+
+  /** Brands I'm actively assigned to, with their product knowledge. */
+  brands: (token: string) => api<{ brands: MyBrand[] }>("/host/brands", { token }),
 };
+
+export type MyBrand = Pick<Brand, "id" | "name" | "is_obs"> & { product_knowledge: string | null };
 
 export const operatorApi = {
   hosts: (token: string, params: { search?: string; brand_id?: string; page?: number }) => {
@@ -556,6 +575,15 @@ export const operatorApi = {
     query.set("page", String(params.page ?? 1));
 
     return api<Paginated<HostListItem>>(`/operator/hosts?${query}`, { token });
+  },
+
+  /** Every host matching the filters (not just one page) as an Excel file. */
+  exportHosts: (token: string, params: { search?: string; brand_id?: string }) => {
+    const query = new URLSearchParams();
+    if (params.search) query.set("search", params.search);
+    if (params.brand_id) query.set("brand_id", params.brand_id);
+
+    return downloadFile(`/operator/hosts/export?${query}`, token, `hosts-${toDateInput()}.xlsx`);
   },
 
   brands: (token: string) => api<{ brands: BrandSummary[] }>("/operator/brands", { token }),
@@ -1020,6 +1048,11 @@ export const pointsApi = {
     api<{ month: string; scale: { min: number; max: number }; hosts: RatingRow[] }>(`/admin/ratings?month=${month}`, { token }),
   rate: (token: string, data: { host_id: string; month_year: string; rating: number; note: string | null }) =>
     api<{ rating: HostRating } & Message>("/admin/ratings", { method: "PUT", body: JSON.stringify(data), token }),
+  /** Ratings of the month, plus that month's point history and SP letters, as Excel. */
+  exportRatings: (token: string, month: string) => downloadFile(`/admin/ratings/export?month=${month}`, token, `ratings-${month}.xlsx`),
+  /** A host's full point and SP history across all periods, newest first. */
+  history: (token: string, hostId: string) =>
+    api<{ logs: PointLog[]; warning_letters: WarningLetter[] }>(`/admin/ratings/hosts/${hostId}/history`, { token }),
 };
 
 export interface Performance {

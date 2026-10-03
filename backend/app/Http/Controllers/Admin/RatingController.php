@@ -6,13 +6,24 @@ use App\Http\Controllers\Controller;
 use App\Models\HostProfile;
 use App\Models\HostRating;
 use App\Models\PointLog;
+use App\Models\WarningLetter;
 use App\Services\RatingService;
+use App\Services\SpreadsheetExport;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RatingController extends Controller
 {
+    private const SOURCE_LABELS = [
+        'internal' => 'Violation',
+        'brand_complaint' => 'Brand complaint',
+        'backup_cancel' => 'Dropped backup (automatic)',
+        'late_attachment' => 'Late sick letter (automatic)',
+    ];
+
     public function __construct(private RatingService $ratings)
     {
     }
@@ -22,33 +33,79 @@ class RatingController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $request->validate(['month' => 'nullable|date_format:Y-m']);
-        $month = $request->month ?? now()->format('Y-m');
+        $month = $this->month($request);
+
+        return response()->json(['month' => $month, 'scale' => config('vidhelp.rating'), 'hosts' => $this->rows($month)]);
+    }
+
+    /**
+     * The month as Excel: ratings, plus the point history and SP letters of that month.
+     */
+    public function export(Request $request, SpreadsheetExport $export): BinaryFileResponse
+    {
+        $month = $this->month($request);
         $first = CarbonImmutable::parse("{$month}-01");
+        $range = [$first->toDateString(), $first->endOfMonth()->toDateString()];
 
-        $ratings = HostRating::where('month_year', $month)->with('rater:id,name')->get()->keyBy('host_id');
-        $violations = PointLog::counting()
-            ->whereNotNull('violation_type_id')
-            ->whereBetween('occurred_on', [$first->toDateString(), $first->endOfMonth()->toDateString()])
-            ->selectRaw('host_id, count(*) as total')->groupBy('host_id')->pluck('total', 'host_id');
+        $ratings = $this->rows($month)->map(fn (array $row) => [
+            $row['name'],
+            $row['violations'],
+            $row['suggested'],
+            $row['rating']?->rating,
+            $row['rating']?->note,
+            $row['rating']?->rater?->name,
+        ]);
 
-        $hosts = HostProfile::query()
-            ->where('status', 'active')
-            ->whereHas('user', fn ($q) => $q->where('status', 'active'))
-            ->with('user')
+        $logs = PointLog::query()
+            ->whereBetween('occurred_on', $range)
+            ->with(['host.user:id,name', 'violationType:id,name', 'recorder:id,name', 'brandComplaint.brand:id,name'])
+            ->orderBy('occurred_on')
+            ->oldest()
             ->get()
-            ->map(fn (HostProfile $host) => [
-                'host_id' => $host->id,
-                'name' => $host->user->name,
-                'avatar_url' => $host->user->avatar_url,
-                'violations' => (int) ($violations[$host->id] ?? 0),
-                'suggested' => $this->ratings->suggested($host, $month),
-                'rating' => $ratings->get($host->id),
-            ])
-            ->sortBy('name')
-            ->values();
+            ->map(fn (PointLog $log) => [
+                $log->occurred_on->toDateString(),
+                $log->host->user->name,
+                $this->logLabel($log),
+                $log->points_change,
+                $log->reason,
+                $log->recorder?->name ?? 'Automatic',
+                $log->voided_at ? 'Yes' : 'No',
+            ]);
 
-        return response()->json(['month' => $month, 'scale' => config('vidhelp.rating'), 'hosts' => $hosts]);
+        $letters = WarningLetter::query()
+            ->whereBetween('issued_at', [$first->startOfDay(), $first->endOfMonth()->endOfDay()])
+            ->with(['host.user:id,name', 'issuer:id,name'])
+            ->orderBy('issued_at')
+            ->get()
+            ->map(fn (WarningLetter $letter) => [
+                $letter->issued_at->format('Y-m-d H:i'),
+                $letter->host->user->name,
+                "SP{$letter->level}",
+                $letter->reason,
+                $letter->issuer?->name ?? 'Automatic',
+                $letter->voided_at ? 'Yes' : 'No',
+            ]);
+
+        return $export->download("ratings-{$month}.xlsx", [
+            'Ratings' => [['Host', 'Violations', 'Suggested', 'Rating', 'Note', 'Rated by'], $ratings],
+            'Point history' => [['Date', 'Host', 'Type', 'Points', 'Reason', 'Recorded by', 'Cancelled'], $logs],
+            'SP history' => [['Issued', 'Host', 'Level', 'Reason', 'Issued by', 'Cancelled'], $letters],
+        ]);
+    }
+
+    /**
+     * One host's full point and SP history across all periods, newest first.
+     */
+    public function history(HostProfile $host): JsonResponse
+    {
+        return response()->json([
+            'logs' => $host->pointLogs()
+                ->with(['violationType:id,name', 'recorder:id,name', 'brandComplaint.brand:id,name'])
+                ->latest('occurred_on')
+                ->latest()
+                ->get(),
+            'warning_letters' => $host->warningLetters()->with('issuer:id,name')->latest('issued_at')->get(),
+        ]);
     }
 
     public function upsert(Request $request): JsonResponse
@@ -69,5 +126,46 @@ class RatingController extends Controller
         );
 
         return response()->json(['rating' => $rating, 'message' => 'Rating saved']);
+    }
+
+    private function month(Request $request): string
+    {
+        $request->validate(['month' => 'nullable|date_format:Y-m']);
+
+        return $request->month ?? now()->format('Y-m');
+    }
+
+    private function rows(string $month): Collection
+    {
+        $first = CarbonImmutable::parse("{$month}-01");
+
+        $ratings = HostRating::where('month_year', $month)->with('rater:id,name')->get()->keyBy('host_id');
+        $violations = PointLog::counting()
+            ->whereNotNull('violation_type_id')
+            ->whereBetween('occurred_on', [$first->toDateString(), $first->endOfMonth()->toDateString()])
+            ->selectRaw('host_id, count(*) as total')->groupBy('host_id')->pluck('total', 'host_id');
+
+        return HostProfile::query()
+            ->where('status', 'active')
+            ->whereHas('user', fn ($q) => $q->where('status', 'active'))
+            ->with('user')
+            ->get()
+            ->map(fn (HostProfile $host) => [
+                'host_id' => $host->id,
+                'name' => $host->user->name,
+                'avatar_url' => $host->user->avatar_url,
+                'violations' => (int) ($violations[$host->id] ?? 0),
+                'suggested' => $this->ratings->suggested($host, $month),
+                'rating' => $ratings->get($host->id),
+            ])
+            ->sortBy('name')
+            ->values();
+    }
+
+    private function logLabel(PointLog $log): string
+    {
+        $label = $log->violationType->name ?? self::SOURCE_LABELS[$log->source];
+
+        return $log->brandComplaint ? "{$label} · {$log->brandComplaint->brand->name}" : $label;
     }
 }

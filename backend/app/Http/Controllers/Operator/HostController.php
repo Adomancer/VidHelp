@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
+use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
 use App\Models\User;
+use App\Services\SpreadsheetExport;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class HostController extends Controller
 {
@@ -15,7 +19,36 @@ class HostController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $hosts = HostProfile::query()
+        return response()->json($this->filtered($request)->paginate(20));
+    }
+
+    /**
+     * The same list (same filters, every page) as an Excel file. No KTP/bank data.
+     */
+    public function export(Request $request, SpreadsheetExport $export): BinaryFileResponse
+    {
+        $rows = $this->filtered($request)->get()->map(fn (HostProfile $host) => [
+            $host->user->name,
+            $host->user->email,
+            $host->phone,
+            $host->guardian_phone,
+            $host->status,
+            $host->rateCategory?->name,
+            $host->join_date?->toDateString(),
+            $host->assignments
+                ->where('status', 'active')
+                ->map(fn (HostBrandAssignment $assignment) => $assignment->brand->name.($assignment->is_leader ? ' (leader)' : ''))
+                ->join(', '),
+        ]);
+
+        return $export->download('hosts-'.today()->toDateString().'.xlsx', [
+            'Hosts' => [['Name', 'Email', 'Phone', 'Guardian phone', 'Status', 'Rate level', 'Join date', 'Brands'], $rows],
+        ]);
+    }
+
+    private function filtered(Request $request): Builder
+    {
+        return HostProfile::query()
             ->with(['user', 'rateCategory:id,name', 'assignments.brand:id,name'])
             ->when($request->search, fn ($q, $search) => $q->whereHas('user', fn ($q) => $q
                 ->where('name', 'like', "%{$search}%")
@@ -26,9 +59,6 @@ class HostController extends Controller
             ->when($request->status, fn ($q, $status) => $q->where('status', $status))
             ->orderBy(
                 User::select('name')->whereColumn('users.id', 'host_profiles.user_id')
-            )
-            ->paginate(20);
-
-        return response()->json($hosts);
+            );
     }
 }

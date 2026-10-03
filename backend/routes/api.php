@@ -18,6 +18,7 @@ use App\Http\Controllers\Finance\CashAdvanceController;
 use App\Http\Controllers\Finance\PayrollController;
 use App\Http\Controllers\Host\AvailabilityController;
 use App\Http\Controllers\Host\BackupController as HostBackupController;
+use App\Http\Controllers\Host\BrandController as HostBrandController;
 use App\Http\Controllers\Host\EventController as HostEventController;
 use App\Http\Controllers\Host\LiveController;
 use App\Http\Controllers\Host\MyScheduleController;
@@ -145,6 +146,8 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::post('/violation-types', [ViolationTypeController::class, 'store']);
         Route::put('/violation-types/{violationType}', [ViolationTypeController::class, 'update']);
         Route::get('/ratings', [RatingController::class, 'index']);
+        Route::get('/ratings/export', [RatingController::class, 'export']);
+        Route::get('/ratings/hosts/{host}/history', [RatingController::class, 'history']);
         Route::put('/ratings', [RatingController::class, 'upsert']);
     });
 
@@ -186,6 +189,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
         // Hosts & brand assignments
         Route::get('/hosts', [OperatorHostController::class, 'index']);
+        Route::get('/hosts/export', [OperatorHostController::class, 'export']);
         Route::get('/brands', [BrandController::class, 'index']);
         Route::get('/brands/{brand}/hosts', [BrandController::class, 'hosts']);
         Route::post('/assignments', [AssignmentController::class, 'store']);
@@ -237,6 +241,9 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::get('/schedules', [MyScheduleController::class, 'index']);
         Route::get('/availability', [AvailabilityController::class, 'show']);
         Route::put('/availability', [AvailabilityController::class, 'update']);
+
+        // Product knowledge of the brands I'm assigned to
+        Route::get('/brands', [HostBrandController::class, 'index']);
 
         // Backups: request cover for my slot (open or to named hosts), apply to cover others
         Route::get('/backups', [HostBackupController::class, 'index']);

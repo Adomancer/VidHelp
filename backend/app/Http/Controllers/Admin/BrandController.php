@@ -89,6 +89,7 @@ class BrandController extends Controller
         return $request->validate([
             'name' => [$required, 'string', 'max:255', Rule::unique('brands')->ignore($brand)],
             'is_obs' => 'sometimes|boolean',
+            'product_knowledge' => 'sometimes|nullable|string|max:20000',
             'target_hours_per_period' => "$required|integer|min:1|max:10000",
             'payment_cycle_days' => "$required|integer|min:1|max:365",
             'payroll_start_date' => 'sometimes|nullable|date_format:Y-m-d',

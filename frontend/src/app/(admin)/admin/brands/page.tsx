@@ -102,6 +102,7 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
     const input: BrandInput = {
       name: formValue(data, "name"),
       is_obs: data.get("is_obs") === "on",
+      product_knowledge: formValue(data, "product_knowledge") || null,
       target_hours_per_period: Number(formValue(data, "target_hours_per_period")),
       payment_cycle_days: Number(formValue(data, "payment_cycle_days")),
       payroll_start_date: formValue(data, "payroll_start_date") || null,
@@ -159,6 +160,24 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="accent-purple-500" />
           OBS brand (streamed with OBS)
         </label>
+        <div className="space-y-1.5 sm:col-span-2">
+          <label htmlFor="product_knowledge" className="block text-sm font-medium text-gray-200">
+            Product knowledge
+          </label>
+          <textarea
+            id="product_knowledge"
+            name="product_knowledge"
+            rows={8}
+            defaultValue={brand?.product_knowledge ?? ""}
+            placeholder="Products, prices, promos, talking points, links to catalogs…"
+            aria-invalid={errors.product_knowledge ? true : undefined}
+            className={`w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border text-white outline-none focus:ring-2 focus:ring-purple-500 ${
+              errors.product_knowledge ? "border-red-400" : "border-white/15"
+            }`}
+          />
+          <p className="text-xs text-gray-400">Hosts assigned to this brand see this on their Brands page. Links are clickable.</p>
+          {errors.product_knowledge && <p className="text-sm text-red-300">{errors.product_knowledge}</p>}
+        </div>
         <div className="flex gap-3 sm:col-span-2">
           <div className="w-40">
             <SubmitButton loading={loading}>Save</SubmitButton>
