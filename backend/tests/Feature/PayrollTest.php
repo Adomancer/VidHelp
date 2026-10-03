@@ -59,8 +59,8 @@ class PayrollTest extends TestCase
         return $user->hostProfile;
     }
 
-    /** An approved work session (attendance → report → session), placed in its period. */
-    private function workSession(HostProfile $host, string $date, float $hours, ?Brand $brand = null): WorkSession
+    /** A live report (with its attendance) for a 10:00 session. */
+    private function liveReport(HostProfile $host, string $date, float $hours, string $status, ?Brand $brand = null): LiveReport
     {
         $brand ??= $this->brand;
         $start = CarbonImmutable::parse("{$date} 10:00");
@@ -71,17 +71,42 @@ class PayrollTest extends TestCase
             'scheduled_start_at' => $start, 'scheduled_end_at' => $end, 'check_in_at' => $start, 'check_out_at' => $end,
             'report_due_at' => $start->addDay(),
         ]);
-        $report = LiveReport::create([
+
+        return LiveReport::create([
             'attendance_id' => $attendance->id, 'host_id' => $host->id, 'brand_id' => $brand->id,
-            'session_count' => 1, 'duration_hours' => $hours, 'status' => 'approved', 'submitted_at' => $end,
+            'session_count' => 1, 'duration_hours' => $hours, 'status' => $status, 'submitted_at' => $end,
         ]);
+    }
+
+    /** An approved work session (attendance → report → session), placed in its period. */
+    private function workSession(HostProfile $host, string $date, float $hours, ?Brand $brand = null): WorkSession
+    {
+        $report = $this->liveReport($host, $date, $hours, 'approved', $brand);
+        $attendance = $report->attendance;
+
         $session = WorkSession::create([
-            'live_report_id' => $report->id, 'host_id' => $host->id, 'brand_id' => $brand->id, 'session_date' => $date,
-            'start_at' => $start, 'end_at' => $end, 'duration_hours' => $hours, 'session_type' => 'regular',
+            'live_report_id' => $report->id, 'host_id' => $host->id, 'brand_id' => $report->brand_id, 'session_date' => $date,
+            'start_at' => $attendance->check_in_at, 'end_at' => $attendance->check_out_at, 'duration_hours' => $hours, 'session_type' => 'regular',
         ]);
         app(PayrollService::class)->assign($session);
 
         return $session->fresh();
+    }
+
+    /** Move past the first period (1-7 Oct) so it is waiting for payment. */
+    private function endFirstPeriod(): PaymentPeriod
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
+        $this->artisan('payroll:roll-periods');
+
+        return $this->period('2026-10-01');
+    }
+
+    private function recordAdvance(int $amount, int $installments): string
+    {
+        return $this->actingAs($this->admin)->postJson('/api/finance/cash-advances', [
+            'host_id' => $this->host->id, 'type' => 'loan', 'total_amount' => $amount, 'installment_count' => $installments,
+        ])->assertCreated()->json('advance.id');
     }
 
     private function period(string $start): PaymentPeriod
@@ -238,21 +263,132 @@ class PayrollTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/paid")->assertJsonValidationErrors('period');
     }
 
-    public function test_installment_bigger_than_the_slip_waits_for_the_next_one(): void
+    public function test_installment_bigger_than_the_slip_waits_and_shows_as_skipped(): void
     {
-        $this->actingAs($this->admin)->postJson('/api/finance/cash-advances', [
-            'host_id' => $this->host->id, 'type' => 'early_payment', 'total_amount' => 50000, 'installment_count' => 1,
-        ])->assertCreated();
+        $this->recordAdvance(50000, 1);
 
         $this->workSession($this->host, '2026-10-02', 2); // 40.000 < 50.000
-        $period = $this->period('2026-10-01');
-        $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
-        $this->artisan('payroll:roll-periods');
+        $period = $this->endFirstPeriod();
         $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request");
         $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/paid")->assertOk();
 
-        $this->assertSame(40000.0, SalarySlip::firstOrFail()->net_amount);
+        $slip = SalarySlip::firstOrFail();
+        $this->assertSame(40000.0, $slip->net_amount);
         $this->assertSame('unpaid', CashAdvance::firstOrFail()->status);
+
+        $this->actingAs($this->admin)->getJson("/api/finance/payroll/slips/{$slip->id}")
+            ->assertJsonPath('slip.skipped_deductions.0.amount', 50000)
+            ->assertJsonPath('slip.skipped_deductions.0.seq', 1);
+        $this->actingAs($this->admin)->getJson('/api/finance/cash-advances')
+            ->assertJsonPath('advances.0.installments.0.status', 'scheduled')
+            ->assertJsonPath('advances.0.installments.0.skip_count', 1);
+    }
+
+    public function test_request_waits_until_reports_in_the_period_are_reviewed(): void
+    {
+        $this->workSession($this->host, '2026-10-02', 2);
+        $flagged = $this->liveReport($this->host, '2026-10-04', 2, 'flagged');
+        $this->liveReport($this->host, '2026-10-09', 2, 'flagged'); // next period: doesn't block
+        $period = $this->endFirstPeriod();
+
+        $this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$period->id}")->assertJsonPath('pending_reports', 1);
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertJsonValidationErrors('period');
+
+        $flagged->update(['status' => 'rejected']);
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
+    }
+
+    public function test_cancelling_a_request_unlocks_the_period_and_keeps_history(): void
+    {
+        $this->workSession($this->host, '2026-10-02', 12); // 2 hours over the target carry out
+        $period = $this->endFirstPeriod();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
+        $this->assertSame(2.0, $this->period('2026-10-08')->carried_in_hours);
+
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/cancel-request")->assertJsonValidationErrors('reason');
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/cancel-request", ['reason' => 'Wrong hours for one host'])
+            ->assertOk();
+
+        $this->assertSame('waiting_payment', $period->fresh()->status);
+        $this->assertSame(0, $period->items()->count());
+        $this->assertSame(0.0, $this->period('2026-10-08')->carried_in_hours);
+
+        // Open again: adjust, then request a second time
+        $this->travel(10)->minutes();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/adjustments", [
+            'host_id' => $this->host->id, 'sessions_added' => 0, 'hours_added' => -1, 'notes' => 'Counted an hour twice',
+        ])->assertCreated();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
+
+        $this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$period->id}")
+            ->assertJsonPath('period.payment_request.status', 'requested')
+            ->assertJsonPath('summary.carried_out_hours', 1)
+            ->assertJsonCount(2, 'requests')
+            ->assertJsonPath('requests.1.status', 'cancelled')
+            ->assertJsonPath('requests.1.cancel_reason', 'Wrong hours for one host');
+    }
+
+    public function test_paid_period_or_one_whose_next_is_locked_cannot_be_cancelled(): void
+    {
+        $this->workSession($this->host, '2026-10-02', 2);
+        $this->workSession($this->host, '2026-10-09', 2);
+        $first = $this->endFirstPeriod();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$first->id}/request")->assertOk();
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-15 09:00'));
+        $this->artisan('payroll:roll-periods');
+        $second = $this->period('2026-10-08');
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$second->id}/request")->assertOk();
+
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$first->id}/cancel-request", ['reason' => 'Mistake'])
+            ->assertJsonValidationErrors('period');
+
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$second->id}/paid")->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$second->id}/cancel-request", ['reason' => 'Mistake'])
+            ->assertJsonValidationErrors('period');
+    }
+
+    public function test_kasbon_can_be_paid_back_outside_payroll(): void
+    {
+        $id = $this->recordAdvance(30000, 3);
+
+        $this->actingAs($this->admin)->postJson("/api/finance/cash-advances/{$id}/settle", ['note' => 'Paid in cash'])->assertOk();
+
+        $advance = CashAdvance::findOrFail($id);
+        $this->assertSame('paid', $advance->status);
+        $this->assertSame('Paid in cash', $advance->settled_note);
+        $this->assertSame(3, $advance->installments()->where('status', 'settled')->count());
+
+        $this->actingAs($this->admin)->postJson("/api/finance/cash-advances/{$id}/settle")->assertJsonValidationErrors('advance');
+        $this->actingAs($this->admin)->deleteJson("/api/finance/cash-advances/{$id}")->assertStatus(422);
+
+        // A settled kasbon is no longer deducted
+        $this->workSession($this->host, '2026-10-02', 2);
+        $period = $this->endFirstPeriod();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request");
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/paid")->assertOk();
+        $this->assertSame(0.0, SalarySlip::firstOrFail()->advance_deduction);
+    }
+
+    public function test_remaining_kasbon_can_be_spread_over_new_installments(): void
+    {
+        $id = $this->recordAdvance(30000, 2); // 15.000 + 15.000
+
+        $this->workSession($this->host, '2026-10-02', 2);
+        $period = $this->endFirstPeriod();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request");
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/paid")->assertOk();
+
+        // 15.000 left → 3 installments of 5.000, numbered after the one already deducted
+        $this->actingAs($this->admin)->postJson("/api/finance/cash-advances/{$id}/reschedule", ['installment_count' => 3])
+            ->assertOk()
+            ->assertJsonPath('advance.installment_count', 4)
+            ->assertJsonPath('advance.installments.0.status', 'deducted')
+            ->assertJsonPath('advance.installments.1.seq', 2)
+            ->assertJsonPath('advance.installments.3.seq', 4)
+            ->assertJsonPath('advance.installments.3.amount', 5000);
+
+        $this->actingAs($this->admin)->getJson('/api/finance/cash-advances')->assertJsonPath('advances.0.remaining_amount', 15000);
     }
 
     public function test_kasbon_with_deductions_cannot_be_removed(): void

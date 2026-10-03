@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * The agency asking the brand to pay a locked period.
  */
-#[Fillable(['payment_period_id', 'requested_by', 'requested_at', 'status', 'exported_report_url', 'paid_at'])]
+#[Fillable([
+    'payment_period_id', 'requested_by', 'requested_at', 'status', 'exported_report_url', 'paid_at',
+    'cancelled_at', 'cancelled_by', 'cancel_reason',
+])]
 class PaymentRequest extends Model
 {
     use Auditable, HasUuids;
@@ -21,6 +24,7 @@ class PaymentRequest extends Model
         return [
             'requested_at' => 'datetime',
             'paid_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 
@@ -32,5 +36,10 @@ class PaymentRequest extends Model
     public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requested_by');
+    }
+
+    public function canceller(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 }

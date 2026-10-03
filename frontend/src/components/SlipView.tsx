@@ -74,6 +74,17 @@ export default function SlipView({ slip }: { slip: SlipDetail }) {
           </tbody>
         </table>
 
+        {slip.skipped_deductions.length > 0 && (
+          <section className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-1">
+            <p className="font-medium">Not deducted this time (pay too low), moved to the next slip:</p>
+            {slip.skipped_deductions.map((deduction) => (
+              <p key={`${deduction.type}-${deduction.seq}`}>
+                Kasbon ({advanceLabels[deduction.type]}) installment {deduction.seq}/{deduction.installment_count}: {formatRupiah(deduction.amount)}
+              </p>
+            ))}
+          </section>
+        )}
+
         <footer className="text-xs text-slate-400">Generated {formatDate(slip.generated_at)}</footer>
       </article>
     </div>

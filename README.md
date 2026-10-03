@@ -105,7 +105,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 | `HostCalendar` | When a host or brand is busy (slots, covers, events), used to prevent clashes |
 | `PointService` | Points per 3-month period, violations, penalties, automatic SP1–SP3 |
 | `RatingService` | Monthly 1–5 host ratings and the suggested value |
-| `PayrollService` | Pay periods per brand, host pay, payment requests, salary slips, kasbon, CSV export |
+| `PayrollService` | Pay periods per brand, host pay, payment requests (blocked while reports await review; can be cancelled to reopen a period), salary slips, kasbon (installments, direct payback, rescheduling), CSV export |
 | `Notifier` / `DiscordClient` | Bell notifications, Discord channel posts and DMs, retries |
 | `TwoFactorService` / `Totp` | Two-factor sign-in for admin and finance, recovery codes |
 | `SettingsService` | Admin-editable rules layered over `config/vidhelp.php` |

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { errorMessage, payrollApi, type PeriodListItem, type PeriodStatus } from "@/lib/api";
+import { errorMessage, payrollApi, type CashAdvance, type PeriodListItem, type PeriodStatus } from "@/lib/api";
 import { formatDate, formatDuration, formatRupiah } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
@@ -178,7 +178,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
 
   if (detail.error) return <FormAlert tone="error">{detail.error}</FormAlert>;
   if (!detail.data) return <p className="text-gray-400">Loading…</p>;
-  const { period, summary, hosts, adjustments, slips } = detail.data;
+  const { period, summary, pending_reports: pendingReports, requests, hosts, adjustments, slips } = detail.data;
   const locked = period.status === "requested" || period.status === "paid";
 
   return (
@@ -195,8 +195,9 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
             {period.status === "waiting_payment" && (
               <button
                 type="button"
+                disabled={pendingReports > 0}
                 onClick={() => confirm("Lock this period and request payment? Hours and rates are frozen.") && act(() => payrollApi.requestPayment(token, period.id))}
-                className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500"
+                className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Request payment
               </button>
@@ -215,8 +216,25 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                 Mark as paid
               </button>
             )}
+            {period.status === "requested" && (
+              <InlineAction
+                label="Cancel request"
+                placeholder="Why? e.g. wrong hours for a host"
+                submitLabel="Cancel request"
+                required
+                buttonClass="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 text-sm hover:bg-red-500/10"
+                onSubmit={(reason) => act(() => payrollApi.cancelRequest(token, period.id, reason))}
+              />
+            )}
           </div>
         </div>
+
+        {period.status !== "paid" && pendingReports > 0 && (
+          <FormAlert tone="warning">
+            {pendingReports} live report{pendingReports === 1 ? "" : "s"} in this period {pendingReports === 1 ? "is" : "are"} still waiting for review. Payment
+            can be requested once operators approve or reject {pendingReports === 1 ? "it" : "them"}.
+          </FormAlert>
+        )}
 
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
           <Stat label="Target" value={`${summary.target_hours} h`} />
@@ -227,7 +245,37 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
           <Stat label="Host pay" value={formatRupiah(summary.total_amount)} />
         </dl>
         {period.status === "in_progress" && <p className="text-xs text-gray-400">Pay is an estimate at today&apos;s rates until payment is requested.</p>}
+        {period.status === "requested" && (
+          <p className="text-xs text-gray-400">
+            Cancelling unlocks the period so hours can be corrected; request again afterwards. Hours approved while it was locked stay in the next period.
+          </p>
+        )}
       </Card>
+
+      {requests.some((request) => request.status === "cancelled") && (
+        <Card title="Request history">
+          <ul className="space-y-2 text-sm">
+            {requests.map((request) => (
+              <li key={request.id} className="rounded-lg bg-slate-800 px-3 py-2">
+                <p className="text-gray-200">
+                  Requested {formatDate(request.requested_at)}
+                  {request.requester ? ` by ${request.requester.name}` : ""}
+                  {request.status === "cancelled" ? (
+                    <span className="text-red-300">
+                      {" "}
+                      · cancelled {request.cancelled_at ? formatDate(request.cancelled_at) : ""}
+                      {request.canceller ? ` by ${request.canceller.name}` : ""}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400"> · {request.status === "paid" ? "paid" : "current"}</span>
+                  )}
+                </p>
+                {request.cancel_reason && <p className="text-xs text-gray-400">{request.cancel_reason}</p>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card title="Hosts">
         {hosts.length === 0 && <p className="text-sm text-gray-400">No approved hours yet.</p>}
@@ -286,6 +334,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                   {formatRupiah(slip.gross_amount)}
                   {slip.advance_deduction > 0 && ` − ${formatRupiah(slip.advance_deduction)} kasbon`}
                 </span>
+                {(slip.skipped_deductions?.length ?? 0) > 0 && <span className="text-xs text-yellow-300">kasbon skipped (pay too low)</span>}
                 <span className="font-medium text-green-300">{formatRupiah(slip.net_amount)}</span>
                 <Link href={`${slipsPath}/${slip.id}`} className="text-xs text-purple-300 hover:text-white">
                   View
@@ -296,6 +345,71 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * A button that opens a one-field form (a reason, a note, a number) before running the action.
+ */
+function InlineAction({
+  label,
+  placeholder,
+  submitLabel,
+  type = "text",
+  required = false,
+  buttonClass,
+  onSubmit,
+}: {
+  label: string;
+  placeholder: string;
+  submitLabel: string;
+  type?: "text" | "number";
+  required?: boolean;
+  buttonClass: string;
+  onSubmit: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const missing = required && value.trim() === "";
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass}>
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (missing) return;
+        onSubmit(value.trim());
+        setOpen(false);
+        setValue("");
+      }}
+      className="flex flex-wrap items-center gap-2"
+    >
+      <input
+        autoFocus
+        type={type}
+        min={type === "number" ? 1 : undefined}
+        max={type === "number" ? 24 : undefined}
+        maxLength={type === "text" ? 255 : undefined}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className={`px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm ${type === "number" ? "w-28" : "min-w-56"}`}
+      />
+      <button type="submit" disabled={missing} className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50">
+        {submitLabel}
+      </button>
+      <button type="button" onClick={() => setOpen(false)} className="text-xs text-gray-400 hover:text-white">
+        Back
+      </button>
+    </form>
   );
 }
 
@@ -372,6 +486,12 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
 
 const advanceTypes = { early_payment: "Early payment", loan: "Loan" } as const;
 
+function installmentColor(installment: CashAdvance["installments"][number]): string {
+  if (installment.status === "deducted") return "bg-green-500";
+  if (installment.status === "settled") return "bg-blue-400";
+  return installment.skip_count > 0 ? "bg-yellow-500" : "bg-slate-700";
+}
+
 function Kasbon() {
   const { token } = useAuth();
   const [status, setStatus] = useState<"open" | "paid" | "">("open");
@@ -424,7 +544,8 @@ function Kasbon() {
         </Card>
       )}
       {advances.data?.advances.map((advance) => {
-        const paidCount = advance.installments.filter((installment) => installment.status === "deducted").length;
+        const paidCount = advance.installments.filter((installment) => installment.status !== "scheduled").length;
+        const skipped = advance.installments.find((installment) => installment.status === "scheduled" && installment.skip_count > 0);
 
         return (
           <Card key={advance.id}>
@@ -440,27 +561,62 @@ function Kasbon() {
                 </p>
               </div>
               <span className="text-sm text-gray-300">
-                {paidCount}/{advance.installment_count} installments · {formatRupiah(advance.total_amount - advance.deducted_amount)} left
+                {paidCount}/{advance.installment_count} installments · {formatRupiah(advance.remaining_amount)} left
               </span>
             </div>
             <div className="flex gap-1">
               {advance.installments.map((installment) => (
                 <span
                   key={installment.id}
-                  title={`${installment.seq}: ${formatRupiah(installment.amount)}`}
-                  className={`h-2 flex-1 rounded-full ${installment.status === "deducted" ? "bg-green-500" : "bg-slate-700"}`}
+                  title={`${installment.seq}: ${formatRupiah(installment.amount)}${installment.skip_count > 0 ? ` · skipped ${installment.skip_count}×` : ""}`}
+                  className={`h-2 flex-1 rounded-full ${installmentColor(installment)}`}
                 />
               ))}
             </div>
-            {paidCount === 0 && (
-              <button
-                type="button"
-                onClick={() => confirm("Remove this kasbon?") && act(() => payrollApi.removeAdvance(token, advance.id))}
-                className="text-xs text-red-300 hover:text-red-200"
-              >
-                Remove (recorded by mistake)
-              </button>
+            {skipped && (
+              <p className="text-xs text-yellow-300">
+                Installment {skipped.seq} ({formatRupiah(skipped.amount)}) was skipped on {skipped.skip_count} slip{skipped.skip_count === 1 ? "" : "s"}: pay was too
+                low. Consider rescheduling into smaller installments.
+              </p>
             )}
+            {advance.settled_at && (
+              <p className="text-xs text-gray-400">
+                Paid back directly on {formatDate(advance.settled_at)}
+                {advance.settler ? ` (recorded by ${advance.settler.name})` : ""}
+                {advance.settled_note ? ` · ${advance.settled_note}` : ""}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              {advance.status !== "paid" && (
+                <>
+                  <InlineAction
+                    label="Paid back directly"
+                    placeholder="Note (optional), e.g. cash on 3 Oct"
+                    submitLabel="Mark paid back"
+                    buttonClass="text-xs text-green-300 hover:text-green-200"
+                    onSubmit={(note) => act(() => payrollApi.settleAdvance(token, advance.id, note || null))}
+                  />
+                  <InlineAction
+                    label="Reschedule"
+                    placeholder="Installments"
+                    submitLabel="Spread the rest"
+                    type="number"
+                    required
+                    buttonClass="text-xs text-purple-300 hover:text-white"
+                    onSubmit={(count) => act(() => payrollApi.rescheduleAdvance(token, advance.id, Number(count)))}
+                  />
+                </>
+              )}
+              {paidCount === 0 && (
+                <button
+                  type="button"
+                  onClick={() => confirm("Remove this kasbon?") && act(() => payrollApi.removeAdvance(token, advance.id))}
+                  className="text-xs text-red-300 hover:text-red-200"
+                >
+                  Remove (recorded by mistake)
+                </button>
+              )}
+            </div>
           </Card>
         );
       })}

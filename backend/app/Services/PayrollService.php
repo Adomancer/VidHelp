@@ -6,6 +6,7 @@ use App\Models\Brand;
 use App\Models\CashAdvance;
 use App\Models\HostProfile;
 use App\Models\HourAdjustment;
+use App\Models\LiveReport;
 use App\Models\PaymentPeriod;
 use App\Models\PaymentRequest;
 use App\Models\SalarySlip;
@@ -188,6 +189,12 @@ class PayrollService
                 $this->fail('Payment was already requested for this period.');
             }
 
+            // Hours still under review would otherwise slip into the next period unnoticed
+            $pending = $this->pendingReports($period);
+            if ($pending > 0) {
+                $this->fail("{$pending} live report(s) in this period are still waiting for review. Approve or reject them first.");
+            }
+
             $totals = $this->hostTotals($period);
             $summary = $this->summary($period, $totals);
 
@@ -226,6 +233,65 @@ class PayrollService
     }
 
     /**
+     * Take back a request (e.g. a mistake spotted after sending the report): unlock the period
+     * so hours and adjustments can change, and undo the hours it carried to the next period.
+     * The cancelled request is kept as history.
+     */
+    public function cancelRequest(PaymentPeriod $period, User $by, string $reason): void
+    {
+        DB::transaction(function () use ($period, $by, $reason) {
+            $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
+
+            if ($period->status !== 'requested') {
+                $this->fail($period->status === 'paid' ? 'This period is already paid; it can no longer be reopened.' : 'Payment has not been requested for this period.');
+            }
+
+            $next = $this->nextPeriod($period);
+            if ($next?->isLocked()) {
+                $this->fail('The next period is already locked with the hours carried over from this one. Cancel its request first.');
+            }
+
+            $period->paymentRequest?->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+                'cancelled_by' => $by->id,
+                'cancel_reason' => $reason,
+            ]);
+
+            $period->items()->delete();
+            $period->update([
+                'worked_hours' => 0,
+                'achieved_hours' => 0,
+                'carried_out_hours' => 0,
+                'status' => 'waiting_payment',
+                'locked_at' => null,
+            ]);
+
+            $next?->update(['carried_in_hours' => 0]);
+        });
+    }
+
+    /**
+     * Live reports for the period's brand and dates that nobody has approved or rejected yet.
+     */
+    public function pendingReports(PaymentPeriod $period): int
+    {
+        return LiveReport::where('brand_id', $period->brand_id)
+            ->whereIn('status', ['submitted', 'flagged'])
+            ->whereHas('attendance', fn ($q) => $q
+                ->whereDate('session_date', '>=', $period->period_start)
+                ->whereDate('session_date', '<=', $period->period_end))
+            ->count();
+    }
+
+    private function nextPeriod(PaymentPeriod $period): ?PaymentPeriod
+    {
+        return PaymentPeriod::where('brand_id', $period->brand_id)
+            ->whereDate('period_start', CarbonImmutable::parse($period->period_end->toDateString())->addDay())
+            ->first();
+    }
+
+    /**
      * The brand paid: close the period and create a salary slip per host (kasbon deducted).
      *
      * @return Collection<int, SalarySlip>
@@ -252,8 +318,12 @@ class PayrollService
                     'generated_at' => now(),
                 ]);
 
-                $deducted = $this->deductAdvances($slip, $period);
-                $slip->update(['advance_deduction' => $deducted, 'net_amount' => $slip->gross_amount - $deducted]);
+                [$deducted, $skipped] = $this->deductAdvances($slip, $period);
+                $slip->update([
+                    'advance_deduction' => $deducted,
+                    'skipped_deductions' => $skipped ?: null,
+                    'net_amount' => $slip->gross_amount - $deducted,
+                ]);
 
                 $this->notifier->toUsers(
                     $item->host->user,
@@ -270,13 +340,16 @@ class PayrollService
     }
 
     /**
-     * Take the next installment of each of the host's open kasbon (oldest first) if the slip covers it;
-     * an installment that doesn't fit waits for the next slip.
+     * Take the next installment of each of the host's open kasbon (oldest first) if the slip covers it.
+     * An installment that doesn't fit waits for the next slip; it is counted and listed on this slip as skipped.
+     *
+     * @return array{0: float, 1: list<array{type: string, seq: int, installment_count: int, amount: float}>}
      */
-    private function deductAdvances(SalarySlip $slip, PaymentPeriod $period): float
+    private function deductAdvances(SalarySlip $slip, PaymentPeriod $period): array
     {
         $remaining = $slip->gross_amount;
         $deducted = 0.0;
+        $skipped = [];
 
         $advances = CashAdvance::where('host_id', $slip->host_id)
             ->whereIn('status', ['unpaid', 'in_progress'])
@@ -285,7 +358,18 @@ class PayrollService
 
         foreach ($advances as $advance) {
             $installment = $advance->installments()->where('status', 'scheduled')->first();
-            if (! $installment || $installment->amount > $remaining) {
+            if (! $installment) {
+                continue;
+            }
+            if ($installment->amount > $remaining) {
+                $installment->increment('skip_count');
+                $skipped[] = [
+                    'type' => $advance->type,
+                    'seq' => $installment->seq,
+                    'installment_count' => $advance->installment_count,
+                    'amount' => $installment->amount,
+                ];
+
                 continue;
             }
 
@@ -303,7 +387,7 @@ class PayrollService
             $advance->update(['status' => $open ? 'in_progress' : 'paid']);
         }
 
-        return $deducted;
+        return [$deducted, $skipped];
     }
 
     /**
@@ -320,20 +404,70 @@ class PayrollService
                 'requested_at' => now(),
             ]);
 
-            $count = $advance->installment_count;
-            $total = (int) round($advance->total_amount);
-            $each = intdiv($total, $count);
-
-            for ($seq = 1; $seq <= $count; $seq++) {
-                $advance->installments()->create([
-                    'seq' => $seq,
-                    'amount' => $seq === $count ? $total - $each * ($count - 1) : $each,
-                    'status' => 'scheduled',
-                ]);
-            }
+            $this->scheduleInstallments($advance, (int) round($advance->total_amount), $advance->installment_count, 1);
 
             return $advance->load('installments');
         });
+    }
+
+    /**
+     * The host paid the rest back outside payroll (cash or transfer): close every open installment.
+     */
+    public function settleAdvance(CashAdvance $advance, User $by, ?string $note): CashAdvance
+    {
+        return DB::transaction(function () use ($advance, $by, $note) {
+            $advance = CashAdvance::lockForUpdate()->findOrFail($advance->id);
+            if ($advance->status === 'paid') {
+                throw ValidationException::withMessages(['advance' => ['This kasbon is already paid back.']]);
+            }
+
+            $advance->installments()->where('status', 'scheduled')->update(['status' => 'settled']);
+            $advance->update([
+                'status' => 'paid',
+                'settled_at' => now(),
+                'settled_by' => $by->id,
+                'settled_note' => $note,
+            ]);
+
+            return $advance->load('installments');
+        });
+    }
+
+    /**
+     * Spread what's still owed over a new number of installments (e.g. the host's pay dropped).
+     */
+    public function rescheduleAdvance(CashAdvance $advance, int $count): CashAdvance
+    {
+        return DB::transaction(function () use ($advance, $count) {
+            $advance = CashAdvance::lockForUpdate()->findOrFail($advance->id);
+            $open = $advance->installments()->where('status', 'scheduled')->get();
+            if ($open->isEmpty()) {
+                throw ValidationException::withMessages(['advance' => ['Nothing is left to pay on this kasbon.']]);
+            }
+
+            $firstSeq = $open->min('seq');
+            $advance->installments()->where('status', 'scheduled')->delete();
+            $this->scheduleInstallments($advance, (int) round($open->sum('amount')), $count, $firstSeq);
+            $advance->update(['installment_count' => $firstSeq - 1 + $count]);
+
+            return $advance->load('installments');
+        });
+    }
+
+    /**
+     * Split $total into $count equal installments numbered from $firstSeq (the last one takes the rounding).
+     */
+    private function scheduleInstallments(CashAdvance $advance, int $total, int $count, int $firstSeq): void
+    {
+        $each = intdiv($total, $count);
+
+        for ($i = 1; $i <= $count; $i++) {
+            $advance->installments()->create([
+                'seq' => $firstSeq + $i - 1,
+                'amount' => $i === $count ? $total - $each * ($count - 1) : $each,
+                'status' => 'scheduled',
+            ]);
+        }
     }
 
     /**
@@ -362,6 +496,7 @@ class PayrollService
                 'installment_count' => $installment->advance->installment_count,
                 'amount' => $installment->amount,
             ])->values(),
+            'skipped_deductions' => $slip->skipped_deductions ?? [],
             'bank' => $slip->host->sensitiveData ? [
                 'bank_name' => $slip->host->sensitiveData->bank_name,
                 'account' => $slip->host->sensitiveData->bank_account_masked,
@@ -376,8 +511,10 @@ class PayrollService
      */
     public function rollPeriods(): int
     {
-        $closed = PaymentPeriod::where('status', 'in_progress')->whereDate('period_end', '<', today())
-            ->update(['status' => 'waiting_payment']);
+        // One by one rather than a bulk update, so each change lands in the audit log
+        $ended = PaymentPeriod::where('status', 'in_progress')->whereDate('period_end', '<', today())->get();
+        $ended->each(fn (PaymentPeriod $period) => $period->update(['status' => 'waiting_payment']));
+        $closed = $ended->count();
 
         Brand::whereNotNull('payroll_start_date')->where('status', 'active')->get()
             ->each(fn (Brand $brand) => $this->periodFor($brand, today()));

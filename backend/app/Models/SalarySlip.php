@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * A host's pay for one paid period: gross, kasbon deducted, net.
  */
 #[Fillable([
-    'host_id', 'payment_period_id', 'gross_amount', 'advance_deduction', 'net_amount',
+    'host_id', 'payment_period_id', 'gross_amount', 'advance_deduction', 'skipped_deductions', 'net_amount',
     'pdf_path', 'generated_at', 'sent_at',
 ])]
 class SalarySlip extends Model
@@ -25,6 +25,7 @@ class SalarySlip extends Model
         return [
             'gross_amount' => 'float',
             'advance_deduction' => 'float',
+            'skipped_deductions' => 'array',
             'net_amount' => 'float',
             'generated_at' => 'datetime',
             'sent_at' => 'datetime',

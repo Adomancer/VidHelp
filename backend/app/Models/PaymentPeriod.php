@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * One payment cycle of a brand.
  * in_progress → (period ends) waiting_payment → (admin requests payment, locked) requested → paid.
+ * Cancelling the request unlocks it again (requested → waiting_payment).
  */
 #[Fillable([
     'brand_id', 'period_start', 'period_end', 'target_hours', 'worked_hours', 'achieved_hours',
@@ -61,9 +62,16 @@ class PaymentPeriod extends Model
         return $this->hasMany(HourAdjustment::class);
     }
 
+    /** The live request (a period has at most one that isn't cancelled). */
     public function paymentRequest(): HasOne
     {
-        return $this->hasOne(PaymentRequest::class);
+        return $this->hasOne(PaymentRequest::class)->where('status', '!=', 'cancelled');
+    }
+
+    /** Every request, cancelled ones included. */
+    public function paymentRequests(): HasMany
+    {
+        return $this->hasMany(PaymentRequest::class)->latest('requested_at');
     }
 
     public function slips(): HasMany

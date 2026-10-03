@@ -163,6 +163,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::post('/payroll/periods/{period}/adjustments', [PayrollController::class, 'storeAdjustment']);
         Route::delete('/payroll/adjustments/{adjustment}', [PayrollController::class, 'destroyAdjustment']);
         Route::post('/payroll/periods/{period}/request', [PayrollController::class, 'requestPayment']);
+        Route::post('/payroll/periods/{period}/cancel-request', [PayrollController::class, 'cancelRequest']);
         Route::post('/payroll/periods/{period}/paid', [PayrollController::class, 'markPaid']);
         Route::get('/payroll/periods/{period}/export', [PayrollController::class, 'export']);
         Route::get('/payroll/slips/{slip}', [PayrollController::class, 'slip']);
@@ -170,6 +171,8 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         // Kasbon (cash advances)
         Route::get('/cash-advances', [CashAdvanceController::class, 'index']);
         Route::post('/cash-advances', [CashAdvanceController::class, 'store']);
+        Route::post('/cash-advances/{advance}/settle', [CashAdvanceController::class, 'settle']);
+        Route::post('/cash-advances/{advance}/reschedule', [CashAdvanceController::class, 'reschedule']);
         Route::delete('/cash-advances/{advance}', [CashAdvanceController::class, 'destroy']);
     });
 

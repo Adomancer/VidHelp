@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'cash_advance_id', 'payment_period_id', 'salary_slip_id', 'seq', 'amount',
-    'deducted_brand_id', 'status', 'deducted_at',
+    'deducted_brand_id', 'status', 'skip_count', 'deducted_at',
 ])]
 class CashAdvanceInstallment extends Model
 {
@@ -20,6 +20,7 @@ class CashAdvanceInstallment extends Model
         return [
             'seq' => 'integer',
             'amount' => 'float',
+            'skip_count' => 'integer',
             'deducted_at' => 'datetime',
         ];
     }

@@ -70,7 +70,7 @@ class PayrollController extends Controller
     }
 
     /**
-     * One period: per-host pay, brand invoice numbers, adjustments, payment request and slips.
+     * One period: per-host pay, brand invoice numbers, adjustments, payment requests (cancelled ones too) and slips.
      */
     public function show(PaymentPeriod $period): JsonResponse
     {
@@ -79,6 +79,8 @@ class PayrollController extends Controller
         return response()->json([
             'period' => $period->load(['brand:id,name', 'paymentRequest.requester:id,name']),
             'summary' => $this->payroll->summary($period, $totals),
+            'pending_reports' => $period->isLocked() ? 0 : $this->payroll->pendingReports($period),
+            'requests' => $period->paymentRequests()->with(['requester:id,name', 'canceller:id,name'])->get(),
             'hosts' => $totals,
             'adjustments' => $period->adjustments()->with(['host.user', 'creator:id,name'])->latest()->get(),
             'slips' => $period->slips()->with('host.user')->get(),
@@ -125,6 +127,18 @@ class PayrollController extends Controller
         $this->payroll->requestPayment($period, $request->user());
 
         return response()->json(['message' => 'Period locked and payment requested. Download the report for the brand.']);
+    }
+
+    /**
+     * Take the request back and unlock the period so it can be corrected and requested again.
+     */
+    public function cancelRequest(Request $request, PaymentPeriod $period): JsonResponse
+    {
+        $validated = $request->validate(['reason' => 'required|string|max:255']);
+
+        $this->payroll->cancelRequest($period, $request->user(), $validated['reason']);
+
+        return response()->json(['message' => 'Request cancelled; the period is open for changes again.']);
     }
 
     public function markPaid(PaymentPeriod $period): JsonResponse
