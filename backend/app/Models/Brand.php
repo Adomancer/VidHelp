@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'is_obs', 'target_hours_per_period', 'payment_cycle_days', 'payroll_start_date', 'status'])]
+#[Fillable(['name', 'is_obs', 'product_knowledge','target_hours_per_period', 'payment_cycle_days', 'payroll_start_date', 'status'])]
 class Brand extends Model
 {
     use Auditable, HasUuids;

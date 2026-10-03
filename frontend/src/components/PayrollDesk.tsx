@@ -11,6 +11,7 @@ import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import DurationInput from "./DurationInput";
 import FormAlert from "./FormAlert";
+import Modal from "./Modal";
 import SubmitButton from "./SubmitButton";
 
 type Notice = { tone: "success" | "error"; text: string } | null;
@@ -522,8 +523,8 @@ function Kasbon() {
           <option value="paid">Paid back</option>
           <option value="">All</option>
         </select>
-        <button type="button" onClick={() => setCreating(!creating)} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500">
-          {creating ? "Close" : "Record kasbon"}
+        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500">
+          Record kasbon
         </button>
       </div>
 
@@ -533,6 +534,7 @@ function Kasbon() {
             setCreating(false);
             act(async () => ({ message }));
           }}
+          onCancel={() => setCreating(false)}
         />
       )}
       {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
@@ -624,7 +626,7 @@ function Kasbon() {
   );
 }
 
-function AdvanceForm({ onDone }: { onDone: (message: string) => void }) {
+function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
   const hosts = useApiData("payroll-hosts-all", () => payrollApi.hosts(token));
   const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
@@ -642,7 +644,7 @@ function AdvanceForm({ onDone }: { onDone: (message: string) => void }) {
   );
 
   return (
-    <Card title="Record kasbon" description="Paid back in equal installments from the host's next salary slips (any brand).">
+    <Modal title="Record kasbon" description="Paid back in equal installments from the host's next salary slips (any brand)." onClose={onCancel}>
       <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -680,10 +682,15 @@ function AdvanceForm({ onDone }: { onDone: (message: string) => void }) {
           <span className="block text-xs text-gray-400">Notes</span>
           <input name="notes" maxLength={255} className={input} />
         </label>
-        <div className="w-40">
-          <SubmitButton loading={loading}>Record</SubmitButton>
+        <div className="sm:col-span-2 flex gap-3">
+          <div className="w-40">
+            <SubmitButton loading={loading}>Record</SubmitButton>
+          </div>
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+            Cancel
+          </button>
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }

@@ -241,6 +241,50 @@ class PointsTest extends TestCase
             ->assertJsonPath('ratings.0.rating', 4.2);
     }
 
+    public function test_admin_exports_ratings_with_point_and_sp_history_of_the_month(): void
+    {
+        $this->violation(['reason' => 'Late 20 minutes'])->assertCreated();
+        $this->actingAs($this->admin)->postJson('/api/admin/warning-letters', [
+            'host_id' => $this->host->id, 'level' => 1, 'reason' => 'Repeated no-show',
+        ])->assertCreated();
+        $this->actingAs($this->admin)->putJson('/api/admin/ratings', [
+            'host_id' => $this->host->id, 'month_year' => '2026-10', 'rating' => 4.2, 'note' => 'Good',
+        ])->assertOk();
+        $name = $this->host->user->name;
+
+        $sheets = $this->xlsxSheets(
+            $this->actingAs($this->admin)->get('/api/admin/ratings/export?month=2026-10')
+                ->assertOk()
+                ->assertDownload('ratings-2026-10.xlsx')
+        );
+
+        $this->assertSame(['Ratings', 'Point history', 'SP history'], array_keys($sheets));
+        $rating = collect($sheets['Ratings'])->firstWhere(0, $name);
+        $this->assertEquals([$name, 1, 4.8, 4.2, 'Good', $this->admin->name], $rating);
+        $this->assertEquals([$name, 'Telat', -5, 'Late 20 minutes'], array_slice($sheets['Point history'][1], 1, 4));
+        $this->assertSame([$name, 'SP1', 'Repeated no-show', $this->admin->name, 'No'], array_slice($sheets['SP history'][1], 1));
+    }
+
+    public function test_admin_sees_a_hosts_full_point_and_sp_history(): void
+    {
+        $this->violation()->assertCreated();
+        $this->travelTo(CarbonImmutable::parse('2027-01-10 10:00')); // next three-month period
+        $this->violation()->assertCreated();
+        $this->actingAs($this->admin)->postJson('/api/admin/warning-letters', [
+            'host_id' => $this->host->id, 'level' => 2, 'reason' => 'Second warning',
+        ])->assertCreated();
+
+        $this->actingAs($this->admin)->getJson("/api/admin/ratings/hosts/{$this->host->id}/history")
+            ->assertOk()
+            ->assertJsonCount(2, 'logs')
+            ->assertJsonPath('logs.0.occurred_on', '2027-01-10')
+            ->assertJsonPath('logs.1.violation_type.name', 'Telat')
+            ->assertJsonPath('warning_letters.0.level', 2);
+
+        $this->actingAs($this->operator)->getJson("/api/admin/ratings/hosts/{$this->host->id}/history")->assertForbidden();
+        $this->actingAs($this->operator)->get('/api/admin/ratings/export')->assertForbidden();
+    }
+
     public function test_rating_must_be_within_the_scale(): void
     {
         $this->actingAs($this->admin)->putJson('/api/admin/ratings', [

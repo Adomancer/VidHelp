@@ -17,6 +17,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { BackupStatusBadge, LetterBadge, reasonLabels, RequestTypeBadge } from "@/components/BackupBadges";
 import Card from "@/components/Card";
 import FormAlert from "@/components/FormAlert";
+import Modal from "@/components/Modal";
 import SubmitButton from "@/components/SubmitButton";
 import UserAvatar from "@/components/UserAvatar";
 
@@ -189,7 +190,14 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
 
   return (
     <div className="space-y-4">
-      {formOpen ? (
+      <button
+        type="button"
+        onClick={() => setFormOpen(true)}
+        className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500"
+      >
+        I need a backup
+      </button>
+      {formOpen && (
         <RequestForm
           onDone={(message) => {
             setFormOpen(false);
@@ -197,14 +205,6 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
           }}
           onCancel={() => setFormOpen(false)}
         />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setFormOpen(true)}
-          className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500"
-        >
-          I need a backup
-        </button>
       )}
 
       {requests?.length === 0 && <p className="text-sm text-gray-400 text-center">You haven&apos;t requested a backup yet.</p>}
@@ -304,7 +304,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
   // Nothing to request for (yet): no form, so it can't be sent without a session
   if (!occurrence) {
     return (
-      <Card title="Request a backup">
+      <Modal title="Request a backup" onClose={onCancel}>
         {slots.error && <FormAlert tone="error">{slots.error}</FormAlert>}
         <p className="text-sm text-gray-400">{slots.data ? "You have no sessions you can still request a backup for." : "Loading your sessions…"}</p>
         {slots.data && settings && (
@@ -316,12 +316,12 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         <button type="button" onClick={onCancel} className="px-4 py-2 rounded-xl text-gray-300 hover:bg-slate-800">
           Close
         </button>
-      </Card>
+      </Modal>
     );
   }
 
   return (
-    <Card title="Request a backup" description="Pick the session you can't do. It goes on the backup board right away; an admin approves who covers it.">
+    <Modal title="Request a backup" description="Pick the session you can't do. It goes on the backup board right away; an admin approves who covers it." onClose={onCancel}>
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
@@ -437,7 +437,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
           </button>
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }
 

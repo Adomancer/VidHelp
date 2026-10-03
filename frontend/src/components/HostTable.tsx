@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import { operatorApi, type HostListItem } from "@/lib/api";
+import { errorMessage, operatorApi, type HostListItem } from "@/lib/api";
 import { formatTenure } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import AssignmentEditor from "./AssignmentEditor";
@@ -24,6 +24,20 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
   const [brandId, setBrandId] = useState("");
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function exportExcel() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      await operatorApi.exportHosts(token, { search, brand_id: brandId });
+    } catch (caught) {
+      setExportError(errorMessage(caught));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const hosts = useApiData(JSON.stringify({ search, brandId, page }), () =>
@@ -64,8 +78,18 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={exportExcel}
+          disabled={exporting}
+          title="All hosts matching the search and brand filter"
+          className="px-4 py-2 rounded-lg border border-slate-700 text-gray-200 text-sm whitespace-nowrap hover:bg-slate-800 disabled:opacity-40"
+        >
+          {exporting ? "Exporting…" : "Export Excel"}
+        </button>
       </div>
 
+      {exportError && <FormAlert tone="error">{exportError}</FormAlert>}
       {hosts.error && <FormAlert tone="error">{hosts.error}</FormAlert>}
 
       <div className={`bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto ${hosts.loading ? "opacity-60" : ""}`}>

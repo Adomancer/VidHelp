@@ -9,6 +9,7 @@ import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import FormAlert from "./FormAlert";
+import Modal from "./Modal";
 import SubmitButton from "./SubmitButton";
 
 type Notice = { tone: "success" | "error"; text: string } | null;
@@ -29,8 +30,8 @@ export default function EventManager() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button type="button" onClick={() => setCreating(!creating)} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500">
-          {creating ? "Close" : "New event"}
+        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500">
+          New event
         </button>
       </div>
 
@@ -42,6 +43,7 @@ export default function EventManager() {
             setSelected(id);
             events.reload();
           }}
+          onCancel={() => setCreating(false)}
         />
       )}
       {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
@@ -247,7 +249,7 @@ function EventSettings({
   );
 }
 
-function EventForm({ onDone }: { onDone: (message: string, id: string) => void }) {
+function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
@@ -279,7 +281,7 @@ function EventForm({ onDone }: { onDone: (message: string, id: string) => void }
   );
 
   return (
-    <Card title="New event" description="Hosts of the brand claim the blocks, first come first served.">
+    <Modal title="New event" description="Hosts of the brand claim the blocks, first come first served." onClose={onCancel} wide>
       <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -319,10 +321,15 @@ function EventForm({ onDone }: { onDone: (message: string, id: string) => void }
           <input type="checkbox" name="open_full_schedule" className="accent-purple-500" />
           Replace the brand&apos;s regular schedule on these days (&quot;jadwal dibuka kosong&quot;)
         </label>
-        <div className="w-40">
-          <SubmitButton loading={loading}>Create event</SubmitButton>
+        <div className="sm:col-span-2 flex gap-3">
+          <div className="w-40">
+            <SubmitButton loading={loading}>Create event</SubmitButton>
+          </div>
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+            Cancel
+          </button>
         </div>
       </form>
-    </Card>
+    </Modal>
   );
 }

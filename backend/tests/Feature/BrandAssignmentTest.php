@@ -142,11 +142,81 @@ class BrandAssignmentTest extends TestCase
             ->assertJsonPath('data.0.id', $assigned->id);
     }
 
+    public function test_operator_exports_every_filtered_host_to_excel(): void
+    {
+        $brand = $this->brand(['name' => 'Wardah']);
+        $other = $this->brand(['name' => 'Emina']);
+        $assigned = $this->host();
+        $assigned->update(['phone' => '08123456789']);
+        $assigned->assignments()->create(['brand_id' => $brand->id, 'status' => 'active', 'is_leader' => true]);
+        $assigned->assignments()->create(['brand_id' => $other->id, 'status' => 'banned']);
+        $this->host(); // not assigned
+
+        $sheets = $this->xlsxSheets(
+            $this->actingAs($this->operator)->get("/api/operator/hosts/export?brand_id={$brand->id}")
+                ->assertOk()
+                ->assertDownload('hosts-'.today()->toDateString().'.xlsx')
+        );
+
+        $this->assertSame(['Name', 'Email', 'Phone', 'Guardian phone', 'Status', 'Rate level', 'Join date', 'Brands'], $sheets['Hosts'][0]);
+        $this->assertCount(2, $sheets['Hosts']);
+        $this->assertSame($assigned->user->email, $sheets['Hosts'][1][1]);
+        $this->assertSame('08123456789', $sheets['Hosts'][1][2]);
+        $this->assertSame('Wardah (leader)', $sheets['Hosts'][1][7]);
+    }
+
+    public function test_host_export_writes_formula_like_names_as_plain_text(): void
+    {
+        $host = $this->host();
+        $host->user->update(['name' => '=HYPERLINK("http://evil.test","Click")']);
+
+        $response = $this->actingAs($this->operator)->get('/api/operator/hosts/export')->assertOk();
+        $zip = new \ZipArchive;
+        $zip->open($response->baseResponse->getFile()->getPathname());
+        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+
+        $this->assertStringNotContainsString('<f>', $sheetXml);
+        $this->assertSame('=HYPERLINK("http://evil.test","Click")', $this->xlsxSheets($response)['Hosts'][1][0]);
+    }
+
     public function test_host_cannot_use_operator_routes(): void
     {
         $host = $this->host();
 
         $this->actingAs($host->user)->getJson('/api/operator/hosts')->assertForbidden();
         $this->actingAs($host->user)->postJson('/api/operator/assignments', [])->assertForbidden();
+    }
+
+    public function test_admin_saves_product_knowledge(): void
+    {
+        $id = $this->actingAs($this->admin)->postJson('/api/admin/brands', [
+            'name' => 'Skintific',
+            'product_knowledge' => "Serum 5X Ceramide\nHarga Rp 129.000",
+            'target_hours_per_period' => 120,
+            'payment_cycle_days' => 14,
+        ])->assertCreated()
+            ->assertJsonPath('brand.product_knowledge', "Serum 5X Ceramide\nHarga Rp 129.000")
+            ->json('brand.id');
+
+        $this->actingAs($this->admin)->putJson("/api/admin/brands/{$id}", ['product_knowledge' => null])
+            ->assertOk()
+            ->assertJsonPath('brand.product_knowledge', null);
+    }
+
+    public function test_host_sees_product_knowledge_of_active_assigned_brands_only(): void
+    {
+        $host = $this->host();
+        $assigned = $this->brand(['name' => 'Wardah', 'product_knowledge' => 'Lip cream 12 shades']);
+        $banned = $this->brand(['product_knowledge' => 'Secret']);
+        $this->brand(['product_knowledge' => 'Not mine']);
+        $host->assignments()->create(['brand_id' => $assigned->id, 'status' => 'active']);
+        $host->assignments()->create(['brand_id' => $banned->id, 'status' => 'banned']);
+
+        $this->actingAs($host->user)->getJson('/api/host/brands')
+            ->assertOk()
+            ->assertJsonCount(1, 'brands')
+            ->assertJsonPath('brands.0.name', 'Wardah')
+            ->assertJsonPath('brands.0.product_knowledge', 'Lip cream 12 shades');
     }
 }
