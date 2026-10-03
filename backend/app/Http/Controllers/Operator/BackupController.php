@@ -11,6 +11,7 @@ use App\Services\BackupService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackupController extends Controller
@@ -62,8 +63,24 @@ class BackupController extends Controller
     }
 
     /**
+     * Every active host who could cover one session of a slot, before a request exists
+     * (free ones first), so staff can pick the cover straight from the schedule.
+     */
+    public function slotCandidates(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'slot_id' => 'required|exists:schedule_slots,id',
+            'backup_date' => 'required|date_format:Y-m-d',
+        ]);
+
+        $draft = $this->backups->draft(ScheduleSlot::with('assignment')->findOrFail($validated['slot_id']), $validated['backup_date']);
+
+        return response()->json(['candidates' => $this->backups->candidates($draft)]);
+    }
+
+    /**
      * Request a backup on a host's behalf (e.g. they called in sick). Opens immediately,
-     * also for a session starting soon.
+     * also for a session starting soon. With `host_id`, that host covers it right away.
      */
     public function store(Request $request): JsonResponse
     {
@@ -72,15 +89,31 @@ class BackupController extends Controller
             'backup_date' => 'required|date_format:Y-m-d',
             'reason_type' => 'required|in:sick,permit,other',
             'reason' => 'nullable|string|max:1000',
+            'host_id' => 'nullable|exists:host_profiles,id',
         ]);
 
+        $slot = ScheduleSlot::with('assignment')->findOrFail($validated['slot_id']);
+        $cover = isset($validated['host_id']) ? HostProfile::with('user')->findOrFail($validated['host_id']) : null;
+
+        // Check the cover first, so a request isn't left behind when they can't take it
+        if ($cover && $reason = $this->backups->coverReason($cover, $this->backups->draft($slot, $validated['backup_date']))) {
+            throw ValidationException::withMessages(['host_id' => [$reason]]);
+        }
+
         $backup = $this->backups->create(
-            ScheduleSlot::with('assignment')->findOrFail($validated['slot_id']),
+            $slot,
             $validated['backup_date'],
             ['reason_type' => $validated['reason_type'], 'reason' => $validated['reason'] ?? null],
             $request->user(),
             byStaff: true,
+            announce: $cover === null,
         );
+
+        if ($cover) {
+            $backup = $this->backups->fill($backup, $cover, $request->user())->load('filler.user');
+
+            return response()->json(['request' => $backup, 'message' => 'Backup host approved'], 201);
+        }
 
         return response()->json(['request' => $backup, 'message' => 'Backup request opened'], 201);
     }

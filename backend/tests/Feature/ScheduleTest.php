@@ -180,6 +180,141 @@ class ScheduleTest extends TestCase
         $this->assertNull(ScheduleSlot::find($id));
     }
 
+    public function test_stopping_a_slot_from_a_later_date(): void
+    {
+        $slot = ScheduleSlot::create([
+            'assignment_id' => $this->assignment($this->brand())->id,
+            'day_of_week' => 1, 'start_time' => '14:00', 'end_time' => '15:00',
+            'effective_from' => today()->subMonth(),
+        ]);
+
+        $this->actingAs($this->operator)->deleteJson("/api/operator/schedules/{$slot->id}?from=".today()->subDay()->toDateString())
+            ->assertJsonValidationErrors('from');
+
+        $this->actingAs($this->operator)->deleteJson("/api/operator/schedules/{$slot->id}?from=".today()->addWeek()->toDateString())
+            ->assertOk();
+
+        $this->assertSame(today()->addDays(6)->toDateString(), $slot->fresh()->effective_to->toDateString());
+    }
+
+    public function test_editing_from_a_later_date_keeps_the_weeks_before(): void
+    {
+        $slot = ScheduleSlot::create([
+            'assignment_id' => $this->assignment($this->brand())->id,
+            'day_of_week' => 1, 'start_time' => '14:00', 'end_time' => '15:00',
+            'effective_from' => today()->subMonth(),
+        ]);
+        $nextWeek = today()->addWeek()->toDateString();
+
+        $this->actingAs($this->operator)->putJson("/api/operator/schedules/{$slot->id}", ['end_time' => '16:00', 'apply_from' => $nextWeek])
+            ->assertOk()
+            ->assertJsonPath('slot.end_time', '16:00')
+            ->assertJsonPath('slot.effective_from', $nextWeek)
+            ->assertJsonPath('slot.previous_slot_id', $slot->id);
+
+        $slot->refresh();
+        $this->assertSame('15:00', $slot->end_time);
+        $this->assertSame(today()->addDays(6)->toDateString(), $slot->effective_to->toDateString());
+    }
+
+    public function test_editing_a_slot_that_has_not_started_changes_it_in_place(): void
+    {
+        $id = $this->addSlot($this->assignment($this->brand()), 1, '14:00', '15:00', [
+            'effective_from' => today()->addWeeks(2)->toDateString(),
+        ])->json('slot.id');
+
+        $this->actingAs($this->operator)
+            ->putJson("/api/operator/schedules/{$id}", ['end_time' => '16:00', 'apply_from' => today()->addWeek()->toDateString()])
+            ->assertOk()
+            ->assertJsonPath('slot.id', $id)
+            ->assertJsonPath('slot.end_time', '16:00');
+
+        $this->assertSame(1, ScheduleSlot::count());
+    }
+
+    public function test_undoing_an_edit_brings_back_the_earlier_slot(): void
+    {
+        $slot = ScheduleSlot::create([
+            'assignment_id' => $this->assignment($this->brand())->id,
+            'day_of_week' => 1, 'start_time' => '14:00', 'end_time' => '15:00',
+            'effective_from' => today()->subMonth(),
+        ]);
+
+        $newId = $this->actingAs($this->operator)
+            ->putJson("/api/operator/schedules/{$slot->id}", ['end_time' => '16:00', 'apply_from' => today()->addWeek()->toDateString()])
+            ->json('slot.id');
+
+        $this->actingAs($this->operator)->postJson("/api/operator/schedules/{$newId}/undo")
+            ->assertOk()
+            ->assertJsonPath('slot.id', $slot->id);
+
+        $this->assertNull(ScheduleSlot::find($newId));
+        $this->assertNull($slot->fresh()->effective_to);
+    }
+
+    public function test_undoing_a_new_slot_removes_it_only_shortly_after(): void
+    {
+        $assignment = $this->assignment($this->brand());
+        $first = $this->addSlot($assignment, 1, '14:00', '15:00')->json('slot.id');
+
+        $this->actingAs($this->operator)->postJson("/api/operator/schedules/{$first}/undo")->assertOk();
+        $this->assertNull(ScheduleSlot::find($first));
+
+        $second = $this->addSlot($assignment, 1, '14:00', '15:00')->json('slot.id');
+        $this->travel(11)->minutes();
+
+        $this->actingAs($this->operator)->postJson("/api/operator/schedules/{$second}/undo")->assertUnprocessable();
+        $this->assertNotNull(ScheduleSlot::find($second));
+    }
+
+    public function test_conflict_check_names_the_clashing_slot(): void
+    {
+        $first = $this->assignment($this->brand());
+        $second = $this->assignment($this->brand(), sameHostAs: $first);
+        $clashId = $this->addSlot($first, 2, '16:00', '18:00')->json('slot.id');
+
+        $query = [
+            'assignment_id' => $second->id, 'day_of_week' => 2, 'start_time' => '17:00', 'end_time' => '19:00',
+            'effective_from' => today()->toDateString(),
+        ];
+
+        $this->actingAs($this->operator)->getJson('/api/operator/schedules/conflicts?'.http_build_query($query))
+            ->assertOk()
+            ->assertJsonCount(1, 'conflicts')
+            ->assertJsonPath('conflicts.0.brand_name', $first->brand->name)
+            ->assertJsonPath('conflicts.0.same_host', true);
+
+        $this->actingAs($this->operator)->getJson('/api/operator/schedules/conflicts?'.http_build_query($query + ['ignore_id' => $clashId]))
+            ->assertJsonCount(0, 'conflicts');
+    }
+
+    public function test_history_follows_an_edit_from_a_later_date(): void
+    {
+        $id = $this->addSlot($this->assignment($this->brand()), 1, '14:00', '15:00')->json('slot.id');
+
+        $newId = $this->actingAs($this->operator)
+            ->putJson("/api/operator/schedules/{$id}", ['end_time' => '16:00', 'apply_from' => today()->addWeek()->toDateString()])
+            ->json('slot.id');
+
+        // Added, ended for the edit, continued as the new slot
+        $this->actingAs($this->operator)->getJson("/api/operator/schedules/{$newId}/history")
+            ->assertOk()
+            ->assertJsonCount(3, 'history');
+    }
+
+    public function test_week_view_includes_slots_starting_mid_week(): void
+    {
+        $brand = $this->brand();
+        $monday = today()->next('Monday');
+        $this->addSlot($this->assignment($brand), 4, '10:00', '12:00', [
+            'effective_from' => $monday->copy()->addDays(3)->toDateString(),
+        ])->assertCreated();
+
+        $url = "/api/operator/schedules?brand_id={$brand->id}&on={$monday->toDateString()}";
+        $this->actingAs($this->operator)->getJson($url)->assertJsonCount(0, 'slots');
+        $this->actingAs($this->operator)->getJson("{$url}&days=7")->assertJsonCount(1, 'slots');
+    }
+
     public function test_leaving_a_brand_removes_the_hosts_slots(): void
     {
         $assignment = $this->assignment($this->brand());

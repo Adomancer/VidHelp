@@ -65,10 +65,12 @@ class BackupService
      * (open to everyone, or only to `$nomineeIds` when given). Hosts must ask at least
      * request_min_hours_before ahead; staff (`$byStaff`) may open one any time (emergencies).
      *
+     * `$announce` = false when staff pick the cover straight away (nobody needs to apply).
+     *
      * @param  array{reason_type: string, reason: ?string}  $reason
      * @param  list<string>  $nomineeIds
      */
-    public function create(ScheduleSlot $slot, string $date, array $reason, User $by, bool $byStaff, array $nomineeIds = [], ?UploadedFile $letter = null): BackupRequest
+    public function create(ScheduleSlot $slot, string $date, array $reason, User $by, bool $byStaff, array $nomineeIds = [], ?UploadedFile $letter = null, bool $announce = true): BackupRequest
     {
         $backup = $this->draft($slot, $date);
 
@@ -105,7 +107,9 @@ class BackupService
             }
         });
 
-        $this->announceOpen($backup);
+        if ($announce) {
+            $this->announceOpen($backup);
+        }
 
         return $backup;
     }

@@ -196,11 +196,15 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::put('/assignments/{assignment}', [AssignmentController::class, 'update']);
 
         // Schedule Management
+        Route::get('/schedules/conflicts', [ScheduleController::class, 'conflicts']);
+        Route::get('/schedules/{schedule}/history', [ScheduleController::class, 'history']);
+        Route::post('/schedules/{schedule}/undo', [ScheduleController::class, 'undo']);
         Route::apiResource('/schedules', ScheduleController::class)->except('show');
 
         // Backups: approve or reject applicants, assign a cover directly in emergencies
         Route::get('/backups', [OperatorBackupController::class, 'index']);
         Route::post('/backups', [OperatorBackupController::class, 'store']);
+        Route::get('/backups/candidates', [OperatorBackupController::class, 'slotCandidates']);
         Route::get('/backups/{backup}/applicants', [OperatorBackupController::class, 'applicants']);
         Route::get('/backups/{backup}/candidates', [OperatorBackupController::class, 'candidates']);
         Route::get('/backups/{backup}/letter', [OperatorBackupController::class, 'letter']);

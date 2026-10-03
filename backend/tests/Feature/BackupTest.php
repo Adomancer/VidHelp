@@ -538,6 +538,39 @@ class BackupTest extends TestCase
         $this->actingAs($operator)->getJson('/api/operator/backups?status=open')->assertJsonCount(1, 'requests');
     }
 
+    public function test_operator_picks_a_cover_straight_from_the_schedule(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operator');
+
+        $candidates = collect($this->actingAs($operator)
+            ->getJson("/api/operator/backups/candidates?slot_id={$this->slot->id}&backup_date=".self::TUESDAY)
+            ->assertOk()
+            ->json('candidates'));
+        $this->assertTrue($candidates->firstWhere('host_id', $this->sameBrand->id)['eligible']);
+        $this->assertNull($candidates->firstWhere('host_id', $this->requester->id));
+
+        $this->actingAs($operator)->postJson('/api/operator/backups', [
+            'slot_id' => $this->slot->id, 'backup_date' => self::TUESDAY, 'reason_type' => 'permit', 'host_id' => $this->sameBrand->id,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('request.status', 'filled')
+            ->assertJsonPath('request.filled_by_host_id', $this->sameBrand->id);
+    }
+
+    public function test_operator_cannot_pick_a_busy_cover(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operator');
+        $this->slotFor(HostBrandAssignment::where('host_id', $this->otherBrand->id)->firstOrFail(), 2, '15:00', '17:00');
+
+        $this->actingAs($operator)->postJson('/api/operator/backups', [
+            'slot_id' => $this->slot->id, 'backup_date' => self::TUESDAY, 'reason_type' => 'permit', 'host_id' => $this->otherBrand->id,
+        ])->assertJsonValidationErrors('host_id');
+
+        $this->assertSame(0, BackupRequest::count());
+    }
+
     public function test_host_sees_upcoming_slot_occurrences_to_request(): void
     {
         $response = $this->actingAs($this->requester->user)->getJson('/api/host/backups/slots')->assertOk();

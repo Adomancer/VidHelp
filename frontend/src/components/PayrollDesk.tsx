@@ -13,6 +13,7 @@ import DurationInput from "./DurationInput";
 import FormAlert from "./FormAlert";
 import Modal from "./Modal";
 import SubmitButton from "./SubmitButton";
+import ToggleGroup from "./ToggleGroup";
 
 type Notice = { tone: "success" | "error"; text: string } | null;
 
@@ -36,23 +37,14 @@ export default function PayrollDesk() {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        {(
-          [
-            ["periods", "Payment periods"],
-            ["kasbon", "Kasbon"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setTab(value)}
-            className={`px-4 py-2 rounded-lg text-sm ${tab === value ? "bg-purple-600 text-white" : "bg-slate-900 text-gray-300 hover:bg-slate-800"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <ToggleGroup
+        options={[
+          ["periods", "Payment periods"],
+          ["kasbon", "Kasbon"],
+        ] as const}
+        value={tab}
+        onChange={setTab}
+      />
       {tab === "periods" ? <Periods /> : <Kasbon />}
     </div>
   );
