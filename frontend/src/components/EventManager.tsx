@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { errorMessage, eventApi, operatorApi, scheduleApi, type EventInput, type EventListItem } from "@/lib/api";
+import { errorMessage, eventApi, operatorApi, scheduleApi, type BrandHost, type EventBlock, type EventInput, type EventListItem } from "@/lib/api";
 import { groupByDay } from "@/lib/events";
 import { formatClock, formatDate, formatDay, formatDuration, toDateInput } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
@@ -102,8 +102,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
   const detail = useApiData(`event-${eventId}`, () => eventApi.show(token, eventId));
   const brandId = detail.data?.event.brand_id ?? "";
   const hosts = useApiData(`event-hosts-${brandId}`, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
-  const [assigning, setAssigning] = useState<string | null>(null);
-  const [assignHostId, setAssignHostId] = useState("");
+  const [openDay, setOpenDay] = useState<string | null>(null);
 
   async function act(action: () => Promise<{ message: string }>) {
     try {
@@ -111,7 +110,6 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
     } catch (caught) {
       onChanged(errorMessage(caught), "error");
     }
-    setAssigning(null);
     detail.reload();
   }
 
@@ -119,6 +117,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
   if (!detail.data) return <p className="text-muted">Memuat…</p>;
   const { event, blocks } = detail.data;
   const cancelled = event.status === "cancelled";
+  const days = groupByDay(blocks);
 
   return (
     <div className="space-y-4">
@@ -147,69 +146,206 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
         {!cancelled && <EventSettings key={`${event.max_slots_per_host}-${event.open_full_schedule}`} eventId={event.id} maxPerHost={event.max_slots_per_host} openFull={event.open_full_schedule} act={act} />}
       </Card>
 
-      {groupByDay(blocks).map(([day, dayBlocks]) => (
-        <Card key={day} title={formatDay(`${day}T00:00`)}>
-          <ul className="space-y-2">
-            {dayBlocks.map((block) => (
-              <li key={block.start_at} className="rounded-lg bg-surface-2 px-3 py-2 space-y-2">
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="w-28 text-sm text-accent">
-                    {formatClock(block.start_at)}–{formatClock(block.end_at)}
-                  </span>
-                  <span className="flex-1 min-w-32 text-sm">
-                    {block.claim ? (
-                      <span className="text-heading">{block.claim.host_name}</span>
-                    ) : block.state === "unavailable" ? (
-                      <span className="text-faint">{block.reason}</span>
-                    ) : (
-                      <span className="text-muted">{block.state === "past" ? "tidak diambil" : "kosong"}</span>
-                    )}
-                  </span>
-                  {!cancelled && new Date(block.end_at) > new Date() && (
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setAssigning(assigning === block.start_at ? null : block.start_at)} className="text-xs text-accent hover:text-heading">
-                        {block.claim ? "Ganti host" : "Tunjuk host"}
+      <Card title="Blok per hari" description="Klik hari untuk melihat setiap blok dan mengatur host-nya.">
+        <ul className="-my-2 divide-y divide-stroke">
+          {days.map(([day, dayBlocks]) => (
+            <li key={day}>
+              <DaySummary day={day} blocks={dayBlocks} onOpen={() => setOpenDay(day)} />
+            </li>
+          ))}
+        </ul>
+        <BlockLegend />
+      </Card>
+
+      {openDay && (
+        <DayBlocksModal
+          day={openDay}
+          eventName={event.name}
+          eventId={event.id}
+          blocks={days.find(([day]) => day === openDay)?.[1] ?? []}
+          hosts={hosts.data?.assignments ?? []}
+          editable={!cancelled}
+          act={act}
+          onClose={() => setOpenDay(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
+
+/** Strip colors, one segment per block: who has it at a glance. */
+function blockColor(block: EventBlock): string {
+  if (block.claim) return "bg-primary";
+  if (block.state === "unavailable") return "bg-amber-400/60";
+  if (block.state === "past") return "bg-stroke";
+  return "bg-primary/15 ring-1 ring-inset ring-primary/40";
+}
+
+/** One day of the event in a line: a strip of its blocks, how many are taken and by whom. */
+function DaySummary({ day, blocks, onOpen }: { day: string; blocks: EventBlock[]; onOpen: () => void }) {
+  const claimed = blocks.filter((block) => block.claim).length;
+  const open = blocks.filter((block) => !block.claim && block.state === "free").length;
+  const holders = [...new Set(blocks.flatMap((block) => (block.claim ? [block.claim.host_name] : [])))];
+
+  return (
+    <button type="button" onClick={onOpen} className="group flex w-full items-center gap-4 rounded-lg px-1 py-3 text-left hover:bg-surface-2">
+      <span className="w-28 shrink-0">
+        <span className="block text-sm font-medium text-heading">{formatDay(`${day}T00:00`)}</span>
+        <span className="block text-xs text-muted">
+          {claimed}/{blocks.length} terisi
+        </span>
+      </span>
+      <span className="min-w-0 flex-1 space-y-1.5">
+        <span className="flex gap-0.5" aria-hidden="true">
+          {blocks.map((block) => (
+            <span key={block.start_at} className={`h-2.5 flex-1 rounded-sm ${blockColor(block)}`} />
+          ))}
+        </span>
+        <span className="block truncate text-xs text-muted">
+          {holders.length > 0
+            ? `Diambil ${holders.slice(0, 3).join(", ")}${holders.length > 3 ? ` +${holders.length - 3} lainnya` : ""}`
+            : "Belum ada yang mengambil"}
+          {open > 0 && <span className="text-accent"> · {open} masih kosong</span>}
+        </span>
+      </span>
+      <span className="shrink-0 text-sm text-muted group-hover:text-heading">Detail ›</span>
+    </button>
+  );
+}
+
+function BlockLegend() {
+  const items: [string, string][] = [
+    ["bg-primary", "Terisi"],
+    ["bg-primary/15 ring-1 ring-inset ring-primary/40", "Kosong"],
+    ["bg-amber-400/60", "Ada jadwal reguler"],
+    ["bg-stroke", "Lewat, tidak diambil"],
+  ];
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-stroke pt-3 text-xs text-muted">
+      {items.map(([color, label]) => (
+        <span key={label} className="flex items-center gap-1.5">
+          <span className={`h-2.5 w-4 rounded-sm ${color}`} /> {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Every block of one day, with who holds it; give, change or release a block from the row. */
+function DayBlocksModal({
+  day,
+  eventName,
+  eventId,
+  blocks,
+  hosts,
+  editable,
+  act,
+  onClose,
+}: {
+  day: string;
+  eventName: string;
+  eventId: string;
+  blocks: EventBlock[];
+  hosts: BrandHost[];
+  editable: boolean;
+  act: Act;
+  onClose: () => void;
+}) {
+  const { token } = useAuth();
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const [assignHostId, setAssignHostId] = useState("");
+  const claimed = blocks.filter((block) => block.claim).length;
+
+  async function run(action: () => Promise<{ message: string }>) {
+    await act(action);
+    setAssigning(null);
+  }
+
+  return (
+    <Modal title={formatDay(`${day}T00:00`)} description={`${eventName} · ${claimed}/${blocks.length} blok terisi`} onClose={onClose} wide>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs uppercase tracking-wide text-faint">
+            <th className="w-32 pb-2 font-medium">Jam</th>
+            <th className="pb-2 font-medium">Host / status</th>
+            <th className="pb-2 text-right font-medium">Aksi</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-stroke">
+          {blocks.map((block) => {
+            const upcoming = new Date(block.end_at) > new Date();
+            return (
+              <tr key={block.start_at} className={block.state === "past" && !block.claim ? "opacity-60" : ""}>
+                <td className="py-2.5 whitespace-nowrap tabular-nums text-accent">
+                  {formatClock(block.start_at)}–{formatClock(block.end_at)}
+                </td>
+                <td className="py-2.5">
+                  {block.claim ? (
+                    <span className="font-medium text-heading">{block.claim.host_name}</span>
+                  ) : block.state === "unavailable" ? (
+                    <span className="text-faint">{block.reason}</span>
+                  ) : (
+                    <span className="text-muted">{block.state === "past" ? "Tidak diambil" : "Kosong"}</span>
+                  )}
+                  {assigning === block.start_at && (
+                    <div className="mt-2 flex gap-2">
+                      <select
+                        value={assignHostId || hosts[0]?.host_id || ""}
+                        onChange={(change) => setAssignHostId(change.target.value)}
+                        aria-label="Host"
+                        className="flex-1 rounded-md border border-stroke-strong bg-surface px-2 py-1.5 text-sm text-heading"
+                      >
+                        {hosts.map((assignment) => (
+                          <option key={assignment.host_id} value={assignment.host_id}>
+                            {assignment.host.user.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const hostId = assignHostId || hosts[0]?.host_id;
+                          if (hostId) run(() => eventApi.assign(token, eventId, block.start_at, hostId));
+                        }}
+                        className="rounded-md bg-primary px-3 py-1.5 text-sm text-white hover:bg-primary-hover"
+                      >
+                        Berikan blok
+                      </button>
+                    </div>
+                  )}
+                </td>
+                <td className="py-2.5 text-right whitespace-nowrap align-top">
+                  {editable && upcoming ? (
+                    <span className="inline-flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAssigning(assigning === block.start_at ? null : block.start_at)}
+                        className="rounded-md border border-stroke-strong px-2.5 py-1 text-xs text-body hover:bg-surface-2"
+                      >
+                        {assigning === block.start_at ? "Tutup" : block.claim ? "Ganti host" : "Tunjuk host"}
                       </button>
                       {block.claim && (
-                        <button type="button" onClick={() => act(() => eventApi.release(token, block.claim!.id))} className="text-xs text-danger hover:text-danger">
+                        <button
+                          type="button"
+                          onClick={() => run(() => eventApi.release(token, block.claim!.id))}
+                          className="rounded-md border border-red-400/40 px-2.5 py-1 text-xs text-danger hover:bg-red-500/10"
+                        >
                           Lepas
                         </button>
                       )}
-                    </div>
+                    </span>
+                  ) : (
+                    <span className="text-faint">—</span>
                   )}
-                </div>
-                {assigning === block.start_at && (
-                  <div className="flex gap-2">
-                    <select
-                      value={assignHostId || hosts.data?.assignments[0]?.host_id || ""}
-                      onChange={(change) => setAssignHostId(change.target.value)}
-                      aria-label="Host"
-                      className="flex-1 px-2 py-1.5 rounded-md bg-surface border border-stroke-strong text-heading text-sm"
-                    >
-                      {hosts.data?.assignments.map((assignment) => (
-                        <option key={assignment.host_id} value={assignment.host_id}>
-                          {assignment.host.user.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const hostId = assignHostId || hosts.data?.assignments[0]?.host_id;
-                        if (hostId) act(() => eventApi.assign(token, event.id, block.start_at, hostId));
-                      }}
-                      className="px-3 py-1.5 rounded-md bg-primary text-white text-sm hover:bg-primary-hover"
-                    >
-                      Berikan blok
-                    </button>
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      ))}
-    </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Modal>
   );
 }
 
