@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { adminHostsApi, errorMessage, type RateCategory, type RateCategoryInput } from "@/lib/api";
-import { formatRupiah } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
 import FormAlert from "@/components/FormAlert";
+import RupiahInput from "@/components/RupiahInput";
 
 export default function AdminRatesPage() {
   const { token } = useAuth();
@@ -29,7 +29,7 @@ export default function AdminRatesPage() {
         <div className="hidden sm:grid grid-cols-[1fr_8rem_10rem_auto] gap-3 text-xs text-gray-400 px-1">
           <span>Nama</span>
           <span>Mulai bulan ke-</span>
-          <span>Tarif per jam (Rp)</span>
+          <span>Tarif per jam</span>
           <span className="w-36" />
         </div>
         <div className="space-y-3">
@@ -74,7 +74,7 @@ function LevelRow({ level, hostsCount = 0, onChanged }: { level?: RateCategory; 
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_8rem_10rem_auto] gap-3 items-center">
         <input name="name" defaultValue={level?.name} placeholder="Nama level baru" aria-label="Nama" className={input} />
         <input name="min_tenure_months" type="number" min={0} defaultValue={level?.min_tenure_months} placeholder="Bulan" aria-label="Mulai bulan ke-" className={input} />
-        <input name="rate_per_hour" type="number" min={0} step={500} defaultValue={level ? Number(level.rate_per_hour) : undefined} placeholder="Tarif" aria-label="Tarif per jam" className={input} />
+        <RupiahInput name="rate_per_hour" defaultValue={level?.rate_per_hour} placeholder="0" aria-label="Tarif per jam" className={input} />
         <div className="flex gap-2 w-36">
           <button type="submit" disabled={loading} className="flex-1 px-3 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50">
             {level ? "Simpan" : "Tambah"}
@@ -92,11 +92,7 @@ function LevelRow({ level, hostsCount = 0, onChanged }: { level?: RateCategory; 
           )}
         </div>
       </div>
-      {level && (
-        <p className="text-xs text-gray-500 px-1">
-          {hostsCount} host · {formatRupiah(level.rate_per_hour)}/jam
-        </p>
-      )}
+      {level && <p className="text-xs text-gray-500 px-1">Dipakai {hostsCount} host</p>}
       {message && <p className="text-sm text-red-300 px-1">{message}</p>}
     </form>
   );

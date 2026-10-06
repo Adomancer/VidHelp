@@ -142,6 +142,26 @@ class BrandAssignmentTest extends TestCase
             ->assertJsonPath('data.0.id', $assigned->id);
     }
 
+    public function test_host_list_searches_several_names_and_picked_hosts_at_once(): void
+    {
+        $ayu = $this->host();
+        $ayu->user->update(['name' => 'Ayu Lestari']);
+        $budi = $this->host();
+        $budi->user->update(['name' => 'Budi Santoso']);
+        $picked = $this->host();
+        $this->host(); // matches nothing
+
+        $query = http_build_query(['search' => ['ayu', 'santoso'], 'host_ids' => [$picked->id]]);
+
+        $ids = collect($this->actingAs($this->operator)->getJson("/api/operator/hosts?{$query}")->assertOk()->json('data'))->pluck('id');
+        $this->assertEqualsCanonicalizing([$ayu->id, $budi->id, $picked->id], $ids->all());
+
+        // A single search text still works as before
+        $this->actingAs($this->operator)->getJson('/api/operator/hosts?search=lestari')
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $ayu->id);
+    }
+
     public function test_operator_exports_every_filtered_host_to_excel(): void
     {
         $brand = $this->brand(['name' => 'Wardah']);

@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import Link from "next/link";
 import { errorMessage, operatorApi, type HostListItem } from "@/lib/api";
 import { formatTenure } from "@/lib/format";
 import { statusLabel } from "@/lib/labels";
@@ -9,30 +8,39 @@ import { useApiData } from "@/lib/useApiData";
 import AssignmentEditor from "./AssignmentEditor";
 import { useAuth } from "./AuthProvider";
 import FormAlert from "./FormAlert";
+import HostSearch, { type SearchChip } from "./HostSearch";
 import UserAvatar from "./UserAvatar";
 
 interface HostTableProps {
-  /** Admin: link each host to its detail page. */
-  detailHref?: (host: HostListItem) => string;
+  /** Admin: clicking a row (anywhere on it) opens the host. */
+  onSelect?: (host: HostListItem) => void;
+  /** Change it to load the list again (e.g. after a host was edited). */
+  refreshKey?: number;
   /** Operator: expand a row to manage the host's brands in place. */
   editableBrands?: boolean;
 }
 
 /** Searchable, brand-filterable host list shared by the operator and admin panels. */
-export default function HostTable({ detailHref, editableBrands = false }: HostTableProps) {
+export default function HostTable({ onSelect, refreshKey = 0, editableBrands = false }: HostTableProps) {
   const { token } = useAuth();
-  const [search, setSearch] = useState("");
+  const [chips, setChips] = useState<SearchChip[]>([]);
   const [brandId, setBrandId] = useState("");
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
+  const filters = {
+    search: chips.flatMap((chip) => (chip.kind === "text" ? [chip.text] : [])),
+    host_ids: chips.flatMap((chip) => (chip.kind === "host" ? [chip.id] : [])),
+    brand_id: brandId,
+  };
+
   async function exportExcel() {
     setExporting(true);
     setExportError(null);
     try {
-      await operatorApi.exportHosts(token, { search, brand_id: brandId });
+      await operatorApi.exportHosts(token, filters);
     } catch (caught) {
       setExportError(errorMessage(caught));
     } finally {
@@ -41,28 +49,18 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
   }
 
   const brands = useApiData("brands", () => operatorApi.brands(token));
-  const hosts = useApiData(JSON.stringify({ search, brandId, page }), () =>
-    operatorApi.hosts(token, { search, brand_id: brandId, page })
-  );
+  const hosts = useApiData(JSON.stringify({ filters, page, refreshKey }), () => operatorApi.hosts(token, { ...filters, page }));
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <form
-          className="flex-1"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setSearch(String(new FormData(event.currentTarget).get("search") ?? ""));
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <HostSearch
+          value={chips}
+          onChange={(next) => {
+            setChips(next);
             setPage(1);
           }}
-        >
-          <input
-            name="search"
-            type="search"
-            placeholder="Cari nama atau email…"
-            className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
-          />
-        </form>
+        />
         <select
           value={brandId}
           onChange={(event) => {
@@ -111,18 +109,27 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
 
               return (
                 <Fragment key={host.id}>
-                  <tr className="text-gray-200 align-top">
+                  <tr
+                    className={`text-gray-200 align-top ${
+                      onSelect ? "cursor-pointer transition-colors hover:bg-slate-800/60 focus-visible:outline-none focus-visible:bg-slate-800/60" : ""
+                    }`}
+                    {...(onSelect && {
+                      tabIndex: 0,
+                      title: `Buka ${host.user.name}`,
+                      onClick: () => onSelect(host),
+                      onKeyDown: (event: React.KeyboardEvent) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onSelect(host);
+                        }
+                      },
+                    })}
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <UserAvatar user={host.user} />
                         <div className="min-w-0">
-                          {detailHref ? (
-                            <Link href={detailHref(host)} className="text-white hover:text-purple-300">
-                              {host.user.name}
-                            </Link>
-                          ) : (
-                            <p className="text-white">{host.user.name}</p>
-                          )}
+                          <p className="text-white">{host.user.name}</p>
                           <p className="text-gray-400 truncate">{host.user.email}</p>
                         </div>
                       </div>

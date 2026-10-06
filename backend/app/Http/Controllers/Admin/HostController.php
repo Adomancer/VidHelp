@@ -26,8 +26,8 @@ class HostController extends Controller
     public function update(Request $request, HostProfile $host): JsonResponse
     {
         $validated = $request->validate([
-            'phone' => 'sometimes|nullable|regex:/^\+?[0-9 \-]{8,20}$/',
-            'guardian_phone' => 'sometimes|nullable|regex:/^\+?[0-9 \-]{8,20}$/',
+            'phone' => 'sometimes|nullable|digits_between:8,15',
+            'guardian_phone' => 'sometimes|nullable|digits_between:8,15',
             'join_date' => 'sometimes|date|before_or_equal:today',
             'rate_category_id' => 'sometimes|nullable|exists:host_rate_categories,id',
         ]);

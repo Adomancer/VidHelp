@@ -567,24 +567,32 @@ export const hostApi = {
 
 export type MyBrand = Pick<Brand, "id" | "name" | "is_obs"> & { product_knowledge: string | null };
 
+export interface HostFilters {
+  search?: string[];
+  host_ids?: string[];
+  brand_id?: string;
+}
+
+function hostQuery(params: HostFilters): URLSearchParams {
+  const query = new URLSearchParams();
+  params.search?.forEach((text) => query.append("search[]", text));
+  params.host_ids?.forEach((id) => query.append("host_ids[]", id));
+  if (params.brand_id) query.set("brand_id", params.brand_id);
+  return query;
+}
+
 export const operatorApi = {
-  hosts: (token: string, params: { search?: string; brand_id?: string; page?: number }) => {
-    const query = new URLSearchParams();
-    if (params.search) query.set("search", params.search);
-    if (params.brand_id) query.set("brand_id", params.brand_id);
+  /** Hosts matching any of the `search` texts or `host_ids` (none = everyone), within the brand. */
+  hosts: (token: string, params: HostFilters & { page?: number }) => {
+    const query = hostQuery(params);
     query.set("page", String(params.page ?? 1));
 
     return api<Paginated<HostListItem>>(`/operator/hosts?${query}`, { token });
   },
 
   /** Every host matching the filters (not just one page) as an Excel file. */
-  exportHosts: (token: string, params: { search?: string; brand_id?: string }) => {
-    const query = new URLSearchParams();
-    if (params.search) query.set("search", params.search);
-    if (params.brand_id) query.set("brand_id", params.brand_id);
-
-    return downloadFile(`/operator/hosts/export?${query}`, token, `hosts-${toDateInput()}.xlsx`);
-  },
+  exportHosts: (token: string, params: HostFilters) =>
+    downloadFile(`/operator/hosts/export?${hostQuery(params)}`, token, `hosts-${toDateInput()}.xlsx`),
 
   brands: (token: string) => api<{ brands: BrandSummary[] }>("/operator/brands", { token }),
 

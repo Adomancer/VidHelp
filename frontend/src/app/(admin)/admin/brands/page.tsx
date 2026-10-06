@@ -58,7 +58,7 @@ export default function AdminBrandsPage() {
               <th className="px-4 py-3 font-medium">Host</th>
               <th className="px-4 py-3 font-medium">Leader</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3" />
+              <th className="px-4 py-3 font-medium text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800 text-gray-200">
@@ -82,6 +82,8 @@ export default function AdminBrandsPage() {
                   <button
                     type="button"
                     onClick={() => setEditing(brand)}
+                    title={`Ubah data ${brand.name}: nama, target jam, siklus pembayaran, dan status`}
+                    aria-label={`Ubah ${brand.name}`}
                     className="px-3 py-1.5 rounded-md border border-slate-700 text-gray-300 hover:bg-slate-800"
                   >
                     Ubah
