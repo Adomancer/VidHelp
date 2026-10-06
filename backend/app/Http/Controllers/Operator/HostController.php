@@ -46,13 +46,33 @@ class HostController extends Controller
         ]);
     }
 
+    /**
+     * `search` (one text or several) and `host_ids`: hosts matching any of them.
+     */
     private function filtered(Request $request): Builder
     {
+        $request->validate([
+            'search' => 'nullable',
+            'search.*' => 'nullable|string|max:100',
+            'host_ids' => 'nullable|array|max:100',
+            'host_ids.*' => 'uuid',
+        ]);
+
+        $terms = array_values(array_filter(array_map('trim', (array) $request->input('search', [])), 'strlen'));
+        $hostIds = $request->input('host_ids', []);
+
         return HostProfile::query()
             ->with(['user', 'rateCategory:id,name', 'assignments.brand:id,name'])
-            ->when($request->search, fn ($q, $search) => $q->whereHas('user', fn ($q) => $q
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")))
+            ->when($terms || $hostIds, fn ($q) => $q->where(function ($q) use ($terms, $hostIds) {
+                if ($hostIds) {
+                    $q->orWhereIn('id', $hostIds);
+                }
+                foreach ($terms as $term) {
+                    $q->orWhereHas('user', fn ($q) => $q
+                        ->where('name', 'like', "%{$term}%")
+                        ->orWhere('email', 'like', "%{$term}%"));
+                }
+            }))
             ->when($request->brand_id, fn ($q, $brandId) => $q->whereHas('assignments', fn ($q) => $q
                 ->where('brand_id', $brandId)
                 ->where('status', 'active')))

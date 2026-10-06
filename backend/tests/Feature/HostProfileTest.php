@@ -123,12 +123,23 @@ class HostProfileTest extends TestCase
         $this->actingAs($host)->putJson('/api/host/profile', [
             'name' => 'New Name',
             'phone' => '081234567890',
-            'guardian_phone' => '+62 812 0000 1111',
+            'guardian_phone' => '6281200001111',
             'join_date' => '2020-01-01',
         ])->assertOk()->assertJsonPath('host_profile.phone', '081234567890');
 
         $this->assertSame('New Name', $host->fresh()->name);
         $this->assertTrue($host->hostProfile->fresh()->join_date->isToday());
+    }
+
+    public function test_contact_numbers_and_bank_details_are_digits_only(): void
+    {
+        $host = $this->activeHost();
+
+        $this->actingAs($host)->putJson('/api/host/profile', ['phone' => '0812abc4567', 'guardian_phone' => '+62 812 0000 1111'])
+            ->assertJsonValidationErrors(['phone', 'guardian_phone']);
+
+        $this->actingAs($host)->putJson('/api/host/profile/sensitive', ['ktp_number' => '32012345678900AB', 'bank_account' => '1234-5678'])
+            ->assertJsonValidationErrors(['ktp_number', 'bank_account']);
     }
 
     public function test_sensitive_data_is_encrypted_and_masked_for_the_host(): void

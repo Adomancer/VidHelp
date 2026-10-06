@@ -10,6 +10,7 @@ import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
 import FormAlert from "@/components/FormAlert";
 import SubmitButton from "@/components/SubmitButton";
+import DigitsField from "@/components/DigitsField";
 import TextField from "@/components/TextField";
 import UserAvatar from "@/components/UserAvatar";
 import DiscordConnect from "@/components/DiscordConnect";
@@ -127,8 +128,8 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
         <TextField label="Nama lengkap" name="name" defaultValue={data.user.name} autoComplete="name" required error={errors.name} />
         {host && (
           <>
-            <TextField label="No. HP (WhatsApp)" name="phone" type="tel" defaultValue={host.phone ?? ""} placeholder="08…" autoComplete="tel" error={errors.phone} />
-            <TextField label="No. HP wali / keluarga" name="guardian_phone" type="tel" defaultValue={host.guardian_phone ?? ""} placeholder="08…" error={errors.guardian_phone} />
+            <DigitsField label="No. HP (WhatsApp)" name="phone" defaultValue={host.phone} maxLength={15} placeholder="08…" autoComplete="tel" error={errors.phone} />
+            <DigitsField label="No. HP wali / keluarga" name="guardian_phone" defaultValue={host.guardian_phone} maxLength={15} placeholder="08…" error={errors.guardian_phone} />
           </>
         )}
 
@@ -200,19 +201,18 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
         {error && <FormAlert tone="error">{error}</FormAlert>}
         {saved && <FormAlert tone="success">{saved}</FormAlert>}
 
-        <TextField
+        <DigitsField
           label="Nomor KTP (NIK)"
           name="ktp_number"
-          inputMode="numeric"
-          maxLength={16}
+          exactLength={16}
           placeholder={current?.ktp_number_masked ?? "16 digit"}
           error={errors.ktp_number}
         />
         <TextField label="Bank" name="bank_name" placeholder={current?.bank_name ?? "mis. BCA"} error={errors.bank_name} />
-        <TextField
+        <DigitsField
           label="Nomor rekening"
           name="bank_account"
-          inputMode="numeric"
+          maxLength={20}
           placeholder={current?.bank_account_masked ?? "Hanya angka"}
           error={errors.bank_account}
         />

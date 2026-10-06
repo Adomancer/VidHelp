@@ -32,8 +32,8 @@ class ProfileController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
-            'phone' => [$profile ? 'sometimes' : 'prohibited', 'nullable', 'regex:/^\+?[0-9 \-]{8,20}$/'],
-            'guardian_phone' => [$profile ? 'sometimes' : 'prohibited', 'nullable', 'regex:/^\+?[0-9 \-]{8,20}$/'],
+            'phone' => [$profile ? 'sometimes' : 'prohibited', 'nullable', 'digits_between:8,15'],
+            'guardian_phone' => [$profile ? 'sometimes' : 'prohibited', 'nullable', 'digits_between:8,15'],
         ]);
 
         $user->update(Arr::only($validated, ['name']));
