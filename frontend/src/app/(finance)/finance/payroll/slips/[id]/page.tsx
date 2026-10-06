@@ -15,7 +15,7 @@ export default function FinanceSlipPage() {
 
   return (
     <div className="space-y-4">
-      <Link href="/finance/payroll" className="text-sm text-purple-300 hover:text-white print:hidden">
+      <Link href="/finance/payroll" className="text-sm text-accent hover:text-heading print:hidden">
         ← Penggajian
       </Link>
       {slip.error && <FormAlert tone="error">{slip.error}</FormAlert>}

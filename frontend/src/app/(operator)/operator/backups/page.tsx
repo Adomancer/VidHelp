@@ -5,7 +5,7 @@ export default function OperatorBackupsPage() {
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Backup</h1>
+        <h1 className="text-2xl font-bold text-heading">Backup</h1>
         <BackupTimingNote />
       </div>
       <BackupDesk />

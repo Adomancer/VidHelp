@@ -59,13 +59,13 @@ export default function ToggleGroup<T extends string>({
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex gap-1 rounded-xl bg-slate-900/80 border border-slate-800 p-1"
+      className="relative inline-flex gap-1 rounded-xl bg-surface border border-stroke p-1"
     >
       {/* Sliding pill indicator */}
       {pill && (
         <span
           aria-hidden="true"
-          className="absolute top-1 bottom-1 rounded-lg bg-purple-600 shadow-lg shadow-purple-600/25 transition-all duration-300 ease-out"
+          className="absolute top-1 bottom-1 rounded-lg bg-primary shadow-lg shadow-primary/25 transition-all duration-300 ease-out"
           style={{ left: pill.left, width: pill.width }}
         />
       )}
@@ -80,8 +80,8 @@ export default function ToggleGroup<T extends string>({
             onClick={() => onChange(option.value)}
             className={`relative z-10 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
               isActive
-                ? "text-white"
-                : "text-gray-400 hover:text-gray-200"
+                ? "text-heading"
+                : "text-muted hover:text-body"
             }`}
           >
             {option.label}

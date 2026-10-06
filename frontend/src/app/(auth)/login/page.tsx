@@ -9,9 +9,9 @@ export default function LoginPage() {
       <AuthCard subtitle="Platform Manajemen Agensi">
         <LoginForm />
 
-        <p className="text-center text-sm text-gray-400">
+        <p className="text-center text-sm text-muted">
           Host baru?{" "}
-          <Link href="/register" className="text-purple-300 hover:text-white">
+          <Link href="/register" className="text-accent hover:text-heading">
             Buat akun
           </Link>
         </p>

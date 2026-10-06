@@ -38,7 +38,7 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
   return (
     <div className="space-y-4">
       {hosts.data && (
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-muted">
           Periode poin {formatDate(hosts.data.period.start)} – {formatDate(hosts.data.period.end)}. Semua mulai dari 100; SP terbit
           otomatis di{" "}
           {Object.entries(hosts.data.thresholds)
@@ -62,7 +62,7 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
               name="search"
               type="search"
               placeholder="Cari host…"
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-gray-500"
+              className="w-full px-3 py-2 rounded-lg bg-surface border border-stroke text-heading placeholder-faint"
             />
           </form>
           <ul className={`space-y-1 ${hosts.loading ? "opacity-60" : ""}`}>
@@ -72,17 +72,17 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
                   type="button"
                   onClick={() => setSelected(host.host_id)}
                   className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left ${
-                    host.host_id === hostId ? "bg-purple-600/20 border border-purple-500/50" : "bg-slate-900 border border-slate-800 hover:bg-slate-800"
+                    host.host_id === hostId ? "bg-primary/20 border border-primary/50" : "bg-surface border border-stroke hover:bg-surface-2"
                   }`}
                 >
                   <UserAvatar user={host} size="w-7 h-7" />
-                  <span className="flex-1 min-w-0 truncate text-sm text-white">{host.name}</span>
+                  <span className="flex-1 min-w-0 truncate text-sm text-heading">{host.name}</span>
                   <SpBadge level={host.sp_level} />
-                  <span className={`text-sm font-medium ${host.points < 100 ? "text-yellow-200" : "text-gray-400"}`}>{host.points}</span>
+                  <span className={`text-sm font-medium ${host.points < 100 ? "text-warning" : "text-muted"}`}>{host.points}</span>
                 </button>
               </li>
             ))}
-            {hosts.data?.hosts.length === 0 && <li className="text-sm text-gray-400 px-1">Tidak ada host aktif.</li>}
+            {hosts.data?.hosts.length === 0 && <li className="text-sm text-muted px-1">Tidak ada host aktif.</li>}
           </ul>
         </div>
 
@@ -123,7 +123,7 @@ function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: b
   };
 
   if (detail.error) return <FormAlert tone="error">{detail.error}</FormAlert>;
-  if (!detail.data) return <p className="text-gray-400">Memuat…</p>;
+  if (!detail.data) return <p className="text-muted">Memuat…</p>;
   const data = detail.data;
 
   return (
@@ -132,8 +132,8 @@ function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: b
         <div className="flex items-center gap-3">
           <UserAvatar user={data.host.user} size="w-10 h-10" />
           <div>
-            <p className="text-white font-medium">{data.host.user.name}</p>
-            <p className="text-xs text-gray-400">
+            <p className="text-heading font-medium">{data.host.user.name}</p>
+            <p className="text-xs text-muted">
               {formatDate(data.period.start)} – {formatDate(data.period.end)}
             </p>
           </div>
@@ -162,31 +162,31 @@ function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: b
       </Card>
 
       <Card title="Periode ini">
-        {data.logs.length === 0 && <p className="text-sm text-gray-400">Tidak ada potongan.</p>}
+        {data.logs.length === 0 && <p className="text-sm text-muted">Tidak ada potongan.</p>}
         <ul className="space-y-2">
           {data.logs.map((log) => (
-            <li key={log.id} className={`rounded-lg px-3 py-2 ${log.voided_at ? "bg-slate-800/30" : "bg-slate-800"}`}>
+            <li key={log.id} className={`rounded-lg px-3 py-2 ${log.voided_at ? "bg-surface-2" : "bg-surface-2"}`}>
               <div className="flex items-center justify-between gap-3">
-                <span className={`text-sm ${log.voided_at ? "text-gray-500 line-through" : "text-white"}`}>
+                <span className={`text-sm ${log.voided_at ? "text-faint line-through" : "text-heading"}`}>
                   {log.violation_type?.name ?? sourceLabels[log.source]}
-                  {log.brand_complaint && <span className="text-gray-400"> · {log.brand_complaint.brand.name}</span>}
+                  {log.brand_complaint && <span className="text-muted"> · {log.brand_complaint.brand.name}</span>}
                 </span>
-                <span className={`text-sm font-medium ${log.voided_at ? "text-gray-500" : log.points_change < 0 ? "text-red-300" : "text-green-300"}`}>
+                <span className={`text-sm font-medium ${log.voided_at ? "text-faint" : log.points_change < 0 ? "text-danger" : "text-success"}`}>
                   {log.points_change > 0 ? "+" : ""}
                   {log.points_change}
                 </span>
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-muted">
                 {formatShortDate(log.occurred_on)} · {sourceLabels[log.source]}
                 {log.recorder ? ` · oleh ${log.recorder.name}` : ""}
                 {log.voided_at ? " · dibatalkan" : ""}
               </p>
-              {log.reason && <p className="text-xs text-gray-300 mt-1">{log.reason}</p>}
+              {log.reason && <p className="text-xs text-body mt-1">{log.reason}</p>}
               {isAdmin && !log.voided_at && (
                 <button
                   type="button"
                   onClick={() => confirm("Batalkan catatan ini? Poinnya dikembalikan.") && act(() => pointsApi.voidLog(token, log.id))}
-                  className="mt-1 text-xs text-red-300 hover:text-red-200"
+                  className="mt-1 text-xs text-danger hover:text-danger"
                 >
                   Batalkan catatan
                 </button>
@@ -206,15 +206,15 @@ function WarningsCard({ data, isAdmin, act }: { data: PointsHostDetail; isAdmin:
 
   return (
     <Card title="Surat peringatan">
-      {data.warning_letters.length === 0 && <p className="text-sm text-gray-400">Tidak ada.</p>}
+      {data.warning_letters.length === 0 && <p className="text-sm text-muted">Tidak ada.</p>}
       <ul className="space-y-2">
         {data.warning_letters.map((letter) => (
-          <li key={letter.id} className="flex items-start gap-3 rounded-lg bg-slate-800 px-3 py-2">
+          <li key={letter.id} className="flex items-start gap-3 rounded-lg bg-surface-2 px-3 py-2">
             <SpBadge level={letter.voided_at ? 0 : letter.level} />
-            {letter.voided_at && <span className="text-xs text-gray-500 line-through">SP{letter.level}</span>}
+            {letter.voided_at && <span className="text-xs text-faint line-through">SP{letter.level}</span>}
             <div className="flex-1 min-w-0">
-              <p className={`text-sm ${letter.voided_at ? "text-gray-500 line-through" : "text-white"}`}>{letter.reason}</p>
-              <p className="text-xs text-gray-400">
+              <p className={`text-sm ${letter.voided_at ? "text-faint line-through" : "text-heading"}`}>{letter.reason}</p>
+              <p className="text-xs text-muted">
                 {formatDate(letter.issued_at)} · {letter.issuer ? `oleh ${letter.issuer.name}` : "otomatis"}
                 {letter.voided_at ? " · dibatalkan" : ""}
               </p>
@@ -223,7 +223,7 @@ function WarningsCard({ data, isAdmin, act }: { data: PointsHostDetail; isAdmin:
               <button
                 type="button"
                 onClick={() => confirm(`Batalkan SP${letter.level}?`) && act(() => pointsApi.voidWarning(token, letter.id))}
-                className="text-xs text-red-300 hover:text-red-200"
+                className="text-xs text-danger hover:text-danger"
               >
                 Batalkan
               </button>
@@ -237,13 +237,13 @@ function WarningsCard({ data, isAdmin, act }: { data: PointsHostDetail; isAdmin:
 
 function ActionButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} className="px-3 py-1.5 rounded-lg text-sm border border-slate-700 text-gray-300 hover:bg-slate-800">
+    <button type="button" onClick={onClick} className="px-3 py-1.5 rounded-lg text-sm border border-stroke-strong text-body hover:bg-surface-2">
       {children}
     </button>
   );
 }
 
-const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
+const input = "w-full px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading";
 
 type FormProps = { hostId: string; onDone: (message: string) => void; onCancel: () => void };
 
@@ -253,7 +253,7 @@ function FormButtons({ loading, label, onCancel }: { loading: boolean; label: st
       <div className="w-40">
         <SubmitButton loading={loading}>{label}</SubmitButton>
       </div>
-      <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+      <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
         Batal
       </button>
     </div>
@@ -286,7 +286,7 @@ function ViolationForm({ hostId, onDone, onCancel }: FormProps) {
         </div>
       )}
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Pelanggaran</span>
+        <span className="block text-xs text-muted">Pelanggaran</span>
         <select value={chosen?.id ?? ""} onChange={(event) => setTypeId(event.target.value)} className={input}>
           {types.data?.violation_types.map((type) => (
             <option key={type.id} value={type.id}>
@@ -294,19 +294,19 @@ function ViolationForm({ hostId, onDone, onCancel }: FormProps) {
             </option>
           ))}
         </select>
-        {errors.violation_type_id && <span className="text-xs text-red-300">{errors.violation_type_id}</span>}
+        {errors.violation_type_id && <span className="text-xs text-danger">{errors.violation_type_id}</span>}
       </label>
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Poin yang dipotong</span>
+        <span className="block text-xs text-muted">Poin yang dipotong</span>
         <input key={chosen?.id} name="points" type="number" min={1} max={100} placeholder={String(chosen?.default_points ?? "")} className={input} />
-        {errors.points && <span className="text-xs text-red-300">{errors.points}</span>}
+        {errors.points && <span className="text-xs text-danger">{errors.points}</span>}
       </label>
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Tanggal</span>
+        <span className="block text-xs text-muted">Tanggal</span>
         <input name="occurred_on" type="date" defaultValue={toDateInput()} max={toDateInput()} className={input} />
       </label>
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Kejadiannya</span>
+        <span className="block text-xs text-muted">Kejadiannya</span>
         <input name="reason" maxLength={255} className={input} />
       </label>
       <FormButtons loading={loading} label="Catat" onCancel={onCancel} />
@@ -338,7 +338,7 @@ function ComplaintForm({ hostId, onDone, onCancel }: FormProps) {
         </div>
       )}
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Brand</span>
+        <span className="block text-xs text-muted">Brand</span>
         <select name="brand_id" className={input}>
           {brands.data?.brands.map((brand) => (
             <option key={brand.id} value={brand.id}>
@@ -348,16 +348,16 @@ function ComplaintForm({ hostId, onDone, onCancel }: FormProps) {
         </select>
       </label>
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Poin yang dipotong (kosong = bawaan)</span>
+        <span className="block text-xs text-muted">Poin yang dipotong (kosong = bawaan)</span>
         <input name="points" type="number" min={1} max={100} className={input} />
       </label>
       <label className="space-y-1 sm:col-span-2">
-        <span className="block text-xs text-gray-400">Keluhan dari brand</span>
+        <span className="block text-xs text-muted">Keluhan dari brand</span>
         <textarea name="description" rows={2} maxLength={2000} className={input} />
-        {errors.description && <span className="text-xs text-red-300">{errors.description}</span>}
+        {errors.description && <span className="text-xs text-danger">{errors.description}</span>}
       </label>
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Tanggal</span>
+        <span className="block text-xs text-muted">Tanggal</span>
         <input name="occurred_on" type="date" defaultValue={toDateInput()} max={toDateInput()} className={input} />
       </label>
       <FormButtons loading={loading} label="Catat" onCancel={onCancel} />
@@ -385,7 +385,7 @@ function WarningForm({ hostId, onDone, onCancel }: FormProps) {
         </div>
       )}
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Level</span>
+        <span className="block text-xs text-muted">Level</span>
         <select name="level" className={input}>
           <option value="1">SP1</option>
           <option value="2">SP2</option>
@@ -393,9 +393,9 @@ function WarningForm({ hostId, onDone, onCancel }: FormProps) {
         </select>
       </label>
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Alasan</span>
+        <span className="block text-xs text-muted">Alasan</span>
         <input name="reason" maxLength={255} className={input} />
-        {errors.reason && <span className="text-xs text-red-300">{errors.reason}</span>}
+        {errors.reason && <span className="text-xs text-danger">{errors.reason}</span>}
       </label>
       <FormButtons loading={loading} label="Terbitkan" onCancel={onCancel} />
     </form>

@@ -53,16 +53,16 @@ export default function DiscordConnect() {
 
       {link ? (
         <div className="space-y-3">
-          <p className="text-sm text-gray-200">
-            Terhubung sebagai <span className="text-white font-medium">{link.discord_username}</span>
-            <span className="text-gray-400"> sejak {formatDate(link.linked_at)}</span>
+          <p className="text-sm text-body">
+            Terhubung sebagai <span className="text-heading font-medium">{link.discord_username}</span>
+            <span className="text-muted"> sejak {formatDate(link.linked_at)}</span>
           </p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={busy}
               onClick={() => run(() => discordApi.test(token))}
-              className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-500 disabled:opacity-50"
+              className="px-3 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
             >
               Kirim pesan percobaan
             </button>
@@ -70,12 +70,12 @@ export default function DiscordConnect() {
               type="button"
               disabled={busy}
               onClick={() => run(() => discordApi.unlink(token))}
-              className="px-3 py-2 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800 disabled:opacity-50"
+              className="px-3 py-2 rounded-lg border border-stroke-strong text-body text-sm hover:bg-surface-2 disabled:opacity-50"
             >
               Putuskan
             </button>
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted">
             Tidak menerima pesan? Gabung ke server Discord agensi dan aktifkan &quot;Allow direct messages from server members&quot; di
             Privacy Settings server tersebut.
           </p>
@@ -85,7 +85,7 @@ export default function DiscordConnect() {
           type="button"
           disabled={busy}
           onClick={connect}
-          className="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 disabled:opacity-50"
+          className="w-full py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary-hover disabled:opacity-50"
         >
           Hubungkan Discord
         </button>

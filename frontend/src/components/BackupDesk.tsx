@@ -57,7 +57,7 @@ export default function BackupDesk() {
         <button
           type="button"
           onClick={() => setCreating(true)}
-          className="px-4 py-2 rounded-lg border border-slate-700 text-sm text-gray-200 hover:bg-slate-800"
+          className="px-4 py-2 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2"
         >
           Ajukan untuk host
         </button>
@@ -81,7 +81,7 @@ export default function BackupDesk() {
       <div className={`space-y-3 ${requests.loading ? "opacity-60" : ""}`}>
         {requests.data?.requests.length === 0 && (
           <Card>
-            <p className="text-sm text-gray-400">Tidak ada data.</p>
+            <p className="text-sm text-muted">Tidak ada data.</p>
           </Card>
         )}
         {requests.data?.requests.map((backup) => (
@@ -118,13 +118,13 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-white font-medium">
+          <p className="text-heading font-medium">
             {backup.brand.name} · {backup.requester?.user.name}
           </p>
-          <p className="text-sm text-purple-200">{formatWindow(backup.start_at, backup.end_at)}</p>
-          <p className="text-sm text-gray-300 mt-1">
+          <p className="text-sm text-accent">{formatWindow(backup.start_at, backup.end_at)}</p>
+          <p className="text-sm text-body mt-1">
             {reasonLabels[backup.reason_type]}
-            {backup.reason && <span className="text-gray-400"> · {backup.reason}</span>}
+            {backup.reason && <span className="text-muted"> · {backup.reason}</span>}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -133,12 +133,12 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
         {backup.letter_status !== "not_needed" && (
           <span className="flex items-center gap-2">
             <LetterBadge status={backup.letter_status} />
             {backup.letter_status === "uploaded" && (
-              <button type="button" onClick={openLetter} className="text-purple-300 hover:text-white">
+              <button type="button" onClick={openLetter} className="text-accent hover:text-heading">
                 Lihat
               </button>
             )}
@@ -153,11 +153,11 @@ function RequestCard({ backup, act }: { backup: BackupRequest; act: Act }) {
       {letterError && <FormAlert tone="error">{letterError}</FormAlert>}
 
       {backup.status === "filled" && backup.filler && (
-        <div className="flex items-center gap-2 text-sm text-green-300">
+        <div className="flex items-center gap-2 text-sm text-success">
           <UserAvatar user={backup.filler.user} size="w-6 h-6" />
           Digantikan {backup.filler.user.name}
-          {backup.auto_filled && <span className="text-xs text-gray-400">(disetujui otomatis)</span>}
-          {backup.counts_toward_quota && <span className="text-xs text-gray-400">· brand lain, memakai kuota</span>}
+          {backup.auto_filled && <span className="text-xs text-muted">(disetujui otomatis)</span>}
+          {backup.counts_toward_quota && <span className="text-xs text-muted">· brand lain, memakai kuota</span>}
         </div>
       )}
 
@@ -191,7 +191,7 @@ function ActionButton({ primary, onClick, children }: { primary?: boolean; onCli
     <button
       type="button"
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-sm ${primary ? "bg-purple-600 text-white hover:bg-purple-500" : "border border-slate-700 text-gray-300 hover:bg-slate-800"}`}
+      className={`px-3 py-1.5 rounded-lg text-sm ${primary ? "bg-primary text-white hover:bg-primary-hover" : "border border-stroke-strong text-body hover:bg-surface-2"}`}
     >
       {children}
     </button>
@@ -213,18 +213,18 @@ function CoverPicker({ backup, act }: { backup: BackupRequest; act: Act }) {
     act(() => operatorBackupApi.rejectApplicant(token, backup.id, candidate.host_id));
 
   return (
-    <div className="space-y-3 border-t border-slate-800 pt-3">
-      <p className="text-xs text-gray-400">Pendaftar, terbaik di atas (rating tertinggi, lalu brand yang sama, lalu yang mendaftar paling awal):</p>
-      {applicants.data?.applicants.length === 0 && <p className="text-sm text-gray-400">Belum ada yang mendaftar.</p>}
+    <div className="space-y-3 border-t border-stroke pt-3">
+      <p className="text-xs text-muted">Pendaftar, terbaik di atas (rating tertinggi, lalu brand yang sama, lalu yang mendaftar paling awal):</p>
+      {applicants.data?.applicants.length === 0 && <p className="text-sm text-muted">Belum ada yang mendaftar.</p>}
       <CandidateList candidates={applicants.data?.applicants ?? []} onPick={pick} onReject={reject} />
 
       {showEveryone ? (
         <>
-          <p className="text-xs text-gray-400">Semua host (untuk darurat; tidak harus sudah mendaftar atau diminta):</p>
+          <p className="text-xs text-muted">Semua host (untuk darurat; tidak harus sudah mendaftar atau diminta):</p>
           <CandidateList candidates={everyone.data?.candidates ?? []} onPick={pick} />
         </>
       ) : (
-        <button type="button" onClick={() => setShowEveryone(true)} className="text-sm text-purple-300 hover:text-white">
+        <button type="button" onClick={() => setShowEveryone(true)} className="text-sm text-accent hover:text-heading">
           Tunjuk host yang tidak mendaftar…
         </button>
       )}
@@ -245,21 +245,21 @@ function CandidateList({
   return (
     <ul className="space-y-2">
       {candidates.map((candidate) => (
-        <li key={candidate.host_id} className="flex items-center gap-3 rounded-lg bg-slate-800/60 px-3 py-2">
+        <li key={candidate.host_id} className="flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2">
           <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="w-7 h-7" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-white truncate">{candidate.name}</p>
-            <p className="text-xs text-gray-400 truncate">
-              {candidate.rating != null && <span className="text-yellow-200">★ {candidate.rating.toFixed(1)} · </span>}
+            <p className="text-sm text-heading truncate">{candidate.name}</p>
+            <p className="text-xs text-muted truncate">
+              {candidate.rating != null && <span className="text-warning">★ {candidate.rating.toFixed(1)} · </span>}
               {candidate.same_brand ? "Brand yang sama" : `Brand lain · kuota ${candidate.quota.quota_used}/${candidate.quota.quota_max}`}
-              {candidate.ineligible_reason && <span className="text-red-300"> · {candidate.ineligible_reason}</span>}
+              {candidate.ineligible_reason && <span className="text-danger"> · {candidate.ineligible_reason}</span>}
             </p>
           </div>
           {onReject && (
             <button
               type="button"
               onClick={() => onReject(candidate)}
-              className="px-3 py-1 rounded-md border border-slate-600 text-gray-300 text-sm hover:bg-slate-700"
+              className="px-3 py-1 rounded-md border border-stroke-strong text-body text-sm hover:bg-surface-3"
             >
               Tolak
             </button>
@@ -298,7 +298,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
     ({ message }) => onDone(message)
   );
 
-  const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
+  const input = "w-full px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading";
 
   return (
     <Modal title="Ajukan backup untuk host" description="Langsung muncul di papan backup, juga untuk sesi yang akan segera mulai." onClose={onCancel}>
@@ -309,11 +309,11 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
           </div>
         )}
         <label className="space-y-1">
-          <span className="block text-sm text-gray-200">Tanggal</span>
+          <span className="block text-sm text-body">Tanggal</span>
           <input type="date" value={date} min={toDateInput()} onChange={(event) => event.target.value && setDate(event.target.value)} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="block text-sm text-gray-200">Sesi</span>
+          <span className="block text-sm text-body">Sesi</span>
           <select name="slot_id" className={input} disabled={daySlots.length === 0}>
             {daySlots.length === 0 && <option>Tidak ada sesi di hari itu</option>}
             {daySlots.map((slot) => (
@@ -322,10 +322,10 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
               </option>
             ))}
           </select>
-          {(errors.slot_id || errors.backup_date) && <span className="block text-sm text-red-300">{errors.slot_id ?? errors.backup_date}</span>}
+          {(errors.slot_id || errors.backup_date) && <span className="block text-sm text-danger">{errors.slot_id ?? errors.backup_date}</span>}
         </label>
         <label className="space-y-1">
-          <span className="block text-sm text-gray-200">Alasan</span>
+          <span className="block text-sm text-body">Alasan</span>
           <select value={reasonType} onChange={(event) => setReasonType(event.target.value as BackupReason)} className={input}>
             {(Object.keys(reasonLabels) as BackupReason[]).map((value) => (
               <option key={value} value={value}>
@@ -335,7 +335,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-sm text-gray-200">Keterangan</span>
+          <span className="block text-sm text-body">Keterangan</span>
           <input name="reason" maxLength={1000} className={input} />
         </label>
         <div className="sm:col-span-2 flex gap-3">
@@ -344,7 +344,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
               <SubmitButton loading={loading}>Buka permintaan</SubmitButton>
             </div>
           )}
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
             Batal
           </button>
         </div>

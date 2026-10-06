@@ -63,7 +63,7 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
             <UserAvatar user={detail.user} size="w-10 h-10" />
             <span className="min-w-0">
               <span className="block truncate">{detail.user.name}</span>
-              <span className="block text-sm font-normal text-gray-400 truncate">{detail.user.email}</span>
+              <span className="block text-sm font-normal text-muted truncate">{detail.user.email}</span>
             </span>
           </span>
         ) : (
@@ -73,14 +73,14 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
       footer={
         <>
           <span className="flex-1" />
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2">
             Batal
           </button>
           <button
             type="submit"
             form={FORM_ID}
             disabled={loading || !detail || !rates.data}
-            className="px-5 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-40"
+            className="px-5 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-hover disabled:opacity-40"
           >
             {loading ? "Menyimpan…" : "Simpan"}
           </button>
@@ -88,7 +88,7 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
       }
     >
       {host.error && <FormAlert tone="error">{host.error}</FormAlert>}
-      {!detail && !host.error && <p className="text-sm text-gray-400">Memuat…</p>}
+      {!detail && !host.error && <p className="text-sm text-muted">Memuat…</p>}
 
       {detail && (
         <div className="space-y-6">
@@ -105,11 +105,11 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
                 <DigitsField label="No. HP wali" name="guardian_phone" defaultValue={detail.guardian_phone} maxLength={15} placeholder="08…" error={errors.guardian_phone} />
                 <TextField label="Tanggal bergabung" name="join_date" type="date" defaultValue={detail.join_date.slice(0, 10)} error={errors.join_date} />
                 <div className="space-y-1">
-                  <span className="block text-sm font-medium text-gray-200">Status</span>
-                  <p className="text-sm text-white">{statusLabel(detail.status)}</p>
-                  <p className="text-xs text-gray-400">
+                  <span className="block text-sm font-medium text-body">Status</span>
+                  <p className="text-sm text-heading">{statusLabel(detail.status)}</p>
+                  <p className="text-xs text-muted">
                     Mengikuti status akun. Ubah di halaman{" "}
-                    <Link href="/admin/users" className="text-purple-300 hover:text-white">
+                    <Link href="/admin/users" className="text-accent hover:text-heading">
                       Pengguna
                     </Link>
                     .
@@ -122,7 +122,7 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
             ) : rates.error ? (
               <FormAlert tone="error">{rates.error}</FormAlert>
             ) : (
-              <p className="text-sm text-gray-400">Memuat…</p>
+              <p className="text-sm text-muted">Memuat…</p>
             )}
           </Section>
 
@@ -142,7 +142,7 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
                 }}
               />
             ) : (
-              <p className="text-sm text-gray-400">Memuat…</p>
+              <p className="text-sm text-muted">Memuat…</p>
             )}
           </Section>
         </div>
@@ -154,9 +154,9 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
-      <div className="border-b border-slate-800 pb-2">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
-        {description && <p className="text-xs text-gray-400 mt-0.5">{description}</p>}
+      <div className="border-b border-stroke pb-2">
+        <h3 className="text-sm font-semibold text-heading">{title}</h3>
+        {description && <p className="text-xs text-muted mt-0.5">{description}</p>}
       </div>
       {children}
     </section>
@@ -178,7 +178,7 @@ function RateSelect({ host, rates, error }: { host: AdminHostDetail; rates: Rate
           ...rates.map((rate) => ({ value: rate.id, label: `${rate.name} · ${formatRupiah(rate.rate_per_hour)}/jam (diatur manual)` })),
         ]}
       />
-      <p className="text-xs text-gray-400 mt-1">
+      <p className="text-xs text-muted mt-1">
         Saat ini: {current} · di agensi {formatTenure(host.join_date)} (sejak {formatDate(host.join_date)})
       </p>
     </>
@@ -210,9 +210,9 @@ function SensitiveData({ host }: { host: AdminHostDetail }) {
     <div className="space-y-3">
       <dl className="grid gap-3 sm:grid-cols-2">
         {rows.map(([label, value]) => (
-          <div key={label} className="rounded-lg bg-slate-800/50 px-3 py-2">
-            <dt className="text-xs text-gray-400">{label}</dt>
-            <dd className="text-white font-mono">{value || <span className="text-gray-500 font-sans">belum diisi</span>}</dd>
+          <div key={label} className="rounded-lg bg-surface-2 px-3 py-2">
+            <dt className="text-xs text-muted">{label}</dt>
+            <dd className="text-heading font-mono">{value || <span className="text-faint font-sans">belum diisi</span>}</dd>
           </div>
         ))}
       </dl>
@@ -221,14 +221,14 @@ function SensitiveData({ host }: { host: AdminHostDetail }) {
       {data?.has_ktp_image ? (
         ktpUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- private blob URL
-          <img src={ktpUrl} alt="Foto KTP" className="max-h-80 rounded-lg border border-slate-700" />
+          <img src={ktpUrl} alt="Foto KTP" className="max-h-80 rounded-lg border border-stroke-strong" />
         ) : (
-          <button type="button" onClick={showKtp} className="px-4 py-2 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800">
+          <button type="button" onClick={showKtp} className="px-4 py-2 rounded-lg border border-stroke-strong text-body text-sm hover:bg-surface-2">
             Lihat foto KTP
           </button>
         )
       ) : (
-        <p className="text-sm text-gray-500">Belum ada foto KTP.</p>
+        <p className="text-sm text-faint">Belum ada foto KTP.</p>
       )}
     </div>
   );

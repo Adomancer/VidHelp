@@ -28,11 +28,11 @@ export default function PasswordForm() {
   );
 
   return (
-    <section className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+    <section className="bg-surface border border-stroke rounded-[10px] shadow-card p-5 space-y-4">
       <div>
-        <h2 className="text-white font-medium">{user.has_password ? "Ganti kata sandi" : "Buat kata sandi"}</h2>
+        <h2 className="text-heading font-medium">{user.has_password ? "Ganti kata sandi" : "Buat kata sandi"}</h2>
         {!user.has_password && (
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-muted mt-1">
             Kamu masuk dengan Google. Buat kata sandi kalau kamu juga mau masuk dengan email.
           </p>
         )}

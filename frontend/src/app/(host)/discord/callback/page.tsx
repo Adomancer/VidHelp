@@ -14,7 +14,7 @@ export default function DiscordCallbackPage() {
   return (
     <div className="max-w-lg">
       {/* useSearchParams needs a Suspense boundary */}
-      <Suspense fallback={<p className="text-gray-400">Menghubungkan Discord…</p>}>
+      <Suspense fallback={<p className="text-muted">Menghubungkan Discord…</p>}>
         <FinishLink />
       </Suspense>
     </div>
@@ -54,12 +54,12 @@ function FinishLink() {
     });
   }, [router, searchParams, token]);
 
-  if (!error) return <p className="text-gray-400">Menghubungkan Discord…</p>;
+  if (!error) return <p className="text-muted">Menghubungkan Discord…</p>;
 
   return (
     <Card>
       <FormAlert tone="error">{error}</FormAlert>
-      <Link href="/host/profile" className="text-sm text-purple-300 hover:text-white">
+      <Link href="/host/profile" className="text-sm text-accent hover:text-heading">
         Kembali ke profil saya
       </Link>
     </Card>

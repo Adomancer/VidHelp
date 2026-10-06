@@ -22,13 +22,13 @@ export default function AdminBrandsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Brand</h1>
-          <p className="text-sm text-gray-400 mt-1">Host ditugaskan ke brand di halaman Host milik operator.</p>
+          <h1 className="text-2xl font-bold text-heading">Brand</h1>
+          <p className="text-sm text-muted mt-1">Host ditugaskan ke brand di halaman Host milik operator.</p>
         </div>
         <button
           type="button"
           onClick={() => setEditing("new")}
-          className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500"
+          className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover"
         >
           Brand baru
         </button>
@@ -48,9 +48,9 @@ export default function AdminBrandsPage() {
 
       {brands.error && <FormAlert tone="error">{brands.error}</FormAlert>}
 
-      <div className={`bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto ${brands.loading ? "opacity-60" : ""}`}>
+      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${brands.loading ? "opacity-60" : ""}`}>
         <table className="w-full text-sm">
-          <thead className="text-left text-gray-400 border-b border-slate-800">
+          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
             <tr>
               <th className="px-4 py-3 font-medium">Brand</th>
               <th className="px-4 py-3 font-medium">Target / periode</th>
@@ -61,22 +61,22 @@ export default function AdminBrandsPage() {
               <th className="px-4 py-3 font-medium text-right">Aksi</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800 text-gray-200">
+          <tbody className="divide-y divide-stroke text-body">
             {brands.data?.brands.map((brand) => (
               <tr key={brand.id}>
-                <td className="px-4 py-3 text-white">
+                <td className="px-4 py-3 text-heading">
                   {brand.name}
-                  {brand.is_obs && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 text-xs">OBS</span>}
+                  {brand.is_obs && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-500/20 text-info text-xs">OBS</span>}
                 </td>
                 <td className="px-4 py-3">{brand.target_hours_per_period} jam</td>
                 <td className="px-4 py-3">
                   {brand.payment_cycle_days} hari
-                  <span className="block text-xs text-gray-500">
+                  <span className="block text-xs text-faint">
                     {brand.payroll_start_date ? `mulai ${formatDate(brand.payroll_start_date)}` : "penggajian belum dimulai"}
                   </span>
                 </td>
                 <td className="px-4 py-3">{brand.active_hosts_count}</td>
-                <td className="px-4 py-3">{brand.leader?.name ?? <span className="text-gray-500">—</span>}</td>
+                <td className="px-4 py-3">{brand.leader?.name ?? <span className="text-faint">—</span>}</td>
                 <td className="px-4 py-3">{statusLabel(brand.status)}</td>
                 <td className="px-4 py-3 text-right">
                   <button
@@ -84,7 +84,7 @@ export default function AdminBrandsPage() {
                     onClick={() => setEditing(brand)}
                     title={`Ubah data ${brand.name}: nama, target jam, siklus pembayaran, dan status`}
                     aria-label={`Ubah ${brand.name}`}
-                    className="px-3 py-1.5 rounded-md border border-slate-700 text-gray-300 hover:bg-slate-800"
+                    className="px-3 py-1.5 rounded-md border border-stroke-strong text-body hover:bg-surface-2"
                   >
                     Ubah
                   </button>
@@ -93,7 +93,7 @@ export default function AdminBrandsPage() {
             ))}
           </tbody>
         </table>
-        {brands.data?.brands.length === 0 && <p className="px-4 py-8 text-center text-gray-400">Belum ada brand.</p>}
+        {brands.data?.brands.length === 0 && <p className="px-4 py-8 text-center text-muted">Belum ada brand.</p>}
       </div>
     </div>
   );
@@ -159,12 +159,12 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
             ]}
           />
         )}
-        <label className="flex items-center gap-2 text-sm text-gray-200 sm:col-span-2">
-          <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="accent-purple-500" />
+        <label className="flex items-center gap-2 text-sm text-body sm:col-span-2">
+          <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="accent-primary" />
           Brand OBS (live pakai OBS)
         </label>
         <div className="space-y-1.5 sm:col-span-2">
-          <label htmlFor="product_knowledge" className="block text-sm font-medium text-gray-200">
+          <label htmlFor="product_knowledge" className="block text-sm font-medium text-body">
             Product knowledge
           </label>
           <textarea
@@ -174,18 +174,18 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
             defaultValue={brand?.product_knowledge ?? ""}
             placeholder="Produk, harga, promo, poin penting saat live, link katalog…"
             aria-invalid={errors.product_knowledge ? true : undefined}
-            className={`w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border text-white outline-none focus:ring-2 focus:ring-purple-500 ${
-              errors.product_knowledge ? "border-red-400" : "border-white/15"
+            className={`w-full px-4 py-2.5 rounded-xl bg-surface-2 border text-heading outline-none focus:ring-2 focus:ring-primary ${
+              errors.product_knowledge ? "border-red-400" : "border-stroke-strong"
             }`}
           />
-          <p className="text-xs text-gray-400">Host yang ditugaskan ke brand ini melihatnya di halaman Brand mereka. Link bisa diklik.</p>
-          {errors.product_knowledge && <p className="text-sm text-red-300">{errors.product_knowledge}</p>}
+          <p className="text-xs text-muted">Host yang ditugaskan ke brand ini melihatnya di halaman Brand mereka. Link bisa diklik.</p>
+          {errors.product_knowledge && <p className="text-sm text-danger">{errors.product_knowledge}</p>}
         </div>
         <div className="flex gap-3 sm:col-span-2">
           <div className="w-40">
             <SubmitButton loading={loading}>Simpan</SubmitButton>
           </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
             Batal
           </button>
         </div>

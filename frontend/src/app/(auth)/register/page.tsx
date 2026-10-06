@@ -9,12 +9,12 @@ export default function RegisterPage() {
       <AuthCard subtitle="Buat akun kamu">
         <RegisterForm />
 
-        <p className="text-center text-xs text-gray-400">
+        <p className="text-center text-xs text-muted">
           Akun baru diperiksa admin dulu sebelum kamu bisa masuk.
         </p>
-        <p className="text-center text-sm text-gray-400">
+        <p className="text-center text-sm text-muted">
           Sudah punya akun?{" "}
-          <Link href="/login" className="text-purple-300 hover:text-white">
+          <Link href="/login" className="text-accent hover:text-heading">
             Masuk
           </Link>
         </p>

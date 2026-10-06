@@ -55,11 +55,11 @@ const tableLabel = (table: string) => tableLabels[table] ?? humanize(table);
 
 function actionTone(action: string): string {
   if (action === "delete" || action.endsWith("_failed") || action === "two_factor_reset" || action === "two_factor_disabled") {
-    return "bg-red-500/15 text-red-300";
+    return "bg-red-500/15 text-danger";
   }
-  if (action === "create" || action === "approve" || action === "login") return "bg-green-500/15 text-green-300";
-  if (action.startsWith("two_factor") || action.startsWith("recovery")) return "bg-purple-500/15 text-purple-200";
-  return "bg-slate-700 text-gray-200";
+  if (action === "create" || action === "approve" || action === "login") return "bg-green-500/15 text-success";
+  if (action.startsWith("two_factor") || action.startsWith("recovery")) return "bg-primary/15 text-accent";
+  return "bg-surface-3 text-body";
 }
 
 const actionLabel = (action: string) => actionLabels[action] ?? humanize(action);
@@ -98,8 +98,8 @@ export default function AuditLogPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Log Audit</h1>
-        <p className="text-sm text-gray-400 mt-1">Setiap aktivitas masuk dan setiap perubahan data penting: siapa, kapan, apa yang berubah, dan dari mana.</p>
+        <h1 className="text-2xl font-bold text-heading">Log Audit</h1>
+        <p className="text-sm text-muted mt-1">Setiap aktivitas masuk dan setiap perubahan data penting: siapa, kapan, apa yang berubah, dan dari mana.</p>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -115,13 +115,13 @@ export default function AuditLogPage() {
             type="search"
             defaultValue={filters.search}
             placeholder="Cari orang, data, atau IP…"
-            className="w-64 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-64 px-3 py-2 rounded-lg bg-surface border border-stroke text-sm text-heading placeholder-faint outline-none focus:ring-2 focus:ring-primary"
           />
         </form>
         <select
           value={filters.action ?? ""}
           onChange={(event) => change("action", event.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white"
+          className="px-3 py-2 rounded-lg bg-surface border border-stroke text-sm text-heading"
           aria-label="Aksi"
         >
           <option value="">Semua aksi</option>
@@ -134,7 +134,7 @@ export default function AuditLogPage() {
         <select
           value={filters.target_table ?? ""}
           onChange={(event) => change("target_table", event.target.value)}
-          className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white"
+          className="px-3 py-2 rounded-lg bg-surface border border-stroke text-sm text-heading"
           aria-label="Jenis data"
         >
           <option value="">Semua data</option>
@@ -144,26 +144,26 @@ export default function AuditLogPage() {
             </option>
           ))}
         </select>
-        <label className="text-xs text-gray-400">
+        <label className="text-xs text-muted">
           Dari
           <input
             type="date"
             value={filters.from ?? ""}
             onChange={(event) => change("from", event.target.value)}
-            className="block mt-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white [color-scheme:dark]"
+            className="block mt-1 px-3 py-1.5 rounded-lg bg-surface border border-stroke text-sm text-heading [color-scheme:dark]"
           />
         </label>
-        <label className="text-xs text-gray-400">
+        <label className="text-xs text-muted">
           Sampai
           <input
             type="date"
             value={filters.to ?? ""}
             onChange={(event) => change("to", event.target.value)}
-            className="block mt-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-sm text-white [color-scheme:dark]"
+            className="block mt-1 px-3 py-1.5 rounded-lg bg-surface border border-stroke text-sm text-heading [color-scheme:dark]"
           />
         </label>
         {Object.values(filters).some(Boolean) && (
-          <button type="button" onClick={() => applyFilters({})} className="px-3 py-2 text-sm text-purple-300 hover:text-white">
+          <button type="button" onClick={() => applyFilters({})} className="px-3 py-2 text-sm text-accent hover:text-heading">
             Hapus filter
           </button>
         )}
@@ -179,9 +179,9 @@ export default function AuditLogPage() {
       )}
       {result.error && <FormAlert tone="error">{result.error}</FormAlert>}
 
-      <div className={`bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto ${result.loading ? "opacity-60" : ""}`}>
+      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${result.loading ? "opacity-60" : ""}`}>
         <table className="w-full text-sm">
-          <thead className="text-left text-gray-400 border-b border-slate-800">
+          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
             <tr>
               <th className="px-4 py-3 font-medium">Waktu</th>
               <th className="px-4 py-3 font-medium">Siapa</th>
@@ -190,14 +190,14 @@ export default function AuditLogPage() {
               <th className="px-4 py-3 font-medium">IP</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
+          <tbody className="divide-y divide-stroke">
             {logs?.data.map((log) => (
               <Fragment key={log.id}>
                 <tr
                   onClick={() => setOpenId(openId === log.id ? null : log.id)}
-                  className={`text-gray-200 cursor-pointer hover:bg-slate-800/50 ${openId === log.id ? "bg-slate-800/50" : ""}`}
+                  className={`text-body cursor-pointer hover:bg-surface-2 ${openId === log.id ? "bg-surface-2" : ""}`}
                 >
-                  <td className="px-4 py-3 whitespace-nowrap text-gray-400">{formatDateTime(log.created_at)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-muted">{formatDateTime(log.created_at)}</td>
                   <td className="px-4 py-3">
                     {log.user ? (
                       <button
@@ -206,14 +206,14 @@ export default function AuditLogPage() {
                           event.stopPropagation();
                           applyFilters({ ...filters, user_id: log.user!.id });
                         }}
-                        className="text-left hover:text-purple-300"
+                        className="text-left hover:text-accent"
                         title="Tampilkan semua yang dilakukan orang ini"
                       >
-                        <span className="block text-white">{log.user.name}</span>
-                        <span className="block text-xs text-gray-400">{log.user.email}</span>
+                        <span className="block text-heading">{log.user.name}</span>
+                        <span className="block text-xs text-muted">{log.user.email}</span>
                       </button>
                     ) : (
-                      <span className="text-gray-400">{log.action === "login_failed" ? "Tidak dikenal" : "Sistem"}</span>
+                      <span className="text-muted">{log.action === "login_failed" ? "Tidak dikenal" : "Sistem"}</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -227,20 +227,20 @@ export default function AuditLogPage() {
                           event.stopPropagation();
                           if (log.target_id) applyFilters({ ...filters, target_table: log.target_table!, target_id: log.target_id });
                         }}
-                        className="text-left hover:text-purple-300"
+                        className="text-left hover:text-accent"
                         title="Tampilkan riwayat data ini"
                       >
-                        <span className="block text-gray-400 text-xs">{tableLabel(log.target_table)}</span>
-                        <span className="block text-white">{log.target_label ?? log.target_id?.slice(0, 8)}</span>
+                        <span className="block text-muted text-xs">{tableLabel(log.target_table)}</span>
+                        <span className="block text-heading">{log.target_label ?? log.target_id?.slice(0, 8)}</span>
                       </button>
                     ) : (
                       "—"
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-400 font-mono text-xs">{log.ip_address ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted font-mono text-xs">{log.ip_address ?? "—"}</td>
                 </tr>
                 {openId === log.id && (
-                  <tr className="bg-slate-950/60">
+                  <tr className="bg-surface-2">
                     <td colSpan={5} className="px-4 py-4">
                       <Details log={log} />
                     </td>
@@ -251,19 +251,19 @@ export default function AuditLogPage() {
           </tbody>
         </table>
 
-        {logs && logs.data.length === 0 && <p className="px-4 py-8 text-center text-gray-400">Tidak ada catatan untuk filter ini.</p>}
+        {logs && logs.data.length === 0 && <p className="px-4 py-8 text-center text-muted">Tidak ada catatan untuk filter ini.</p>}
       </div>
 
       {logs && logs.last_page > 1 && (
-        <div className="flex items-center justify-between text-sm text-gray-400">
+        <div className="flex items-center justify-between text-sm text-muted">
           <span>
             Halaman {logs.current_page} dari {logs.last_page} · {logs.total} catatan
           </span>
           <div className="flex gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
               Sebelumnya
             </button>
-            <button type="button" disabled={page >= logs.last_page} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
+            <button type="button" disabled={page >= logs.last_page} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
               Berikutnya
             </button>
           </div>
@@ -283,7 +283,7 @@ function Details({ log }: { log: AuditLogEntry }) {
     <div className="space-y-3">
       {fields.length > 0 ? (
         <table className="text-sm">
-          <thead className="text-left text-xs text-gray-400">
+          <thead className="text-left text-xs text-muted">
             <tr>
               <th className="pr-6 pb-1 font-medium">Kolom</th>
               {showBefore && <th className="pr-6 pb-1 font-medium">Sebelum</th>}
@@ -293,21 +293,21 @@ function Details({ log }: { log: AuditLogEntry }) {
           <tbody>
             {fields.map((field) => (
               <tr key={field} className="align-top">
-                <td className="pr-6 py-0.5 text-gray-400 font-mono text-xs">{field}</td>
-                {showBefore && <td className="pr-6 py-0.5 text-red-200 break-all">{showValue(log.old_value?.[field])}</td>}
-                {showAfter && <td className="py-0.5 text-green-200 break-all">{showValue(log.new_value?.[field])}</td>}
+                <td className="pr-6 py-0.5 text-muted font-mono text-xs">{field}</td>
+                {showBefore && <td className="pr-6 py-0.5 text-danger break-all">{showValue(log.old_value?.[field])}</td>}
+                {showAfter && <td className="py-0.5 text-success break-all">{showValue(log.new_value?.[field])}</td>}
               </tr>
             ))}
           </tbody>
         </table>
       ) : (
-        <p className="text-sm text-gray-400">Tidak ada detail kolom untuk catatan ini.</p>
+        <p className="text-sm text-muted">Tidak ada detail kolom untuk catatan ini.</p>
       )}
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-faint">
         {log.target_id && <>ID data {log.target_id} · </>}
         {log.user_agent ?? "Browser tidak dikenal"}
       </p>
-      <p className="text-xs text-gray-500">&quot;[hidden]&quot; berarti kolom itu berubah, tapi nilainya (kata sandi, KTP, nomor rekening) tidak pernah disimpan di log.</p>
+      <p className="text-xs text-faint">&quot;[hidden]&quot; berarti kolom itu berubah, tapi nilainya (kata sandi, KTP, nomor rekening) tidak pernah disimpan di log.</p>
     </div>
   );
 }

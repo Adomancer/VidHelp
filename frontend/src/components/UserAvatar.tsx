@@ -20,7 +20,7 @@ export default function UserAvatar({ user, size = "w-8 h-8" }: UserAvatarProps) 
   }
 
   return (
-    <span className={`${size} shrink-0 rounded-full bg-purple-600 flex items-center justify-center text-white text-sm font-bold`}>
+    <span className={`${size} shrink-0 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold`}>
       {shown.name.charAt(0).toUpperCase()}
     </span>
   );

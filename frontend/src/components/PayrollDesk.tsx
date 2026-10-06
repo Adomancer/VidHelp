@@ -18,10 +18,10 @@ import ToggleGroup from "./ToggleGroup";
 type Notice = { tone: "success" | "error"; text: string } | null;
 
 const statusStyles: Record<PeriodStatus, [string, string]> = {
-  in_progress: ["Berjalan", "bg-blue-500/15 text-blue-200"],
-  waiting_payment: ["Siap ditagihkan", "bg-yellow-500/15 text-yellow-200"],
-  requested: ["Menunggu brand", "bg-purple-500/15 text-purple-200"],
-  paid: ["Lunas", "bg-green-500/15 text-green-300"],
+  in_progress: ["Berjalan", "bg-blue-500/15 text-info"],
+  waiting_payment: ["Siap ditagihkan", "bg-yellow-500/15 text-warning"],
+  requested: ["Menunggu brand", "bg-primary/15 text-accent"],
+  paid: ["Lunas", "bg-green-500/15 text-success"],
 };
 
 export function PeriodBadge({ status }: { status: PeriodStatus }) {
@@ -78,7 +78,7 @@ function Periods() {
           setSelected(null);
         }}
         aria-label="Brand"
-        className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white"
+        className="px-3 py-2 rounded-lg bg-surface border border-stroke text-heading"
       >
         <option value="">Semua brand</option>
         {brands.data?.brands.map((brand) => (
@@ -88,9 +88,9 @@ function Periods() {
         ))}
       </select>
 
-      <div className={`bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto ${periods.loading ? "opacity-60" : ""}`}>
+      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${periods.loading ? "opacity-60" : ""}`}>
         <table className="w-full text-sm">
-          <thead className="text-left text-gray-400 border-b border-slate-800">
+          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
             <tr>
               <th className="px-4 py-3 font-medium">Brand · periode</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -99,13 +99,13 @@ function Periods() {
               <th className="px-4 py-3 font-medium text-right">Gaji host</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
+          <tbody className="divide-y divide-stroke">
             {periods.data?.periods.map((period) => (
               <PeriodRow key={period.id} period={period} selected={period.id === selected} onClick={() => setSelected(period.id === selected ? null : period.id)} />
             ))}
           </tbody>
         </table>
-        {periods.data?.periods.length === 0 && <p className="px-4 py-8 text-center text-gray-400">Belum ada periode pembayaran.</p>}
+        {periods.data?.periods.length === 0 && <p className="px-4 py-8 text-center text-muted">Belum ada periode pembayaran.</p>}
       </div>
 
       {selected && (
@@ -124,10 +124,10 @@ function Periods() {
 
 function PeriodRow({ period, selected, onClick }: { period: PeriodListItem; selected: boolean; onClick: () => void }) {
   return (
-    <tr onClick={onClick} className={`cursor-pointer text-gray-200 ${selected ? "bg-purple-600/10" : "hover:bg-slate-800/50"}`}>
+    <tr onClick={onClick} className={`cursor-pointer text-body ${selected ? "bg-primary/10" : "hover:bg-surface-2"}`}>
       <td className="px-4 py-3">
-        <p className="text-white">{period.brand?.name}</p>
-        <p className="text-xs text-gray-400">
+        <p className="text-heading">{period.brand?.name}</p>
+        <p className="text-xs text-muted">
           {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
         </p>
       </td>
@@ -136,7 +136,7 @@ function PeriodRow({ period, selected, onClick }: { period: PeriodListItem; sele
       </td>
       <td className="px-4 py-3 whitespace-nowrap">{formatDuration(period.worked_hours)}</td>
       <td className="px-4 py-3 whitespace-nowrap">
-        {formatDuration(period.achieved_hours)} <span className="text-xs text-gray-500">/ {period.target_hours} jam</span>
+        {formatDuration(period.achieved_hours)} <span className="text-xs text-faint">/ {period.target_hours} jam</span>
       </td>
       <td className="px-4 py-3 text-right whitespace-nowrap">{formatRupiah(period.total_amount)}</td>
     </tr>
@@ -170,7 +170,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
   }
 
   if (detail.error) return <FormAlert tone="error">{detail.error}</FormAlert>;
-  if (!detail.data) return <p className="text-gray-400">Memuat…</p>;
+  if (!detail.data) return <p className="text-muted">Memuat…</p>;
   const { period, summary, pending_reports: pendingReports, requests, hosts, adjustments, slips } = detail.data;
   const locked = period.status === "requested" || period.status === "paid";
 
@@ -179,7 +179,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-lg text-white font-medium">
+            <p className="text-lg text-heading font-medium">
               {period.brand?.name} · {formatDate(period.period_start)} – {formatDate(period.period_end)}
             </p>
             <PeriodBadge status={period.status} />
@@ -190,13 +190,13 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                 type="button"
                 disabled={pendingReports > 0}
                 onClick={() => confirm("Kunci periode ini dan ajukan pembayaran? Jam dan tarif akan dibekukan.") && act(() => payrollApi.requestPayment(token, period.id))}
-                className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Ajukan pembayaran
               </button>
             )}
             {locked && (
-              <button type="button" onClick={download} className="px-3 py-1.5 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800">
+              <button type="button" onClick={download} className="px-3 py-1.5 rounded-lg border border-stroke-strong text-body text-sm hover:bg-surface-2">
                 Laporan brand (CSV)
               </button>
             )}
@@ -215,7 +215,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                 placeholder="Kenapa? mis. jam host salah"
                 submitLabel="Batalkan pengajuan"
                 required
-                buttonClass="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 text-sm hover:bg-red-500/10"
+                buttonClass="px-3 py-1.5 rounded-lg border border-red-500/40 text-danger text-sm hover:bg-red-500/10"
                 onSubmit={(reason) => act(() => payrollApi.cancelRequest(token, period.id, reason))}
               />
             )}
@@ -237,9 +237,9 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
           <Stat label="Dibawa ke periode berikutnya" value={formatDuration(summary.carried_out_hours)} />
           <Stat label="Gaji host" value={formatRupiah(summary.total_amount)} />
         </dl>
-        {period.status === "in_progress" && <p className="text-xs text-gray-400">Gaji masih perkiraan dengan tarif hari ini sampai pembayaran diajukan.</p>}
+        {period.status === "in_progress" && <p className="text-xs text-muted">Gaji masih perkiraan dengan tarif hari ini sampai pembayaran diajukan.</p>}
         {period.status === "requested" && (
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted">
             Membatalkan akan membuka kunci periode supaya jam bisa dikoreksi; ajukan lagi setelahnya. Jam yang disetujui saat periode terkunci tetap di periode berikutnya.
           </p>
         )}
@@ -249,21 +249,21 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
         <Card title="Riwayat pengajuan">
           <ul className="space-y-2 text-sm">
             {requests.map((request) => (
-              <li key={request.id} className="rounded-lg bg-slate-800 px-3 py-2">
-                <p className="text-gray-200">
+              <li key={request.id} className="rounded-lg bg-surface-2 px-3 py-2">
+                <p className="text-body">
                   Diajukan {formatDate(request.requested_at)}
                   {request.requester ? ` oleh ${request.requester.name}` : ""}
                   {request.status === "cancelled" ? (
-                    <span className="text-red-300">
+                    <span className="text-danger">
                       {" "}
                       · dibatalkan {request.cancelled_at ? formatDate(request.cancelled_at) : ""}
                       {request.canceller ? ` oleh ${request.canceller.name}` : ""}
                     </span>
                   ) : (
-                    <span className="text-gray-400"> · {request.status === "paid" ? "lunas" : "aktif"}</span>
+                    <span className="text-muted"> · {request.status === "paid" ? "lunas" : "aktif"}</span>
                   )}
                 </p>
-                {request.cancel_reason && <p className="text-xs text-gray-400">{request.cancel_reason}</p>}
+                {request.cancel_reason && <p className="text-xs text-muted">{request.cancel_reason}</p>}
               </li>
             ))}
           </ul>
@@ -271,21 +271,21 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
       )}
 
       <Card title="Host">
-        {hosts.length === 0 && <p className="text-sm text-gray-400">Belum ada jam yang disetujui.</p>}
+        {hosts.length === 0 && <p className="text-sm text-muted">Belum ada jam yang disetujui.</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-stroke">
               {hosts.map((host) => (
-                <tr key={host.host_id} className="text-gray-200">
-                  <td className="py-2 text-white">{host.name}</td>
+                <tr key={host.host_id} className="text-body">
+                  <td className="py-2 text-heading">{host.name}</td>
                   <td className="py-2">
                     {host.session_count} sesi
                   </td>
                   <td className="py-2 whitespace-nowrap">{formatDuration(host.hours)}</td>
-                  <td className="py-2 whitespace-nowrap text-gray-400">× {formatRupiah(host.rate_per_hour)}</td>
+                  <td className="py-2 whitespace-nowrap text-muted">× {formatRupiah(host.rate_per_hour)}</td>
                   <td className="py-2 text-right whitespace-nowrap">
                     {formatRupiah(host.amount)}
-                    {host.estimate && <span className="text-xs text-gray-500"> perkiraan</span>}
+                    {host.estimate && <span className="text-xs text-faint"> perkiraan</span>}
                   </td>
                 </tr>
               ))}
@@ -295,19 +295,19 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
       </Card>
 
       <Card title="Penyesuaian" description="Tambah atau kurangi waktu host, mis. live terpotong karena gangguan.">
-        {adjustments.length === 0 && <p className="text-sm text-gray-400">Tidak ada.</p>}
+        {adjustments.length === 0 && <p className="text-sm text-muted">Tidak ada.</p>}
         <ul className="space-y-2">
           {adjustments.map((adjustment) => (
-            <li key={adjustment.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 px-3 py-2 text-sm">
-              <span className="text-white">{adjustment.host.user.name}</span>
-              <span className={adjustment.hours_added < 0 ? "text-red-300" : "text-green-300"}>
+            <li key={adjustment.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 text-sm">
+              <span className="text-heading">{adjustment.host.user.name}</span>
+              <span className={adjustment.hours_added < 0 ? "text-danger" : "text-success"}>
                 {adjustment.hours_added < 0 ? "−" : "+"}
                 {formatDuration(Math.abs(adjustment.hours_added))}
                 {adjustment.sessions_added !== 0 && `, ${adjustment.sessions_added > 0 ? "+" : ""}${adjustment.sessions_added} sesi`}
               </span>
-              <span className="flex-1 min-w-32 text-gray-400">{adjustment.notes}</span>
+              <span className="flex-1 min-w-32 text-muted">{adjustment.notes}</span>
               {!locked && (
-                <button type="button" onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))} className="text-xs text-red-300 hover:text-red-200">
+                <button type="button" onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))} className="text-xs text-danger hover:text-danger">
                   Hapus
                 </button>
               )}
@@ -321,15 +321,15 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
         <Card title="Slip gaji">
           <ul className="space-y-2">
             {slips.map((slip) => (
-              <li key={slip.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-800 px-3 py-2 text-sm">
-                <span className="flex-1 text-white">{slip.host?.user.name}</span>
-                <span className="text-gray-400">
+              <li key={slip.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 text-sm">
+                <span className="flex-1 text-heading">{slip.host?.user.name}</span>
+                <span className="text-muted">
                   {formatRupiah(slip.gross_amount)}
                   {slip.advance_deduction > 0 && ` − ${formatRupiah(slip.advance_deduction)} kasbon`}
                 </span>
-                {(slip.skipped_deductions?.length ?? 0) > 0 && <span className="text-xs text-yellow-300">kasbon dilewati (gaji tidak cukup)</span>}
-                <span className="font-medium text-green-300">{formatRupiah(slip.net_amount)}</span>
-                <Link href={`${slipsPath}/${slip.id}`} className="text-xs text-purple-300 hover:text-white">
+                {(slip.skipped_deductions?.length ?? 0) > 0 && <span className="text-xs text-warning">kasbon dilewati (gaji tidak cukup)</span>}
+                <span className="font-medium text-success">{formatRupiah(slip.net_amount)}</span>
+                <Link href={`${slipsPath}/${slip.id}`} className="text-xs text-accent hover:text-heading">
                   Lihat
                 </Link>
               </li>
@@ -394,12 +394,12 @@ function InlineAction({
         onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className={`px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm ${type === "number" ? "w-28" : "min-w-56"}`}
+        className={`px-3 py-1.5 rounded-lg bg-surface-2 border border-stroke-strong text-heading text-sm ${type === "number" ? "w-28" : "min-w-56"}`}
       />
-      <button type="submit" disabled={missing} className="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50">
+      <button type="submit" disabled={missing} className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50">
         {submitLabel}
       </button>
-      <button type="button" onClick={() => setOpen(false)} className="text-xs text-gray-400 hover:text-white">
+      <button type="button" onClick={() => setOpen(false)} className="text-xs text-muted hover:text-heading">
         Kembali
       </button>
     </form>
@@ -409,8 +409,8 @@ function InlineAction({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-gray-400">{label}</dt>
-      <dd className="text-white">{value}</dd>
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="text-heading">{value}</dd>
     </div>
   );
 }
@@ -420,7 +420,7 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
   const hosts = useApiData(`payroll-hosts-${brandId}`, () => payrollApi.hosts(token, brandId));
   const [direction, setDirection] = useState<1 | -1>(1);
   const [hours, setHours] = useState(1);
-  const input = "px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
+  const input = "px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading";
 
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) =>
@@ -437,14 +437,14 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
   );
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 border-t border-slate-800 pt-3" noValidate>
+    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 border-t border-stroke pt-3" noValidate>
       {error && (
         <div className="sm:col-span-2">
           <FormAlert tone="error">{error}</FormAlert>
         </div>
       )}
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Host</span>
+        <span className="block text-xs text-muted">Host</span>
         <select name="host_id" className={`${input} w-full`}>
           {hosts.data?.hosts.map((host) => (
             <option key={host.host_id} value={host.host_id}>
@@ -454,7 +454,7 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
         </select>
       </label>
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Tambah atau kurangi</span>
+        <span className="block text-xs text-muted">Tambah atau kurangi</span>
         <select value={direction} onChange={(event) => setDirection(Number(event.target.value) as 1 | -1)} className={`${input} w-full`}>
           <option value={1}>Tambah waktu</option>
           <option value={-1}>Kurangi waktu</option>
@@ -462,13 +462,13 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
       </label>
       <DurationInput label="Waktu" hours={hours} onChange={setHours} error={errors.hours_added} compact />
       <label className="space-y-1">
-        <span className="block text-xs text-gray-400">Sesi (opsional)</span>
+        <span className="block text-xs text-muted">Sesi (opsional)</span>
         <input name="sessions" type="number" min={0} max={50} defaultValue={0} className={`${input} w-24`} />
       </label>
       <label className="space-y-1 sm:col-span-2">
-        <span className="block text-xs text-gray-400">Alasan</span>
+        <span className="block text-xs text-muted">Alasan</span>
         <input name="notes" maxLength={255} className={`${input} w-full`} />
-        {errors.notes && <span className="block text-xs text-red-300">{errors.notes}</span>}
+        {errors.notes && <span className="block text-xs text-danger">{errors.notes}</span>}
       </label>
       <div className="w-44">
         <SubmitButton loading={loading}>Simpan penyesuaian</SubmitButton>
@@ -482,7 +482,7 @@ const advanceTypes = { early_payment: "Gaji di muka", loan: "Pinjaman" } as cons
 function installmentColor(installment: CashAdvance["installments"][number]): string {
   if (installment.status === "deducted") return "bg-green-500";
   if (installment.status === "settled") return "bg-blue-400";
-  return installment.skip_count > 0 ? "bg-yellow-500" : "bg-slate-700";
+  return installment.skip_count > 0 ? "bg-yellow-500" : "bg-surface-3";
 }
 
 function Kasbon() {
@@ -509,13 +509,13 @@ function Kasbon() {
           value={status}
           onChange={(event) => setStatus(event.target.value as typeof status)}
           aria-label="Status"
-          className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white"
+          className="px-3 py-2 rounded-lg bg-surface border border-stroke text-heading"
         >
           <option value="open">Masih dicicil</option>
           <option value="paid">Sudah lunas</option>
           <option value="">Semua</option>
         </select>
-        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500">
+        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover">
           Catat kasbon
         </button>
       </div>
@@ -534,7 +534,7 @@ function Kasbon() {
 
       {advances.data?.advances.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">Tidak ada kasbon.</p>
+          <p className="text-sm text-muted">Tidak ada kasbon.</p>
         </Card>
       )}
       {advances.data?.advances.map((advance) => {
@@ -545,16 +545,16 @@ function Kasbon() {
           <Card key={advance.id}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-white font-medium">
+                <p className="text-heading font-medium">
                   {advance.host.user.name} · {formatRupiah(advance.total_amount)}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-muted">
                   {advanceTypes[advance.type]} · {formatDate(advance.requested_at)}
                   {advance.brand ? ` · ${advance.brand.name}` : ""}
                   {advance.notes ? ` · ${advance.notes}` : ""}
                 </p>
               </div>
-              <span className="text-sm text-gray-300">
+              <span className="text-sm text-body">
                 {paidCount}/{advance.installment_count} cicilan · sisa {formatRupiah(advance.remaining_amount)}
               </span>
             </div>
@@ -568,13 +568,13 @@ function Kasbon() {
               ))}
             </div>
             {skipped && (
-              <p className="text-xs text-yellow-300">
+              <p className="text-xs text-warning">
                 Cicilan {skipped.seq} ({formatRupiah(skipped.amount)}) dilewati di {skipped.skip_count} slip karena gaji tidak
                 cukup. Pertimbangkan menjadwal ulang jadi cicilan yang lebih kecil.
               </p>
             )}
             {advance.settled_at && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-muted">
                 Dilunasi langsung pada {formatDate(advance.settled_at)}
                 {advance.settler ? ` (dicatat oleh ${advance.settler.name})` : ""}
                 {advance.settled_note ? ` · ${advance.settled_note}` : ""}
@@ -587,7 +587,7 @@ function Kasbon() {
                     label="Dilunasi langsung"
                     placeholder="Catatan (opsional), mis. tunai tgl 3 Okt"
                     submitLabel="Tandai lunas"
-                    buttonClass="text-xs text-green-300 hover:text-green-200"
+                    buttonClass="text-xs text-success hover:text-success"
                     onSubmit={(note) => act(() => payrollApi.settleAdvance(token, advance.id, note || null))}
                   />
                   <InlineAction
@@ -596,7 +596,7 @@ function Kasbon() {
                     submitLabel="Bagi sisanya"
                     type="number"
                     required
-                    buttonClass="text-xs text-purple-300 hover:text-white"
+                    buttonClass="text-xs text-accent hover:text-heading"
                     onSubmit={(count) => act(() => payrollApi.rescheduleAdvance(token, advance.id, Number(count)))}
                   />
                 </>
@@ -605,7 +605,7 @@ function Kasbon() {
                 <button
                   type="button"
                   onClick={() => confirm("Hapus kasbon ini?") && act(() => payrollApi.removeAdvance(token, advance.id))}
-                  className="text-xs text-red-300 hover:text-red-200"
+                  className="text-xs text-danger hover:text-danger"
                 >
                   Hapus (salah catat)
                 </button>
@@ -621,7 +621,7 @@ function Kasbon() {
 function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
   const hosts = useApiData("payroll-hosts-all", () => payrollApi.hosts(token));
-  const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
+  const input = "w-full px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading";
 
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) =>
@@ -644,7 +644,7 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
           </div>
         )}
         <label className="space-y-1">
-          <span className="block text-xs text-gray-400">Host</span>
+          <span className="block text-xs text-muted">Host</span>
           <select name="host_id" className={input}>
             {hosts.data?.hosts.map((host) => (
               <option key={host.host_id} value={host.host_id}>
@@ -654,31 +654,31 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-xs text-gray-400">Jenis</span>
+          <span className="block text-xs text-muted">Jenis</span>
           <select name="type" className={input}>
             <option value="loan">Pinjaman</option>
             <option value="early_payment">Gaji di muka</option>
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-xs text-gray-400">Jumlah (Rp)</span>
+          <span className="block text-xs text-muted">Jumlah (Rp)</span>
           <input name="total_amount" type="number" min={1000} step={1000} className={input} />
-          {errors.total_amount && <span className="block text-xs text-red-300">{errors.total_amount}</span>}
+          {errors.total_amount && <span className="block text-xs text-danger">{errors.total_amount}</span>}
         </label>
         <label className="space-y-1">
-          <span className="block text-xs text-gray-400">Jumlah cicilan</span>
+          <span className="block text-xs text-muted">Jumlah cicilan</span>
           <input name="installment_count" type="number" min={1} max={24} defaultValue={1} className={input} />
-          {errors.installment_count && <span className="block text-xs text-red-300">{errors.installment_count}</span>}
+          {errors.installment_count && <span className="block text-xs text-danger">{errors.installment_count}</span>}
         </label>
         <label className="space-y-1 sm:col-span-2">
-          <span className="block text-xs text-gray-400">Catatan</span>
+          <span className="block text-xs text-muted">Catatan</span>
           <input name="notes" maxLength={255} className={input} />
         </label>
         <div className="sm:col-span-2 flex gap-3">
           <div className="w-40">
             <SubmitButton loading={loading}>Catat</SubmitButton>
           </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
             Batal
           </button>
         </div>

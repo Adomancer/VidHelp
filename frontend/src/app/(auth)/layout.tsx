@@ -1,8 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "../globals.css";
-
-const inter = Inter({ subsets: ["latin"] });
+import ThemeToggle from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "VidHelp - Masuk",
@@ -15,7 +12,10 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`${inter.className} min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900`}>
+    <div className="relative min-h-screen flex items-center justify-center bg-canvas py-10">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       {children}
     </div>
   );

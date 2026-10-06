@@ -102,9 +102,9 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
     <div ref={containerRef} className="relative flex-1">
       <div
         onClick={() => inputRef.current?.focus()}
-        className="flex flex-wrap items-center gap-1.5 min-h-[42px] w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 cursor-text focus-within:ring-2 focus-within:ring-purple-500"
+        className="flex flex-wrap items-center gap-1.5 min-h-[42px] w-full px-2.5 py-1.5 rounded-lg bg-surface border border-stroke cursor-text focus-within:ring-2 focus-within:ring-primary"
       >
-        <svg className="w-4 h-4 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <svg className="w-4 h-4 shrink-0 text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
         </svg>
 
@@ -112,7 +112,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
           <span
             key={chip.kind === "host" ? chip.id : `text-${chip.text}`}
             className={`flex items-center gap-1.5 rounded-md py-0.5 pl-1 pr-1.5 text-xs ${
-              chip.kind === "host" ? "bg-purple-500/20 text-purple-100" : "bg-slate-700 text-gray-100"
+              chip.kind === "host" ? "bg-primary/20 text-accent" : "bg-surface-3 text-heading"
             }`}
           >
             {chip.kind === "host" ? (
@@ -130,7 +130,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
                 onChange(value.filter((_, at) => at !== index));
               }}
               aria-label={`Hapus ${chip.kind === "host" ? chip.name : chip.text}`}
-              className="ml-0.5 text-gray-400 hover:text-white"
+              className="ml-0.5 text-muted hover:text-heading"
             >
               ✕
             </button>
@@ -149,7 +149,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
           aria-activedescendant={open && options[active] ? `${listId}-${active}` : undefined}
           aria-label="Cari host"
           placeholder={value.length > 0 ? "Tambah host atau kata kunci…" : "Ketik nama/email atau pilih host (bisa lebih dari satu)…"}
-          className="flex-1 min-w-[12rem] bg-transparent py-1 text-white placeholder-gray-500 outline-none"
+          className="flex-1 min-w-[12rem] bg-transparent py-1 text-heading placeholder-faint outline-none"
         />
 
         {value.length > 0 && (
@@ -159,7 +159,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
               event.stopPropagation();
               onChange([]);
             }}
-            className="shrink-0 rounded-md px-2 py-0.5 text-xs text-gray-400 hover:bg-slate-800 hover:text-white"
+            className="shrink-0 rounded-md px-2 py-0.5 text-xs text-muted hover:bg-surface-2 hover:text-heading"
           >
             Hapus semua
           </button>
@@ -167,7 +167,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
       </div>
 
       {open && (
-        <ul id={listId} role="listbox" aria-multiselectable="true" className="absolute z-30 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-slate-700 bg-slate-800 p-1 shadow-xl">
+        <ul id={listId} role="listbox" aria-multiselectable="true" className="absolute z-30 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-stroke-strong bg-surface-2 p-1 shadow-xl">
           {options.map((option, index) => (
             <li
               key={option.kind === "text" ? "text" : option.host.id}
@@ -179,30 +179,30 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
                 event.preventDefault(); // keep focus in the input
                 choose(option);
               }}
-              className={`flex items-center gap-3 rounded-md px-2.5 py-2 cursor-pointer ${index === active ? "bg-slate-700" : ""}`}
+              className={`flex items-center gap-3 rounded-md px-2.5 py-2 cursor-pointer ${index === active ? "bg-surface-3" : ""}`}
             >
               {option.kind === "text" ? (
                 <>
-                  <span className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full bg-slate-700 text-gray-300" aria-hidden="true">
+                  <span className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full bg-surface-3 text-body" aria-hidden="true">
                     🔍
                   </span>
                   <span className="min-w-0 text-sm">
-                    <span className="text-white">Cari “{option.text}”</span>
-                    <span className="block text-xs text-gray-400">Semua host yang nama atau emailnya memuat teks ini</span>
+                    <span className="text-heading">Cari “{option.text}”</span>
+                    <span className="block text-xs text-muted">Semua host yang nama atau emailnya memuat teks ini</span>
                   </span>
                 </>
               ) : (
                 <>
                   <UserAvatar user={option.host.user} size="w-7 h-7" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm text-white truncate">{option.host.user.name}</span>
-                    <span className="block text-xs text-gray-400 truncate">{option.host.user.email}</span>
+                    <span className="block text-sm text-heading truncate">{option.host.user.name}</span>
+                    <span className="block text-xs text-muted truncate">{option.host.user.email}</span>
                   </span>
                   <span className="hidden sm:flex flex-wrap justify-end gap-1">
                     {option.host.assignments
                       .filter((assignment) => assignment.status === "active")
                       .map((assignment) => (
-                        <span key={assignment.id} className="rounded bg-slate-900/60 px-1.5 py-0.5 text-[10px] text-gray-300">
+                        <span key={assignment.id} className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-body">
                           {assignment.brand.name}
                         </span>
                       ))}
@@ -212,12 +212,12 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
             </li>
           ))}
 
-          {suggestions.loading && !suggestions.data && <li className="px-3 py-2 text-sm text-gray-400">Memuat host…</li>}
+          {suggestions.loading && !suggestions.data && <li className="px-3 py-2 text-sm text-muted">Memuat host…</li>}
           {suggestions.data && hosts.length === 0 && (
-            <li className="px-3 py-2 text-sm text-gray-400">{typed ? "Tidak ada host dengan nama/email itu." : "Semua host sudah dipilih."}</li>
+            <li className="px-3 py-2 text-sm text-muted">{typed ? "Tidak ada host dengan nama/email itu." : "Semua host sudah dipilih."}</li>
           )}
           {suggestions.data && suggestions.data.total > suggestions.data.data.length && (
-            <li className="px-3 py-1.5 text-xs text-gray-500">
+            <li className="px-3 py-1.5 text-xs text-faint">
               Menampilkan {suggestions.data.data.length} dari {suggestions.data.total} host. Ketik untuk mempersempit.
             </li>
           )}

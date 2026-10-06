@@ -215,10 +215,25 @@ This is **Next.js 16**, which differs from older versions. Check `frontend/node_
 
 ### UI rules
 
-- **Look:** dark slate background (`bg-slate-950`, cards `bg-slate-900 border-slate-800`), white headings, `text-gray-400` for secondary text, purple for actions and accents. Reuse `Card`, `FormAlert`, `TextField`, `SubmitButton` instead of new styles.
+- **Look (NextAdmin style):** light by default, with a dark mode toggle (`ThemeToggle`; the choice is saved per device in `localStorage`). Font is Plus Jakarta Sans (Google Fonts, OFL licence, loaded with `next/font/google` in `src/app/layout.tsx`), with `system-ui` as fallback. Primary color is indigo-purple `#5750F1` for buttons, links, focus rings and the active menu item.
+- **Use theme tokens, never raw colors.** The tokens are defined once in `src/app/globals.css` and switch automatically in dark mode. Don't use `slate-*`, `gray-*` or `text-white` for surfaces and text (`text-white` is only for text on a solid colored button or badge).
+
+  | Use | Class |
+  | --- | --- |
+  | Page background | `bg-canvas` |
+  | Card / panel | `bg-surface border border-stroke rounded-[10px] shadow-card` (or just use `Card`) |
+  | Subtle fill (table header, hover, inset box) | `bg-surface-2`, stronger: `bg-surface-3` |
+  | Borders | `border-stroke`; inputs and buttons: `border-stroke-strong` |
+  | Text | `text-heading` (titles), `text-body`, `text-muted` (secondary), `text-faint` (hints) |
+  | Brand | `bg-primary` + `hover:bg-primary-hover` (buttons), `text-accent` (links), `bg-primary/10` (tints) |
+  | Status text | `text-danger`, `text-success`, `text-warning`, `text-info` on a tint such as `bg-red-500/10` |
+
+- **Admin, operator and finance panels** use `SidebarLayout`: fixed left sidebar (290px) with grouped menu sections and icons (`NavIcon`), and a sticky header with a breadcrumb, theme toggle, notifications and the account menu (`UserMenu`). Below `lg` the sidebar becomes a slide-over drawer. Every menu item needs an `icon`.
+- **Host pages are mobile-first:** same tokens, no sidebar. A top bar plus a bottom tab bar on phones (`HostNav`); on desktop the menu links move into the top bar. Design for a phone width first, then desktop.
+- **Reuse** `Card`, `FormAlert`, `TextField`, `SelectField`, `SubmitButton`, `Modal`, `Dialog` instead of new styles. To change the look, restyle these components, not individual pages.
+- **Tables:** inside a card, header row `bg-surface-2` with small uppercase `text-muted` labels, thin `divide-stroke` row dividers, status as pill badges, actions on the right. On phones, scroll horizontally (`overflow-x-auto`) or collapse rows into cards.
 - **Add and edit forms open in a `Modal`**, never inline on the page: render `{open && <Modal title onClose>…</Modal>}` with the form inside, plus a Cancel button next to the submit button. See `CreateAccountForm` on the Users page.
 - **All UI text is in Bahasa Indonesia**, including API messages, notifications and Excel/CSV headers. Status values from the API (`active`, `pending`, …) are shown through `statusLabel()` / `roleLabel()` in `src/lib/labels.ts`. Laravel validation messages and field names are in `backend/lang/id/validation.php` (`APP_LOCALE=id`); dates in backend messages use `translatedFormat()` so day and month names come out in Indonesian.
-- **Host pages are mobile-first:** design for a phone width first, then desktop.
 - **Never hardcode a business number** in text (like "30 minutes" or "24 hours"). Read it from `settingsApi.public()`; see `components/BackupTimingNote.tsx`.
 - **Durations** always as hours and minutes (`formatDuration`), money as rupiah (`formatRupiah`).
 - **Status badges** have a word, not only a color (see `BackupBadges.tsx`).

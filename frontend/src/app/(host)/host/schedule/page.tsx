@@ -27,7 +27,7 @@ export default function HostSchedulePage() {
 
   return (
     <div className="max-w-lg space-y-6">
-      <h1 className="text-xl font-bold text-white">Jadwal Saya</h1>
+      <h1 className="text-xl font-bold text-heading">Jadwal Saya</h1>
 
       {schedule.error && <FormAlert tone="error">{schedule.error}</FormAlert>}
       {schedule.data && (
@@ -49,16 +49,16 @@ function SlotLine({ slot, marker, replacedBy }: { slot: ScheduleSlot; marker?: S
   const off = marker?.status === "filled" || replacedBy !== undefined;
 
   return (
-    <li className={`rounded-lg px-3 py-2 ${off ? "bg-slate-800/40" : "bg-slate-800"}`}>
+    <li className={`rounded-lg px-3 py-2 ${off ? "bg-surface-2" : "bg-surface-2"}`}>
       <div className="flex items-center justify-between gap-3">
-        <span className={off ? "text-gray-400 line-through" : "text-white"}>{slot.assignment.brand.name}</span>
-        <span className={`text-sm whitespace-nowrap ${off ? "text-gray-500 line-through" : "text-purple-200"}`}>
+        <span className={off ? "text-muted line-through" : "text-heading"}>{slot.assignment.brand.name}</span>
+        <span className={`text-sm whitespace-nowrap ${off ? "text-faint line-through" : "text-accent"}`}>
           {formatTimeRange(slot.start_time, slot.end_time, slot.day_of_week)}
-          {slot.slot_type === "pd" && <span className="ml-1 px-1 rounded bg-yellow-500/20 text-yellow-200 text-xs">PD</span>}
+          {slot.slot_type === "pd" && <span className="ml-1 px-1 rounded bg-yellow-500/20 text-warning text-xs">PD</span>}
         </span>
       </div>
       {replacedBy ? (
-        <span className="block text-xs text-yellow-200">Diganti event {replacedBy}: ambil blok event di bawah</span>
+        <span className="block text-xs text-warning">Diganti event {replacedBy}: ambil blok event di bawah</span>
       ) : (
         marker && <BackupMarker marker={marker} mine />
       )}
@@ -71,10 +71,10 @@ function EventLine({ claim }: { claim: MyEventClaim }) {
   return (
     <li className="rounded-lg bg-yellow-500/10 border border-yellow-400/30 px-3 py-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-white">{claim.brand.name}</span>
-        <span className="text-sm text-yellow-100 whitespace-nowrap">{formatWindow(claim.start_at, claim.end_at).split(", ")[1]}</span>
+        <span className="text-heading">{claim.brand.name}</span>
+        <span className="text-sm text-warning whitespace-nowrap">{formatWindow(claim.start_at, claim.end_at).split(", ")[1]}</span>
       </div>
-      <span className="block text-xs text-yellow-200">Event: {claim.event_name}</span>
+      <span className="block text-xs text-warning">Event: {claim.event_name}</span>
     </li>
   );
 }
@@ -84,10 +84,10 @@ function CoverLine({ cover }: { cover: BackupNeed }) {
   return (
     <li className="rounded-lg bg-green-500/10 border border-green-400/30 px-3 py-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-white">{cover.brand.name}</span>
-        <span className="text-sm text-green-200 whitespace-nowrap">{formatWindow(cover.start_at, cover.end_at).split(", ")[1]}</span>
+        <span className="text-heading">{cover.brand.name}</span>
+        <span className="text-sm text-success whitespace-nowrap">{formatWindow(cover.start_at, cover.end_at).split(", ")[1]}</span>
       </div>
-      <span className="block text-xs text-green-300">Backup untuk {cover.requester_name}</span>
+      <span className="block text-xs text-success">Backup untuk {cover.requester_name}</span>
     </li>
   );
 }
@@ -95,9 +95,9 @@ function CoverLine({ cover }: { cover: BackupNeed }) {
 /** An overnight slot from the previous day, shown at the top of the day it ends on. */
 function CarryOverLine({ slot }: { slot: ScheduleSlot }) {
   return (
-    <li className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-slate-600 px-3 py-2">
-      <span className="text-gray-300">{slot.assignment.brand.name}</span>
-      <span className="text-xs text-gray-400 whitespace-nowrap">
+    <li className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-stroke-strong px-3 py-2">
+      <span className="text-body">{slot.assignment.brand.name}</span>
+      <span className="text-xs text-muted whitespace-nowrap">
         sampai {slot.end_time} · dari {dayShort(slot.day_of_week)} {slot.start_time}
       </span>
     </li>
@@ -130,7 +130,7 @@ function WeekList({
   if (slots.length === 0 && covers.length === 0 && eventClaims.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-gray-400">Kamu belum punya slot live. Operator akan menambahkannya.</p>
+        <p className="text-sm text-muted">Kamu belum punya slot live. Operator akan menambahkannya.</p>
       </Card>
     );
   }
@@ -147,9 +147,9 @@ function WeekList({
 
         return (
           <Card key={day.value}>
-            <h2 className={`text-sm font-medium ${day.value === today ? "text-purple-300" : "text-white"}`}>
+            <h2 className={`text-sm font-medium ${day.value === today ? "text-accent" : "text-heading"}`}>
               {day.long}
-              <span className="ml-1 font-normal text-gray-500">{formatShortDate(date)}</span>
+              <span className="ml-1 font-normal text-faint">{formatShortDate(date)}</span>
               {day.value === today && " · hari ini"}
             </h2>
             <ul className="space-y-2">
@@ -179,7 +179,7 @@ function UpcomingList({ slots }: { slots: ScheduleSlot[] }) {
       <ul className="space-y-2">
         {slots.map((slot) => (
           <li key={slot.id} className="space-y-1">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted">
               Setiap {DAYS[slot.day_of_week - 1].long} mulai {formatDate(slot.effective_from)}
             </p>
             <ul>
@@ -221,14 +221,14 @@ function AvailabilityEditor() {
     }
   }
 
-  const input = "px-2 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-white text-sm";
+  const input = "px-2 py-1.5 rounded-md bg-surface-2 border border-stroke-strong text-heading text-sm";
 
   return (
     <Card title="Waktu luang saya" description="Membantu operator menyusun slot. Jam selesai yang lebih awal dari jam mulai berarti lewat tengah malam.">
       {saved.error && <FormAlert tone="error">{saved.error}</FormAlert>}
       {status && <FormAlert tone={status.tone}>{status.text}</FormAlert>}
 
-      {ranges.length === 0 && <p className="text-sm text-gray-400">Belum ada waktu luang yang ditambahkan.</p>}
+      {ranges.length === 0 && <p className="text-sm text-muted">Belum ada waktu luang yang ditambahkan.</p>}
 
       <ul className="space-y-2">
         {ranges.map((range, index) => (
@@ -247,7 +247,7 @@ function AvailabilityEditor() {
                 ))}
               </select>
               <input type="time" value={range.available_from} onChange={(event) => change(index, { available_from: event.target.value })} aria-label="Dari" className={input} />
-              <span className="text-gray-400">–</span>
+              <span className="text-muted">–</span>
               <input type="time" value={range.available_to} onChange={(event) => change(index, { available_to: event.target.value })} aria-label="Sampai" className={input} />
               <input
                 value={range.note ?? ""}
@@ -260,13 +260,13 @@ function AvailabilityEditor() {
                 type="button"
                 onClick={() => setDraft(ranges.filter((_, i) => i !== index))}
                 aria-label="Hapus rentang waktu"
-                className="px-2 py-1.5 rounded-md text-gray-400 hover:bg-slate-800 hover:text-white"
+                className="px-2 py-1.5 rounded-md text-muted hover:bg-surface-2 hover:text-heading"
               >
                 ✕
               </button>
             </div>
             {status?.errors && Object.entries(status.errors).filter(([field]) => field.startsWith(`ranges.${index}.`)).map(([field, message]) => (
-              <p key={field} className="text-xs text-red-300">{message}</p>
+              <p key={field} className="text-xs text-danger">{message}</p>
             ))}
           </li>
         ))}
@@ -276,7 +276,7 @@ function AvailabilityEditor() {
         <button
           type="button"
           onClick={() => setDraft([...ranges, { day_of_week: 1, available_from: "08:00", available_to: "17:00", note: null }])}
-          className="px-3 py-2 rounded-lg border border-slate-700 text-sm text-gray-300 hover:bg-slate-800"
+          className="px-3 py-2 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2"
         >
           Tambah waktu
         </button>
@@ -284,7 +284,7 @@ function AvailabilityEditor() {
           type="button"
           onClick={save}
           disabled={saving || draft === null}
-          className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50"
+          className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
         >
           {saving ? "Menyimpan…" : "Simpan waktu luang"}
         </button>

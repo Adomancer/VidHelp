@@ -41,7 +41,7 @@ export default function RupiahInput({ name, defaultValue, className = "", ...pro
 
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">Rp</span>
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">Rp</span>
       <input
         ref={inputRef}
         type="text"

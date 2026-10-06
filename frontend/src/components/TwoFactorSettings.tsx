@@ -73,10 +73,10 @@ export default function TwoFactorSettings() {
 
       {data?.enabled && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-200">
-            <span className="text-green-300">Aktif ✓</span>
-            {data.enabled_at && <span className="text-gray-400"> sejak {formatDate(data.enabled_at)}</span>}
-            <span className={data.recovery_codes_left <= 2 ? "text-yellow-200" : "text-gray-400"}>
+          <p className="text-sm text-body">
+            <span className="text-success">Aktif ✓</span>
+            {data.enabled_at && <span className="text-muted"> sejak {formatDate(data.enabled_at)}</span>}
+            <span className={data.recovery_codes_left <= 2 ? "text-warning" : "text-muted"}>
               {" "}
               · sisa {data.recovery_codes_left} kode pemulihan
             </span>
@@ -101,7 +101,7 @@ export default function TwoFactorSettings() {
                 type="submit"
                 value="regenerate"
                 disabled={busy}
-                className="px-3 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50"
+                className="px-3 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
               >
                 Buat kode pemulihan baru
               </button>
@@ -110,13 +110,13 @@ export default function TwoFactorSettings() {
                   type="submit"
                   value="disable"
                   disabled={busy}
-                  className="px-3 py-2 rounded-lg border border-red-400/40 text-red-300 text-sm hover:bg-red-500/10 disabled:opacity-50"
+                  className="px-3 py-2 rounded-lg border border-red-400/40 text-danger text-sm hover:bg-red-500/10 disabled:opacity-50"
                 >
                   Matikan 2FA
                 </button>
               )}
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted">
               {data.required
                 ? "2FA wajib untuk akun kamu, jadi tidak bisa dimatikan. HP hilang? Masuk dengan kode pemulihan, atau minta admin lain mereset 2FA kamu."
                 : "HP hilang? Masuk dengan kode pemulihan, atau minta admin lain mereset 2FA kamu."}

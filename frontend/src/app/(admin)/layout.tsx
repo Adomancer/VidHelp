@@ -10,52 +10,51 @@ export const metadata: Metadata = {
 const links: SidebarGroup[] = [
   {
     group: "Ringkasan",
-    items: [{ href: "/admin/dashboard", label: "Dashboard" }],
+    items: [{ href: "/admin/dashboard", label: "Dashboard", icon: "dashboard" }],
   },
   {
     group: "Manajemen",
     items: [
-      { href: "/admin/users", label: "Pengguna" },
-      { href: "/admin/hosts", label: "Host" },
-      { href: "/admin/brands", label: "Brand" },
-      { href: "/admin/rates", label: "Level Tarif" },
+      { href: "/admin/users", label: "Pengguna", icon: "users" },
+      { href: "/admin/hosts", label: "Host", icon: "host" },
+      { href: "/admin/brands", label: "Brand", icon: "brand" },
+      { href: "/admin/rates", label: "Level Tarif", icon: "rates" },
     ],
   },
   {
     group: "Operasional",
     items: [
-      { href: "/admin/schedules", label: "Jadwal" },
-      { href: "/admin/events", label: "Event" },
-      { href: "/admin/backups", label: "Backup" },
+      { href: "/admin/schedules", label: "Jadwal", icon: "calendar" },
+      { href: "/admin/events", label: "Event", icon: "event" },
+      { href: "/admin/backups", label: "Backup", icon: "backup" },
     ],
   },
   {
     group: "Monitoring",
     items: [
-      { href: "/admin/reports", label: "Laporan Live" },
-      { href: "/admin/points", label: "Poin & SP" },
-      { href: "/admin/ratings", label: "Rating" },
+      { href: "/admin/reports", label: "Laporan Live", icon: "report" },
+      { href: "/admin/points", label: "Poin & SP", icon: "points" },
+      { href: "/admin/ratings", label: "Rating", icon: "rating" },
     ],
   },
   {
     group: "Keuangan",
-    items: [{ href: "/admin/payroll", label: "Penggajian" }],
+    items: [{ href: "/admin/payroll", label: "Penggajian", icon: "payroll" }],
   },
   {
     group: "Sistem",
     items: [
-      { href: "/admin/audit", label: "Log Audit" },
-      { href: "/admin/settings", label: "Pengaturan" },
-      { href: "/admin/security", label: "Keamanan" },
+      { href: "/admin/audit", label: "Log Audit", icon: "audit" },
+      { href: "/admin/settings", label: "Pengaturan", icon: "settings" },
+      { href: "/admin/security", label: "Keamanan", icon: "security" },
     ],
   },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarLayout panel="Panel Admin" accentClass="text-purple-400" roles={["admin"]} links={links}>
+    <SidebarLayout panel="Panel Admin" roles={["admin"]} links={links}>
       {children}
     </SidebarLayout>
   );
 }
-

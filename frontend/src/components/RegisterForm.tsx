@@ -27,7 +27,7 @@ export default function RegisterForm() {
     return (
       <div className="space-y-4 text-center">
         <FormAlert tone="warning">{done}</FormAlert>
-        <Link href="/login" className="inline-block text-sm text-purple-300 hover:text-white">
+        <Link href="/login" className="inline-block text-sm text-accent hover:text-heading">
           Kembali ke halaman masuk
         </Link>
       </div>

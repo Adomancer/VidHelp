@@ -34,22 +34,22 @@ export default function Modal({ title, description, onClose, wide = false, child
         event.preventDefault();
         onClose();
       }}
-      className={`m-auto w-[calc(100%-2rem)] ${wide ? "max-w-3xl" : "max-w-xl"} max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-0 text-gray-200 shadow-2xl backdrop:bg-black/70`}
+      className={`m-auto w-[calc(100%-2rem)] ${wide ? "max-w-3xl" : "max-w-xl"} max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[10px] border border-stroke bg-surface p-0 text-body shadow-2xl backdrop:bg-black/60`}
     >
-      <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-800 bg-slate-900 px-5 py-4">
+      <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-stroke bg-surface px-5 py-4 md:px-6">
         <div>
-          <h2 id={titleId} className="text-white font-medium">
+          <h2 id={titleId} className="text-lg font-semibold text-heading">
             {title}
           </h2>
-          {description && <p className="text-sm text-gray-400 mt-1">{description}</p>}
+          {description && <p className="text-sm text-muted mt-1">{description}</p>}
         </div>
-        <button type="button" onClick={onClose} aria-label="Tutup" className="-mr-1 rounded-md p-1 text-gray-400 hover:bg-slate-800 hover:text-white">
+        <button type="button" onClick={onClose} aria-label="Tutup" className="-mr-1 rounded-md p-1 text-muted hover:bg-surface-2 hover:text-heading">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
-      <div className="p-5 space-y-4">{children}</div>
+      <div className="p-5 md:p-6 space-y-4">{children}</div>
     </dialog>
   );
 }

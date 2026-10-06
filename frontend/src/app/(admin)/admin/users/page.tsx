@@ -22,10 +22,10 @@ const tabs: { label: string; status?: UserStatus }[] = [
 const roles: RoleName[] = ["host", "operator", "finance", "admin"];
 
 const statusStyles: Record<UserStatus, string> = {
-  pending: "bg-yellow-500/15 text-yellow-200",
-  active: "bg-green-500/15 text-green-300",
-  inactive: "bg-slate-700 text-gray-300",
-  archived: "bg-slate-800 text-gray-400",
+  pending: "bg-yellow-500/15 text-warning",
+  active: "bg-green-500/15 text-success",
+  inactive: "bg-surface-3 text-body",
+  archived: "bg-surface-2 text-muted",
 };
 
 type Notice = { tone: "success" | "error"; text: string } | null;
@@ -83,8 +83,8 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-white">Manajemen Pengguna</h1>
-        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-sm text-white hover:bg-purple-500">
+        <h1 className="text-2xl font-bold text-heading">Manajemen Pengguna</h1>
+        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-primary text-sm text-white hover:bg-primary-hover">
           Buat akun
         </button>
       </div>
@@ -121,7 +121,7 @@ export default function AdminUsersPage() {
               type="button"
               onClick={() => selectTab(tab.status)}
               className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                status === tab.status ? "bg-purple-600 text-white" : "bg-slate-900 text-gray-300 hover:bg-slate-800"
+                status === tab.status ? "bg-primary text-white" : "bg-surface text-body hover:bg-surface-2"
               }`}
             >
               {tab.label}
@@ -140,7 +140,7 @@ export default function AdminUsersPage() {
             name="search"
             type="search"
             placeholder="Cari nama atau email…"
-            className="w-full lg:w-72 px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full lg:w-72 px-4 py-2 rounded-lg bg-surface border border-stroke text-heading placeholder-faint outline-none focus:ring-2 focus:ring-primary"
           />
         </form>
       </div>
@@ -148,9 +148,9 @@ export default function AdminUsersPage() {
       {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
       {result?.error && <FormAlert tone="error">{result.error}</FormAlert>}
 
-      <div className={`bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto ${loading ? "opacity-60" : ""}`}>
+      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${loading ? "opacity-60" : ""}`}>
         <table className="w-full text-sm">
-          <thead className="text-left text-gray-400 border-b border-slate-800">
+          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
             <tr>
               <th className="px-4 py-3 font-medium">Pengguna</th>
               <th className="px-4 py-3 font-medium">Mendaftar</th>
@@ -159,24 +159,24 @@ export default function AdminUsersPage() {
               <th className="px-4 py-3 font-medium text-right">Aksi</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
+          <tbody className="divide-y divide-stroke">
             {users?.data.map((user) => {
               const isMe = user.id === me.id;
               const busy = busyId === user.id;
               const erased = Boolean(user.erased_at);
 
               return (
-                <tr key={user.id} className="text-gray-200">
+                <tr key={user.id} className="text-body">
                   <td className="px-4 py-3">
-                    <p className="text-white">
+                    <p className="text-heading">
                       {user.name}
                       {user.two_factor_enabled && (
-                        <span className="ml-2 px-1.5 py-0.5 rounded bg-purple-500/15 text-[10px] text-purple-200 align-middle">2FA</span>
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-primary/15 text-[10px] text-accent align-middle">2FA</span>
                       )}
                     </p>
-                    {!erased && <p className="text-gray-400">{user.email}</p>}
+                    {!erased && <p className="text-muted">{user.email}</p>}
                   </td>
-                  <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
+                  <td className="px-4 py-3 text-muted whitespace-nowrap">
                     {new Date(user.created_at).toLocaleDateString("id-ID")}
                     <span className="block text-xs">
                       {user.signup_source === "admin_created" ? "oleh admin" : user.has_password ? "email" : "Google"}
@@ -192,7 +192,7 @@ export default function AdminUsersPage() {
                       value={user.roles[0]?.name ?? "host"}
                       disabled={isMe || busy || erased}
                       onChange={(event) => run(user.id, () => adminApi.setRole(token, user.id, event.target.value as RoleName))}
-                      className="bg-slate-800 border border-slate-700 rounded-md px-2 py-1 text-white disabled:opacity-50"
+                      className="bg-surface-2 border border-stroke-strong rounded-md px-2 py-1 text-heading disabled:opacity-50"
                     >
                       {roles.map((role) => (
                         <option key={role} value={role}>
@@ -257,22 +257,22 @@ export default function AdminUsersPage() {
         </table>
 
         {users && users.data.length === 0 && (
-          <p className="px-4 py-8 text-center text-gray-400">
+          <p className="px-4 py-8 text-center text-muted">
             {status === "pending" ? "Tidak ada yang menunggu persetujuan." : "Pengguna tidak ditemukan."}
           </p>
         )}
       </div>
 
       {users && users.last_page > 1 && (
-        <div className="flex items-center justify-between text-sm text-gray-400">
+        <div className="flex items-center justify-between text-sm text-muted">
           <span>
             Halaman {users.current_page} dari {users.last_page} · {users.total} pengguna
           </span>
           <div className="flex gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
               Sebelumnya
             </button>
-            <button type="button" disabled={page >= users.last_page} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
+            <button type="button" disabled={page >= users.last_page} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
               Berikutnya
             </button>
           </div>
@@ -283,10 +283,10 @@ export default function AdminUsersPage() {
 }
 
 const buttonTones = {
-  plain: "border border-slate-700 text-gray-300 hover:bg-slate-800",
+  plain: "border border-stroke-strong text-body hover:bg-surface-2",
   green: "bg-green-600 text-white hover:bg-green-500",
-  red: "border border-red-400/40 text-red-300 hover:bg-red-500/10",
-  purple: "border border-purple-400/40 text-purple-200 hover:bg-purple-500/10",
+  red: "border border-red-400/40 text-danger hover:bg-red-500/10",
+  purple: "border border-primary/40 text-accent hover:bg-primary/10",
 };
 
 function ActionButton({
@@ -341,7 +341,7 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
           <div className="w-44">
             <SubmitButton loading={loading}>Buat akun</SubmitButton>
           </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
             Batal
           </button>
         </div>
@@ -385,7 +385,7 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
           <div className="w-52">
             <SubmitButton loading={loading}>Hapus permanen</SubmitButton>
           </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
             Batal
           </button>
         </div>

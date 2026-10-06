@@ -40,7 +40,7 @@ export default function LoginForm() {
         <TextField label="Kata sandi" name="password" type="password" autoComplete="current-password" required error={errors.password} />
 
         <div className="text-right">
-          <Link href="/forgot-password" className="text-sm text-purple-300 hover:text-white">
+          <Link href="/forgot-password" className="text-sm text-accent hover:text-heading">
             Lupa kata sandi?
           </Link>
         </div>
@@ -56,10 +56,10 @@ export default function LoginForm() {
 
 export function Divider() {
   return (
-    <div className="flex items-center gap-3 text-xs text-gray-400">
-      <span className="h-px flex-1 bg-white/15" />
+    <div className="flex items-center gap-3 text-xs text-muted">
+      <span className="h-px flex-1 bg-stroke" />
       atau
-      <span className="h-px flex-1 bg-white/15" />
+      <span className="h-px flex-1 bg-stroke" />
     </div>
   );
 }

@@ -35,8 +35,8 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       <div className="text-center space-y-1">
-        <p className="text-white font-medium">Verifikasi dua langkah</p>
-        <p className="text-sm text-gray-300">
+        <p className="text-heading font-medium">Verifikasi dua langkah</p>
+        <p className="text-sm text-body">
           {useRecovery
             ? "Masukkan salah satu kode pemulihan yang kamu simpan saat mengatur 2FA. Setiap kode hanya bisa dipakai sekali."
             : "Buka aplikasi authenticator kamu dan masukkan kode 6 digit untuk VidHelp."}
@@ -47,7 +47,7 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
       {expired && (
         <FormAlert tone="error">
           {expired}{" "}
-          <button type="button" onClick={onRestart} className="underline hover:text-white">
+          <button type="button" onClick={onRestart} className="underline hover:text-heading">
             Masuk lagi
           </button>
         </FormAlert>
@@ -86,10 +86,10 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
       <SubmitButton loading={loading}>Verifikasi</SubmitButton>
 
       <div className="flex justify-between text-sm">
-        <button type="button" onClick={() => setUseRecovery(!useRecovery)} className="text-purple-300 hover:text-white">
+        <button type="button" onClick={() => setUseRecovery(!useRecovery)} className="text-accent hover:text-heading">
           {useRecovery ? "Pakai kode dari aplikasi" : "HP hilang? Pakai kode pemulihan"}
         </button>
-        <button type="button" onClick={onRestart} className="text-gray-400 hover:text-white">
+        <button type="button" onClick={onRestart} className="text-muted hover:text-heading">
           Batal
         </button>
       </div>

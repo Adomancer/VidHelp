@@ -53,11 +53,11 @@ export default function DigitsField({ label, name, defaultValue, error, maxLengt
   return (
     <div className="space-y-1">
       <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={name} className="block text-sm font-medium text-gray-200">
+        <label htmlFor={name} className="block text-sm font-medium text-body">
           {label}
         </label>
         {exactLength && (
-          <span className={`text-xs tabular-nums ${value.length === exactLength ? "text-green-300" : "text-gray-500"}`}>
+          <span className={`text-xs tabular-nums ${value.length === exactLength ? "text-success" : "text-faint"}`}>
             {value.length}/{exactLength} digit
           </span>
         )}
@@ -73,17 +73,17 @@ export default function DigitsField({ label, name, defaultValue, error, maxLengt
         onChange={(event) => change(event.target.value)}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={warning ? `${name}-warning` : undefined}
-        className={`w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border text-white tabular-nums placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500 transition-colors ${
-          invalid ? "border-red-400" : "border-white/15"
+        className={`w-full px-4 py-2.5 rounded-xl bg-surface-2 border text-heading tabular-nums placeholder-faint outline-none focus:ring-2 focus:ring-primary transition-colors ${
+          invalid ? "border-red-400" : "border-stroke-strong"
         } ${className}`}
         {...props}
       />
       {warning && (
-        <p id={`${name}-warning`} role="alert" className="flex items-center gap-1.5 text-sm text-amber-200">
+        <p id={`${name}-warning`} role="alert" className="flex items-center gap-1.5 text-sm text-warning">
           <span aria-hidden="true">⚠</span> {label} hanya boleh diisi angka (0–9).
         </p>
       )}
-      {error && !warning && <p className="text-sm text-red-300">{error}</p>}
+      {error && !warning && <p className="text-sm text-danger">{error}</p>}
     </div>
   );
 }

@@ -30,7 +30,7 @@ export default function EventManager() {
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500">
+        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover">
           Event baru
         </button>
       </div>
@@ -51,7 +51,7 @@ export default function EventManager() {
 
       {events.data && active.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">Belum ada event. Buat event untuk kampanye PD atau double date.</p>
+          <p className="text-sm text-muted">Belum ada event. Buat event untuk kampanye PD atau double date.</p>
         </Card>
       )}
 
@@ -83,14 +83,14 @@ function EventListButton({ event, selected, onClick }: { event: EventListItem; s
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-lg px-3 py-2 border ${selected ? "bg-purple-600/20 border-purple-500/50" : "bg-slate-900 border-slate-800 hover:bg-slate-800"}`}
+      className={`w-full text-left rounded-lg px-3 py-2 border ${selected ? "bg-primary/20 border-primary/50" : "bg-surface border-stroke hover:bg-surface-2"}`}
     >
-      <p className={`text-sm font-medium ${event.status === "cancelled" ? "text-gray-500 line-through" : "text-white"}`}>{event.name}</p>
-      <p className="text-xs text-gray-400">
+      <p className={`text-sm font-medium ${event.status === "cancelled" ? "text-faint line-through" : "text-heading"}`}>{event.name}</p>
+      <p className="text-xs text-muted">
         {event.brand?.name} · {formatDate(event.start_date)}
         {event.end_date !== event.start_date ? ` – ${formatDate(event.end_date)}` : ""}
       </p>
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-faint">
         {event.status === "cancelled" ? "dibatalkan" : `${event.claimed_blocks}/${event.total_blocks} blok terisi`}
       </p>
     </button>
@@ -116,7 +116,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
   }
 
   if (detail.error) return <FormAlert tone="error">{detail.error}</FormAlert>;
-  if (!detail.data) return <p className="text-gray-400">Memuat…</p>;
+  if (!detail.data) return <p className="text-muted">Memuat…</p>;
   const { event, blocks } = detail.data;
   const cancelled = event.status === "cancelled";
 
@@ -125,12 +125,12 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-lg text-white font-medium">{event.name}</p>
-            <p className="text-sm text-gray-400">
+            <p className="text-lg text-heading font-medium">{event.name}</p>
+            <p className="text-sm text-muted">
               {event.brand?.name} · setiap hari {event.daily_start_time}–{event.daily_end_time} · blok {formatDuration(event.block_minutes / 60)} · maks{" "}
               {event.max_slots_per_host} per host
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-muted mt-1">
               {event.open_full_schedule ? "Menggantikan jadwal reguler di hari-hari ini." : "Berjalan bersama jadwal reguler; jam yang sudah terjadwal tidak bisa diambil."}
             </p>
           </div>
@@ -138,7 +138,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
             <button
               type="button"
               onClick={() => confirm(`Batalkan ${event.name}? Semua blok yang sudah diambil akan dilepas.`) && act(() => eventApi.cancel(token, event.id))}
-              className="px-3 py-1.5 rounded-lg border border-red-400/40 text-red-300 text-sm hover:bg-red-500/10"
+              className="px-3 py-1.5 rounded-lg border border-red-400/40 text-danger text-sm hover:bg-red-500/10"
             >
               Batalkan event
             </button>
@@ -151,27 +151,27 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
         <Card key={day} title={formatDay(`${day}T00:00`)}>
           <ul className="space-y-2">
             {dayBlocks.map((block) => (
-              <li key={block.start_at} className="rounded-lg bg-slate-800 px-3 py-2 space-y-2">
+              <li key={block.start_at} className="rounded-lg bg-surface-2 px-3 py-2 space-y-2">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="w-28 text-sm text-purple-200">
+                  <span className="w-28 text-sm text-accent">
                     {formatClock(block.start_at)}–{formatClock(block.end_at)}
                   </span>
                   <span className="flex-1 min-w-32 text-sm">
                     {block.claim ? (
-                      <span className="text-white">{block.claim.host_name}</span>
+                      <span className="text-heading">{block.claim.host_name}</span>
                     ) : block.state === "unavailable" ? (
-                      <span className="text-gray-500">{block.reason}</span>
+                      <span className="text-faint">{block.reason}</span>
                     ) : (
-                      <span className="text-gray-400">{block.state === "past" ? "tidak diambil" : "kosong"}</span>
+                      <span className="text-muted">{block.state === "past" ? "tidak diambil" : "kosong"}</span>
                     )}
                   </span>
                   {!cancelled && new Date(block.end_at) > new Date() && (
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setAssigning(assigning === block.start_at ? null : block.start_at)} className="text-xs text-purple-300 hover:text-white">
+                      <button type="button" onClick={() => setAssigning(assigning === block.start_at ? null : block.start_at)} className="text-xs text-accent hover:text-heading">
                         {block.claim ? "Ganti host" : "Tunjuk host"}
                       </button>
                       {block.claim && (
-                        <button type="button" onClick={() => act(() => eventApi.release(token, block.claim!.id))} className="text-xs text-red-300 hover:text-red-200">
+                        <button type="button" onClick={() => act(() => eventApi.release(token, block.claim!.id))} className="text-xs text-danger hover:text-danger">
                           Lepas
                         </button>
                       )}
@@ -184,7 +184,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
                       value={assignHostId || hosts.data?.assignments[0]?.host_id || ""}
                       onChange={(change) => setAssignHostId(change.target.value)}
                       aria-label="Host"
-                      className="flex-1 px-2 py-1.5 rounded-md bg-slate-900 border border-slate-700 text-white text-sm"
+                      className="flex-1 px-2 py-1.5 rounded-md bg-surface border border-stroke-strong text-heading text-sm"
                     >
                       {hosts.data?.assignments.map((assignment) => (
                         <option key={assignment.host_id} value={assignment.host_id}>
@@ -198,7 +198,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
                         const hostId = assignHostId || hosts.data?.assignments[0]?.host_id;
                         if (hostId) act(() => eventApi.assign(token, event.id, block.start_at, hostId));
                       }}
-                      className="px-3 py-1.5 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-500"
+                      className="px-3 py-1.5 rounded-md bg-primary text-white text-sm hover:bg-primary-hover"
                     >
                       Berikan blok
                     </button>
@@ -229,19 +229,19 @@ function EventSettings({
   const [full, setFull] = useState(openFull);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-slate-800 pt-3 text-sm">
-      <label className="flex items-center gap-2 text-gray-300">
+    <div className="flex flex-wrap items-center gap-3 border-t border-stroke pt-3 text-sm">
+      <label className="flex items-center gap-2 text-body">
         Maks blok per host
-        <input type="number" min={1} max={100} value={max} onChange={(event) => setMax(event.target.value)} className="w-16 px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-white" />
+        <input type="number" min={1} max={100} value={max} onChange={(event) => setMax(event.target.value)} className="w-16 px-2 py-1 rounded-md bg-surface-2 border border-stroke-strong text-heading" />
       </label>
-      <label className="flex items-center gap-2 text-gray-300">
-        <input type="checkbox" checked={full} onChange={(event) => setFull(event.target.checked)} className="accent-purple-500" />
+      <label className="flex items-center gap-2 text-body">
+        <input type="checkbox" checked={full} onChange={(event) => setFull(event.target.checked)} className="accent-primary" />
         Gantikan jadwal reguler
       </label>
       <button
         type="button"
         onClick={() => act(() => eventApi.update(token, eventId, { max_slots_per_host: Number(max), open_full_schedule: full }))}
-        className="px-3 py-1 rounded-md border border-slate-700 text-gray-300 hover:bg-slate-800"
+        className="px-3 py-1 rounded-md border border-stroke-strong text-body hover:bg-surface-2"
       >
         Simpan
       </button>
@@ -252,7 +252,7 @@ function EventSettings({
 function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
   const brands = useApiData("brands", () => operatorApi.brands(token));
-  const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white";
+  const input = "w-full px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading";
 
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) => {
@@ -274,9 +274,9 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
 
   const field = (label: string, name: string, child: React.ReactNode) => (
     <label className="space-y-1">
-      <span className="block text-xs text-gray-400">{label}</span>
+      <span className="block text-xs text-muted">{label}</span>
       {child}
-      {errors[name] && <span className="block text-xs text-red-300">{errors[name]}</span>}
+      {errors[name] && <span className="block text-xs text-danger">{errors[name]}</span>}
     </label>
   );
 
@@ -311,21 +311,21 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
           "block_minutes",
           <div className="flex items-center gap-2">
             <input name="block_hours" type="number" min={0} max={12} defaultValue={2} aria-label="Jam per blok" className={input} />
-            <span className="text-sm text-gray-400">jam</span>
+            <span className="text-sm text-muted">jam</span>
             <input name="block_extra_minutes" type="number" min={0} max={59} step={15} defaultValue={0} aria-label="Menit per blok" className={input} />
-            <span className="text-sm text-gray-400">menit</span>
+            <span className="text-sm text-muted">menit</span>
           </div>
         )}
         {field("Maks blok per host", "max_slots_per_host", <input name="max_slots_per_host" type="number" min={1} max={100} defaultValue={3} className={input} />)}
-        <label className="flex items-center gap-2 text-sm text-gray-200 sm:col-span-2">
-          <input type="checkbox" name="open_full_schedule" className="accent-purple-500" />
+        <label className="flex items-center gap-2 text-sm text-body sm:col-span-2">
+          <input type="checkbox" name="open_full_schedule" className="accent-primary" />
           Gantikan jadwal reguler brand di hari-hari ini (&quot;jadwal dibuka kosong&quot;)
         </label>
         <div className="sm:col-span-2 flex gap-3">
           <div className="w-40">
             <SubmitButton loading={loading}>Buat event</SubmitButton>
           </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
             Batal
           </button>
         </div>

@@ -156,11 +156,11 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           />
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900 p-1">
+        <div className="flex items-center gap-1 rounded-lg border border-stroke bg-surface p-1">
           <IconButton label="Minggu sebelumnya" onClick={() => goToWeek(addDays(week, -7))}>
             ‹
           </IconButton>
-          <span className="px-2 min-w-44 text-center text-sm font-medium text-white tabular-nums">{formatWeekRange(week)}</span>
+          <span className="px-2 min-w-44 text-center text-sm font-medium text-heading tabular-nums">{formatWeekRange(week)}</span>
           <IconButton label="Minggu berikutnya" onClick={() => goToWeek(addDays(week, 7))}>
             ›
           </IconButton>
@@ -184,7 +184,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           <button
             type="button"
             onClick={() => goToWeek(weekStart())}
-            className="px-3 py-2 rounded-lg text-sm text-purple-300 border border-purple-500/40 hover:bg-purple-500/10"
+            className="px-3 py-2 rounded-lg text-sm text-accent border border-primary/40 hover:bg-primary/10"
           >
             Minggu ini
           </button>
@@ -194,18 +194,18 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           type="button"
           onClick={() => setDialog({ kind: "slot", day: mobileDay })}
           disabled={!brandId}
-          className="ml-auto px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-500 disabled:opacity-50"
+          className="ml-auto px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover disabled:opacity-50"
         >
           + Tambah slot
         </button>
       </div>
 
       {/* What needs attention this week */}
-      <p className="text-sm text-gray-400">
-        <span className="text-gray-300">{isThisWeek ? "Minggu ini" : "Minggu tersebut"}:</span> {sessions} slot
-        {uncovered > 0 && <span className="text-amber-300"> · {uncovered} belum ada host pengganti</span>}
-        {events.length > 0 && <span className="text-yellow-200"> · {events.length} event</span>}
-        {board.loading && <span className="text-gray-500"> · memuat…</span>}
+      <p className="text-sm text-muted">
+        <span className="text-body">{isThisWeek ? "Minggu ini" : "Minggu tersebut"}:</span> {sessions} slot
+        {uncovered > 0 && <span className="text-warning"> · {uncovered} belum ada host pengganti</span>}
+        {events.length > 0 && <span className="text-warning"> · {events.length} event</span>}
+        {board.loading && <span className="text-faint"> · memuat…</span>}
       </p>
 
       {board.error && <FormAlert tone="error">{board.error}</FormAlert>}
@@ -221,10 +221,10 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
             onClick={() => setMobileDay(day.value)}
             className={`rounded-lg px-0.5 py-1.5 text-center border ${
               mobileDay === day.value
-                ? "bg-purple-600 border-purple-500 text-white"
+                ? "bg-primary border-primary text-white"
                 : day.date === today
-                  ? "border-purple-500/60 text-purple-200"
-                  : "border-slate-800 text-gray-300"
+                  ? "border-primary/60 text-accent"
+                  : "border-stroke text-body"
             }`}
           >
             <span className="block text-xs">{day.short}</span>
@@ -256,31 +256,31 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
               key={day.value}
               aria-label={`${day.long} ${formatLongDate(day.date)}`}
               className={`${mobileDay === day.value ? "flex" : "hidden"} lg:flex flex-col gap-1.5 min-h-40 rounded-xl border p-2 ${
-                isToday ? "border-purple-500 bg-purple-500/5" : "border-slate-800 bg-slate-900"
+                isToday ? "border-primary bg-primary/5" : "border-stroke bg-surface"
               }`}
             >
               <header className="flex items-center justify-between gap-1 px-0.5">
-                <h3 className="text-sm font-medium text-white">
+                <h3 className="text-sm font-medium text-heading">
                   <span className="lg:hidden">{day.long}</span>
                   <span className="hidden lg:inline">{day.short}</span>
-                  <span className={`ml-1 text-xs font-normal ${isToday ? "text-purple-300" : "text-gray-500"}`}>{formatShortDate(day.date)}</span>
+                  <span className={`ml-1 text-xs font-normal ${isToday ? "text-accent" : "text-faint"}`}>{formatShortDate(day.date)}</span>
                 </h3>
-                {isToday && <span className="lg:hidden xl:inline text-[10px] rounded bg-purple-600 px-1.5 py-0.5 text-white">Hari ini</span>}
+                {isToday && <span className="lg:hidden xl:inline text-[10px] rounded bg-primary px-1.5 py-0.5 text-white">Hari ini</span>}
                 <button
                   type="button"
                   onClick={() => setDialog({ kind: "slot", day: day.value })}
                   aria-label={`Tambah slot hari ${day.long}`}
                   title={`Tambah slot hari ${day.long}`}
-                  className="w-6 h-6 shrink-0 rounded-md text-gray-400 hover:bg-slate-800 hover:text-white"
+                  className="w-6 h-6 shrink-0 rounded-md text-muted hover:bg-surface-2 hover:text-heading"
                 >
                   +
                 </button>
               </header>
 
               {day.event && (
-                <div className="rounded-md bg-yellow-400/15 border border-yellow-400/30 px-2 py-1 text-[11px] text-yellow-100">
+                <div className="rounded-md bg-yellow-400/15 border border-yellow-400/30 px-2 py-1 text-[11px] text-warning">
                   <span className="font-medium">★ {day.event.name}</span>
-                  <span className="block text-yellow-200/70">Slot reguler diganti blok event</span>
+                  <span className="block text-warning/70">Slot reguler diganti blok event</span>
                 </div>
               )}
 
@@ -289,14 +289,14 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                   key={`carry-${slot.id}`}
                   type="button"
                   onClick={() => setDialog({ kind: "detail", slot, date: addDays(day.date, -1) })}
-                  className={`w-full text-left rounded-lg border border-dashed border-slate-600 hover:bg-slate-800 px-2 py-1.5 ${
+                  className={`w-full text-left rounded-lg border border-dashed border-stroke-strong hover:bg-surface-2 px-2 py-1.5 ${
                     day.eventDayBefore ? "opacity-40" : ""
                   }`}
                 >
-                  <span className="block text-[11px] text-gray-400">
+                  <span className="block text-[11px] text-muted">
                     Lanjutan dari {dayLong(slot.day_of_week)}, {slot.start_time}
                   </span>
-                  <span className="block text-xs text-gray-300 truncate">
+                  <span className="block text-xs text-body truncate">
                     s.d. {slot.end_time} · {coverName(slot, backups, addDays(day.date, -1))}
                   </span>
                 </button>
@@ -313,12 +313,12 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
               ))}
 
               {empty && !day.event && (
-                <div className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-slate-800 px-2 py-4 text-center">
-                  <p className="text-xs text-gray-500">Belum ada jadwal.</p>
+                <div className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-stroke px-2 py-4 text-center">
+                  <p className="text-xs text-faint">Belum ada jadwal.</p>
                   <button
                     type="button"
                     onClick={() => setDialog({ kind: "slot", day: day.value })}
-                    className="text-xs text-purple-300 hover:text-white"
+                    className="text-xs text-accent hover:text-heading"
                   >
                     Tambah slot
                   </button>
@@ -374,15 +374,15 @@ function SlotCard({ slot, backup, replaced, onOpen }: { slot: ScheduleSlot; back
       type="button"
       onClick={onOpen}
       className={`w-full text-left rounded-lg border-l-[3px] px-2 py-1.5 transition-colors ${
-        pd ? "border-amber-400 bg-amber-500/10 hover:bg-amber-500/20" : "border-purple-400 bg-purple-500/10 hover:bg-purple-500/20"
+        pd ? "border-amber-400 bg-amber-500/10 hover:bg-amber-500/20" : "border-primary bg-primary/10 hover:bg-primary/20"
       } ${replaced ? "opacity-45" : ""}`}
     >
       <span className="flex items-start justify-between gap-1">
-        <span className={`text-xs font-medium tabular-nums ${pd ? "text-amber-100" : "text-purple-100"}`}>
+        <span className={`text-xs font-medium tabular-nums ${pd ? "text-warning" : "text-accent"}`}>
           {slot.start_time}–{slot.end_time}
-          {slot.crosses_midnight && <span className="text-[10px] text-gray-400"> +1</span>}
+          {slot.crosses_midnight && <span className="text-[10px] text-muted"> +1</span>}
         </span>
-        <span className="flex items-center gap-0.5 text-gray-400">
+        <span className="flex items-center gap-0.5 text-muted">
           {slot.is_locked && (
             <Hint text="Dikunci oleh Admin">
               <LockIcon />
@@ -403,17 +403,17 @@ function SlotCard({ slot, backup, replaced, onOpen }: { slot: ScheduleSlot; back
                     : "Butuh backup, belum ada host pengganti"
               }
             >
-              <SwapIcon className={covered ? "text-green-300" : "text-amber-300"} />
+              <SwapIcon className={covered ? "text-success" : "text-warning"} />
             </Hint>
           )}
         </span>
       </span>
-      <span className={`block text-sm truncate ${covered ? "text-green-200" : "text-white"}`}>{covered ? backup.filler_name : hostName}</span>
+      <span className={`block text-sm truncate ${covered ? "text-success" : "text-heading"}`}>{covered ? backup.filler_name : hostName}</span>
       <span className="flex items-center justify-between gap-1 text-[10px]">
-        <span className={pd ? "text-amber-300/80" : "text-purple-300/70"}>{pd ? "PD" : "Reguler"}</span>
-        {covered && <span className="text-gray-500 truncate">ganti {hostName}</span>}
+        <span className={pd ? "text-warning/80" : "text-accent/70"}>{pd ? "PD" : "Reguler"}</span>
+        {covered && <span className="text-faint truncate">ganti {hostName}</span>}
       </span>
-      {replaced && <span className="block text-[10px] text-yellow-200/80">Diganti blok event</span>}
+      {replaced && <span className="block text-[10px] text-warning/80">Diganti blok event</span>}
     </button>
   );
 }
@@ -423,7 +423,7 @@ function Hint({ text, children }: { text: string; children: ReactNode }) {
   return (
     <span className="group/hint relative inline-flex" aria-label={text} role="img">
       {children}
-      <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden whitespace-nowrap rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-gray-100 shadow-lg group-hover/hint:block">
+      <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden whitespace-nowrap rounded-md border border-stroke-strong bg-canvas px-2 py-1 text-[11px] text-heading shadow-lg group-hover/hint:block">
         {text}
       </span>
     </span>
@@ -437,7 +437,7 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="w-8 h-8 flex items-center justify-center rounded-md text-lg text-gray-300 hover:bg-slate-800 hover:text-white"
+      className="w-8 h-8 flex items-center justify-center rounded-md text-lg text-body hover:bg-surface-2 hover:text-heading"
     >
       {children}
     </button>

@@ -16,8 +16,8 @@ export default function AdminRatesPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Level Tarif</h1>
-        <p className="text-sm text-gray-400 mt-1">
+        <h1 className="text-2xl font-bold text-heading">Level Tarif</h1>
+        <p className="text-sm text-muted mt-1">
           Setiap malam host otomatis naik ke level tertinggi sesuai masa kerjanya, kecuali levelnya diatur manual di
           halaman host. Mengubah level di sini langsung menempatkan ulang para host.
         </p>
@@ -26,7 +26,7 @@ export default function AdminRatesPage() {
       {levels.error && <FormAlert tone="error">{levels.error}</FormAlert>}
 
       <Card>
-        <div className="hidden sm:grid grid-cols-[1fr_8rem_10rem_auto] gap-3 text-xs text-gray-400 px-1">
+        <div className="hidden sm:grid grid-cols-[1fr_8rem_10rem_auto] gap-3 text-xs text-muted px-1">
           <span>Nama</span>
           <span>Mulai bulan ke-</span>
           <span>Tarif per jam</span>
@@ -66,7 +66,7 @@ function LevelRow({ level, hostsCount = 0, onChanged }: { level?: RateCategory; 
     }
   }
 
-  const input = "w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-purple-500";
+  const input = "w-full px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading outline-none focus:ring-2 focus:ring-primary";
   const message = error ?? deleteError ?? Object.values(errors)[0];
 
   return (
@@ -76,7 +76,7 @@ function LevelRow({ level, hostsCount = 0, onChanged }: { level?: RateCategory; 
         <input name="min_tenure_months" type="number" min={0} defaultValue={level?.min_tenure_months} placeholder="Bulan" aria-label="Mulai bulan ke-" className={input} />
         <RupiahInput name="rate_per_hour" defaultValue={level?.rate_per_hour} placeholder="0" aria-label="Tarif per jam" className={input} />
         <div className="flex gap-2 w-36">
-          <button type="submit" disabled={loading} className="flex-1 px-3 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50">
+          <button type="submit" disabled={loading} className="flex-1 px-3 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50">
             {level ? "Simpan" : "Tambah"}
           </button>
           {level && (
@@ -85,15 +85,15 @@ function LevelRow({ level, hostsCount = 0, onChanged }: { level?: RateCategory; 
               onClick={remove}
               disabled={hostsCount > 0}
               title={hostsCount > 0 ? "Dipakai oleh host" : "Hapus"}
-              className="px-3 py-2 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800 disabled:opacity-40"
+              className="px-3 py-2 rounded-lg border border-stroke-strong text-body text-sm hover:bg-surface-2 disabled:opacity-40"
             >
               ✕
             </button>
           )}
         </div>
       </div>
-      {level && <p className="text-xs text-gray-500 px-1">Dipakai {hostsCount} host</p>}
-      {message && <p className="text-sm text-red-300 px-1">{message}</p>}
+      {level && <p className="text-xs text-faint px-1">Dipakai {hostsCount} host</p>}
+      {message && <p className="text-sm text-danger px-1">{message}</p>}
     </form>
   );
 }

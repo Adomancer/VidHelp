@@ -49,8 +49,8 @@ export default function SearchableSelect({
       <button
         type="button"
         disabled={disabled}
-        className={`w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-purple-500 ${
-          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-slate-800/80"
+        className={`w-full px-3 py-2 rounded-lg bg-surface border border-stroke text-heading flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-primary ${
+          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-surface-2"
         }`}
         onClick={() => {
           if (disabled) return;
@@ -58,11 +58,11 @@ export default function SearchableSelect({
           if (!isOpen) setSearch(""); // Reset search when opening
         }}
       >
-        <span className={`truncate ${selectedOption ? "text-white" : "text-gray-400"}`}>
+        <span className={`truncate ${selectedOption ? "text-heading" : "text-muted"}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <svg
-          className={`w-4 h-4 text-gray-400 shrink-0 ml-2 transition-transform ${
+          className={`w-4 h-4 text-muted shrink-0 ml-2 transition-transform ${
             isOpen ? "rotate-180" : ""
           }`}
           fill="none"
@@ -74,8 +74,8 @@ export default function SearchableSelect({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl max-h-60 flex flex-col">
-          <div className="p-2 border-b border-slate-700 sticky top-0 bg-slate-800 rounded-t-lg">
+        <div className="absolute z-50 w-full mt-1 bg-surface-2 border border-stroke-strong rounded-lg shadow-xl max-h-60 flex flex-col">
+          <div className="p-2 border-b border-stroke-strong sticky top-0 bg-surface-2 rounded-t-lg">
             <input
               type="text"
               autoFocus
@@ -83,7 +83,7 @@ export default function SearchableSelect({
               onChange={(e) => setSearch(e.target.value)}
               onClick={(e) => e.stopPropagation()} // Prevent clicking input from closing it
               placeholder="Ketik untuk mencari..."
-              className="w-full px-3 py-1.5 rounded bg-slate-900 border border-slate-700 text-white text-sm outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+              className="w-full px-3 py-1.5 rounded bg-surface border border-stroke-strong text-heading text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
             />
           </div>
           <div className="overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-slate-600">
@@ -101,13 +101,13 @@ export default function SearchableSelect({
                     }}
                     className={`w-full text-left px-3 py-2 rounded text-sm transition-colors flex items-center justify-between ${
                       isSelected
-                        ? "bg-purple-600/20 text-purple-300"
-                        : "text-gray-200 hover:bg-slate-700"
+                        ? "bg-primary/20 text-accent"
+                        : "text-body hover:bg-surface-3"
                     }`}
                   >
                     <span className="truncate">{opt.label}</span>
                     {isSelected && (
-                      <svg className="w-4 h-4 shrink-0 text-purple-400 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-4 h-4 shrink-0 text-accent ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
@@ -115,7 +115,7 @@ export default function SearchableSelect({
                 );
               })
             ) : (
-              <div className="px-3 py-4 text-sm text-gray-500 text-center">
+              <div className="px-3 py-4 text-sm text-faint text-center">
                 Tidak ada hasil
               </div>
             )}
