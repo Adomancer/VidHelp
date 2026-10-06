@@ -134,7 +134,7 @@ class GoogleAuthTest extends TestCase
 
         $this->postJson('/api/auth/login', ['email' => 'email@host.com', 'password' => 'secret123'])
             ->assertUnprocessable()
-            ->assertJsonPath('errors.email.0', 'Your account is waiting for admin approval.');
+            ->assertJsonPath('errors.email.0', 'Akunmu sedang menunggu persetujuan admin.');
     }
 
     public function test_host_cannot_reach_admin_routes(): void

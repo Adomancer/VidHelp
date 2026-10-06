@@ -19,7 +19,7 @@ class ViolationTypeController extends Controller
     {
         $type = ViolationType::create($this->validated($request));
 
-        return response()->json(['violation_type' => $type, 'message' => 'Violation type added'], 201);
+        return response()->json(['violation_type' => $type, 'message' => 'Jenis pelanggaran ditambahkan'], 201);
     }
 
     /**
@@ -29,7 +29,7 @@ class ViolationTypeController extends Controller
     {
         $violationType->update($this->validated($request, $violationType));
 
-        return response()->json(['violation_type' => $violationType, 'message' => 'Violation type updated']);
+        return response()->json(['violation_type' => $violationType, 'message' => 'Jenis pelanggaran diperbarui']);
     }
 
     private function validated(Request $request, ?ViolationType $type = null): array

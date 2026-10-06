@@ -21,7 +21,7 @@ class EnsureTwoFactorSetUp
 
         if ($user && $this->twoFactor->needsSetup($user)) {
             return response()->json([
-                'message' => 'Set up two-factor authentication to continue.',
+                'message' => 'Atur verifikasi dua langkah untuk melanjutkan.',
                 'code' => 'two_factor_setup_required',
             ], 403);
         }

@@ -84,13 +84,13 @@ class PayController extends Controller
 
     public function slip(Request $request, SalarySlip $slip): JsonResponse
     {
-        abort_unless($slip->host_id === $this->host($request)->id, 403, 'This is not your slip.');
+        abort_unless($slip->host_id === $this->host($request)->id, 403, 'Ini bukan slip gajimu.');
 
         return response()->json(['slip' => $this->payroll->slipDetail($slip)]);
     }
 
     private function host(Request $request): HostProfile
     {
-        return $request->user()->hostProfile ?? abort(404, 'You do not have a host profile.');
+        return $request->user()->hostProfile ?? abort(404, 'Kamu tidak punya profil host.');
     }
 }

@@ -32,7 +32,7 @@ class HostController extends Controller
             $host->user->email,
             $host->phone,
             $host->guardian_phone,
-            $host->status,
+            match ($host->status) { 'active' => 'Aktif', 'inactive' => 'Nonaktif', 'archived' => 'Diarsipkan', 'banned' => 'Diblokir', default => $host->status },
             $host->rateCategory?->name,
             $host->join_date?->toDateString(),
             $host->assignments
@@ -42,7 +42,7 @@ class HostController extends Controller
         ]);
 
         return $export->download('hosts-'.today()->toDateString().'.xlsx', [
-            'Hosts' => [['Name', 'Email', 'Phone', 'Guardian phone', 'Status', 'Rate level', 'Join date', 'Brands'], $rows],
+            'Host' => [['Nama', 'Email', 'No. HP', 'No. HP wali', 'Status', 'Level tarif', 'Tanggal bergabung', 'Brand'], $rows],
         ]);
     }
 

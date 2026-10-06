@@ -25,7 +25,7 @@ class PointAdminController extends Controller
 
         return response()->json([
             'points' => $balance->current_points,
-            'message' => "Entry cancelled. Points are now {$balance->current_points}.",
+            'message' => "Catatan dibatalkan. Poin sekarang {$balance->current_points}.",
         ]);
     }
 

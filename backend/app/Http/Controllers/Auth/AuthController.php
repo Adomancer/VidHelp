@@ -42,7 +42,7 @@ class AuthController extends Controller
         app(Notifier::class)->signupPending($user);
 
         return response()->json([
-            'message' => 'Account created. An admin needs to approve it before you can sign in.',
+            'message' => 'Akun dibuat. Admin perlu menyetujuinya dulu sebelum kamu bisa masuk.',
             'status' => 'pending',
         ], 201);
     }
@@ -63,7 +63,7 @@ class AuthController extends Controller
             AuditLog::record('login_failed', $user, new: ['email' => $request->email, 'method' => 'password']);
 
             throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
+                'email' => ['Email atau kata sandi salah.'],
             ]);
         }
 
@@ -104,7 +104,7 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
         AuditLog::record('logout', $request->user());
 
-        return response()->json(['message' => 'Logged out successfully']);
+        return response()->json(['message' => 'Berhasil keluar']);
     }
 
     /**

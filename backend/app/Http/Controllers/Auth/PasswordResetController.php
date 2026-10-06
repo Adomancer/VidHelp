@@ -24,7 +24,7 @@ class PasswordResetController extends Controller
         Password::sendResetLink($request->only('email'));
 
         return response()->json([
-            'message' => 'If that email is registered, we sent a password reset link to it.',
+            'message' => 'Kalau email itu terdaftar, kami sudah mengirim link untuk mengatur ulang kata sandi.',
         ]);
     }
 
@@ -56,6 +56,6 @@ class PasswordResetController extends Controller
             throw ValidationException::withMessages(['email' => [__($status)]]);
         }
 
-        return response()->json(['message' => 'Your password has been reset. You can now sign in.']);
+        return response()->json(['message' => 'Kata sandimu sudah diatur ulang. Sekarang kamu bisa masuk.']);
     }
 }

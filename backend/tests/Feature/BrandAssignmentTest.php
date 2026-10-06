@@ -158,11 +158,11 @@ class BrandAssignmentTest extends TestCase
                 ->assertDownload('hosts-'.today()->toDateString().'.xlsx')
         );
 
-        $this->assertSame(['Name', 'Email', 'Phone', 'Guardian phone', 'Status', 'Rate level', 'Join date', 'Brands'], $sheets['Hosts'][0]);
-        $this->assertCount(2, $sheets['Hosts']);
-        $this->assertSame($assigned->user->email, $sheets['Hosts'][1][1]);
-        $this->assertSame('08123456789', $sheets['Hosts'][1][2]);
-        $this->assertSame('Wardah (leader)', $sheets['Hosts'][1][7]);
+        $this->assertSame(['Nama', 'Email', 'No. HP', 'No. HP wali', 'Status', 'Level tarif', 'Tanggal bergabung', 'Brand'], $sheets['Host'][0]);
+        $this->assertCount(2, $sheets['Host']);
+        $this->assertSame($assigned->user->email, $sheets['Host'][1][1]);
+        $this->assertSame('08123456789', $sheets['Host'][1][2]);
+        $this->assertSame('Wardah (leader)', $sheets['Host'][1][7]);
     }
 
     public function test_host_export_writes_formula_like_names_as_plain_text(): void
@@ -177,7 +177,7 @@ class BrandAssignmentTest extends TestCase
         $zip->close();
 
         $this->assertStringNotContainsString('<f>', $sheetXml);
-        $this->assertSame('=HYPERLINK("http://evil.test","Click")', $this->xlsxSheets($response)['Hosts'][1][0]);
+        $this->assertSame('=HYPERLINK("http://evil.test","Click")', $this->xlsxSheets($response)['Host'][1][0]);
     }
 
     public function test_host_cannot_use_operator_routes(): void

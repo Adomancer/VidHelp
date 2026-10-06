@@ -16,10 +16,10 @@ export default function AdminRatesPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Rate Levels</h1>
+        <h1 className="text-2xl font-bold text-white">Level Tarif</h1>
         <p className="text-sm text-gray-400 mt-1">
-          Every night hosts move up to the highest level their tenure qualifies for, unless you set their level by hand on
-          their host page. Changing levels here re-places hosts right away.
+          Setiap malam host otomatis naik ke level tertinggi sesuai masa kerjanya, kecuali levelnya diatur manual di
+          halaman host. Mengubah level di sini langsung menempatkan ulang para host.
         </p>
       </div>
 
@@ -27,9 +27,9 @@ export default function AdminRatesPage() {
 
       <Card>
         <div className="hidden sm:grid grid-cols-[1fr_8rem_10rem_auto] gap-3 text-xs text-gray-400 px-1">
-          <span>Name</span>
-          <span>From month</span>
-          <span>Rate per hour (Rp)</span>
+          <span>Nama</span>
+          <span>Mulai bulan ke-</span>
+          <span>Tarif per jam (Rp)</span>
           <span className="w-36" />
         </div>
         <div className="space-y-3">
@@ -57,7 +57,7 @@ function LevelRow({ level, hostsCount = 0, onChanged }: { level?: RateCategory; 
   }, onChanged);
 
   async function remove() {
-    if (!level || !confirm(`Delete "${level.name}"?`)) return;
+    if (!level || !confirm(`Hapus "${level.name}"?`)) return;
     try {
       await adminHostsApi.deleteRateCategory(token, level.id);
       onChanged();
@@ -72,19 +72,19 @@ function LevelRow({ level, hostsCount = 0, onChanged }: { level?: RateCategory; 
   return (
     <form onSubmit={handleSubmit} className="space-y-1" noValidate>
       <div className="grid grid-cols-1 sm:grid-cols-[1fr_8rem_10rem_auto] gap-3 items-center">
-        <input name="name" defaultValue={level?.name} placeholder="New level name" aria-label="Name" className={input} />
-        <input name="min_tenure_months" type="number" min={0} defaultValue={level?.min_tenure_months} placeholder="Months" aria-label="From month" className={input} />
-        <input name="rate_per_hour" type="number" min={0} step={500} defaultValue={level ? Number(level.rate_per_hour) : undefined} placeholder="Rate" aria-label="Rate per hour" className={input} />
+        <input name="name" defaultValue={level?.name} placeholder="Nama level baru" aria-label="Nama" className={input} />
+        <input name="min_tenure_months" type="number" min={0} defaultValue={level?.min_tenure_months} placeholder="Bulan" aria-label="Mulai bulan ke-" className={input} />
+        <input name="rate_per_hour" type="number" min={0} step={500} defaultValue={level ? Number(level.rate_per_hour) : undefined} placeholder="Tarif" aria-label="Tarif per jam" className={input} />
         <div className="flex gap-2 w-36">
           <button type="submit" disabled={loading} className="flex-1 px-3 py-2 rounded-lg bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50">
-            {level ? "Save" : "Add"}
+            {level ? "Simpan" : "Tambah"}
           </button>
           {level && (
             <button
               type="button"
               onClick={remove}
               disabled={hostsCount > 0}
-              title={hostsCount > 0 ? "Used by hosts" : "Delete"}
+              title={hostsCount > 0 ? "Dipakai oleh host" : "Hapus"}
               className="px-3 py-2 rounded-lg border border-slate-700 text-gray-300 text-sm hover:bg-slate-800 disabled:opacity-40"
             >
               ✕
@@ -94,7 +94,7 @@ function LevelRow({ level, hostsCount = 0, onChanged }: { level?: RateCategory; 
       </div>
       {level && (
         <p className="text-xs text-gray-500 px-1">
-          {hostsCount} host{hostsCount === 1 ? "" : "s"} · {formatRupiah(level.rate_per_hour)}/hour
+          {hostsCount} host · {formatRupiah(level.rate_per_hour)}/jam
         </p>
       )}
       {message && <p className="text-sm text-red-300 px-1">{message}</p>}

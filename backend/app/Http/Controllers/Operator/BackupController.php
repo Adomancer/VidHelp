@@ -112,10 +112,10 @@ class BackupController extends Controller
         if ($cover) {
             $backup = $this->backups->fill($backup, $cover, $request->user())->load('filler.user');
 
-            return response()->json(['request' => $backup, 'message' => 'Backup host approved'], 201);
+            return response()->json(['request' => $backup, 'message' => 'Host pengganti disetujui'], 201);
         }
 
-        return response()->json(['request' => $backup, 'message' => 'Backup request opened'], 201);
+        return response()->json(['request' => $backup, 'message' => 'Permintaan backup dibuka'], 201);
     }
 
     /**
@@ -127,7 +127,7 @@ class BackupController extends Controller
 
         $this->backups->rejectApplicant($backup, HostProfile::findOrFail($validated['host_id']));
 
-        return response()->json(['message' => 'Applicant rejected']);
+        return response()->json(['message' => 'Pendaftar ditolak']);
     }
 
     /**
@@ -136,12 +136,12 @@ class BackupController extends Controller
     public function cancel(BackupRequest $backup): JsonResponse
     {
         if (! in_array($backup->status, ['pending', 'open', 'filled'])) {
-            return response()->json(['message' => 'This request is already closed.'], 422);
+            return response()->json(['message' => 'Permintaan ini sudah ditutup.'], 422);
         }
 
         $this->backups->close($backup, 'cancelled');
 
-        return response()->json(['message' => 'Request cancelled']);
+        return response()->json(['message' => 'Permintaan dibatalkan']);
     }
 
     /**
@@ -153,7 +153,7 @@ class BackupController extends Controller
 
         $backup = $this->backups->fill($backup, HostProfile::findOrFail($validated['host_id']), $request->user());
 
-        return response()->json(['request' => $backup->load('filler.user'), 'message' => 'Backup host approved']);
+        return response()->json(['request' => $backup->load('filler.user'), 'message' => 'Host pengganti disetujui']);
     }
 
     /**
@@ -162,12 +162,12 @@ class BackupController extends Controller
     public function unassign(BackupRequest $backup): JsonResponse
     {
         if ($backup->status !== 'filled') {
-            return response()->json(['message' => 'Nobody is assigned to this backup.'], 422);
+            return response()->json(['message' => 'Belum ada yang ditunjuk untuk backup ini.'], 422);
         }
 
         $this->backups->unfill($backup, 'rejected');
 
-        return response()->json(['message' => 'Cover removed. The backup is open again.']);
+        return response()->json(['message' => 'Pengganti dilepas. Backup dibuka lagi.']);
     }
 
     /**
@@ -176,7 +176,7 @@ class BackupController extends Controller
     public function letter(BackupRequest $backup): StreamedResponse
     {
         $attachment = $backup->attachments()->first();
-        abort_unless($attachment && Storage::disk('local')->exists($attachment->file_path), 404, 'No letter uploaded.');
+        abort_unless($attachment && Storage::disk('local')->exists($attachment->file_path), 404, 'Belum ada surat yang diunggah.');
 
         return Storage::disk('local')->response($attachment->file_path, $attachment->original_name);
     }

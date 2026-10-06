@@ -39,7 +39,7 @@ class ProfileController extends Controller
         $user->update(Arr::only($validated, ['name']));
         $profile?->update(Arr::only($validated, ['phone', 'guardian_phone']));
 
-        return response()->json([...$this->payload($user->fresh()), 'message' => 'Profile updated successfully']);
+        return response()->json([...$this->payload($user->fresh()), 'message' => 'Profil berhasil diperbarui']);
     }
 
     /**
@@ -53,7 +53,7 @@ class ProfileController extends Controller
         $this->deleteUploadedAvatar($user);
         $user->update(['avatar' => $request->file('photo')->store('avatars', 'public')]);
 
-        return response()->json([...$this->payload($user->fresh()), 'message' => 'Photo updated']);
+        return response()->json([...$this->payload($user->fresh()), 'message' => 'Foto diperbarui']);
     }
 
     /**
@@ -72,7 +72,7 @@ class ProfileController extends Controller
 
         $profile->sensitiveData()->updateOrCreate([], $validated);
 
-        return response()->json([...$this->payload($request->user()->fresh()), 'message' => 'Data saved']);
+        return response()->json([...$this->payload($request->user()->fresh()), 'message' => 'Data disimpan']);
     }
 
     /**
@@ -90,7 +90,7 @@ class ProfileController extends Controller
         $sensitive->ktp_image_path = $request->file('ktp_image')->store('ktp', 'local');
         $sensitive->save();
 
-        return response()->json([...$this->payload($request->user()->fresh()), 'message' => 'KTP photo uploaded']);
+        return response()->json([...$this->payload($request->user()->fresh()), 'message' => 'Foto KTP diunggah']);
     }
 
     private function payload(User $user): array
@@ -108,7 +108,7 @@ class ProfileController extends Controller
     private function requireHostProfile(Request $request): HostProfile
     {
         return $request->user()->hostProfile
-            ?? abort(404, 'You do not have a host profile.');
+            ?? abort(404, 'Kamu tidak punya profil host.');
     }
 
     private function deleteUploadedAvatar(User $user): void
@@ -132,7 +132,7 @@ class ProfileController extends Controller
 
         if ($user->has_password && ! Hash::check($request->current_password, $user->password)) {
             return response()->json([
-                'message' => 'Current password is incorrect',
+                'message' => 'Kata sandi saat ini salah',
             ], 422);
         }
 
@@ -140,6 +140,6 @@ class ProfileController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        return response()->json(['message' => 'Password changed successfully']);
+        return response()->json(['message' => 'Kata sandi berhasil diganti']);
     }
 }

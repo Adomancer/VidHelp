@@ -159,7 +159,7 @@ class BackupTest extends TestCase
     {
         $this->travelTo(CarbonImmutable::parse('2026-10-05 14:01')); // 23h59m before the slot
 
-        $this->request()->assertJsonValidationErrors(['backup_date' => 'at least 24 hours']);
+        $this->request()->assertJsonValidationErrors(['backup_date' => 'paling lambat 24 jam']);
         $slots = $this->actingAs($this->requester->user)->getJson('/api/host/backups/slots')->json('slots');
         $this->assertSame(['2026-10-13'], array_column($slots, 'date')); // next Tuesday is still far enough ahead
 
@@ -175,7 +175,7 @@ class BackupTest extends TestCase
 
         $this->apply($this->otherBrand, $backup)
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Live on Brand B (Tue 15:00-17:00).');
+            ->assertJsonPath('message', 'Live di Brand B (Sel 15:00-17:00).');
     }
 
     public function test_overnight_slot_from_the_night_before_counts_as_busy(): void
@@ -194,7 +194,7 @@ class BackupTest extends TestCase
 
         $this->apply($this->otherBrand, $backup)
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Banned from Brand A.');
+            ->assertJsonPath('message', 'Diblokir dari Brand A.');
 
         $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->otherBrand->id])
             ->assertJsonValidationErrors('host_id');
@@ -208,7 +208,7 @@ class BackupTest extends TestCase
 
         $this->apply($this->otherBrand, $backup)
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Monthly cross-brand backup quota used (3/3).');
+            ->assertJsonPath('message', 'Kuota backup lintas brand bulan ini sudah habis (3/3).');
 
         $this->apply($this->sameBrand, $backup)->assertOk();
     }
@@ -250,9 +250,9 @@ class BackupTest extends TestCase
         // The admin's "no" sticks: a rejected host can't apply to this request again
         $this->apply($this->sameBrand, $backup)
             ->assertUnprocessable()
-            ->assertJsonPath('errors.backup.0', 'An admin already turned down your offer for this backup.');
+            ->assertJsonPath('errors.backup.0', 'Admin sudah menolak tawaranmu untuk backup ini.');
         $this->actingAs($this->sameBrand->user)->getJson('/api/host/backups/needs')
-            ->assertJsonPath('needs.0.ineligible_reason', 'An admin already turned down your offer for this backup.');
+            ->assertJsonPath('needs.0.ineligible_reason', 'Admin sudah menolak tawaranmu untuk backup ini.');
     }
 
     public function test_rejected_host_who_tries_again_is_not_auto_approved(): void
@@ -314,7 +314,7 @@ class BackupTest extends TestCase
         $this->apply($this->sameBrand, $first)->assertOk();
         $this->apply($this->sameBrand, $second)
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'You already applied to cover Brand A at that time. Withdraw that one first.');
+            ->assertJsonPath('message', 'Kamu sudah mendaftar menggantikan di Brand A pada waktu yang sama. Tarik diri dari yang itu dulu.');
     }
 
     public function test_applications_close_when_the_slot_starts(): void
@@ -322,7 +322,7 @@ class BackupTest extends TestCase
         $backup = $this->openRequest();
         $this->travelTo(CarbonImmutable::parse('2026-10-06 14:00'));
 
-        $this->apply($this->sameBrand, $backup)->assertUnprocessable()->assertJsonPath('message', 'This backup is no longer open.');
+        $this->apply($this->sameBrand, $backup)->assertUnprocessable()->assertJsonPath('message', 'Backup ini sudah tidak dibuka.');
         $this->actingAs($this->sameBrand->user)->getJson('/api/host/backups/needs')->assertJsonCount(0, 'needs');
     }
 
@@ -330,14 +330,14 @@ class BackupTest extends TestCase
     {
         $direct = fn (array $ids) => $this->request(['request_type' => 'direct', 'host_ids' => $ids]);
 
-        $direct([$this->sameBrand->id])->assertJsonValidationErrors(['host_ids' => 'at least 2']);
+        $direct([$this->sameBrand->id])->assertJsonValidationErrors(['host_ids' => 'minimal 2']);
         $direct([])->assertJsonValidationErrors('host_ids');
-        $direct(collect(range(1, 6))->map(fn () => $this->host()->id)->all())->assertJsonValidationErrors(['host_ids' => 'at most 5']);
-        $direct([$this->sameBrand->id, $this->requester->id])->assertJsonValidationErrors(['host_ids' => 'your own request']);
+        $direct(collect(range(1, 6))->map(fn () => $this->host()->id)->all())->assertJsonValidationErrors(['host_ids' => 'maksimal 5']);
+        $direct([$this->sameBrand->id, $this->requester->id])->assertJsonValidationErrors(['host_ids' => 'permintaanmu sendiri']);
 
         $this->slotFor($this->otherBrand->assignments()->first(), 2, '15:00', '17:00');
         $direct([$this->sameBrand->id, $this->otherBrand->id])
-            ->assertJsonValidationErrors(['host_ids' => "{$this->otherBrand->user->name} can't cover it: Live on Brand B"]);
+            ->assertJsonValidationErrors(['host_ids' => "{$this->otherBrand->user->name} tidak bisa menggantikan: Live di Brand B"]);
 
         $this->assertSame(0, BackupRequest::count());
     }
@@ -358,7 +358,7 @@ class BackupTest extends TestCase
         $this->actingAs($this->otherBrand->user)->getJson('/api/host/backups/needs')
             ->assertJsonPath('needs.0.request_type', 'direct')
             ->assertJsonPath('needs.0.asked_me', false)
-            ->assertJsonPath('needs.0.ineligible_reason', "Only the hosts {$this->requester->user->name} asked can take this one.");
+            ->assertJsonPath('needs.0.ineligible_reason', "Hanya host yang diminta {$this->requester->user->name} yang bisa mengambil ini.");
         $this->apply($this->otherBrand, $backup)->assertUnprocessable();
 
         $this->actingAs($nominee->user)->getJson('/api/host/backups/needs')->assertJsonPath('needs.0.asked_me', true);
@@ -382,7 +382,7 @@ class BackupTest extends TestCase
         $this->assertArrayNotHasKey('rating', $candidates->first());
 
         // Another host's reason (here: their own slot then) stays private
-        $this->assertSame('Not available', $candidates->firstWhere('host_id', $this->otherBrand->id)['ineligible_reason']);
+        $this->assertSame('Tidak tersedia', $candidates->firstWhere('host_id', $this->otherBrand->id)['ineligible_reason']);
         $this->assertNull($candidates->firstWhere('host_id', $this->sameBrand->id)['ineligible_reason']);
     }
 

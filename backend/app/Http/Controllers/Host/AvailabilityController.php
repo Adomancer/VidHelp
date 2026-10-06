@@ -33,7 +33,7 @@ class AvailabilityController extends Controller
 
         foreach ($validated['ranges'] as $index => $range) {
             if ($range['available_from'] === $range['available_to']) {
-                throw ValidationException::withMessages(["ranges.$index.available_to" => ['End time must differ from start time.']]);
+                throw ValidationException::withMessages(["ranges.$index.available_to" => ['Jam selesai harus berbeda dari jam mulai.']]);
             }
         }
 
@@ -42,11 +42,11 @@ class AvailabilityController extends Controller
             $profile->availability()->createMany($validated['ranges']);
         });
 
-        return response()->json(['availability' => $profile->availability()->get(), 'message' => 'Availability saved']);
+        return response()->json(['availability' => $profile->availability()->get(), 'message' => 'Waktu luang disimpan']);
     }
 
     private function profile(Request $request): HostProfile
     {
-        return $request->user()->hostProfile ?? abort(404, 'You do not have a host profile.');
+        return $request->user()->hostProfile ?? abort(404, 'Kamu tidak punya profil host.');
     }
 }

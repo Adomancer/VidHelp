@@ -20,7 +20,7 @@ class PerformanceController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $host = $request->user()->hostProfile ?? abort(404, 'You do not have a host profile.');
+        $host = $request->user()->hostProfile ?? abort(404, 'Kamu tidak punya profil host.');
         [$start, $end] = $this->points->periodFor(today());
         $opening = (int) config('vidhelp.points.starting_points');
         $balance = PointBalance::where('host_id', $host->id)->whereDate('period_start', $start)->first();

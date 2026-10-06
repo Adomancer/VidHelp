@@ -50,7 +50,7 @@ export default function HostLivePage() {
 
       {live.data && current.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">No sessions right now. Your next ones are on the Schedule page.</p>
+          <p className="text-sm text-gray-400">Tidak ada sesi saat ini. Sesi berikutnya ada di halaman Jadwal.</p>
         </Card>
       )}
 
@@ -59,7 +59,7 @@ export default function HostLivePage() {
       ))}
 
       {live.data && live.data.missing_reports.length > 0 && (
-        <Card title="Reports you still owe" description="These are late; send them anyway so the hours can be reviewed.">
+        <Card title="Laporan yang belum kamu kirim" description="Laporan ini sudah terlambat; tetap kirim supaya jamnya bisa dicek.">
           <div className="space-y-4">
             {live.data.missing_reports.map((attendance) => (
               <div key={attendance.id} className="space-y-2">
@@ -74,7 +74,7 @@ export default function HostLivePage() {
       )}
 
       {done.length > 0 && (
-        <Card title="Earlier">
+        <Card title="Sebelumnya">
           <ul className="space-y-2">
             {done.map((session) => (
               <li key={sessionKey(session)} className="flex items-center justify-between gap-3 text-sm">
@@ -99,8 +99,8 @@ function sessionKey(session: LiveSession): string {
 }
 
 function DoneLabel({ session }: { session: LiveSession }) {
-  if (session.role === "off") return <span className="text-xs text-gray-500">off</span>;
-  if (!session.attendance) return <span className="text-xs text-red-300">no check-in</span>;
+  if (session.role === "off") return <span className="text-xs text-gray-500">libur</span>;
+  if (!session.attendance) return <span className="text-xs text-red-300">tidak check-in</span>;
   return <ReportStatusLabel report={session.attendance.report ?? null} />;
 }
 
@@ -118,25 +118,25 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
         <div>
           <p className={`font-medium ${session.role === "off" ? "text-gray-400" : "text-white"}`}>{session.brand.name}</p>
           <p className="text-sm text-purple-200">{formatWindow(session.start_at, session.end_at)}</p>
-          {session.role === "cover" && <p className="text-xs text-green-300">Backup for {session.covered_for}</p>}
+          {session.role === "cover" && <p className="text-xs text-green-300">Backup untuk {session.covered_for}</p>}
           {session.role === "event" && <p className="text-xs text-yellow-200">Event: {session.event_name}</p>}
-          {session.role === "off" && <p className="text-xs text-gray-400">You&apos;re off · covered by {session.covered_by}</p>}
+          {session.role === "off" && <p className="text-xs text-gray-400">Kamu libur · digantikan {session.covered_by}</p>}
         </div>
         {attendance && <ReportStatusLabel report={attendance.report ?? null} />}
       </div>
 
       {session.role !== "off" && !attendance && (
         ended ? (
-          <p className="text-sm text-red-300">You didn&apos;t check in for this session.</p>
+          <p className="text-sm text-red-300">Kamu tidak check-in untuk sesi ini.</p>
         ) : now < opensAt ? (
-          <p className="text-sm text-gray-400">Check-in opens at {formatClock(opensAt.toISOString())}.</p>
+          <p className="text-sm text-gray-400">Check-in dibuka jam {formatClock(opensAt.toISOString())}.</p>
         ) : (
           <button
             type="button"
             onClick={() => act(() => liveApi.checkIn(token, session))}
             className="w-full py-3 rounded-xl bg-green-600 text-white font-medium hover:bg-green-500"
           >
-            Check in
+            Check-in
           </button>
         )
       )}
@@ -144,8 +144,8 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
       {attendance && (
         <div className="space-y-3">
           <p className="text-xs text-gray-400">
-            Checked in {formatClock(attendance.check_in_at)}
-            {attendance.check_out_at ? ` · out ${formatClock(attendance.check_out_at)}` : ""}
+            Check-in {formatClock(attendance.check_in_at)}
+            {attendance.check_out_at ? ` · check-out ${formatClock(attendance.check_out_at)}` : ""}
           </p>
 
           {!attendance.check_out_at && (
@@ -154,7 +154,7 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
               onClick={() => act(() => liveApi.checkOut(token, attendance.id))}
               className="w-full py-3 rounded-xl bg-slate-700 text-white font-medium hover:bg-slate-600"
             >
-              Check out
+              Check-out
             </button>
           )}
 
@@ -166,13 +166,13 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
 }
 
 function ReportStatusLabel({ report }: { report: LiveReport | null }) {
-  if (!report) return <span className="text-xs text-yellow-200 whitespace-nowrap">Report needed</span>;
+  if (!report) return <span className="text-xs text-yellow-200 whitespace-nowrap">Perlu laporan</span>;
 
   const styles: Record<LiveReport["status"], [string, string]> = {
-    submitted: ["Sent", "text-blue-200"],
-    flagged: ["Under review", "text-yellow-200"],
-    approved: ["Approved ✓", "text-green-300"],
-    rejected: ["Rejected", "text-red-300"],
+    submitted: ["Terkirim", "text-blue-200"],
+    flagged: ["Sedang dicek", "text-yellow-200"],
+    approved: ["Disetujui ✓", "text-green-300"],
+    rejected: ["Ditolak", "text-red-300"],
   };
   const [label, style] = styles[report.status];
   return <span className={`text-xs whitespace-nowrap ${style}`}>{label}</span>;
@@ -186,15 +186,15 @@ function ReportSection({ attendance, metrics, act }: { attendance: Attendance; m
   if (report?.status === "approved") return null;
 
   if (report?.status === "rejected") {
-    return <p className="text-sm text-red-300">Rejected{report.review_note ? `: ${report.review_note}` : "."}</p>;
+    return <p className="text-sm text-red-300">Ditolak{report.review_note ? `: ${report.review_note}` : "."}</p>;
   }
 
   if (report?.status === "flagged" && !editing) {
     return (
       <div className="space-y-1">
-        <p className="text-xs text-yellow-200">An operator will check: {(report.flag_reasons ?? []).map((reason) => FLAG_REASONS[reason] ?? reason).join(", ")}.</p>
+        <p className="text-xs text-yellow-200">Operator akan mengecek: {(report.flag_reasons ?? []).map((reason) => FLAG_REASONS[reason] ?? reason).join(", ")}.</p>
         <button type="button" onClick={() => setEditing(true)} className="text-xs text-purple-300 hover:text-white">
-          Fix and resend
+          Perbaiki dan kirim ulang
         </button>
       </div>
     );
@@ -202,7 +202,7 @@ function ReportSection({ attendance, metrics, act }: { attendance: Attendance; m
 
   return (
     <div className="border-t border-slate-800 pt-3">
-      <p className="text-sm text-white mb-2">Live report · due {formatDateTime(attendance.report_due_at)}</p>
+      <p className="text-sm text-white mb-2">Laporan live · batas {formatDateTime(attendance.report_due_at)}</p>
       <ReportForm attendance={attendance} metrics={metrics} act={act} />
     </div>
   );
@@ -236,9 +236,9 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
   return (
     <form onSubmit={handleSubmit} className="space-y-3" noValidate>
       {error && <FormAlert tone="error">{error}</FormAlert>}
-      <DurationInput label="Time live" hours={hours} onChange={setHours} error={errors.duration_hours} />
+      <DurationInput label="Durasi live" hours={hours} onChange={setHours} error={errors.duration_hours} />
       <div className="grid grid-cols-2 gap-3">
-        <TextField label="Live sessions" name="session_count" type="number" min={1} defaultValue={report?.session_count ?? 1} error={errors.session_count} />
+        <TextField label="Sesi live" name="session_count" type="number" min={1} defaultValue={report?.session_count ?? 1} error={errors.session_count} />
         {metrics.map((key) => (
           <TextField
             key={key}
@@ -255,7 +255,7 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
       </div>
       <div className="space-y-1">
         <label htmlFor={`notes-${attendance.id}`} className="block text-sm font-medium text-gray-200">
-          Notes (problems, disruptions)
+          Catatan (masalah, gangguan)
         </label>
         <textarea
           id={`notes-${attendance.id}`}
@@ -265,7 +265,7 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
           className="w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white outline-none focus:ring-2 focus:ring-purple-500"
         />
       </div>
-      <SubmitButton loading={loading}>{report ? "Resend report" : "Send report"}</SubmitButton>
+      <SubmitButton loading={loading}>{report ? "Kirim ulang laporan" : "Kirim laporan"}</SubmitButton>
     </form>
   );
 }

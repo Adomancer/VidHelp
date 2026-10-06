@@ -183,16 +183,16 @@ class PayrollService
             $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
 
             if ($period->status === 'in_progress') {
-                $this->fail('Payment can be requested once the period has ended.');
+                $this->fail('Pembayaran baru bisa diajukan setelah periode berakhir.');
             }
             if ($period->isLocked()) {
-                $this->fail('Payment was already requested for this period.');
+                $this->fail('Pembayaran untuk periode ini sudah diajukan.');
             }
 
             // Hours still under review would otherwise slip into the next period unnoticed
             $pending = $this->pendingReports($period);
             if ($pending > 0) {
-                $this->fail("{$pending} live report(s) in this period are still waiting for review. Approve or reject them first.");
+                $this->fail("{$pending} laporan live di periode ini masih menunggu dicek. Setujui atau tolak dulu.");
             }
 
             $totals = $this->hostTotals($period);
@@ -243,12 +243,12 @@ class PayrollService
             $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
 
             if ($period->status !== 'requested') {
-                $this->fail($period->status === 'paid' ? 'This period is already paid; it can no longer be reopened.' : 'Payment has not been requested for this period.');
+                $this->fail($period->status === 'paid' ? 'Periode ini sudah lunas; tidak bisa dibuka lagi.' : 'Pembayaran untuk periode ini belum diajukan.');
             }
 
             $next = $this->nextPeriod($period);
             if ($next?->isLocked()) {
-                $this->fail('The next period is already locked with the hours carried over from this one. Cancel its request first.');
+                $this->fail('Periode berikutnya sudah terkunci dengan jam bawaan dari periode ini. Batalkan pengajuannya dulu.');
             }
 
             $period->paymentRequest?->update([
@@ -302,7 +302,7 @@ class PayrollService
             $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
 
             if ($period->status !== 'requested') {
-                $this->fail($period->status === 'paid' ? 'This period is already paid.' : 'Request payment first.');
+                $this->fail($period->status === 'paid' ? 'Periode ini sudah lunas.' : 'Ajukan pembayaran dulu.');
             }
 
             $period->paymentRequest?->update(['status' => 'paid', 'paid_at' => now()]);
@@ -328,8 +328,8 @@ class PayrollService
                 $this->notifier->toUsers(
                     $item->host->user,
                     'slip_ready',
-                    "Salary slip ready: {$period->brand->name}",
-                    'Net pay Rp '.number_format($slip->net_amount, 0, ',', '.')." for {$period->period_start->format('j M')} – {$period->period_end->format('j M Y')}.",
+                    "Slip gaji siap: {$period->brand->name}",
+                    'Gaji bersih Rp '.number_format($slip->net_amount, 0, ',', '.')." untuk {$period->period_start->translatedFormat('j M')} – {$period->period_end->translatedFormat('j M Y')}.",
                     "/host/pay/slips/{$slip->id}",
                     dm: true,
                 );
@@ -418,7 +418,7 @@ class PayrollService
         return DB::transaction(function () use ($advance, $by, $note) {
             $advance = CashAdvance::lockForUpdate()->findOrFail($advance->id);
             if ($advance->status === 'paid') {
-                throw ValidationException::withMessages(['advance' => ['This kasbon is already paid back.']]);
+                throw ValidationException::withMessages(['advance' => ['Kasbon ini sudah lunas.']]);
             }
 
             $advance->installments()->where('status', 'scheduled')->update(['status' => 'settled']);
@@ -442,7 +442,7 @@ class PayrollService
             $advance = CashAdvance::lockForUpdate()->findOrFail($advance->id);
             $open = $advance->installments()->where('status', 'scheduled')->get();
             if ($open->isEmpty()) {
-                throw ValidationException::withMessages(['advance' => ['Nothing is left to pay on this kasbon.']]);
+                throw ValidationException::withMessages(['advance' => ['Tidak ada sisa yang harus dibayar untuk kasbon ini.']]);
             }
 
             $firstSeq = $open->min('seq');
@@ -531,9 +531,9 @@ class PayrollService
         $summary = $this->summary($period, $this->hostTotals($period));
 
         fputcsv($out, ['Brand', $period->brand->name]);
-        fputcsv($out, ['Period', $period->period_start->toDateString(), $period->period_end->toDateString()]);
+        fputcsv($out, ['Periode', $period->period_start->toDateString(), $period->period_end->toDateString()]);
         fputcsv($out, []);
-        fputcsv($out, ['Date', 'Host', 'Start', 'End', 'Hours', 'Type']);
+        fputcsv($out, ['Tanggal', 'Host', 'Mulai', 'Selesai', 'Jam', 'Jenis']);
 
         WorkSession::where('payment_period_id', $period->id)->with('host.user')->orderBy('start_at')->get()
             ->each(fn (WorkSession $session) => fputcsv($out, [
@@ -548,18 +548,18 @@ class PayrollService
         $adjustments = $period->adjustments()->with('host.user')->get();
         if ($adjustments->isNotEmpty()) {
             fputcsv($out, []);
-            fputcsv($out, ['Adjustments']);
-            fputcsv($out, ['Host', 'Sessions', 'Hours', 'Notes']);
+            fputcsv($out, ['Penyesuaian']);
+            fputcsv($out, ['Host', 'Sesi', 'Jam', 'Catatan']);
             $adjustments->each(fn (HourAdjustment $adjustment) => fputcsv($out, [
                 $adjustment->host->user->name, $adjustment->sessions_added, $adjustment->hours_added, $adjustment->notes,
             ]));
         }
 
         fputcsv($out, []);
-        fputcsv($out, ['Worked hours', $summary['worked_hours']]);
-        fputcsv($out, ['Carried in from last period', $summary['carried_in_hours']]);
-        fputcsv($out, ["Billable hours (target {$summary['target_hours']})", $summary['achieved_hours']]);
-        fputcsv($out, ['Carried out to next period', $summary['carried_out_hours']]);
+        fputcsv($out, ['Jam kerja', $summary['worked_hours']]);
+        fputcsv($out, ['Bawaan dari periode lalu', $summary['carried_in_hours']]);
+        fputcsv($out, ["Jam yang ditagihkan (target {$summary['target_hours']})", $summary['achieved_hours']]);
+        fputcsv($out, ['Dibawa ke periode berikutnya', $summary['carried_out_hours']]);
 
         rewind($out);
         $csv = stream_get_contents($out);

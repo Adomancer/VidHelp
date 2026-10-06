@@ -28,9 +28,9 @@ class SettingsController extends Controller
         return response()->json([
             'groups' => $this->settings->all(),
             'message' => match (count($changed)) {
-                0 => 'Nothing changed.',
-                1 => 'Setting saved.',
-                default => count($changed).' settings saved.',
+                0 => 'Tidak ada yang berubah.',
+                1 => 'Pengaturan disimpan.',
+                default => count($changed).' pengaturan disimpan.',
             },
         ]);
     }

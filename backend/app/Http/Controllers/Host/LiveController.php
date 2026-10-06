@@ -57,7 +57,7 @@ class LiveController extends Controller
             $validated['event_claim_id'] ?? null,
         );
 
-        return response()->json(['attendance' => $attendance, 'message' => 'Checked in. Have a good live!'], 201);
+        return response()->json(['attendance' => $attendance, 'message' => 'Berhasil check-in. Selamat live!'], 201);
     }
 
     public function checkOut(Request $request, Attendance $attendance): JsonResponse
@@ -66,7 +66,7 @@ class LiveController extends Controller
 
         $this->attendance->checkOut($attendance);
 
-        return response()->json(['attendance' => $attendance, 'message' => 'Checked out. Remember to send your report.']);
+        return response()->json(['attendance' => $attendance, 'message' => 'Berhasil check-out. Jangan lupa kirim laporanmu.']);
     }
 
     /**
@@ -93,18 +93,18 @@ class LiveController extends Controller
         return response()->json([
             'report' => $report,
             'message' => $report->status === 'approved'
-                ? 'Report approved. These hours count toward your pay.'
-                : 'Report sent. An operator will check it.',
+                ? 'Laporan disetujui. Jam ini dihitung untuk gajimu.'
+                : 'Laporan terkirim. Operator akan mengeceknya.',
         ]);
     }
 
     private function host(Request $request): HostProfile
     {
-        return $request->user()->hostProfile ?? abort(404, 'You do not have a host profile.');
+        return $request->user()->hostProfile ?? abort(404, 'Kamu tidak punya profil host.');
     }
 
     private function ensureMine(Request $request, Attendance $attendance): void
     {
-        abort_unless($attendance->host_id === $this->host($request)->id, 403, 'This is not your session.');
+        abort_unless($attendance->host_id === $this->host($request)->id, 403, 'Ini bukan sesimu.');
     }
 }

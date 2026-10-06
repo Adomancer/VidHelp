@@ -51,7 +51,7 @@ class HostCalendar
             ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
             ->get();
 
-        $intervals = $this->slotIntervals($slots, $from, $to, fn (ScheduleSlot $slot) => "Live on {$slot->assignment->brand->name} ({$slot->label()}).");
+        $intervals = $this->slotIntervals($slots, $from, $to, fn (ScheduleSlot $slot) => "Live di {$slot->assignment->brand->name} ({$slot->label()}).");
 
         BackupRequest::query()
             ->with('brand:id,name')
@@ -64,7 +64,7 @@ class HostCalendar
             ->each(fn (BackupRequest $cover) => $intervals->push([
                 'start' => CarbonImmutable::parse($cover->start_at),
                 'end' => CarbonImmutable::parse($cover->end_at),
-                'reason' => "Already covering {$cover->brand->name} at that time.",
+                'reason' => "Sudah menggantikan di {$cover->brand->name} pada waktu itu.",
             ]));
 
         EventSlotClaim::active()
@@ -77,7 +77,7 @@ class HostCalendar
             ->each(fn (EventSlotClaim $claim) => $intervals->push([
                 'start' => CarbonImmutable::parse($claim->start_at),
                 'end' => CarbonImmutable::parse($claim->end_at),
-                'reason' => "Booked for {$claim->event->name} at that time.",
+                'reason' => "Sudah mengambil blok {$claim->event->name} pada waktu itu.",
             ]));
 
         return $intervals;
@@ -96,7 +96,7 @@ class HostCalendar
             ->whereHas('assignment', fn ($q) => $q->where('brand_id', $brandId)->where('status', 'active'))
             ->get();
 
-        return $this->slotIntervals($slots, $from, $to, fn (ScheduleSlot $slot) => "Regular schedule: {$slot->assignment->host->user->name} is live then.");
+        return $this->slotIntervals($slots, $from, $to, fn (ScheduleSlot $slot) => "Jadwal reguler: {$slot->assignment->host->user->name} sedang live di waktu itu.");
     }
 
     /**

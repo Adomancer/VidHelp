@@ -34,13 +34,13 @@ class NotificationController extends Controller
 
         $notification->update(['read_at' => $notification->read_at ?? now()]);
 
-        return response()->json(['message' => 'Marked as read']);
+        return response()->json(['message' => 'Ditandai sudah dibaca']);
     }
 
     public function readAll(Request $request): JsonResponse
     {
         AppNotification::where('user_id', $request->user()->id)->where('channel', 'web')->whereNull('read_at')->update(['read_at' => now()]);
 
-        return response()->json(['message' => 'All marked as read']);
+        return response()->json(['message' => 'Semua ditandai sudah dibaca']);
     }
 }

@@ -50,7 +50,7 @@ class EventController extends Controller
 
         $event = $this->events->create($validated, $request->user());
 
-        return response()->json(['event' => $event, 'message' => 'Event created. Hosts of the brand can claim blocks now.'], 201);
+        return response()->json(['event' => $event, 'message' => 'Event dibuat. Host dari brand ini sekarang bisa mengambil blok.'], 201);
     }
 
     /**
@@ -76,14 +76,14 @@ class EventController extends Controller
             'max_slots_per_host' => 'sometimes|integer|min:1|max:100',
         ]);
 
-        return response()->json(['event' => $this->events->update($event, $validated), 'message' => 'Event updated']);
+        return response()->json(['event' => $this->events->update($event, $validated), 'message' => 'Event diperbarui']);
     }
 
     public function cancel(SpecialEvent $event): JsonResponse
     {
         $this->events->cancel($event);
 
-        return response()->json(['message' => 'Event cancelled; every claimed block was released.']);
+        return response()->json(['message' => 'Event dibatalkan; semua blok yang sudah diambil dilepas.']);
     }
 
     /**
@@ -104,13 +104,13 @@ class EventController extends Controller
             asManager: true,
         );
 
-        return response()->json(['claim' => $claim, 'message' => 'Block assigned'], 201);
+        return response()->json(['claim' => $claim, 'message' => 'Blok ditugaskan'], 201);
     }
 
     public function release(EventSlotClaim $claim): JsonResponse
     {
         $this->events->release($claim, asManager: true);
 
-        return response()->json(['message' => 'Block released']);
+        return response()->json(['message' => 'Blok dilepas']);
     }
 }

@@ -26,7 +26,7 @@ class RateCategoryController extends Controller
         $category = HostRateCategory::create($this->validated($request));
         HostProfile::syncAllRateCategories();
 
-        return response()->json(['rate_category' => $category, 'message' => 'Rate level created'], 201);
+        return response()->json(['rate_category' => $category, 'message' => 'Level tarif dibuat'], 201);
     }
 
     public function update(Request $request, HostRateCategory $rateCategory): JsonResponse
@@ -34,18 +34,18 @@ class RateCategoryController extends Controller
         $rateCategory->update($this->validated($request, $rateCategory));
         HostProfile::syncAllRateCategories();
 
-        return response()->json(['rate_category' => $rateCategory, 'message' => 'Rate level updated']);
+        return response()->json(['rate_category' => $rateCategory, 'message' => 'Level tarif diperbarui']);
     }
 
     public function destroy(HostRateCategory $rateCategory): JsonResponse
     {
         if ($rateCategory->hosts()->exists()) {
-            return response()->json(['message' => 'This rate level is still used by hosts.'], 422);
+            return response()->json(['message' => 'Level tarif ini masih dipakai oleh host.'], 422);
         }
 
         $rateCategory->delete();
 
-        return response()->json(['message' => 'Rate level deleted']);
+        return response()->json(['message' => 'Level tarif dihapus']);
     }
 
     private function validated(Request $request, ?HostRateCategory $category = null): array

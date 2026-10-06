@@ -37,16 +37,16 @@ class BackupService
         $day = CarbonImmutable::parse($date)->startOfDay();
 
         if (! $slot->runsOn($day)) {
-            throw ValidationException::withMessages(['backup_date' => ['That slot is not scheduled on this date.']]);
+            throw ValidationException::withMessages(['backup_date' => ['Slot itu tidak terjadwal di tanggal ini.']]);
         }
         if ($event = $this->events->replacing($slot->assignment->brand_id, $day)) {
-            throw ValidationException::withMessages(['backup_date' => ["That day the regular schedule is replaced by {$event->name}."]]);
+            throw ValidationException::withMessages(['backup_date' => ["Di hari itu jadwal reguler diganti oleh {$event->name}."]]);
         }
 
         [$start, $end] = $slot->occurrenceOn($day);
 
         if ($end->isPast()) {
-            throw ValidationException::withMessages(['backup_date' => ['That slot has already finished.']]);
+            throw ValidationException::withMessages(['backup_date' => ['Slot itu sudah selesai.']]);
         }
 
         return new BackupRequest([
@@ -77,7 +77,7 @@ class BackupService
         $minHours = config('vidhelp.backup.request_min_hours_before');
         if (! $byStaff && $backup->start_at->lt(now()->addHours($minHours))) {
             throw ValidationException::withMessages(['backup_date' => [
-                "Backups must be requested at least {$minHours} hours before the session starts. For a last-minute absence, contact an admin.",
+                "Backup harus diajukan paling lambat {$minHours} jam sebelum sesi dimulai. Kalau mendadak tidak bisa, hubungi admin.",
             ]]);
         }
 
@@ -86,7 +86,7 @@ class BackupService
             ->whereIn('status', ['pending', 'open', 'filled'])
             ->exists();
         if ($duplicate) {
-            throw ValidationException::withMessages(['backup_date' => ['A backup is already requested for this slot on that date.']]);
+            throw ValidationException::withMessages(['backup_date' => ['Sudah ada permintaan backup untuk slot ini di tanggal itu.']]);
         }
 
         $nominees = $this->checkNominees($backup, $nomineeIds);
@@ -130,17 +130,17 @@ class BackupService
         $ids = array_values(array_unique($ids));
         [$min, $max] = [config('vidhelp.backup.direct_min_hosts'), config('vidhelp.backup.direct_max_hosts')];
         if (count($ids) < $min || count($ids) > $max) {
-            throw ValidationException::withMessages(['host_ids' => ["Choose between {$min} and {$max} hosts."]]);
+            throw ValidationException::withMessages(['host_ids' => ["Pilih antara {$min} sampai {$max} host."]]);
         }
 
         $hosts = HostProfile::with('user')->whereIn('id', $ids)->get();
         if ($hosts->count() !== count($ids)) {
-            throw ValidationException::withMessages(['host_ids' => ['One of the chosen hosts does not exist.']]);
+            throw ValidationException::withMessages(['host_ids' => ['Salah satu host yang dipilih tidak ditemukan.']]);
         }
 
         foreach ($hosts as $host) {
             if ($reason = $this->coverReason($host, $backup)) {
-                throw ValidationException::withMessages(['host_ids' => ["{$host->user->name} can't cover it: {$reason}"]]);
+                throw ValidationException::withMessages(['host_ids' => ["{$host->user->name} tidak bisa menggantikan: {$reason}"]]);
             }
         }
 
@@ -165,12 +165,12 @@ class BackupService
     public function ineligibleReason(HostProfile $host, BackupRequest $request): ?string
     {
         if ($request->request_type === 'direct' && $host->id !== $request->requesting_host_id && ! $request->isNominated($host)) {
-            return "Only the hosts {$request->requester->user->name} asked can take this one.";
+            return "Hanya host yang diminta {$request->requester->user->name} yang bisa mengambil ini.";
         }
 
         // An admin's "no" sticks: no applying again (an admin can still assign them directly)
         if ($request->exists && $request->applications()->where('applicant_host_id', $host->id)->where('status', 'rejected')->exists()) {
-            return 'An admin already turned down your offer for this backup.';
+            return 'Admin sudah menolak tawaranmu untuk backup ini.';
         }
 
         return $this->coverReason($host, $request);
@@ -182,15 +182,15 @@ class BackupService
     public function coverReason(HostProfile $host, BackupRequest $request): ?string
     {
         if ($host->id === $request->requesting_host_id) {
-            return 'This is your own request.';
+            return 'Ini permintaanmu sendiri.';
         }
 
         if ($host->status !== 'active' || $host->user->status !== 'active') {
-            return 'This host is not active.';
+            return 'Host ini tidak aktif.';
         }
 
         if ($host->assignments()->where('brand_id', $request->brand_id)->where('status', 'banned')->exists()) {
-            return "Banned from {$request->brand->name}.";
+            return "Diblokir dari {$request->brand->name}.";
         }
 
         if ($busy = $this->busyReason($host, $request->start_at, $request->end_at, $request)) {
@@ -200,7 +200,7 @@ class BackupService
         if (! $this->isSameBrand($host, $request)) {
             $quota = BackupQuota::peek($host->id, $request->quotaMonth());
             if ($quota->isFull()) {
-                return "Monthly cross-brand backup quota used ({$quota->quota_used}/{$quota->quota_max}).";
+                return "Kuota backup lintas brand bulan ini sudah habis ({$quota->quota_used}/{$quota->quota_max}).";
             }
         }
 
@@ -266,13 +266,13 @@ class BackupService
             $request = BackupRequest::lockForUpdate()->findOrFail($request->id);
 
             if (! $request->isOpenForApplications()) {
-                $this->fail('This backup is no longer open.');
+                $this->fail('Backup ini sudah tidak dibuka.');
             }
             if ($reason = $this->ineligibleReason($host, $request)) {
                 $this->fail($reason);
             }
             if ($other = $this->overlappingApplication($host, $request)) {
-                $this->fail("You already applied to cover {$other->request->brand->name} at that time. Withdraw that one first.");
+                $this->fail("Kamu sudah mendaftar menggantikan di {$other->request->brand->name} pada waktu yang sama. Tarik diri dari yang itu dulu.");
             }
 
             $request->applications()->updateOrCreate(
@@ -318,7 +318,7 @@ class BackupService
                 ->update(['status' => 'withdrawn', 'decided_at' => now()]);
 
             if (! $updated) {
-                $this->fail('You have no pending application for this backup.');
+                $this->fail('Kamu tidak punya pendaftaran yang tertunda untuk backup ini.');
             }
 
             $this->syncWaitingStatus($request);
@@ -337,7 +337,7 @@ class BackupService
                 ->update(['status' => 'rejected', 'decided_at' => now()]);
 
             if (! $updated) {
-                $this->fail('This host has no pending application for this backup.');
+                $this->fail('Host ini tidak punya pendaftaran yang tertunda untuk backup ini.');
             }
 
             return $this->syncWaitingStatus($request) === 'open';
@@ -347,10 +347,10 @@ class BackupService
         $host->loadMissing('user');
         $window = "{$request->brand->name} · {$this->window($request)}";
 
-        $this->notifier->toUsers($host->user, 'backup_not_picked', "You weren't picked to cover {$request->brand->name}", "{$window}, for {$request->requester->user->name}.", '/host/backups', dm: true);
+        $this->notifier->toUsers($host->user, 'backup_not_picked', "Kamu tidak terpilih menggantikan di {$request->brand->name}", "{$window}, untuk {$request->requester->user->name}.", '/host/backups', dm: true);
 
         if ($reopened) {
-            $this->notifier->toUsers($request->requester->user, 'backup_reopened', 'Your backup request is open again', "{$window}: the applicant was not approved. Other hosts can still apply.", '/host/backups', dm: true);
+            $this->notifier->toUsers($request->requester->user, 'backup_reopened', 'Permintaan backup kamu dibuka lagi', "{$window}: pendaftar tidak disetujui. Host lain masih bisa mendaftar.", '/host/backups', dm: true);
         }
     }
 
@@ -402,7 +402,7 @@ class BackupService
             $request = BackupRequest::lockForUpdate()->findOrFail($request->id);
 
             if (! in_array($request->status, ['open', 'pending'], true)) {
-                throw ValidationException::withMessages(['host_id' => ['This backup is not open.']]);
+                throw ValidationException::withMessages(['host_id' => ['Backup ini tidak sedang dibuka.']]);
             }
             if ($reason = $this->coverReason($host, $request)) {
                 throw ValidationException::withMessages(['host_id' => [$reason]]);
@@ -478,7 +478,7 @@ class BackupService
 
         // Removed by an admin (not dropped): tell the host they are off it
         if ($previousCover && $applicationStatus !== 'cancelled') {
-            $this->notifier->toUsers($previousCover->user, 'backup_unassigned', "You no longer cover {$request->brand->name}", $this->window($request), '/host/backups', dm: true);
+            $this->notifier->toUsers($previousCover->user, 'backup_unassigned', "Kamu tidak lagi menggantikan di {$request->brand->name}", $this->window($request), '/host/backups', dm: true);
         }
 
         $this->announceOpen($request->fresh(), reopened: true);
@@ -505,13 +505,13 @@ class BackupService
 
         $request->loadMissing(['brand', 'requester.user']);
         $window = "{$request->brand->name} · {$this->window($request)}";
-        $title = "Backup cancelled: {$request->brand->name}";
+        $title = "Backup dibatalkan: {$request->brand->name}";
 
         if ($cover) {
-            $this->notifier->toUsers($cover, 'backup_cancelled', $title, "{$window}: {$request->requester->user->name} no longer needs a cover. You're off this session.", '/host/schedule', dm: true);
+            $this->notifier->toUsers($cover, 'backup_cancelled', $title, "{$window}: {$request->requester->user->name} tidak lagi butuh pengganti. Kamu libur di sesi ini.", '/host/schedule', dm: true);
         }
         if ($waiting->isNotEmpty()) {
-            $this->notifier->toUsers($waiting, 'backup_cancelled', $title, "{$window}: the request was cancelled, so your offer is closed.", '/host/backups');
+            $this->notifier->toUsers($waiting, 'backup_cancelled', $title, "{$window}: permintaan dibatalkan, jadi pendaftaranmu ditutup.", '/host/backups');
         }
     }
 
@@ -562,8 +562,8 @@ class BackupService
 
         if ($request->request_type === 'direct') {
             $request->loadMissing('nominees.host.user');
-            $title = "{$request->requester->user->name} asked you to cover {$request->brand->name}";
-            $body = "{$this->window($request)}. Apply on the Backup tab if you can take it.";
+            $title = "{$request->requester->user->name} meminta kamu menggantikan di {$request->brand->name}";
+            $body = "{$this->window($request)}. Daftar di tab Backup kalau kamu bisa.";
             $nominees = $request->nominees->map(fn ($nominee) => $nominee->host->user);
 
             $this->notifier->toUsers($nominees, 'backup_asked', $title, $body, '/host/backups', dm: true);
@@ -571,8 +571,8 @@ class BackupService
             return;
         }
 
-        $title = ($reopened ? 'Backup needed again: ' : 'Backup needed: ').$request->brand->name;
-        $body = "{$this->window($request)} · for {$request->requester->user->name}. Apply on the Backup tab.";
+        $title = ($reopened ? 'Butuh backup lagi: ' : 'Butuh backup: ').$request->brand->name;
+        $body = "{$this->window($request)} · untuk {$request->requester->user->name}. Daftar di tab Backup.";
 
         $this->notifier->toUsers($this->notifier->hosts(exceptHostId: $request->requesting_host_id), 'backup_opened', $title, $body, '/host/backups');
         $this->notifier->toChannel('backups', 'backup_opened', $title, $body, '/host/backups');
@@ -583,8 +583,8 @@ class BackupService
     {
         $request->loadMissing(['brand', 'requester.user']);
         $applicant->loadMissing('user');
-        $title = "{$applicant->user->name} wants to cover {$request->requester->user->name}";
-        $body = "{$request->brand->name} · {$this->window($request)}. Approve or reject before {$request->auto_fill_at->format('D j M H:i')}, or the best applicant is picked automatically.";
+        $title = "{$applicant->user->name} ingin menggantikan {$request->requester->user->name}";
+        $body = "{$request->brand->name} · {$this->window($request)}. Setujui atau tolak sebelum {$request->auto_fill_at->translatedFormat('D j M H:i')}, atau pendaftar terbaik dipilih otomatis.";
 
         $this->notifier->toUsers($this->notifier->staff(), 'backup_applied', $title, $body, '/operator/backups');
         $this->notifier->toChannel('admin', 'backup_applied', $title, $body, '/operator/backups');
@@ -596,12 +596,12 @@ class BackupService
         $cover->loadMissing('user');
         $window = "{$request->brand->name} · {$this->window($request)}";
 
-        $this->notifier->toUsers($cover->user, 'backup_picked', "You're covering {$request->brand->name}", "{$window}, for {$request->requester->user->name}.", '/host/schedule', dm: true);
-        $this->notifier->toUsers($request->requester->user, 'backup_covered', 'Your backup is covered', "{$cover->user->name} covers {$window}.", '/host/backups', dm: true);
+        $this->notifier->toUsers($cover->user, 'backup_picked', "Kamu menggantikan di {$request->brand->name}", "{$window}, untuk {$request->requester->user->name}.", '/host/schedule', dm: true);
+        $this->notifier->toUsers($request->requester->user, 'backup_covered', 'Backup kamu sudah ada penggantinya', "{$cover->user->name} menggantikan {$window}.", '/host/backups', dm: true);
 
         if ($request->auto_filled) {
-            $title = "Auto-picked {$cover->user->name}";
-            $body = "Covers {$request->requester->user->name} on {$window}; nobody decided before the deadline.";
+            $title = "Otomatis memilih {$cover->user->name}";
+            $body = "Menggantikan {$request->requester->user->name} pada {$window}; tidak ada keputusan sebelum batas waktu.";
             $this->notifier->toUsers($this->notifier->admins(), 'backup_auto_picked', $title, $body, '/operator/backups');
             $this->notifier->toChannel('admin', 'backup_auto_picked', $title, $body, '/operator/backups');
         }
@@ -617,16 +617,16 @@ class BackupService
         }
 
         $request->loadMissing(['brand', 'requester.user']);
-        $body = "{$request->brand->name} · {$this->window($request)}, for {$request->requester->user->name}. You stay on the waiting list in case the cover drops out.";
+        $body = "{$request->brand->name} · {$this->window($request)}, untuk {$request->requester->user->name}. Kamu tetap di daftar tunggu kalau penggantinya batal.";
 
-        $this->notifier->toUsers($others, 'backup_not_picked', "You weren't picked to cover {$request->brand->name}", $body, '/host/backups');
+        $this->notifier->toUsers($others, 'backup_not_picked', "Kamu tidak terpilih menggantikan di {$request->brand->name}", $body, '/host/backups');
     }
 
     private function announceNoCover(BackupRequest $request): void
     {
         $request->loadMissing(['brand', 'requester.user']);
-        $title = "Nobody can cover {$request->requester->user->name}";
-        $body = "{$request->brand->name} · {$this->window($request)} starts soon and no eligible host applied. Assign someone by hand.";
+        $title = "Tidak ada yang bisa menggantikan {$request->requester->user->name}";
+        $body = "{$request->brand->name} · {$this->window($request)} segera dimulai dan belum ada host yang memenuhi syarat mendaftar. Tunjuk pengganti secara manual.";
 
         $this->notifier->toUsers($this->notifier->staff(), 'backup_no_cover', $title, $body, '/operator/backups');
         $this->notifier->toChannel('admin', 'backup_no_cover', $title, $body, '/operator/backups');
@@ -635,7 +635,7 @@ class BackupService
     /** "Tue 6 Oct 14:00–16:00" */
     private function window(BackupRequest $request): string
     {
-        return $request->start_at->format('D j M H:i').'–'.$request->end_at->format('H:i');
+        return $request->start_at->translatedFormat('D j M H:i').'–'.$request->end_at->format('H:i');
     }
 
     private function fail(string $message): never

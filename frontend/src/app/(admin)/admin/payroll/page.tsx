@@ -4,10 +4,10 @@ export default function AdminPayrollPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Payroll</h1>
+        <h1 className="text-2xl font-bold text-white">Penggajian</h1>
         <p className="text-sm text-gray-400 mt-1">
-          Every approved live hour lands in its brand&apos;s payment period. When a period ends: request payment (locks hours and rates, gives
-          you the brand report), then mark it paid to create salary slips with kasbon deducted.
+          Setiap jam live yang disetujui masuk ke periode pembayaran brand-nya. Saat periode berakhir: ajukan pembayaran (mengunci jam dan tarif, serta
+          menghasilkan laporan brand), lalu tandai lunas untuk membuat slip gaji yang sudah dipotong kasbon.
         </p>
       </div>
       <PayrollDesk />

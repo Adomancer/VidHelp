@@ -87,9 +87,9 @@ class AccountTest extends TestCase
     public function test_admins_cannot_change_their_own_role_or_archive_themselves(): void
     {
         $this->actingAs($this->admin)->putJson("/api/admin/users/{$this->admin->id}", ['role' => 'host'])
-            ->assertJsonValidationErrors(['role' => 'your own role']);
+            ->assertJsonValidationErrors(['role' => 'peranmu sendiri']);
         $this->actingAs($this->admin)->postJson("/api/admin/users/{$this->admin->id}/archive")
-            ->assertJsonValidationErrors(['status' => 'your own account']);
+            ->assertJsonValidationErrors(['status' => 'akunmu sendiri']);
 
         $this->assertTrue($this->admin->fresh()->hasRole('admin'));
         $this->assertSame('active', $this->admin->fresh()->status);
@@ -146,16 +146,16 @@ class AccountTest extends TestCase
         $host = $this->host();
         $erase = fn (array $body) => $this->actingAs($this->admin)->postJson("/api/admin/users/{$host->user_id}/erase", $body);
 
-        $erase(['reason' => 'host_request'])->assertJsonValidationErrors(['reason' => 'Archive the account first']);
+        $erase(['reason' => 'host_request'])->assertJsonValidationErrors(['reason' => 'Arsipkan akunnya dulu']);
 
         $this->actingAs($this->admin)->postJson("/api/admin/users/{$host->user_id}/archive")->assertOk();
 
         $erase(['reason' => 'other'])->assertJsonValidationErrors('reason');
-        $erase(['reason' => 'banned'])->assertJsonValidationErrors(['reason' => 'not banned']);
+        $erase(['reason' => 'banned'])->assertJsonValidationErrors(['reason' => 'tidak diblokir']);
 
         $host->assignments()->update(['status' => 'banned']);
         $erase(['reason' => 'banned'])->assertOk();
-        $erase(['reason' => 'banned'])->assertJsonValidationErrors(['reason' => 'already deleted']);
+        $erase(['reason' => 'banned'])->assertJsonValidationErrors(['reason' => 'sudah dihapus']);
     }
 
     public function test_delete_permanently_wipes_personal_data_but_keeps_the_history(): void
@@ -176,7 +176,7 @@ class AccountTest extends TestCase
 
         $user->refresh();
         $this->assertNotNull($user->erased_at);
-        $this->assertStringStartsWith('Deleted user ', $user->name);
+        $this->assertStringStartsWith('Pengguna terhapus ', $user->name);
         $this->assertNotSame($oldEmail, $user->email);
         $this->assertNull($user->password);
         $this->assertNull($host->fresh()->phone);

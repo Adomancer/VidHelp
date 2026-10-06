@@ -5,9 +5,9 @@ export default function AdminPointsPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">Points &amp; SP</h1>
+        <h1 className="text-2xl font-bold text-white">Poin &amp; SP</h1>
         <p className="text-sm text-gray-400 mt-1">
-          Record violations, cancel wrong entries, and issue or cancel warning letters by hand.
+          Catat pelanggaran, batalkan catatan yang salah, serta terbitkan atau batalkan surat peringatan secara manual.
         </p>
       </div>
       <PointsDesk isAdmin />

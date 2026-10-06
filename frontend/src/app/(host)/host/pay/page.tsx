@@ -8,7 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
 import FormAlert from "@/components/FormAlert";
 
-const advanceTypes = { early_payment: "Early payment", loan: "Loan" } as const;
+const advanceTypes = { early_payment: "Gaji di muka", loan: "Pinjaman" } as const;
 
 /** Pay building up in open periods, my salary slips and my kasbon. */
 export default function HostPayPage() {
@@ -18,13 +18,13 @@ export default function HostPayPage() {
 
   return (
     <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-white">My Pay</h1>
+      <h1 className="text-xl font-bold text-white">Gaji Saya</h1>
       {pay.error && <FormAlert tone="error">{pay.error}</FormAlert>}
 
       {data && (
         <>
-          <Card title="This period" description="Estimate at your current rate; the final amount is set when the agency requests payment.">
-            {data.current.length === 0 && <p className="text-sm text-gray-400">No approved hours in an open period yet.</p>}
+          <Card title="Periode ini" description="Perkiraan dengan tarifmu saat ini; jumlah akhir ditetapkan saat agensi mengajukan pembayaran.">
+            {data.current.length === 0 && <p className="text-sm text-gray-400">Belum ada jam yang disetujui di periode yang berjalan.</p>}
             <ul className="space-y-2">
               {data.current.map((period) => (
                 <li key={period.period_id} className="rounded-lg bg-slate-800 px-3 py-2">
@@ -33,16 +33,16 @@ export default function HostPayPage() {
                     <span className="text-lg font-semibold text-green-300">{formatRupiah(period.estimate)}</span>
                   </div>
                   <p className="text-xs text-gray-400">
-                    {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.session_count} session
-                    {period.session_count === 1 ? "" : "s"} · {formatDuration(period.hours)} × {formatRupiah(period.rate_per_hour)}
+                    {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.session_count} sesi
+                    · {formatDuration(period.hours)} × {formatRupiah(period.rate_per_hour)}
                   </p>
                 </li>
               ))}
             </ul>
           </Card>
 
-          <Card title="Salary slips">
-            {data.slips.length === 0 && <p className="text-sm text-gray-400">No slips yet.</p>}
+          <Card title="Slip gaji">
+            {data.slips.length === 0 && <p className="text-sm text-gray-400">Belum ada slip.</p>}
             <ul className="space-y-2">
               {data.slips.map((slip) => (
                 <li key={slip.id}>
@@ -71,11 +71,11 @@ export default function HostPayPage() {
                         {advanceTypes[advance.type]} · {formatRupiah(advance.total_amount)}
                       </span>
                       <span className="block text-xs text-gray-400">
-                        {formatDate(advance.requested_at)} · {advance.installment_count} installment{advance.installment_count === 1 ? "" : "s"}
+                        {formatDate(advance.requested_at)} · {advance.installment_count} cicilan
                       </span>
                     </span>
                     <span className={advance.status === "paid" ? "text-green-300" : "text-yellow-200"}>
-                      {advance.status === "paid" ? "Paid back" : `${formatRupiah(advance.remaining)} left`}
+                      {advance.status === "paid" ? "Lunas" : `sisa ${formatRupiah(advance.remaining)}`}
                     </span>
                   </li>
                 ))}

@@ -6,16 +6,16 @@ import RegisterForm from "@/components/RegisterForm";
 export default function RegisterPage() {
   return (
     <GuestOnly>
-      <AuthCard subtitle="Create your account">
+      <AuthCard subtitle="Buat akun kamu">
         <RegisterForm />
 
         <p className="text-center text-xs text-gray-400">
-          New accounts are reviewed by an admin before you can sign in.
+          Akun baru diperiksa admin dulu sebelum kamu bisa masuk.
         </p>
         <p className="text-center text-sm text-gray-400">
-          Already have an account?{" "}
+          Sudah punya akun?{" "}
           <Link href="/login" className="text-purple-300 hover:text-white">
-            Sign in
+            Masuk
           </Link>
         </p>
       </AuthCard>

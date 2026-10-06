@@ -31,7 +31,7 @@ class ScheduleSlot extends Model
 
     private const WEEK_MINUTES = 7 * self::DAY_MINUTES;
 
-    private const DAY_NAMES = [1 => 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    private const DAY_NAMES = [1 => 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
     protected function casts(): array
     {

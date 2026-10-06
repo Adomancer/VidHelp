@@ -18,10 +18,10 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class RatingController extends Controller
 {
     private const SOURCE_LABELS = [
-        'internal' => 'Violation',
-        'brand_complaint' => 'Brand complaint',
-        'backup_cancel' => 'Dropped backup (automatic)',
-        'late_attachment' => 'Late sick letter (automatic)',
+        'internal' => 'Pelanggaran',
+        'brand_complaint' => 'Komplain brand',
+        'backup_cancel' => 'Membatalkan backup (otomatis)',
+        'late_attachment' => 'Surat sakit terlambat (otomatis)',
     ];
 
     public function __construct(private RatingService $ratings)
@@ -68,8 +68,8 @@ class RatingController extends Controller
                 $this->logLabel($log),
                 $log->points_change,
                 $log->reason,
-                $log->recorder?->name ?? 'Automatic',
-                $log->voided_at ? 'Yes' : 'No',
+                $log->recorder?->name ?? 'Otomatis',
+                $log->voided_at ? 'Ya' : 'Tidak',
             ]);
 
         $letters = WarningLetter::query()
@@ -82,14 +82,14 @@ class RatingController extends Controller
                 $letter->host->user->name,
                 "SP{$letter->level}",
                 $letter->reason,
-                $letter->issuer?->name ?? 'Automatic',
-                $letter->voided_at ? 'Yes' : 'No',
+                $letter->issuer?->name ?? 'Otomatis',
+                $letter->voided_at ? 'Ya' : 'Tidak',
             ]);
 
         return $export->download("ratings-{$month}.xlsx", [
-            'Ratings' => [['Host', 'Violations', 'Suggested', 'Rating', 'Note', 'Rated by'], $ratings],
-            'Point history' => [['Date', 'Host', 'Type', 'Points', 'Reason', 'Recorded by', 'Cancelled'], $logs],
-            'SP history' => [['Issued', 'Host', 'Level', 'Reason', 'Issued by', 'Cancelled'], $letters],
+            'Rating' => [['Host', 'Pelanggaran', 'Saran', 'Rating', 'Catatan', 'Dinilai oleh'], $ratings],
+            'Riwayat poin' => [['Tanggal', 'Host', 'Jenis', 'Poin', 'Alasan', 'Dicatat oleh', 'Dibatalkan'], $logs],
+            'Riwayat SP' => [['Terbit', 'Host', 'Level', 'Alasan', 'Diterbitkan oleh', 'Dibatalkan'], $letters],
         ]);
     }
 
@@ -125,7 +125,7 @@ class RatingController extends Controller
             $request->user(),
         );
 
-        return response()->json(['rating' => $rating, 'message' => 'Rating saved']);
+        return response()->json(['rating' => $rating, 'message' => 'Rating disimpan']);
     }
 
     private function month(Request $request): string

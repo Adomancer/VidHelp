@@ -21,10 +21,10 @@ class SettingsService
     private const CACHE_KEY = 'system-settings';
 
     public const GROUPS = [
-        'backups' => 'Backups',
-        'attendance' => 'Attendance and live reports',
-        'points' => 'Points and warning letters',
-        'security' => 'Security',
+        'backups' => 'Backup',
+        'attendance' => 'Absensi dan laporan live',
+        'points' => 'Poin dan surat peringatan',
+        'security' => 'Keamanan',
     ];
 
     /**
@@ -32,79 +32,79 @@ class SettingsService
      */
     public const DEFINITIONS = [
         'backup.quota_per_month' => [
-            'group' => 'backups', 'type' => 'int', 'min' => 0, 'max' => 31, 'unit' => 'covers',
-            'label' => 'Cross-brand covers per host per month',
-            'help' => 'Covering a shift of your own brand never counts. A change also applies to this month.',
+            'group' => 'backups', 'type' => 'int', 'min' => 0, 'max' => 31, 'unit' => 'kali',
+            'label' => 'Kuota backup lintas brand per host per bulan',
+            'help' => 'Menggantikan di brand sendiri tidak pernah dihitung. Perubahan juga berlaku untuk bulan ini.',
         ],
         'backup.request_min_hours_before' => [
-            'group' => 'backups', 'type' => 'int', 'min' => 0, 'max' => 336, 'unit' => 'hours',
-            'label' => 'Hosts request a backup at least',
-            'help' => 'Before the session starts. Closer to the session, only an admin or operator can open a request (emergencies).',
+            'group' => 'backups', 'type' => 'int', 'min' => 0, 'max' => 336, 'unit' => 'jam',
+            'label' => 'Host mengajukan backup paling lambat',
+            'help' => 'Sebelum sesi dimulai. Kalau lebih mepet, hanya admin atau operator yang bisa membuka permintaan (darurat).',
         ],
         'backup.direct_max_hosts' => [
-            'group' => 'backups', 'type' => 'int', 'min' => 2, 'max' => 20, 'unit' => 'hosts',
-            'label' => 'Most hosts a named request can ask',
-            'help' => 'A host who asks specific people to cover must name at least 2 and at most this many.',
+            'group' => 'backups', 'type' => 'int', 'min' => 2, 'max' => 20, 'unit' => 'host',
+            'label' => 'Maksimal host yang bisa diminta langsung',
+            'help' => 'Host yang meminta orang tertentu untuk menggantikan harus memilih minimal 2 dan maksimal sebanyak ini.',
         ],
         'backup.auto_fill_before_minutes' => [
-            'group' => 'backups', 'type' => 'int', 'min' => 0, 'max' => 1440, 'unit' => 'minutes',
-            'label' => 'Auto-approve a cover before the session',
-            'help' => 'If the admin has not decided yet, the best applicant is approved automatically this long before the session starts.',
+            'group' => 'backups', 'type' => 'int', 'min' => 0, 'max' => 1440, 'unit' => 'menit',
+            'label' => 'Setujui pengganti otomatis sebelum sesi',
+            'help' => 'Kalau admin belum memutuskan, pendaftar terbaik otomatis disetujui selama ini sebelum sesi dimulai.',
         ],
         'backup.sick_letter_grace_hours' => [
-            'group' => 'backups', 'type' => 'int', 'min' => 1, 'max' => 168, 'unit' => 'hours',
-            'label' => 'Sick letter due after the session starts',
-            'help' => 'A missing or late letter costs points.',
+            'group' => 'backups', 'type' => 'int', 'min' => 1, 'max' => 168, 'unit' => 'jam',
+            'label' => 'Batas surat sakit setelah sesi dimulai',
+            'help' => 'Surat yang tidak ada atau terlambat akan memotong poin.',
         ],
         'attendance.check_in_opens_minutes' => [
-            'group' => 'attendance', 'type' => 'int', 'min' => 0, 'max' => 720, 'unit' => 'minutes',
-            'label' => 'Check-in opens before the session',
-            'help' => 'How early the check-in button works.',
+            'group' => 'attendance', 'type' => 'int', 'min' => 0, 'max' => 720, 'unit' => 'menit',
+            'label' => 'Check-in dibuka sebelum sesi',
+            'help' => 'Seberapa awal tombol check-in bisa dipakai.',
         ],
         'attendance.report_due_hours' => [
-            'group' => 'attendance', 'type' => 'int', 'min' => 1, 'max' => 168, 'unit' => 'hours',
-            'label' => 'Live report due after check-in',
-            'help' => 'Reports not sent by then show as overdue.',
+            'group' => 'attendance', 'type' => 'int', 'min' => 1, 'max' => 168, 'unit' => 'jam',
+            'label' => 'Batas laporan live setelah check-in',
+            'help' => 'Laporan yang belum dikirim sampai batas ini ditandai terlambat.',
         ],
         'attendance.duration_tolerance_minutes' => [
-            'group' => 'attendance', 'type' => 'int', 'min' => 0, 'max' => 240, 'unit' => 'minutes',
-            'label' => 'Auto-approve tolerance',
-            'help' => 'A report up to this much shorter than the scheduled session is approved automatically; otherwise it waits for review.',
+            'group' => 'attendance', 'type' => 'int', 'min' => 0, 'max' => 240, 'unit' => 'menit',
+            'label' => 'Toleransi persetujuan otomatis',
+            'help' => 'Laporan yang lebih singkat dari jadwal paling banyak sebesar ini disetujui otomatis; selebihnya menunggu dicek.',
         ],
         'points.starting_points' => [
-            'group' => 'points', 'type' => 'int', 'min' => 1, 'max' => 1000, 'unit' => 'points',
-            'label' => 'Starting points',
-            'help' => 'Every host starts each points period with this many. Balances already started keep their number.',
+            'group' => 'points', 'type' => 'int', 'min' => 1, 'max' => 1000, 'unit' => 'poin',
+            'label' => 'Poin awal',
+            'help' => 'Setiap host memulai periode poin dengan jumlah ini. Saldo yang sudah berjalan tetap memakai angkanya.',
         ],
         'points.reset_every_months' => [
-            'group' => 'points', 'type' => 'int', 'options' => [1, 2, 3, 4, 6, 12], 'unit' => 'months',
-            'label' => 'Points reset every',
-            'help' => 'Periods line up with the calendar (3 = Jan, Apr, Jul, Oct). Changing it starts a new period right away, so change it at a period boundary.',
+            'group' => 'points', 'type' => 'int', 'options' => [1, 2, 3, 4, 6, 12], 'unit' => 'bulan',
+            'label' => 'Poin direset setiap',
+            'help' => 'Periode mengikuti kalender (3 = Jan, Apr, Jul, Okt). Mengubahnya langsung memulai periode baru, jadi ubah saat pergantian periode.',
         ],
         'points.sp_thresholds.1' => [
-            'group' => 'points', 'type' => 'int', 'min' => 0, 'max' => 1000, 'unit' => 'points',
-            'label' => 'SP1 at or below',
-            'help' => 'Must be below the starting points.',
+            'group' => 'points', 'type' => 'int', 'min' => 0, 'max' => 1000, 'unit' => 'poin',
+            'label' => 'SP1 di angka atau di bawah',
+            'help' => 'Harus lebih kecil dari poin awal.',
         ],
         'points.sp_thresholds.2' => [
-            'group' => 'points', 'type' => 'int', 'min' => 0, 'max' => 1000, 'unit' => 'points',
-            'label' => 'SP2 at or below',
-            'help' => 'Must be below SP1.',
+            'group' => 'points', 'type' => 'int', 'min' => 0, 'max' => 1000, 'unit' => 'poin',
+            'label' => 'SP2 di angka atau di bawah',
+            'help' => 'Harus lebih kecil dari SP1.',
         ],
         'points.sp_thresholds.3' => [
-            'group' => 'points', 'type' => 'int', 'min' => 0, 'max' => 1000, 'unit' => 'points',
-            'label' => 'SP3 at or below',
-            'help' => 'Must be below SP2.',
+            'group' => 'points', 'type' => 'int', 'min' => 0, 'max' => 1000, 'unit' => 'poin',
+            'label' => 'SP3 di angka atau di bawah',
+            'help' => 'Harus lebih kecil dari SP2.',
         ],
         'two_factor.required_for_admins' => [
             'group' => 'security', 'type' => 'bool',
-            'label' => 'Require two-factor sign-in for admins and finance',
-            'help' => 'When on, an admin or finance user without 2FA must set it up before using the app, and cannot turn it off.',
+            'label' => 'Wajibkan verifikasi dua langkah untuk admin dan finance',
+            'help' => 'Kalau aktif, admin atau finance yang belum memakai 2FA harus mengaturnya dulu sebelum memakai aplikasi, dan tidak bisa mematikannya.',
         ],
         'audit.keep_days' => [
-            'group' => 'security', 'type' => 'int', 'min' => 0, 'max' => 3650, 'unit' => 'days',
-            'label' => 'Keep audit log entries for',
-            'help' => 'Older entries are deleted every night. 0 keeps everything.',
+            'group' => 'security', 'type' => 'int', 'min' => 0, 'max' => 3650, 'unit' => 'hari',
+            'label' => 'Simpan catatan log audit selama',
+            'help' => 'Catatan yang lebih lama dihapus setiap malam. 0 berarti simpan semuanya.',
         ],
     ];
 
@@ -222,7 +222,7 @@ class SettingsService
         foreach ($values as $key => $value) {
             $definition = self::DEFINITIONS[$key] ?? null;
             if (! $definition) {
-                $errors[$key] = ['This setting does not exist.'];
+                $errors[$key] = ['Pengaturan ini tidak ada.'];
 
                 continue;
             }
@@ -262,9 +262,9 @@ class SettingsService
         [$sp1, $sp2, $sp3] = [$value('points.sp_thresholds.1'), $value('points.sp_thresholds.2'), $value('points.sp_thresholds.3')];
 
         return array_filter([
-            'points.sp_thresholds.1' => $sp1 >= $start ? ["SP1 must be below the starting points ({$start})."] : null,
-            'points.sp_thresholds.2' => $sp2 >= $sp1 ? ["SP2 must be below SP1 ({$sp1})."] : null,
-            'points.sp_thresholds.3' => $sp3 >= $sp2 ? ["SP3 must be below SP2 ({$sp2})."] : null,
+            'points.sp_thresholds.1' => $sp1 >= $start ? ["SP1 harus lebih kecil dari poin awal ({$start})."] : null,
+            'points.sp_thresholds.2' => $sp2 >= $sp1 ? ["SP2 harus lebih kecil dari SP1 ({$sp1})."] : null,
+            'points.sp_thresholds.3' => $sp3 >= $sp2 ? ["SP3 harus lebih kecil dari SP2 ({$sp2})."] : null,
         ]);
     }
 

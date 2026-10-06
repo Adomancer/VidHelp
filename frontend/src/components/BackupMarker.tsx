@@ -5,14 +5,14 @@ export default function BackupMarker({ marker, mine = false }: { marker: SlotBac
   if (marker.status === "filled") {
     return (
       <span className="block text-xs text-green-300">
-        {mine ? "You're off · " : "↳ "}covered by {marker.filler_name}
+        {mine ? "Kamu libur · " : "↳ "}digantikan {marker.filler_name}
       </span>
     );
   }
 
   return (
     <span className={`block text-xs ${marker.status === "open" ? "text-blue-200" : "text-yellow-200"}`}>
-      {marker.status === "open" ? "Looking for a backup" : "Backup requested"}
+      {marker.status === "open" ? "Mencari backup" : "Backup diajukan"}
     </span>
   );
 }

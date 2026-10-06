@@ -16,7 +16,7 @@ export default function AdminSlipPage() {
   return (
     <div className="space-y-4">
       <Link href="/admin/payroll" className="text-sm text-purple-300 hover:text-white print:hidden">
-        ← Payroll
+        ← Penggajian
       </Link>
       {slip.error && <FormAlert tone="error">{slip.error}</FormAlert>}
       {slip.data && <SlipView slip={slip.data.slip} />}

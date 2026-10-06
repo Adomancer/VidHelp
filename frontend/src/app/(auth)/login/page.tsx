@@ -6,13 +6,13 @@ import LoginForm from "@/components/LoginForm";
 export default function LoginPage() {
   return (
     <GuestOnly>
-      <AuthCard subtitle="Agency Management Platform">
+      <AuthCard subtitle="Platform Manajemen Agensi">
         <LoginForm />
 
         <p className="text-center text-sm text-gray-400">
-          New host?{" "}
+          Host baru?{" "}
           <Link href="/register" className="text-purple-300 hover:text-white">
-            Create an account
+            Buat akun
           </Link>
         </p>
       </AuthCard>

@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { errorMessage, operatorApi, type HostListItem } from "@/lib/api";
 import { formatTenure } from "@/lib/format";
+import { statusLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
 import AssignmentEditor from "./AssignmentEditor";
 import { useAuth } from "./AuthProvider";
@@ -58,7 +59,7 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
           <input
             name="search"
             type="search"
-            placeholder="Search name or email…"
+            placeholder="Cari nama atau email…"
             className="w-full px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
           />
         </form>
@@ -68,10 +69,10 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
             setBrandId(event.target.value);
             setPage(1);
           }}
-          aria-label="Filter by brand"
+          aria-label="Filter brand"
           className="sm:w-56 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white"
         >
-          <option value="">All brands</option>
+          <option value="">Semua brand</option>
           {brands.data?.brands.map((brand) => (
             <option key={brand.id} value={brand.id}>
               {brand.name}
@@ -82,10 +83,10 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
           type="button"
           onClick={exportExcel}
           disabled={exporting}
-          title="All hosts matching the search and brand filter"
+          title="Semua host yang cocok dengan pencarian dan filter brand"
           className="px-4 py-2 rounded-lg border border-slate-700 text-gray-200 text-sm whitespace-nowrap hover:bg-slate-800 disabled:opacity-40"
         >
-          {exporting ? "Exporting…" : "Export Excel"}
+          {exporting ? "Mengekspor…" : "Ekspor Excel"}
         </button>
       </div>
 
@@ -97,8 +98,8 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
           <thead className="text-left text-gray-400 border-b border-slate-800">
             <tr>
               <th className="px-4 py-3 font-medium">Host</th>
-              <th className="px-4 py-3 font-medium">Rate level</th>
-              <th className="px-4 py-3 font-medium">Brands</th>
+              <th className="px-4 py-3 font-medium">Level tarif</th>
+              <th className="px-4 py-3 font-medium">Brand</th>
               <th className="px-4 py-3 font-medium">Status</th>
               {editableBrands && <th className="px-4 py-3" />}
             </tr>
@@ -130,7 +131,7 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
                       {host.rate_category?.name ?? "—"}
                       <span className="block text-xs text-gray-400">
                         {formatTenure(host.join_date)}
-                        {host.rate_category_overridden && " · set by admin"}
+                        {host.rate_category_overridden && " · diatur admin"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -144,7 +145,7 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3 capitalize">{host.status}</td>
+                    <td className="px-4 py-3">{statusLabel(host.status)}</td>
                     {editableBrands && (
                       <td className="px-4 py-3 text-right">
                         <button
@@ -152,7 +153,7 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
                           onClick={() => setOpenId(open ? null : host.id)}
                           className="px-3 py-1.5 rounded-md border border-slate-700 text-gray-300 hover:bg-slate-800"
                         >
-                          {open ? "Close" : "Brands"}
+                          {open ? "Tutup" : "Brand"}
                         </button>
                       </td>
                     )}
@@ -180,7 +181,7 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
 
         {hosts.data?.data.length === 0 && (
           <p className="px-4 py-8 text-center text-gray-400">
-            No hosts found. Hosts appear here after an admin approves their account.
+            Tidak ada host. Host muncul di sini setelah admin menyetujui akunnya.
           </p>
         )}
       </div>
@@ -188,11 +189,11 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
       {hosts.data && hosts.data.last_page > 1 && (
         <div className="flex items-center justify-between text-sm text-gray-400">
           <span>
-            Page {hosts.data.current_page} of {hosts.data.last_page} · {hosts.data.total} hosts
+            Halaman {hosts.data.current_page} dari {hosts.data.last_page} · {hosts.data.total} host
           </span>
           <div className="flex gap-2">
             <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
-              Previous
+              Sebelumnya
             </button>
             <button
               type="button"
@@ -200,7 +201,7 @@ export default function HostTable({ detailHref, editableBrands = false }: HostTa
               onClick={() => setPage(page + 1)}
               className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40"
             >
-              Next
+              Berikutnya
             </button>
           </div>
         </div>

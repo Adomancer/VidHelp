@@ -33,7 +33,7 @@ class DiscordController extends Controller
     public function connectUrl(Request $request): JsonResponse
     {
         $request->validate(['state' => 'required|string|max:100']);
-        abort_unless($this->discord->canConnect(), 503, 'Discord is not configured on the server.');
+        abort_unless($this->discord->canConnect(), 503, 'Discord belum dikonfigurasi di server.');
 
         return response()->json(['url' => $this->discord->authorizeUrl($request->state)]);
     }
@@ -47,12 +47,12 @@ class DiscordController extends Controller
             $discordUser = $this->discord->userFromCode($request->code);
         } catch (Throwable $e) {
             report($e);
-            throw ValidationException::withMessages(['code' => ['Discord did not accept the sign-in. Please try again.']]);
+            throw ValidationException::withMessages(['code' => ['Discord tidak menerima proses masuk. Silakan coba lagi.']]);
         }
 
         $taken = DiscordLink::where('discord_user_id', $discordUser['id'])->where('user_id', '!=', $request->user()->id)->exists();
         if ($taken) {
-            throw ValidationException::withMessages(['code' => ['This Discord account is already linked to another VidHelp user.']]);
+            throw ValidationException::withMessages(['code' => ['Akun Discord ini sudah terhubung ke pengguna VidHelp lain.']]);
         }
 
         $link = DiscordLink::updateOrCreate(
@@ -65,26 +65,26 @@ class DiscordController extends Controller
             ]
         );
 
-        return response()->json(['link' => $link->only('discord_username', 'linked_at'), 'message' => 'Discord connected']);
+        return response()->json(['link' => $link->only('discord_username', 'linked_at'), 'message' => 'Discord terhubung']);
     }
 
     public function unlink(Request $request): JsonResponse
     {
         $request->user()->discordLink()?->delete();
 
-        return response()->json(['message' => 'Discord disconnected']);
+        return response()->json(['message' => 'Discord diputuskan']);
     }
 
     /** Send a direct message now, to check the host can receive them. */
     public function test(Request $request, Notifier $notifier): JsonResponse
     {
         $user = $request->user()->load('discordLink');
-        abort_unless($user->discordLink, 422, 'Connect Discord first.');
+        abort_unless($user->discordLink, 422, 'Hubungkan Discord dulu.');
 
         $error = $notifier->testDm($user);
 
         return $error
             ? response()->json(['message' => $error], 422)
-            : response()->json(['message' => 'Sent! Check your Discord direct messages.']);
+            : response()->json(['message' => 'Terkirim! Cek pesan langsung di Discord kamu.']);
     }
 }

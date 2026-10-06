@@ -106,12 +106,12 @@ export function formatShortDate(date: string): string {
   return new Date(`${date}T00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 }
 
-/** 0.33 → "20 min", 2 → "2 h", 2.5 → "2 h 30 min" */
+/** 0.33 → "20 menit", 2 → "2 jam", 2.5 → "2 jam 30 menit" */
 export function formatDuration(hours: number): string {
   const total = Math.round(hours * 60);
   const h = Math.floor(total / 60);
   const m = total % 60;
 
-  if (h === 0) return `${m} min`;
-  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+  if (h === 0) return `${m} menit`;
+  return m === 0 ? `${h} jam` : `${h} jam ${m} menit`;
 }

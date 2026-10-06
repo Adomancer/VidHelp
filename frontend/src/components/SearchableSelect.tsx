@@ -20,7 +20,7 @@ export default function SearchableSelect({
   options,
   value,
   onChange,
-  placeholder = "Select...",
+  placeholder = "Pilih...",
   className = "",
   disabled = false,
 }: SearchableSelectProps) {
@@ -82,7 +82,7 @@ export default function SearchableSelect({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onClick={(e) => e.stopPropagation()} // Prevent clicking input from closing it
-              placeholder="Type to search..."
+              placeholder="Ketik untuk mencari..."
               className="w-full px-3 py-1.5 rounded bg-slate-900 border border-slate-700 text-white text-sm outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
             />
           </div>
@@ -116,7 +116,7 @@ export default function SearchableSelect({
               })
             ) : (
               <div className="px-3 py-4 text-sm text-gray-500 text-center">
-                No results found
+                Tidak ada hasil
               </div>
             )}
           </div>

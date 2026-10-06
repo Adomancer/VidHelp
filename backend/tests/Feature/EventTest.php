@@ -140,7 +140,7 @@ class EventTest extends TestCase
         $this->claim($this->other, $event, '2026-10-09 12:00')->assertCreated();
         $this->claim($this->other, $event, '2026-10-10 10:00')
             ->assertJsonValidationErrors('start_at')
-            ->assertJsonPath('errors.start_at.0', 'You already hold the maximum of 2 blocks for this event.');
+            ->assertJsonPath('errors.start_at.0', 'Kamu sudah mengambil maksimal 2 blok untuk event ini.');
     }
 
     public function test_only_hosts_of_the_brand_can_claim(): void
@@ -153,7 +153,7 @@ class EventTest extends TestCase
     public function test_block_must_match_the_grid(): void
     {
         $this->claim($this->other, $this->event(), '2026-10-09 11:00')
-            ->assertJsonPath('errors.start_at.0', "That is not one of this event's blocks.");
+            ->assertJsonPath('errors.start_at.0', 'Itu bukan salah satu blok event ini.');
     }
 
     public function test_event_keeping_the_regular_schedule_blocks_overlapping_hours(): void
@@ -161,7 +161,7 @@ class EventTest extends TestCase
         $event = $this->event(['name' => 'Extra', 'start_date' => '2026-10-06', 'end_date' => '2026-10-06']);
 
         $this->claim($this->other, $event, '2026-10-06 14:00')
-            ->assertJsonPath('errors.start_at.0', "Regular schedule: {$this->regular->user->name} is live then.");
+            ->assertJsonPath('errors.start_at.0', "Jadwal reguler: {$this->regular->user->name} sedang live di waktu itu.");
 
         $states = collect($this->actingAs($this->other->user)->getJson('/api/host/events')->json('events.0.blocks'))->pluck('state')->all();
         $this->assertSame(['free', 'free', 'unavailable'], $states);
@@ -173,7 +173,7 @@ class EventTest extends TestCase
         $assignment = HostBrandAssignment::create(['host_id' => $this->other->id, 'brand_id' => $this->brandB->id, 'status' => 'active']);
         ScheduleSlot::create(['assignment_id' => $assignment->id, 'day_of_week' => 5, 'start_time' => '11:00', 'end_time' => '13:00', 'effective_from' => '2026-09-01']);
 
-        $this->claim($this->other, $event, '2026-10-09 10:00')->assertJsonPath('errors.start_at.0', 'Live on Brand B (Fri 11:00-13:00).');
+        $this->claim($this->other, $event, '2026-10-09 10:00')->assertJsonPath('errors.start_at.0', 'Live di Brand B (Jum 11:00-13:00).');
     }
 
     public function test_full_schedule_event_replaces_regular_slots(): void
@@ -266,7 +266,7 @@ class EventTest extends TestCase
         $this->actingAs($this->operator)->postJson("/api/operator/events/{$event->id}/cancel")->assertOk();
 
         $this->assertSame(0, EventSlotClaim::active()->count());
-        $this->claim($this->regular, $event, '2026-10-09 12:00')->assertJsonPath('errors.start_at.0', 'This event was cancelled.');
+        $this->claim($this->regular, $event, '2026-10-09 12:00')->assertJsonPath('errors.start_at.0', 'Event ini sudah dibatalkan.');
     }
 
     public function test_host_sees_their_blocks_and_others(): void
@@ -282,6 +282,21 @@ class EventTest extends TestCase
             ->assertJsonPath('events.0.blocks.1.claim.host_name', $this->regular->user->name);
     }
 
+    public function test_host_only_sees_events_of_their_brands(): void
+    {
+        $this->event();
+        $elsewhere = $this->host($this->brandB);
+
+        $this->actingAs($elsewhere->user)->getJson('/api/host/events')
+            ->assertOk()
+            ->assertJsonCount(0, 'events')
+            ->assertJsonPath('my_brands', ['Brand B']);
+
+        $this->actingAs($this->other->user)->getJson('/api/host/events')
+            ->assertJsonCount(1, 'events')
+            ->assertJsonPath('my_brands', ['Brand A']);
+    }
+
     public function test_event_block_makes_the_host_busy_for_backups(): void
     {
         $event = $this->event(['name' => 'Tuesday', 'start_date' => '2026-10-06', 'end_date' => '2026-10-06', 'daily_end_time' => '14:00']);
@@ -295,7 +310,7 @@ class EventTest extends TestCase
 
         $this->actingAs($this->other->user)->postJson("/api/host/backups/{$backup->id}/apply")
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Booked for Tuesday at that time.');
+            ->assertJsonPath('message', 'Sudah mengambil blok Tuesday pada waktu itu.');
     }
 
     public function test_schedules_show_event_blocks_and_replaced_days(): void

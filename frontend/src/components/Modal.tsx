@@ -43,7 +43,7 @@ export default function Modal({ title, description, onClose, wide = false, child
           </h2>
           {description && <p className="text-sm text-gray-400 mt-1">{description}</p>}
         </div>
-        <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-md p-1 text-gray-400 hover:bg-slate-800 hover:text-white">
+        <button type="button" onClick={onClose} aria-label="Tutup" className="-mr-1 rounded-md p-1 text-gray-400 hover:bg-slate-800 hover:text-white">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>

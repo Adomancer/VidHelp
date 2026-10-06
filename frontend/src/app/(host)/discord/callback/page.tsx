@@ -14,7 +14,7 @@ export default function DiscordCallbackPage() {
   return (
     <div className="max-w-lg">
       {/* useSearchParams needs a Suspense boundary */}
-      <Suspense fallback={<p className="text-gray-400">Connecting Discord…</p>}>
+      <Suspense fallback={<p className="text-gray-400">Menghubungkan Discord…</p>}>
         <FinishLink />
       </Suspense>
     </div>
@@ -26,8 +26,8 @@ async function finish(token: string, params: URLSearchParams): Promise<string | 
   sessionStorage.removeItem(DISCORD_STATE_KEY);
 
   const code = params.get("code");
-  if (params.get("error") || !code) return "Discord connection was cancelled.";
-  if (!expected || expected !== params.get("state")) return "This link has expired. Please try again from your profile.";
+  if (params.get("error") || !code) return "Menghubungkan Discord dibatalkan.";
+  if (!expected || expected !== params.get("state")) return "Link ini sudah kedaluwarsa. Silakan coba lagi dari profil kamu.";
 
   try {
     await discordApi.link(token, code);
@@ -54,13 +54,13 @@ function FinishLink() {
     });
   }, [router, searchParams, token]);
 
-  if (!error) return <p className="text-gray-400">Connecting Discord…</p>;
+  if (!error) return <p className="text-gray-400">Menghubungkan Discord…</p>;
 
   return (
     <Card>
       <FormAlert tone="error">{error}</FormAlert>
       <Link href="/host/profile" className="text-sm text-purple-300 hover:text-white">
-        Back to my profile
+        Kembali ke profil saya
       </Link>
     </Card>
   );

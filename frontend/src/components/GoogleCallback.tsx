@@ -20,10 +20,10 @@ async function finishGoogleLogin(params: URLSearchParams): Promise<Outcome> {
   const code = params.get("code");
 
   if (params.get("error") || !code) {
-    return { kind: "error", message: "Google sign-in was cancelled." };
+    return { kind: "error", message: "Masuk dengan Google dibatalkan." };
   }
   if (!consumeOAuthState(params.get("state"))) {
-    return { kind: "error", message: "This sign-in link has expired. Please try again." };
+    return { kind: "error", message: "Link masuk ini sudah kedaluwarsa. Silakan coba lagi." };
   }
 
   try {
@@ -44,7 +44,7 @@ async function finishGoogleLogin(params: URLSearchParams): Promise<Outcome> {
     }
     return {
       kind: "error",
-      message: error instanceof ApiError ? error.message : "Could not reach the server.",
+      message: error instanceof ApiError ? error.message : "Tidak bisa terhubung ke server.",
     };
   }
 }
@@ -72,7 +72,7 @@ export default function GoogleCallback() {
   }, [router, searchParams]);
 
   if (!outcome || outcome.kind === "signed-in") {
-    return <p className="text-center text-gray-300">Signing you in…</p>;
+    return <p className="text-center text-gray-300">Sedang masuk…</p>;
   }
 
   if (outcome.kind === "two-factor") {
@@ -83,7 +83,7 @@ export default function GoogleCallback() {
     <div className="space-y-4 text-center">
       <p className={outcome.kind === "pending" ? "text-yellow-200" : "text-red-300"}>{outcome.message}</p>
       <Link href="/login" className="inline-block text-sm text-purple-300 hover:text-white">
-        Back to login
+        Kembali ke halaman masuk
       </Link>
     </div>
   );

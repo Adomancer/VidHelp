@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { adminApi, errorMessage, type AuthUser, type EraseReason, type Paginated, type RoleName, type UserStatus } from "@/lib/api";
+import { roleLabel, statusLabel } from "@/lib/labels";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
 import FormAlert from "@/components/FormAlert";
@@ -11,11 +12,11 @@ import SubmitButton from "@/components/SubmitButton";
 import TextField from "@/components/TextField";
 
 const tabs: { label: string; status?: UserStatus }[] = [
-  { label: "Pending approval", status: "pending" },
-  { label: "Active", status: "active" },
-  { label: "Inactive", status: "inactive" },
-  { label: "Archived", status: "archived" },
-  { label: "All" },
+  { label: "Menunggu persetujuan", status: "pending" },
+  { label: "Aktif", status: "active" },
+  { label: "Nonaktif", status: "inactive" },
+  { label: "Diarsipkan", status: "archived" },
+  { label: "Semua" },
 ];
 
 const roles: RoleName[] = ["host", "operator", "finance", "admin"];
@@ -82,9 +83,9 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-white">User Management</h1>
+        <h1 className="text-2xl font-bold text-white">Manajemen Pengguna</h1>
         <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-purple-600 text-sm text-white hover:bg-purple-500">
-          Create account
+          Buat akun
         </button>
       </div>
 
@@ -138,7 +139,7 @@ export default function AdminUsersPage() {
           <input
             name="search"
             type="search"
-            placeholder="Search name or email…"
+            placeholder="Cari nama atau email…"
             className="w-full lg:w-72 px-4 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-purple-500"
           />
         </form>
@@ -151,11 +152,11 @@ export default function AdminUsersPage() {
         <table className="w-full text-sm">
           <thead className="text-left text-gray-400 border-b border-slate-800">
             <tr>
-              <th className="px-4 py-3 font-medium">User</th>
-              <th className="px-4 py-3 font-medium">Signed up</th>
+              <th className="px-4 py-3 font-medium">Pengguna</th>
+              <th className="px-4 py-3 font-medium">Mendaftar</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Role</th>
-              <th className="px-4 py-3 font-medium text-right">Actions</th>
+              <th className="px-4 py-3 font-medium">Peran</th>
+              <th className="px-4 py-3 font-medium text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
@@ -176,14 +177,14 @@ export default function AdminUsersPage() {
                     {!erased && <p className="text-gray-400">{user.email}</p>}
                   </td>
                   <td className="px-4 py-3 text-gray-400 whitespace-nowrap">
-                    {new Date(user.created_at).toLocaleDateString()}
+                    {new Date(user.created_at).toLocaleDateString("id-ID")}
                     <span className="block text-xs">
-                      {user.signup_source === "admin_created" ? "by admin" : user.has_password ? "email" : "Google"}
+                      {user.signup_source === "admin_created" ? "oleh admin" : user.has_password ? "email" : "Google"}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-md text-xs capitalize ${statusStyles[user.status]}`}>
-                      {erased ? "deleted" : user.status}
+                    <span className={`px-2 py-1 rounded-md text-xs ${statusStyles[user.status]}`}>
+                      {erased ? "Dihapus" : statusLabel(user.status)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -195,7 +196,7 @@ export default function AdminUsersPage() {
                     >
                       {roles.map((role) => (
                         <option key={role} value={role}>
-                          {role}
+                          {roleLabel(role)}
                         </option>
                       ))}
                     </select>
@@ -207,7 +208,7 @@ export default function AdminUsersPage() {
                         disabled={busy}
                         onClick={() =>
                           window.confirm(
-                            `Reset 2FA for ${user.name}? They will be signed out and must set up 2FA again. Only do this if they lost their phone and recovery codes.`
+                            `Reset 2FA untuk ${user.name}? Dia akan dikeluarkan dan harus mengatur 2FA lagi. Lakukan hanya kalau HP dan kode pemulihannya hilang.`
                           ) && run(user.id, () => adminApi.resetTwoFactor(token, user.id))
                         }
                       >
@@ -216,18 +217,18 @@ export default function AdminUsersPage() {
                     )}
                     {!erased && user.status !== "active" && (
                       <ActionButton tone="green" disabled={busy} onClick={() => run(user.id, () => adminApi.activateUser(token, user.id))}>
-                        {user.status === "pending" ? "Approve" : user.status === "archived" ? "Restore" : "Activate"}
+                        {user.status === "pending" ? "Setujui" : user.status === "archived" ? "Pulihkan" : "Aktifkan"}
                       </ActionButton>
                     )}
                     {user.status === "active" && !isMe && (
                       <ActionButton
                         disabled={busy}
                         onClick={() =>
-                          window.confirm(`Deactivate ${user.name} for now? They can't sign in, but their schedule stays.`) &&
+                          window.confirm(`Nonaktifkan ${user.name} sementara? Dia tidak bisa masuk, tapi jadwalnya tetap ada.`) &&
                           run(user.id, () => adminApi.deactivateUser(token, user.id))
                         }
                       >
-                        Deactivate
+                        Nonaktifkan
                       </ActionButton>
                     )}
                     {(user.status === "active" || user.status === "inactive") && !isMe && (
@@ -236,16 +237,16 @@ export default function AdminUsersPage() {
                         disabled={busy}
                         onClick={() =>
                           window.confirm(
-                            `Archive ${user.name}? Use this when someone leaves: they can't sign in, their slots end today, and their backups are released.`
+                            `Arsipkan ${user.name}? Pakai ini kalau orangnya sudah keluar: tidak bisa masuk, slotnya berakhir hari ini, dan backup-nya dilepas.`
                           ) && run(user.id, () => adminApi.archiveUser(token, user.id))
                         }
                       >
-                        Archive
+                        Arsipkan
                       </ActionButton>
                     )}
                     {user.status === "archived" && !erased && (
                       <ActionButton tone="red" disabled={busy} onClick={() => setErasing(user)}>
-                        Delete permanently
+                        Hapus permanen
                       </ActionButton>
                     )}
                   </td>
@@ -257,7 +258,7 @@ export default function AdminUsersPage() {
 
         {users && users.data.length === 0 && (
           <p className="px-4 py-8 text-center text-gray-400">
-            {status === "pending" ? "No one is waiting for approval." : "No users found."}
+            {status === "pending" ? "Tidak ada yang menunggu persetujuan." : "Pengguna tidak ditemukan."}
           </p>
         )}
       </div>
@@ -265,14 +266,14 @@ export default function AdminUsersPage() {
       {users && users.last_page > 1 && (
         <div className="flex items-center justify-between text-sm text-gray-400">
           <span>
-            Page {users.current_page} of {users.last_page} · {users.total} users
+            Halaman {users.current_page} dari {users.last_page} · {users.total} pengguna
           </span>
           <div className="flex gap-2">
             <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
-              Previous
+              Sebelumnya
             </button>
             <button type="button" disabled={page >= users.last_page} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
-              Next
+              Berikutnya
             </button>
           </div>
         </div>
@@ -322,8 +323,8 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
 
   return (
     <Modal
-      title="Create account"
-      description="The account is active straight away. Give the person their email and password to sign in."
+      title="Buat akun"
+      description="Akun langsung aktif. Berikan email dan kata sandinya ke orang tersebut untuk masuk."
       onClose={onCancel}
     >
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
@@ -332,16 +333,16 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
             <FormAlert tone="error">{error}</FormAlert>
           </div>
         )}
-        <TextField label="Name" name="name" autoComplete="off" error={errors.name} />
+        <TextField label="Nama" name="name" autoComplete="off" error={errors.name} />
         <TextField label="Email" name="email" type="email" autoComplete="off" error={errors.email} />
-        <TextField label="Password" name="password" type="text" autoComplete="new-password" placeholder="At least 8 characters" error={errors.password} />
-        <SelectField label="Role" name="role" defaultValue="host" error={errors.role} options={roles.map((role) => ({ value: role, label: role }))} />
+        <TextField label="Kata sandi" name="password" type="text" autoComplete="new-password" placeholder="Minimal 8 karakter" error={errors.password} />
+        <SelectField label="Peran" name="role" defaultValue="host" error={errors.role} options={roles.map((role) => ({ value: role, label: roleLabel(role) }))} />
         <div className="sm:col-span-2 flex gap-3">
           <div className="w-44">
-            <SubmitButton loading={loading}>Create account</SubmitButton>
+            <SubmitButton loading={loading}>Buat akun</SubmitButton>
           </div>
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
-            Cancel
+            Batal
           </button>
         </div>
       </form>
@@ -350,8 +351,8 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
 }
 
 const eraseReasons: { value: EraseReason; label: string }[] = [
-  { value: "banned", label: "Banned from a brand" },
-  { value: "host_request", label: "The host asked to be deleted" },
+  { value: "banned", label: "Diblokir dari brand" },
+  { value: "host_request", label: "Host minta datanya dihapus" },
 ];
 
 /** Delete an archived account permanently (anonymized), with the reason it is allowed. */
@@ -368,8 +369,8 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
 
   return (
     <Modal
-      title={`Delete ${user.name} permanently`}
-      description="Wipes sign-in, contact details, KTP, bank details, photos and sick letters. Hours, points and salary slips stay, without the name. This can't be undone."
+      title={`Hapus ${user.name} permanen`}
+      description="Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini tidak bisa dibatalkan."
       onClose={onCancel}
     >
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
@@ -378,14 +379,14 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
             <FormAlert tone="error">{error}</FormAlert>
           </div>
         )}
-        <SelectField label="Reason" name="reason" error={errors.reason} options={eraseReasons} />
-        <TextField label="Note (optional)" name="note" maxLength={500} placeholder="e.g. asked by WhatsApp on 5 Oct" error={errors.note} />
+        <SelectField label="Alasan" name="reason" error={errors.reason} options={eraseReasons} />
+        <TextField label="Catatan (opsional)" name="note" maxLength={500} placeholder="mis. diminta lewat WhatsApp tgl 5 Okt" error={errors.note} />
         <div className="sm:col-span-2 flex gap-3">
           <div className="w-52">
-            <SubmitButton loading={loading}>Delete permanently</SubmitButton>
+            <SubmitButton loading={loading}>Hapus permanen</SubmitButton>
           </div>
           <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
-            Cancel
+            Batal
           </button>
         </div>
       </form>

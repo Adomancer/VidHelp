@@ -146,7 +146,7 @@ class AttendanceService
                 ->whereKey($eventClaimId)
                 ->where('host_id', $host->id)
                 ->with('event')
-                ->first() ?? throw ValidationException::withMessages(['session' => ['This event block is not yours.']]);
+                ->first() ?? throw ValidationException::withMessages(['session' => ['Blok event ini bukan milikmu.']]);
 
             [$slotId, $brandId, $date, $start, $end] = [
                 null, $claim->event->brand_id, $claim->start_at->toDateString(), $claim->start_at, $claim->end_at,
@@ -155,7 +155,7 @@ class AttendanceService
             $backup = BackupRequest::whereKey($backupRequestId)
                 ->where('filled_by_host_id', $host->id)
                 ->where('status', 'filled')
-                ->first() ?? throw ValidationException::withMessages(['session' => ['You are not covering this backup.']]);
+                ->first() ?? throw ValidationException::withMessages(['session' => ['Kamu tidak menggantikan di backup ini.']]);
 
             [$slotId, $brandId, $date, $start, $end] = [
                 $backup->slot_id, $backup->brand_id, $backup->backup_date->toDateString(), $backup->start_at, $backup->end_at,
@@ -164,19 +164,19 @@ class AttendanceService
             $slot = ScheduleSlot::whereKey($slotId)
                 ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
                 ->with('assignment')
-                ->first() ?? throw ValidationException::withMessages(['session' => ['This is not one of your sessions.']]);
+                ->first() ?? throw ValidationException::withMessages(['session' => ['Ini bukan salah satu sesimu.']]);
 
             $day = CarbonImmutable::parse($date);
             if (! $slot->runsOn($day)) {
-                throw ValidationException::withMessages(['session' => ['That session is not scheduled on this date.']]);
+                throw ValidationException::withMessages(['session' => ['Sesi itu tidak terjadwal di tanggal ini.']]);
             }
             if ($event = $this->events->replacing($slot->assignment->brand_id, $day)) {
-                throw ValidationException::withMessages(['session' => ["That day {$event->name} replaces the regular schedule; check in for your event blocks instead."]]);
+                throw ValidationException::withMessages(['session' => ["Di hari itu {$event->name} menggantikan jadwal reguler; check-in di blok event kamu saja."]]);
             }
 
             $cover = BackupRequest::where('slot_id', $slot->id)->whereDate('backup_date', $day)->where('status', 'filled')->with('filler.user')->first();
             if ($cover) {
-                throw ValidationException::withMessages(['session' => ["You're off for this session; {$cover->filler->user->name} covers it."]]);
+                throw ValidationException::withMessages(['session' => ["Kamu libur di sesi ini; {$cover->filler->user->name} yang menggantikan."]]);
             }
 
             [$start, $end] = $slot->occurrenceOn($day);
@@ -185,17 +185,17 @@ class AttendanceService
 
         $opensAt = $start->copy()->subMinutes(config('vidhelp.attendance.check_in_opens_minutes'));
         if (now()->lt($opensAt)) {
-            throw ValidationException::withMessages(['session' => ['Check-in opens at '.$opensAt->format('H:i').'.']]);
+            throw ValidationException::withMessages(['session' => ['Check-in dibuka jam '.$opensAt->format('H:i').'.']]);
         }
         if (now()->gte($end)) {
-            throw ValidationException::withMessages(['session' => ['This session has already ended.']]);
+            throw ValidationException::withMessages(['session' => ['Sesi ini sudah selesai.']]);
         }
 
         $existing = $eventClaimId
             ? Attendance::where('event_claim_id', $eventClaimId)->exists()
             : Attendance::where('host_id', $host->id)->where('slot_id', $slotId)->whereDate('session_date', $date)->exists();
         if ($existing) {
-            throw ValidationException::withMessages(['session' => ['You already checked in for this session.']]);
+            throw ValidationException::withMessages(['session' => ['Kamu sudah check-in untuk sesi ini.']]);
         }
 
         return Attendance::create([
@@ -215,7 +215,7 @@ class AttendanceService
     public function checkOut(Attendance $attendance): Attendance
     {
         if ($attendance->check_out_at) {
-            throw ValidationException::withMessages(['session' => ['You already checked out.']]);
+            throw ValidationException::withMessages(['session' => ['Kamu sudah check-out.']]);
         }
 
         $attendance->update(['check_out_at' => now()]);
@@ -231,7 +231,7 @@ class AttendanceService
         $report = $attendance->report;
 
         if ($report && in_array($report->status, ['approved', 'rejected'])) {
-            throw ValidationException::withMessages(['report' => ["This report was already {$report->status}."]]);
+            throw ValidationException::withMessages(['report' => ["Laporan ini sudah ".($report->status === 'approved' ? 'disetujui' : 'ditolak').'.']]);
         }
 
         return DB::transaction(function () use ($attendance, $report, $data) {
@@ -301,7 +301,7 @@ class AttendanceService
     public function approve(LiveReport $report, User $by, float $hours, ?string $note): LiveReport
     {
         if ($report->status === 'approved') {
-            throw ValidationException::withMessages(['report' => ['This report is already approved.']]);
+            throw ValidationException::withMessages(['report' => ['Laporan ini sudah disetujui.']]);
         }
 
         return DB::transaction(function () use ($report, $by, $hours, $note) {
@@ -315,12 +315,12 @@ class AttendanceService
     public function reject(LiveReport $report, User $by, string $note): LiveReport
     {
         if ($report->status === 'approved') {
-            throw ValidationException::withMessages(['report' => ['An approved report cannot be rejected.']]);
+            throw ValidationException::withMessages(['report' => ['Laporan yang sudah disetujui tidak bisa ditolak.']]);
         }
 
         $report->update(['status' => 'rejected', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
 
-        $this->notifier->toUsers($report->host->user, 'report_rejected', 'Your live report was rejected', "{$report->brand->name}, {$report->attendance->scheduled_start_at->format('D j M H:i')}: {$note}", '/host/live', dm: true);
+        $this->notifier->toUsers($report->host->user, 'report_rejected', 'Laporan live kamu ditolak', "{$report->brand->name}, {$report->attendance->scheduled_start_at->translatedFormat('D j M H:i')}: {$note}", '/host/live', dm: true);
 
         return $report;
     }
@@ -353,17 +353,17 @@ class AttendanceService
     private function announceFlagged(LiveReport $report, Attendance $attendance): void
     {
         $labels = [
-            'late_report' => 'sent late',
-            'no_check_out' => 'no check-out',
-            'more_than_scheduled' => 'more time than scheduled',
-            'less_than_scheduled' => 'less time than scheduled',
-            'more_than_attended' => 'more time than checked in',
+            'late_report' => 'dikirim terlambat',
+            'no_check_out' => 'tidak check-out',
+            'more_than_scheduled' => 'waktu lebih lama dari jadwal',
+            'less_than_scheduled' => 'waktu lebih singkat dari jadwal',
+            'more_than_attended' => 'waktu lebih lama dari check-in',
         ];
         $reasons = array_map(fn (string $reason) => $labels[$reason] ?? $reason, $report->flag_reasons ?? []);
 
         $attendance->loadMissing(['host.user', 'brand']);
-        $title = "Report to review: {$attendance->host->user->name}";
-        $body = "{$attendance->brand->name}, {$attendance->scheduled_start_at->format('D j M H:i')}: ".implode(', ', $reasons).'.';
+        $title = "Laporan perlu dicek: {$attendance->host->user->name}";
+        $body = "{$attendance->brand->name}, {$attendance->scheduled_start_at->translatedFormat('D j M H:i')}: ".implode(', ', $reasons).'.';
 
         $this->notifier->toUsers($this->notifier->staff(), 'report_flagged', $title, $body, '/operator/reports');
         $this->notifier->toChannel('admin', 'report_flagged', $title, $body, '/operator/reports');

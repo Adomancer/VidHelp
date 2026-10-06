@@ -35,7 +35,7 @@ async function request(endpoint: string, options: FetchOptions = {}): Promise<Re
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, error.message || "API request failed", error);
+    throw new ApiError(response.status, error.message || "Permintaan ke server gagal", error);
   }
 
   return response;
@@ -85,7 +85,7 @@ export function fieldErrors(error: unknown): Record<string, string> {
 
 /** A message to show the user for any failed request. */
 export function errorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : "Could not reach the server. Is the backend running?";
+  return error instanceof ApiError ? error.message : "Tidak bisa terhubung ke server. Apakah backend sudah berjalan?";
 }
 
 /*
@@ -1194,8 +1194,10 @@ export const eventApi = {
   release: (token: string, claimId: string) => post(`/operator/event-claims/${claimId}/release`, token),
 
   // Hosts
-  mine: (token: string) => api<{ events: HostEvent[] }>("/host/events", { token }),
-  claim: (token: string, id: string, startAt: string) => post(`/host/events/${id}/claim`, token, { start_at: startAt }),
+  /** Events of my brands; `my_brands` = the brands whose events I'd see. */
+  mine: (token: string) => api<{ events: HostEvent[]; my_brands: string[] }>("/host/events", { token }),
+  claim: (token: string, id: string, startAt: string) =>
+    post<{ claim: { id: string } } & Message>(`/host/events/${id}/claim`, token, { start_at: startAt }),
   cancelClaim: (token: string, claimId: string) => post(`/host/event-claims/${claimId}/cancel`, token),
 };
 

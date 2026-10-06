@@ -81,7 +81,7 @@ export function RequireAuth({
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Loading…</p>
+        <p className="text-gray-400 text-sm">Memuat…</p>
       </div>
     );
   }

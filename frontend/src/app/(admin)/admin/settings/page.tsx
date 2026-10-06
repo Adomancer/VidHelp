@@ -25,7 +25,7 @@ function fromDraft(value: string | boolean): SettingValue | string {
 }
 
 function showValue(setting: Setting, value: SettingValue): string {
-  if (typeof value === "boolean") return value ? "On" : "Off";
+  if (typeof value === "boolean") return value ? "Aktif" : "Nonaktif";
   return setting.unit ? `${value} ${setting.unit}` : String(value);
 }
 
@@ -37,9 +37,9 @@ export default function AdminSettingsPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <h1 className="text-2xl font-bold text-white">Pengaturan</h1>
         <p className="text-sm text-gray-400 mt-1">
-          Business rules the whole app follows. Changes apply right away and are recorded in the Audit Log.
+          Aturan bisnis yang diikuti seluruh aplikasi. Perubahan langsung berlaku dan tercatat di Log Audit.
         </p>
       </div>
 
@@ -117,13 +117,13 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
           {error && <FormAlert tone="error">{error}</FormAlert>}
           {turningOn2fa && (
             <FormAlert tone="warning">
-              Admins and finance users without two-factor sign-in{user.two_factor_enabled ? "" : ", including you,"} will have to set it up before they can do
-              anything else.
+              Admin dan finance yang belum memakai verifikasi dua langkah{user.two_factor_enabled ? "" : ", termasuk kamu,"} harus mengaturnya dulu sebelum bisa
+              melakukan hal lain.
             </FormAlert>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-gray-200">
-              {changed.length} unsaved change{changed.length === 1 ? "" : "s"}
+              {changed.length} perubahan belum disimpan
             </p>
             <div className="flex gap-2">
               <button
@@ -136,7 +136,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
                 }}
                 className="px-4 py-2 rounded-lg border border-slate-700 text-sm text-gray-300 hover:bg-slate-800 disabled:opacity-50"
               >
-                Discard
+                Buang
               </button>
               <button
                 type="button"
@@ -144,7 +144,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
                 onClick={save}
                 className="px-4 py-2 rounded-lg bg-purple-600 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-60"
               >
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? "Menyimpan…" : "Simpan perubahan"}
               </button>
             </div>
           </div>
@@ -180,11 +180,11 @@ function SettingRow({
         <p className="text-xs mt-1">
           {setting.changed_at ? (
             <span className="text-purple-300">
-              Changed{setting.changed_by && <> by {setting.changed_by}</>} on {formatDate(setting.changed_at)} · default{" "}
+              Diubah{setting.changed_by && <> oleh {setting.changed_by}</>} pada {formatDate(setting.changed_at)} · bawaan{" "}
               {showValue(setting, setting.default)}
             </span>
           ) : (
-            <span className="text-gray-500">Default value</span>
+            <span className="text-gray-500">Nilai bawaan</span>
           )}
         </p>
         {error && <p className="text-sm text-red-300 mt-1">{error}</p>}
@@ -230,7 +230,7 @@ function SettingRow({
           disabled={isDefault}
           className="text-xs text-purple-300 hover:text-white disabled:invisible"
         >
-          Use default
+          Pakai bawaan
         </button>
       </div>
     </div>
