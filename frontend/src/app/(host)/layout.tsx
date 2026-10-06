@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RequireAuth } from "@/components/AuthProvider";
+import HostBottomNav from "@/components/HostBottomNav";
 import HostNav from "@/components/HostNav";
 import NotificationBell from "@/components/NotificationBell";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -36,10 +37,8 @@ export default function HostLayout({
             </div>
           </div>
         </header>
-
-        <main className="flex-1 w-full mx-auto max-w-6xl p-4 pb-24 md:p-8 lg:pb-8">{children}</main>
-
-        <HostNav variant="bottom" />
+        <main className="flex-1 w-full mx-auto max-w-6xl p-4 pb-28 md:p-8 lg:pb-8">{children}</main>
+        <HostBottomNav />
       </div>
     </RequireAuth>
   );
