@@ -56,7 +56,7 @@ export default function StopSlotDialog({ slot, week, onClose, onSaved }: StopSlo
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2">
             Batal
           </button>
           <span className="flex-1" />
@@ -74,27 +74,27 @@ export default function StopSlotDialog({ slot, week, onClose, onSaved }: StopSlo
       <div className="space-y-4">
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
-        <p className="text-gray-100">
+        <p className="text-heading">
           Hentikan jadwal <strong>{hostName}</strong> {weekly} mulai <strong>{formatLongDate(from)}</strong>?
         </p>
 
-        <label className="flex flex-wrap items-center gap-2 text-sm text-gray-300">
+        <label className="flex flex-wrap items-center gap-2 text-sm text-body">
           Berhenti mulai
           <input
             type="date"
             value={from}
             min={today}
             onChange={(event) => event.target.value && setFrom(event.target.value)}
-            className="px-2 py-1 rounded-md bg-slate-950/60 border border-slate-700 text-white [color-scheme:dark]"
+            className="px-2 py-1 rounded-md bg-surface-2 border border-stroke-strong text-heading [color-scheme:dark]"
           />
         </label>
 
         {alreadyEnded ? (
           <FormAlert tone="warning">Jadwal ini sudah berakhir pada {formatLongDate(slot.effective_to!)}.</FormAlert>
         ) : removesAll ? (
-          <p className="text-sm text-gray-400">Jadwal ini belum pernah berjalan sebelum tanggal itu, jadi akan dihapus seluruhnya.</p>
+          <p className="text-sm text-muted">Jadwal ini belum pernah berjalan sebelum tanggal itu, jadi akan dihapus seluruhnya.</p>
         ) : (
-          <p className="text-sm text-gray-400">Jadwal sebelum tanggal ini tetap tersimpan untuk riwayat dan payroll.</p>
+          <p className="text-sm text-muted">Jadwal sebelum tanggal ini tetap tersimpan untuk riwayat dan payroll.</p>
         )}
       </div>
     </Dialog>

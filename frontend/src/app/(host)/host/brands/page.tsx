@@ -9,10 +9,10 @@ import FormAlert from "@/components/FormAlert";
 /** Shows text with its http(s) links clickable, keeping line breaks. */
 function Linkified({ text }: { text: string }) {
   return (
-    <p className="text-sm text-gray-200 whitespace-pre-wrap break-words">
+    <p className="text-sm text-body whitespace-pre-wrap break-words">
       {text.split(/(https?:\/\/\S+)/g).map((part, index) =>
         index % 2 === 1 ? (
-          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-purple-300 underline hover:text-purple-200">
+          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="text-accent underline hover:text-accent">
             {part}
           </a>
         ) : (
@@ -30,12 +30,12 @@ export default function HostBrandsPage() {
 
   return (
     <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-white">Brand Saya</h1>
+      <h1 className="text-xl font-bold text-heading">Brand Saya</h1>
       {brands.error && <FormAlert tone="error">{brands.error}</FormAlert>}
 
       {brands.data?.brands.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">Kamu belum ditugaskan ke brand mana pun.</p>
+          <p className="text-sm text-muted">Kamu belum ditugaskan ke brand mana pun.</p>
         </Card>
       )}
 
@@ -44,7 +44,7 @@ export default function HostBrandsPage() {
           {brand.product_knowledge ? (
             <Linkified text={brand.product_knowledge} />
           ) : (
-            <p className="text-sm text-gray-400">Belum ada product knowledge. Tanyakan ke operator kamu.</p>
+            <p className="text-sm text-muted">Belum ada product knowledge. Tanyakan ke operator kamu.</p>
           )}
         </Card>
       ))}

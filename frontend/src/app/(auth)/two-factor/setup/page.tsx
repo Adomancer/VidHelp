@@ -33,12 +33,12 @@ function RequiredSetup() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-gray-300 text-center">
+      <p className="text-sm text-body text-center">
         Akun admin dan finance mengelola data pribadi dan pembayaran, jadi wajib verifikasi dua langkah: setelah kata sandi atau
         Google, kamu juga memasukkan kode dari aplikasi di HP.
       </p>
       <TwoFactorSetup onDone={(updated) => router.replace(homePathFor(updated))} />
-      <button type="button" onClick={logout} className="w-full text-sm text-gray-400 hover:text-white">
+      <button type="button" onClick={logout} className="w-full text-sm text-muted hover:text-heading">
         Keluar
       </button>
     </div>

@@ -35,7 +35,7 @@ export default function ResetPasswordForm() {
     return (
       <div className="space-y-4 text-center">
         <FormAlert tone="success">{done}</FormAlert>
-        <Link href="/login" className="inline-block text-sm text-purple-300 hover:text-white">
+        <Link href="/login" className="inline-block text-sm text-accent hover:text-heading">
           Ke halaman masuk
         </Link>
       </div>
@@ -48,8 +48,8 @@ export default function ResetPasswordForm() {
       {/* token/email problems (expired link, wrong account) come back on the email field */}
       {errors.email && <FormAlert tone="error">{errors.email}</FormAlert>}
 
-      <p className="text-sm text-gray-300">
-        Membuat kata sandi baru untuk <span className="text-white">{email}</span>
+      <p className="text-sm text-body">
+        Membuat kata sandi baru untuk <span className="text-heading">{email}</span>
       </p>
       <TextField label="Kata sandi baru" name="password" type="password" autoComplete="new-password" minLength={8} required error={errors.password} />
       <TextField label="Ulangi kata sandi baru" name="password_confirmation" type="password" autoComplete="new-password" required />

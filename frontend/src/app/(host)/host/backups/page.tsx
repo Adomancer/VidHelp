@@ -46,9 +46,9 @@ export default function HostBackupsPage() {
 
   return (
     <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-white">Backup</h1>
+      <h1 className="text-xl font-bold text-heading">Backup</h1>
 
-      <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800">
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-surface border border-stroke">
         {(
           [
             ["needs", "Butuh backup"],
@@ -59,7 +59,7 @@ export default function HostBackupsPage() {
             key={value}
             type="button"
             onClick={() => setTab(value)}
-            className={`py-2 rounded-lg text-sm ${tab === value ? "bg-purple-600 text-white" : "text-gray-300 hover:bg-slate-800"}`}
+            className={`py-2 rounded-lg text-sm ${tab === value ? "bg-primary text-white" : "text-body hover:bg-surface-2"}`}
           >
             {label}
           </button>
@@ -108,9 +108,9 @@ function NeedsTab({
           <ul className="space-y-2">
             {upcomingCovers.map((cover) => (
               <li key={cover.id} className="rounded-lg bg-green-500/10 border border-green-400/30 px-3 py-2 space-y-1">
-                <p className="text-white">{cover.brand.name}</p>
-                <p className="text-sm text-green-200">{formatWindow(cover.start_at, cover.end_at)}</p>
-                <p className="text-xs text-gray-400">untuk {cover.requester_name}</p>
+                <p className="text-heading">{cover.brand.name}</p>
+                <p className="text-sm text-success">{formatWindow(cover.start_at, cover.end_at)}</p>
+                <p className="text-xs text-muted">untuk {cover.requester_name}</p>
                 {new Date(cover.start_at) > new Date() && (
                   <button
                     type="button"
@@ -118,7 +118,7 @@ function NeedsTab({
                       confirm("Batal jadi backup? Permintaan akan dibuka lagi untuk host lain dan kamu kena potongan poin.") &&
                       act(() => hostBackupApi.drop(token, cover.id))
                     }
-                    className="text-xs text-red-300 hover:text-red-200"
+                    className="text-xs text-danger hover:text-danger"
                   >
                     Saya tidak bisa
                   </button>
@@ -130,14 +130,14 @@ function NeedsTab({
       )}
 
       {quota && (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted">
           Membantu brand lain bulan ini: {quota.quota_used}/{quota.quota_max}. Menggantikan di brand sendiri tidak dihitung.
         </p>
       )}
 
       {needs?.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">Saat ini tidak ada yang butuh backup.</p>
+          <p className="text-sm text-muted">Saat ini tidak ada yang butuh backup.</p>
         </Card>
       )}
 
@@ -146,12 +146,12 @@ function NeedsTab({
 
         return (
           <Card key={need.id}>
-            {need.asked_me && <p className="text-xs font-medium text-purple-200">{need.requester_name} meminta kamu menggantikan sesi ini</p>}
+            {need.asked_me && <p className="text-xs font-medium text-accent">{need.requester_name} meminta kamu menggantikan sesi ini</p>}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-white font-medium">{need.brand.name}</p>
-                <p className="text-sm text-purple-200">{formatWindow(need.start_at, need.end_at)}</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-heading font-medium">{need.brand.name}</p>
+                <p className="text-sm text-accent">{formatWindow(need.start_at, need.end_at)}</p>
+                <p className="text-xs text-muted mt-1">
                   untuk {need.requester_name} · {need.same_brand ? "brand kamu" : "brand lain (memakai kuota)"}
                 </p>
               </div>
@@ -159,7 +159,7 @@ function NeedsTab({
                 <button
                   type="button"
                   onClick={() => act(() => hostBackupApi.withdraw(token, need.id))}
-                  className="shrink-0 px-3 py-1.5 rounded-lg border border-slate-700 text-sm text-gray-300 hover:bg-slate-800"
+                  className="shrink-0 px-3 py-1.5 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2"
                 >
                   Tarik diri
                 </button>
@@ -168,15 +168,15 @@ function NeedsTab({
                   type="button"
                   disabled={Boolean(need.ineligible_reason)}
                   onClick={() => act(() => hostBackupApi.apply(token, need.id))}
-                  className="shrink-0 px-3 py-1.5 rounded-lg bg-purple-600 text-sm text-white hover:bg-purple-500 disabled:opacity-40"
+                  className="shrink-0 px-3 py-1.5 rounded-lg bg-primary text-sm text-white hover:bg-primary-hover disabled:opacity-40"
                 >
                   Daftar
                 </button>
               )}
             </div>
             {!need.asked_me && <RequestTypeBadge names={need.nominee_names} />}
-            {applied && <p className="text-xs text-green-300">Kamu sudah mendaftar. Menunggu persetujuan admin.</p>}
-            {!applied && need.ineligible_reason && <p className="text-xs text-gray-400">{need.ineligible_reason}</p>}
+            {applied && <p className="text-xs text-success">Kamu sudah mendaftar. Menunggu persetujuan admin.</p>}
+            {!applied && need.ineligible_reason && <p className="text-xs text-muted">{need.ineligible_reason}</p>}
           </Card>
         );
       })}
@@ -193,7 +193,7 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
       <button
         type="button"
         onClick={() => setFormOpen(true)}
-        className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500"
+        className="w-full px-4 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary-hover"
       >
         Saya butuh backup
       </button>
@@ -207,15 +207,15 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
         />
       )}
 
-      {requests?.length === 0 && <p className="text-sm text-gray-400 text-center">Kamu belum pernah mengajukan backup.</p>}
+      {requests?.length === 0 && <p className="text-sm text-muted text-center">Kamu belum pernah mengajukan backup.</p>}
 
       {requests?.map((backup) => (
         <Card key={backup.id}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-white font-medium">{backup.brand.name}</p>
-              <p className="text-sm text-purple-200">{formatWindow(backup.start_at, backup.end_at)}</p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-heading font-medium">{backup.brand.name}</p>
+              <p className="text-sm text-accent">{formatWindow(backup.start_at, backup.end_at)}</p>
+              <p className="text-xs text-muted mt-1">
                 {reasonLabels[backup.reason_type]}
                 {backup.reason && ` · ${backup.reason}`}
               </p>
@@ -226,18 +226,18 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
           <RequestTypeBadge names={backup.nominees?.map((nominee) => nominee.host.user.name) ?? []} />
 
           {backup.status === "filled" && backup.filler && (
-            <p className="text-sm text-green-300">Digantikan {backup.filler.user.name}</p>
+            <p className="text-sm text-success">Digantikan {backup.filler.user.name}</p>
           )}
-          {backup.status === "open" && <p className="text-xs text-gray-400">Menunggu host mendaftar.</p>}
-          {backup.status === "pending" && <p className="text-xs text-gray-400">Sudah ada yang mendaftar. Admin akan memilih penggantinya.</p>}
+          {backup.status === "open" && <p className="text-xs text-muted">Menunggu host mendaftar.</p>}
+          {backup.status === "pending" && <p className="text-xs text-muted">Sudah ada yang mendaftar. Admin akan memilih penggantinya.</p>}
 
           {backup.letter_status !== "not_needed" && (
             <div className="flex flex-wrap items-center gap-3">
               <LetterBadge status={backup.letter_status} />
               {backup.letter_status !== "uploaded" && backup.letter_due_at && (
-                <span className="text-xs text-gray-400">batas {formatDateTime(backup.letter_due_at)}</span>
+                <span className="text-xs text-muted">batas {formatDateTime(backup.letter_due_at)}</span>
               )}
-              <label className="text-xs text-purple-300 hover:text-white cursor-pointer">
+              <label className="text-xs text-accent hover:text-heading cursor-pointer">
                 {backup.letter_status === "uploaded" ? "Ganti surat" : "Unggah surat"}
                 <input
                   type="file"
@@ -256,7 +256,7 @@ function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; a
             <button
               type="button"
               onClick={() => confirm("Batalkan permintaan backup ini?") && act(() => hostBackupApi.cancel(token, backup.id))}
-              className="text-xs text-red-300 hover:text-red-200"
+              className="text-xs text-danger hover:text-danger"
             >
               Batalkan permintaan
             </button>
@@ -306,14 +306,14 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
     return (
       <Modal title="Ajukan backup" onClose={onCancel}>
         {slots.error && <FormAlert tone="error">{slots.error}</FormAlert>}
-        <p className="text-sm text-gray-400">{slots.data ? "Tidak ada sesi yang masih bisa kamu ajukan backup." : "Memuat sesi kamu…"}</p>
+        <p className="text-sm text-muted">{slots.data ? "Tidak ada sesi yang masih bisa kamu ajukan backup." : "Memuat sesi kamu…"}</p>
         {slots.data && settings && (
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted">
             Sesi yang kurang dari {formatDuration(settings["backup.request_min_hours_before"])} lagi tidak ditampilkan. Kalau mendadak tidak bisa,
             hubungi admin.
           </p>
         )}
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-xl text-gray-300 hover:bg-slate-800">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-xl text-body hover:bg-surface-2">
           Tutup
         </button>
       </Modal>
@@ -326,7 +326,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
         <div className="space-y-1">
-          <label htmlFor="occurrence" className="block text-sm font-medium text-gray-200">
+          <label htmlFor="occurrence" className="block text-sm font-medium text-body">
             Sesi
           </label>
           <select
@@ -336,7 +336,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
               setPickedOccurrence(event.target.value);
               setHostIds([]); // who is free depends on the session
             }}
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white"
+            className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-stroke-strong text-heading"
           >
             {slots.data?.slots.map((slot) => (
               <option key={`${slot.slot_id}|${slot.date}`} value={`${slot.slot_id}|${slot.date}`}>
@@ -345,23 +345,23 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             ))}
           </select>
           {settings && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted">
               Ajukan paling lambat {formatDuration(settings["backup.request_min_hours_before"])} sebelum sesi. Kalau lebih mendadak, hubungi
               admin.
             </p>
           )}
-          {(errors.slot_id || errors.backup_date) && <p className="text-sm text-red-300">{errors.slot_id ?? errors.backup_date}</p>}
+          {(errors.slot_id || errors.backup_date) && <p className="text-sm text-danger">{errors.slot_id ?? errors.backup_date}</p>}
         </div>
 
         <fieldset className="space-y-1">
-          <legend className="block text-sm font-medium text-gray-200">Alasan</legend>
+          <legend className="block text-sm font-medium text-body">Alasan</legend>
           <div className="grid grid-cols-3 gap-2">
             {(Object.keys(reasonLabels) as BackupReason[]).map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setReasonType(value)}
-                className={`py-2 rounded-lg text-sm ${reasonType === value ? "bg-purple-600 text-white" : "bg-slate-800 text-gray-300"}`}
+                className={`py-2 rounded-lg text-sm ${reasonType === value ? "bg-primary text-white" : "bg-surface-2 text-body"}`}
               >
                 {reasonLabels[value]}
               </button>
@@ -370,7 +370,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         </fieldset>
 
         <div className="space-y-1">
-          <label htmlFor="reason" className="block text-sm font-medium text-gray-200">
+          <label htmlFor="reason" className="block text-sm font-medium text-body">
             Keterangan (opsional)
           </label>
           <textarea
@@ -378,12 +378,12 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             name="reason"
             rows={2}
             maxLength={1000}
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-stroke-strong text-heading outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="letter" className="block text-sm font-medium text-gray-200">
+          <label htmlFor="letter" className="block text-sm font-medium text-body">
             {reasonType === "sick" ? "Surat dokter" : "Lampiran"} (boleh menyusul)
           </label>
           <input
@@ -391,32 +391,32 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             name="letter"
             type="file"
             accept="image/*,application/pdf"
-            className="block w-full text-sm text-gray-300 file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-800 file:text-gray-200"
+            className="block w-full text-sm text-body file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-surface-2 file:text-body"
           />
           {reasonType === "sick" && settings && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted">
               Kalau belum ada, unggah paling lambat {formatDuration(settings["backup.sick_letter_grace_hours"])} setelah sesi
               dimulai, atau poinmu dipotong.
             </p>
           )}
-          {errors.letter && <p className="text-sm text-red-300">{errors.letter}</p>}
+          {errors.letter && <p className="text-sm text-danger">{errors.letter}</p>}
         </div>
 
         <fieldset className="space-y-2">
-          <legend className="block text-sm font-medium text-gray-200">Siapa yang bisa menggantikan</legend>
+          <legend className="block text-sm font-medium text-body">Siapa yang bisa menggantikan</legend>
           <div className="grid grid-cols-2 gap-2">
             {requestTypes.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 onClick={() => setRequestType(option.value)}
-                className={`py-2 rounded-lg text-sm ${requestType === option.value ? "bg-purple-600 text-white" : "bg-slate-800 text-gray-300"}`}
+                className={`py-2 rounded-lg text-sm ${requestType === option.value ? "bg-primary text-white" : "bg-surface-2 text-body"}`}
               >
                 {option.label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-400">{requestTypes.find((option) => option.value === requestType)?.hint}</p>
+          <p className="text-xs text-muted">{requestTypes.find((option) => option.value === requestType)?.hint}</p>
           {requestType === "direct" && occurrence && settings && (
             <NomineePicker
               slotId={slotId}
@@ -427,12 +427,12 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
               onChange={setHostIds}
             />
           )}
-          {errors.host_ids && <p className="text-sm text-red-300">{errors.host_ids}</p>}
+          {errors.host_ids && <p className="text-sm text-danger">{errors.host_ids}</p>}
         </fieldset>
 
         <div className="flex gap-3">
           <SubmitButton loading={loading}>Kirim permintaan</SubmitButton>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
             Batal
           </button>
         </div>
@@ -467,11 +467,11 @@ function NomineePicker({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-gray-300">
+      <p className="text-xs text-body">
         Dipilih {selected.length} · pilih {min} sampai {max} host
       </p>
       {candidates.error && <FormAlert tone="error">{candidates.error}</FormAlert>}
-      {candidates.loading && !candidates.data && <p className="text-xs text-gray-400">Memuat host…</p>}
+      {candidates.loading && !candidates.data && <p className="text-xs text-muted">Memuat host…</p>}
       <ul className="max-h-64 overflow-y-auto space-y-1.5">
         {candidates.data?.candidates.map((candidate) => {
           const checked = selected.includes(candidate.host_id);
@@ -480,13 +480,13 @@ function NomineePicker({
           return (
             <li key={candidate.host_id}>
               <label
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 ${checked ? "bg-purple-600/20 border border-purple-400/40" : "bg-slate-800/60 border border-transparent"} ${disabled ? "opacity-50" : "cursor-pointer"}`}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 ${checked ? "bg-primary/20 border border-primary/40" : "bg-surface-2 border border-transparent"} ${disabled ? "opacity-50" : "cursor-pointer"}`}
               >
-                <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(candidate.host_id)} className="accent-purple-500" />
+                <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(candidate.host_id)} className="accent-primary" />
                 <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="w-7 h-7" />
                 <span className="flex-1 min-w-0">
-                  <span className="block text-sm text-white truncate">{candidate.name}</span>
-                  <span className="block text-xs text-gray-400 truncate">
+                  <span className="block text-sm text-heading truncate">{candidate.name}</span>
+                  <span className="block text-xs text-muted truncate">
                     {candidate.ineligible_reason ?? (candidate.same_brand ? "Brand kamu" : "Brand lain")}
                   </span>
                 </span>

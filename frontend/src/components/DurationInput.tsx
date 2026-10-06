@@ -19,19 +19,19 @@ export default function DurationInput({ label, hours, onChange, error, compact =
     onChange(Math.round(((Math.max(0, nextH) * 60 + Math.min(59, Math.max(0, nextM))) / 60) * 100) / 100);
 
   const input = compact
-    ? "w-16 px-2 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm"
-    : "w-full px-3 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white outline-none focus:ring-2 focus:ring-purple-500";
+    ? "w-16 px-2 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading text-sm"
+    : "w-full px-3 py-2.5 rounded-xl bg-surface-2 border border-stroke-strong text-heading outline-none focus:ring-2 focus:ring-primary";
 
   return (
     <fieldset className="space-y-1">
-      <legend className={compact ? "block text-xs text-gray-400" : "block text-sm font-medium text-gray-200"}>{label}</legend>
+      <legend className={compact ? "block text-xs text-muted" : "block text-sm font-medium text-body"}>{label}</legend>
       <div className="flex items-center gap-2">
         <input type="number" min={0} max={24} value={h} onChange={(event) => set(Number(event.target.value), m)} aria-label={`${label} jam`} className={input} />
-        <span className="text-sm text-gray-400">jam</span>
+        <span className="text-sm text-muted">jam</span>
         <input type="number" min={0} max={59} step={5} value={m} onChange={(event) => set(h, Number(event.target.value))} aria-label={`${label} menit`} className={input} />
-        <span className="text-sm text-gray-400">menit</span>
+        <span className="text-sm text-muted">menit</span>
       </div>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </fieldset>
   );
 }

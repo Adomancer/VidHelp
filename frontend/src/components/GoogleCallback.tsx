@@ -72,7 +72,7 @@ export default function GoogleCallback() {
   }, [router, searchParams]);
 
   if (!outcome || outcome.kind === "signed-in") {
-    return <p className="text-center text-gray-300">Sedang masuk…</p>;
+    return <p className="text-center text-body">Sedang masuk…</p>;
   }
 
   if (outcome.kind === "two-factor") {
@@ -81,8 +81,8 @@ export default function GoogleCallback() {
 
   return (
     <div className="space-y-4 text-center">
-      <p className={outcome.kind === "pending" ? "text-yellow-200" : "text-red-300"}>{outcome.message}</p>
-      <Link href="/login" className="inline-block text-sm text-purple-300 hover:text-white">
+      <p className={outcome.kind === "pending" ? "text-warning" : "text-danger"}>{outcome.message}</p>
+      <Link href="/login" className="inline-block text-sm text-accent hover:text-heading">
         Kembali ke halaman masuk
       </Link>
     </div>

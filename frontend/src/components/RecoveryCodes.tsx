@@ -21,11 +21,11 @@ export default function RecoveryCodes({ codes }: { codes: string[] }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-yellow-100">
+      <p className="text-sm text-warning">
         Simpan kode pemulihan ini di tempat aman (password manager atau dicatat di kertas). Kalau HP kamu hilang, setiap kode bisa dipakai
         untuk masuk satu kali. <strong>Kode ini tidak akan ditampilkan lagi.</strong>
       </p>
-      <ul className="grid grid-cols-2 gap-2 p-4 rounded-xl bg-slate-950 border border-slate-700 font-mono text-sm text-white">
+      <ul className="grid grid-cols-2 gap-2 p-4 rounded-xl bg-canvas border border-stroke-strong font-mono text-sm text-heading">
         {codes.map((code) => (
           <li key={code} className="text-center">
             {code}
@@ -33,10 +33,10 @@ export default function RecoveryCodes({ codes }: { codes: string[] }) {
         ))}
       </ul>
       <div className="flex gap-2">
-        <button type="button" onClick={copy} className="flex-1 px-3 py-2 rounded-lg border border-slate-700 text-sm text-gray-200 hover:bg-slate-800">
+        <button type="button" onClick={copy} className="flex-1 px-3 py-2 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2">
           {copied ? "Tersalin ✓" : "Salin"}
         </button>
-        <button type="button" onClick={download} className="flex-1 px-3 py-2 rounded-lg border border-slate-700 text-sm text-gray-200 hover:bg-slate-800">
+        <button type="button" onClick={download} className="flex-1 px-3 py-2 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2">
           Unduh .txt
         </button>
       </div>

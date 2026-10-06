@@ -46,10 +46,10 @@ export default function Toast({ toast, onDismiss }: { toast: (ToastMessage & { i
         <div
           key={toast.id}
           className={`pointer-events-auto relative overflow-hidden flex items-center gap-3 rounded-xl border px-4 py-3 shadow-2xl sm:min-w-80 max-w-md ${
-            toast.tone === "error" ? "bg-red-950 border-red-400/40 text-red-100" : "bg-slate-800 border-slate-700 text-white"
+            toast.tone === "error" ? "bg-red-950 border-red-400/40 text-danger" : "bg-surface-2 border-stroke-strong text-heading"
           }`}
         >
-          <span aria-hidden="true" className={toast.tone === "error" ? "text-red-300" : "text-green-300"}>
+          <span aria-hidden="true" className={toast.tone === "error" ? "text-danger" : "text-success"}>
             {toast.tone === "error" ? "!" : "✓"}
           </span>
           <p className="flex-1 text-sm">{toast.text}</p>
@@ -58,17 +58,17 @@ export default function Toast({ toast, onDismiss }: { toast: (ToastMessage & { i
               type="button"
               onClick={undo}
               disabled={undoing === toast.id}
-              className="px-2 py-1 rounded-md text-sm font-medium text-purple-300 hover:bg-slate-700 hover:text-white disabled:opacity-60"
+              className="px-2 py-1 rounded-md text-sm font-medium text-accent hover:bg-surface-3 hover:text-heading disabled:opacity-60"
             >
               {undoing === toast.id ? "Mengurungkan…" : "Urungkan"}
             </button>
           )}
-          <button type="button" onClick={onDismiss} aria-label="Tutup notifikasi" className="text-gray-400 hover:text-white">
+          <button type="button" onClick={onDismiss} aria-label="Tutup notifikasi" className="text-muted hover:text-heading">
             ✕
           </button>
           <span
             aria-hidden="true"
-            className="absolute left-0 bottom-0 h-0.5 bg-purple-500/70 origin-left"
+            className="absolute left-0 bottom-0 h-0.5 bg-primary/70 origin-left"
             style={{ width: "100%", animation: `toast-timer ${SHOW_MS}ms linear forwards` }}
           />
         </div>

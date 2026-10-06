@@ -20,7 +20,7 @@ export default function ForgotPasswordForm() {
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       {error && <FormAlert tone="error">{error}</FormAlert>}
 
-      <p className="text-sm text-gray-300">
+      <p className="text-sm text-body">
         Masukkan email kamu, nanti kami kirim link untuk membuat kata sandi baru. Ini juga bisa dipakai kalau kamu
         daftar lewat Google dan belum pernah punya kata sandi.
       </p>

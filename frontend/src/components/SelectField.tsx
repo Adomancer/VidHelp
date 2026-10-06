@@ -11,14 +11,14 @@ interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
 export default function SelectField({ label, name, error, options, ...props }: SelectFieldProps) {
   return (
     <div className="space-y-1">
-      <label htmlFor={name} className="block text-sm font-medium text-gray-200">
+      <label htmlFor={name} className="block text-sm font-medium text-body">
         {label}
       </label>
       <select
         id={name}
         name={name}
-        className={`w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border text-white outline-none focus:ring-2 focus:ring-purple-500 ${
-          error ? "border-red-400" : "border-white/15"
+        className={`w-full px-4 py-2.5 rounded-lg bg-transparent dark:bg-surface-2 border-[1.5px] text-heading outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 ${
+          error ? "border-red-500" : "border-stroke-strong"
         }`}
         {...props}
       >
@@ -28,7 +28,7 @@ export default function SelectField({ label, name, error, options, ...props }: S
           </option>
         ))}
       </select>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </div>
   );
 }

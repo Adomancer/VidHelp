@@ -39,20 +39,20 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
     <div className="space-y-3">
       {error && <FormAlert tone="error">{error}</FormAlert>}
 
-      {assignments.length === 0 && <p className="text-sm text-gray-400">Belum ditugaskan ke brand mana pun.</p>}
+      {assignments.length === 0 && <p className="text-sm text-muted">Belum ditugaskan ke brand mana pun.</p>}
 
       <ul className="space-y-2">
         {assignments.map((assignment) => (
-          <li key={assignment.id} className="flex flex-wrap items-center gap-3 bg-slate-800/60 rounded-lg px-3 py-2">
-            <span className="flex-1 min-w-32 text-white">{assignment.brand.name}</span>
+          <li key={assignment.id} className="flex flex-wrap items-center gap-3 bg-surface-2 rounded-lg px-3 py-2">
+            <span className="flex-1 min-w-32 text-heading">{assignment.brand.name}</span>
 
-            <label className="flex items-center gap-2 text-sm text-gray-300">
+            <label className="flex items-center gap-2 text-sm text-body">
               <input
                 type="checkbox"
                 checked={assignment.is_leader}
                 disabled={busy || assignment.status !== "active"}
                 onChange={(event) => run(() => operatorApi.updateAssignment(token, assignment.id, { is_leader: event.target.checked }))}
-                className="accent-purple-500"
+                className="accent-primary"
               />
               Leader
             </label>
@@ -64,7 +64,7 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
                 run(() => operatorApi.updateAssignment(token, assignment.id, { status: event.target.value as AssignmentStatus }))
               }
               aria-label={`Status di ${assignment.brand.name}`}
-              className="bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm text-white"
+              className="bg-surface border border-stroke-strong rounded-md px-2 py-1 text-sm text-heading"
             >
               <option value="active">aktif</option>
               <option value="inactive">nonaktif</option>
@@ -80,7 +80,7 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
             value={brandId}
             onChange={(event) => setBrandId(event.target.value)}
             aria-label="Brand yang ditambahkan"
-            className="flex-1 bg-slate-900 border border-slate-700 rounded-md px-2 py-1.5 text-sm text-white"
+            className="flex-1 bg-surface border border-stroke-strong rounded-md px-2 py-1.5 text-sm text-heading"
           >
             <option value="">Tambahkan ke brand…</option>
             {available.map((brand) => (
@@ -93,7 +93,7 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
             type="button"
             disabled={busy || !brandId}
             onClick={() => run(() => operatorApi.assign(token, { host_id: hostId, brand_id: brandId }).then(() => setBrandId("")))}
-            className="px-3 py-1.5 rounded-md bg-purple-600 text-white text-sm hover:bg-purple-500 disabled:opacity-50"
+            className="px-3 py-1.5 rounded-md bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
           >
             Tambah
           </button>

@@ -20,13 +20,13 @@ export default function HostScorePage() {
 
   return (
     <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-white">Skor Saya</h1>
+      <h1 className="text-xl font-bold text-heading">Skor Saya</h1>
       {performance.error && <FormAlert tone="error">{performance.error}</FormAlert>}
 
       {data && (
         <>
           <Card>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted">
               Poin {formatDate(data.period.start)} – {formatDate(data.period.end)}. Kembali ke {data.opening_points} saat periode berikutnya
               dimulai.
             </p>
@@ -34,18 +34,18 @@ export default function HostScorePage() {
           </Card>
 
           <Card title="Potongan periode ini">
-            {data.logs.length === 0 && <p className="text-sm text-gray-400">Tidak ada, pertahankan!</p>}
+            {data.logs.length === 0 && <p className="text-sm text-muted">Tidak ada, pertahankan!</p>}
             <ul className="space-y-2">
               {data.logs.map((log) => (
-                <li key={log.id} className="rounded-lg bg-slate-800 px-3 py-2">
+                <li key={log.id} className="rounded-lg bg-surface-2 px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-white">{log.violation_type?.name ?? "Penyesuaian"}</span>
-                    <span className={`text-sm font-medium ${log.points_change < 0 ? "text-red-300" : "text-green-300"}`}>
+                    <span className="text-sm text-heading">{log.violation_type?.name ?? "Penyesuaian"}</span>
+                    <span className={`text-sm font-medium ${log.points_change < 0 ? "text-danger" : "text-success"}`}>
                       {log.points_change > 0 ? "+" : ""}
                       {log.points_change}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted">
                     {formatShortDate(log.occurred_on)}
                     {log.reason ? ` · ${log.reason}` : ""}
                   </p>
@@ -61,8 +61,8 @@ export default function HostScorePage() {
                   <li key={letter.id} className="flex items-start gap-3">
                     <SpBadge level={letter.level} />
                     <div>
-                      <p className="text-sm text-white">{letter.reason}</p>
-                      <p className="text-xs text-gray-400">{formatDate(letter.issued_at)}</p>
+                      <p className="text-sm text-heading">{letter.reason}</p>
+                      <p className="text-xs text-muted">{formatDate(letter.issued_at)}</p>
                     </div>
                   </li>
                 ))}
@@ -71,15 +71,15 @@ export default function HostScorePage() {
           )}
 
           <Card title="Rating bulanan">
-            {data.ratings.length === 0 && <p className="text-sm text-gray-400">Kamu belum pernah dinilai.</p>}
+            {data.ratings.length === 0 && <p className="text-sm text-muted">Kamu belum pernah dinilai.</p>}
             <ul className="space-y-2">
               {data.ratings.map((rating) => (
                 <li key={rating.id} className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm text-white">{monthLabel(rating.month_year)}</p>
-                    {rating.note && <p className="text-xs text-gray-400">{rating.note}</p>}
+                    <p className="text-sm text-heading">{monthLabel(rating.month_year)}</p>
+                    {rating.note && <p className="text-xs text-muted">{rating.note}</p>}
                   </div>
-                  <span className="text-lg font-semibold text-yellow-200">★ {rating.rating.toFixed(1)}</span>
+                  <span className="text-lg font-semibold text-warning">★ {rating.rating.toFixed(1)}</span>
                 </li>
               ))}
             </ul>

@@ -49,7 +49,7 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
         <button
           type="button"
           onClick={() => onDone(done.user)}
-          className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500"
+          className="w-full px-4 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary-hover"
         >
           Kode pemulihan sudah saya simpan
         </button>
@@ -60,7 +60,7 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
   if (!secret) {
     return (
       <div className="space-y-4">
-        <ol className="list-decimal list-inside space-y-1 text-sm text-gray-300">
+        <ol className="list-decimal list-inside space-y-1 text-sm text-body">
           <li>Pasang aplikasi authenticator di HP kamu: Google Authenticator, Microsoft Authenticator atau Authy.</li>
           <li>Scan kode QR yang muncul di langkah berikutnya.</li>
           <li>Ketik kode 6 digit dari aplikasi untuk menyelesaikan.</li>
@@ -70,7 +70,7 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
           type="button"
           onClick={start}
           disabled={starting}
-          className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500 disabled:opacity-60"
+          className="w-full px-4 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary-hover disabled:opacity-60"
         >
           {starting ? "Tunggu sebentar…" : "Mulai pengaturan"}
         </button>
@@ -80,15 +80,15 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-      <p className="text-sm text-gray-300">Scan kode ini dengan aplikasi authenticator kamu:</p>
+      <p className="text-sm text-body">Scan kode ini dengan aplikasi authenticator kamu:</p>
       <div className="flex justify-center">
         <div className="p-3 rounded-xl bg-white">
           <QRCodeSVG value={secret.otpauth_url} size={184} marginSize={0} />
         </div>
       </div>
-      <details className="text-sm text-gray-400">
-        <summary className="cursor-pointer hover:text-white">Tidak bisa scan? Masukkan kuncinya manual</summary>
-        <p className="mt-2 font-mono text-white break-all select-all bg-slate-950 border border-slate-700 rounded-lg px-3 py-2">
+      <details className="text-sm text-muted">
+        <summary className="cursor-pointer hover:text-heading">Tidak bisa scan? Masukkan kuncinya manual</summary>
+        <p className="mt-2 font-mono text-heading break-all select-all bg-canvas border border-stroke-strong rounded-lg px-3 py-2">
           {secret.secret.match(/.{1,4}/g)?.join(" ")}
         </p>
         <p className="mt-1 text-xs">Pilih &quot;time based&quot; (berbasis waktu) kalau aplikasi bertanya.</p>

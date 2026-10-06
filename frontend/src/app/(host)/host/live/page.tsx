@@ -43,14 +43,14 @@ export default function HostLivePage() {
 
   return (
     <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-white">Live</h1>
+      <h1 className="text-xl font-bold text-heading">Live</h1>
 
       {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
       {live.error && <FormAlert tone="error">{live.error}</FormAlert>}
 
       {live.data && current.length === 0 && (
         <Card>
-          <p className="text-sm text-gray-400">Tidak ada sesi saat ini. Sesi berikutnya ada di halaman Jadwal.</p>
+          <p className="text-sm text-muted">Tidak ada sesi saat ini. Sesi berikutnya ada di halaman Jadwal.</p>
         </Card>
       )}
 
@@ -63,7 +63,7 @@ export default function HostLivePage() {
           <div className="space-y-4">
             {live.data.missing_reports.map((attendance) => (
               <div key={attendance.id} className="space-y-2">
-                <p className="text-sm text-white">
+                <p className="text-sm text-heading">
                   {attendance.brand?.name} · {formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}
                 </p>
                 <ReportForm attendance={attendance} metrics={live.data!.metrics} act={act} />
@@ -78,7 +78,7 @@ export default function HostLivePage() {
           <ul className="space-y-2">
             {done.map((session) => (
               <li key={sessionKey(session)} className="flex items-center justify-between gap-3 text-sm">
-                <span className="text-gray-300">
+                <span className="text-body">
                   {session.brand.name} · {formatWindow(session.start_at, session.end_at)}
                 </span>
                 <DoneLabel session={session} />
@@ -99,8 +99,8 @@ function sessionKey(session: LiveSession): string {
 }
 
 function DoneLabel({ session }: { session: LiveSession }) {
-  if (session.role === "off") return <span className="text-xs text-gray-500">libur</span>;
-  if (!session.attendance) return <span className="text-xs text-red-300">tidak check-in</span>;
+  if (session.role === "off") return <span className="text-xs text-faint">libur</span>;
+  if (!session.attendance) return <span className="text-xs text-danger">tidak check-in</span>;
   return <ReportStatusLabel report={session.attendance.report ?? null} />;
 }
 
@@ -116,20 +116,20 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className={`font-medium ${session.role === "off" ? "text-gray-400" : "text-white"}`}>{session.brand.name}</p>
-          <p className="text-sm text-purple-200">{formatWindow(session.start_at, session.end_at)}</p>
-          {session.role === "cover" && <p className="text-xs text-green-300">Backup untuk {session.covered_for}</p>}
-          {session.role === "event" && <p className="text-xs text-yellow-200">Event: {session.event_name}</p>}
-          {session.role === "off" && <p className="text-xs text-gray-400">Kamu libur · digantikan {session.covered_by}</p>}
+          <p className={`font-medium ${session.role === "off" ? "text-muted" : "text-heading"}`}>{session.brand.name}</p>
+          <p className="text-sm text-accent">{formatWindow(session.start_at, session.end_at)}</p>
+          {session.role === "cover" && <p className="text-xs text-success">Backup untuk {session.covered_for}</p>}
+          {session.role === "event" && <p className="text-xs text-warning">Event: {session.event_name}</p>}
+          {session.role === "off" && <p className="text-xs text-muted">Kamu libur · digantikan {session.covered_by}</p>}
         </div>
         {attendance && <ReportStatusLabel report={attendance.report ?? null} />}
       </div>
 
       {session.role !== "off" && !attendance && (
         ended ? (
-          <p className="text-sm text-red-300">Kamu tidak check-in untuk sesi ini.</p>
+          <p className="text-sm text-danger">Kamu tidak check-in untuk sesi ini.</p>
         ) : now < opensAt ? (
-          <p className="text-sm text-gray-400">Check-in dibuka jam {formatClock(opensAt.toISOString())}.</p>
+          <p className="text-sm text-muted">Check-in dibuka jam {formatClock(opensAt.toISOString())}.</p>
         ) : (
           <button
             type="button"
@@ -143,7 +143,7 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
 
       {attendance && (
         <div className="space-y-3">
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted">
             Check-in {formatClock(attendance.check_in_at)}
             {attendance.check_out_at ? ` · check-out ${formatClock(attendance.check_out_at)}` : ""}
           </p>
@@ -152,7 +152,7 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
             <button
               type="button"
               onClick={() => act(() => liveApi.checkOut(token, attendance.id))}
-              className="w-full py-3 rounded-xl bg-slate-700 text-white font-medium hover:bg-slate-600"
+              className="w-full py-3 rounded-xl bg-surface-3 text-heading font-medium hover:bg-surface-3"
             >
               Check-out
             </button>
@@ -166,13 +166,13 @@ function SessionCard({ session, metrics, act }: { session: LiveSession; metrics:
 }
 
 function ReportStatusLabel({ report }: { report: LiveReport | null }) {
-  if (!report) return <span className="text-xs text-yellow-200 whitespace-nowrap">Perlu laporan</span>;
+  if (!report) return <span className="text-xs text-warning whitespace-nowrap">Perlu laporan</span>;
 
   const styles: Record<LiveReport["status"], [string, string]> = {
-    submitted: ["Terkirim", "text-blue-200"],
-    flagged: ["Sedang dicek", "text-yellow-200"],
-    approved: ["Disetujui ✓", "text-green-300"],
-    rejected: ["Ditolak", "text-red-300"],
+    submitted: ["Terkirim", "text-info"],
+    flagged: ["Sedang dicek", "text-warning"],
+    approved: ["Disetujui ✓", "text-success"],
+    rejected: ["Ditolak", "text-danger"],
   };
   const [label, style] = styles[report.status];
   return <span className={`text-xs whitespace-nowrap ${style}`}>{label}</span>;
@@ -186,14 +186,14 @@ function ReportSection({ attendance, metrics, act }: { attendance: Attendance; m
   if (report?.status === "approved") return null;
 
   if (report?.status === "rejected") {
-    return <p className="text-sm text-red-300">Ditolak{report.review_note ? `: ${report.review_note}` : "."}</p>;
+    return <p className="text-sm text-danger">Ditolak{report.review_note ? `: ${report.review_note}` : "."}</p>;
   }
 
   if (report?.status === "flagged" && !editing) {
     return (
       <div className="space-y-1">
-        <p className="text-xs text-yellow-200">Operator akan mengecek: {(report.flag_reasons ?? []).map((reason) => FLAG_REASONS[reason] ?? reason).join(", ")}.</p>
-        <button type="button" onClick={() => setEditing(true)} className="text-xs text-purple-300 hover:text-white">
+        <p className="text-xs text-warning">Operator akan mengecek: {(report.flag_reasons ?? []).map((reason) => FLAG_REASONS[reason] ?? reason).join(", ")}.</p>
+        <button type="button" onClick={() => setEditing(true)} className="text-xs text-accent hover:text-heading">
           Perbaiki dan kirim ulang
         </button>
       </div>
@@ -201,8 +201,8 @@ function ReportSection({ attendance, metrics, act }: { attendance: Attendance; m
   }
 
   return (
-    <div className="border-t border-slate-800 pt-3">
-      <p className="text-sm text-white mb-2">Laporan live · batas {formatDateTime(attendance.report_due_at)}</p>
+    <div className="border-t border-stroke pt-3">
+      <p className="text-sm text-heading mb-2">Laporan live · batas {formatDateTime(attendance.report_due_at)}</p>
       <ReportForm attendance={attendance} metrics={metrics} act={act} />
     </div>
   );
@@ -254,7 +254,7 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
         ))}
       </div>
       <div className="space-y-1">
-        <label htmlFor={`notes-${attendance.id}`} className="block text-sm font-medium text-gray-200">
+        <label htmlFor={`notes-${attendance.id}`} className="block text-sm font-medium text-body">
           Catatan (masalah, gangguan)
         </label>
         <textarea
@@ -262,7 +262,7 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
           name="notes"
           rows={2}
           defaultValue={report?.notes ?? ""}
-          className="w-full px-4 py-2.5 rounded-xl bg-slate-900/60 border border-white/15 text-white outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-stroke-strong text-heading outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
       <SubmitButton loading={loading}>{report ? "Kirim ulang laporan" : "Kirim laporan"}</SubmitButton>

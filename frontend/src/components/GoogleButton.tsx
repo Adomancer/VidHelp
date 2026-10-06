@@ -33,7 +33,7 @@ export default function GoogleButton({ label = "Lanjut dengan Google" }: { label
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl bg-white text-slate-800 font-medium hover:bg-gray-100 disabled:opacity-60 disabled:cursor-wait transition-colors"
+        className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border-[1.5px] border-stroke-strong bg-surface text-heading font-medium hover:bg-surface-2 disabled:opacity-60 disabled:cursor-wait transition-colors"
       >
         <svg className="w-5 h-5" viewBox="0 0 48 48" aria-hidden="true">
           <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z" />

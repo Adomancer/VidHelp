@@ -3,7 +3,7 @@ export default function SubmitButton({ loading, children }: { loading: boolean; 
     <button
       type="submit"
       disabled={loading}
-      className="w-full px-4 py-3 rounded-xl bg-purple-600 text-white font-medium hover:bg-purple-500 disabled:opacity-60 disabled:cursor-wait transition-colors"
+      className="w-full px-4 py-3 rounded-lg bg-primary text-white font-medium hover:bg-primary-hover disabled:opacity-60 disabled:cursor-wait transition-colors"
     >
       {loading ? "Tunggu sebentar…" : children}
     </button>

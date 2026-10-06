@@ -37,8 +37,8 @@ export default function AdminSettingsPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Pengaturan</h1>
-        <p className="text-sm text-gray-400 mt-1">
+        <h1 className="text-2xl font-bold text-heading">Pengaturan</h1>
+        <p className="text-sm text-muted mt-1">
           Aturan bisnis yang diikuti seluruh aplikasi. Perubahan langsung berlaku dan tercatat di Log Audit.
         </p>
       </div>
@@ -98,7 +98,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
     <div className="space-y-6 pb-4">
       {groups.map((group) => (
         <Card key={group.key} title={group.label}>
-          <div className="divide-y divide-slate-800 -my-2">
+          <div className="divide-y divide-stroke -my-2">
             {group.settings.map((setting) => (
               <SettingRow
                 key={setting.key}
@@ -113,7 +113,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
       ))}
 
       {changed.length > 0 && (
-        <div className="sticky bottom-4 z-10 rounded-xl border border-purple-500/40 bg-slate-900/95 backdrop-blur p-4 space-y-3 shadow-2xl">
+        <div className="sticky bottom-4 z-10 rounded-xl border border-primary/40 bg-surface backdrop-blur p-4 space-y-3 shadow-2xl">
           {error && <FormAlert tone="error">{error}</FormAlert>}
           {turningOn2fa && (
             <FormAlert tone="warning">
@@ -122,7 +122,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
             </FormAlert>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-gray-200">
+            <p className="text-sm text-body">
               {changed.length} perubahan belum disimpan
             </p>
             <div className="flex gap-2">
@@ -134,7 +134,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
                   setErrors({});
                   setError(null);
                 }}
-                className="px-4 py-2 rounded-lg border border-slate-700 text-sm text-gray-300 hover:bg-slate-800 disabled:opacity-50"
+                className="px-4 py-2 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2 disabled:opacity-50"
               >
                 Buang
               </button>
@@ -142,7 +142,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
                 type="button"
                 disabled={saving}
                 onClick={save}
-                className="px-4 py-2 rounded-lg bg-purple-600 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-60"
+                className="px-4 py-2 rounded-lg bg-primary text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
               >
                 {saving ? "Menyimpan…" : "Simpan perubahan"}
               </button>
@@ -166,28 +166,28 @@ function SettingRow({
   onChange: (value: string | boolean) => void;
 }) {
   const isDefault = fromDraft(value) === setting.default;
-  const inputClass = `rounded-lg bg-slate-950 border px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-purple-500 ${
-    error ? "border-red-400" : "border-slate-700"
+  const inputClass = `rounded-lg bg-canvas border px-3 py-2 text-sm text-heading outline-none focus:ring-2 focus:ring-primary ${
+    error ? "border-red-400" : "border-stroke-strong"
   }`;
 
   return (
     <div className="py-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 sm:max-w-md">
-        <label htmlFor={setting.key} className="block text-sm font-medium text-white">
+        <label htmlFor={setting.key} className="block text-sm font-medium text-heading">
           {setting.label}
         </label>
-        <p className="text-xs text-gray-400 mt-1">{setting.help}</p>
+        <p className="text-xs text-muted mt-1">{setting.help}</p>
         <p className="text-xs mt-1">
           {setting.changed_at ? (
-            <span className="text-purple-300">
+            <span className="text-accent">
               Diubah{setting.changed_by && <> oleh {setting.changed_by}</>} pada {formatDate(setting.changed_at)} · bawaan{" "}
               {showValue(setting, setting.default)}
             </span>
           ) : (
-            <span className="text-gray-500">Nilai bawaan</span>
+            <span className="text-faint">Nilai bawaan</span>
           )}
         </p>
-        {error && <p className="text-sm text-red-300 mt-1">{error}</p>}
+        {error && <p className="text-sm text-danger mt-1">{error}</p>}
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
@@ -198,7 +198,7 @@ function SettingRow({
             role="switch"
             aria-checked={value === true}
             onClick={() => onChange(value !== true)}
-            className={`relative w-11 h-6 rounded-full transition-colors ${value === true ? "bg-purple-600" : "bg-slate-700"}`}
+            className={`relative w-11 h-6 rounded-full transition-colors ${value === true ? "bg-primary" : "bg-surface-3"}`}
           >
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${value === true ? "translate-x-5" : ""}`} />
           </button>
@@ -223,12 +223,12 @@ function SettingRow({
             className={`w-24 text-right ${inputClass}`}
           />
         )}
-        {setting.unit && setting.type !== "bool" && <span className="text-sm text-gray-400 w-16">{setting.unit}</span>}
+        {setting.unit && setting.type !== "bool" && <span className="text-sm text-muted w-16">{setting.unit}</span>}
         <button
           type="button"
           onClick={() => onChange(toDraft(setting.default))}
           disabled={isDefault}
-          className="text-xs text-purple-300 hover:text-white disabled:invisible"
+          className="text-xs text-accent hover:text-heading disabled:invisible"
         >
           Pakai bawaan
         </button>

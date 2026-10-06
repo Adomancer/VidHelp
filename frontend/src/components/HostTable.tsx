@@ -68,7 +68,7 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
             setPage(1);
           }}
           aria-label="Filter brand"
-          className="sm:w-56 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white"
+          className="sm:w-56 px-3 py-2 rounded-lg bg-surface border border-stroke text-heading"
         >
           <option value="">Semua brand</option>
           {brands.data?.brands.map((brand) => (
@@ -82,7 +82,7 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
           onClick={exportExcel}
           disabled={exporting}
           title="Semua host yang cocok dengan pencarian dan filter brand"
-          className="px-4 py-2 rounded-lg border border-slate-700 text-gray-200 text-sm whitespace-nowrap hover:bg-slate-800 disabled:opacity-40"
+          className="px-4 py-2 rounded-lg border border-stroke-strong text-body text-sm whitespace-nowrap hover:bg-surface-2 disabled:opacity-40"
         >
           {exporting ? "Mengekspor…" : "Ekspor Excel"}
         </button>
@@ -91,9 +91,9 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
       {exportError && <FormAlert tone="error">{exportError}</FormAlert>}
       {hosts.error && <FormAlert tone="error">{hosts.error}</FormAlert>}
 
-      <div className={`bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto ${hosts.loading ? "opacity-60" : ""}`}>
+      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${hosts.loading ? "opacity-60" : ""}`}>
         <table className="w-full text-sm">
-          <thead className="text-left text-gray-400 border-b border-slate-800">
+          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
             <tr>
               <th className="px-4 py-3 font-medium">Host</th>
               <th className="px-4 py-3 font-medium">Level tarif</th>
@@ -102,7 +102,7 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
               {editableBrands && <th className="px-4 py-3" />}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800">
+          <tbody className="divide-y divide-stroke">
             {hosts.data?.data.map((host) => {
               const active = host.assignments.filter((assignment) => assignment.status === "active");
               const open = openId === host.id;
@@ -110,8 +110,8 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
               return (
                 <Fragment key={host.id}>
                   <tr
-                    className={`text-gray-200 align-top ${
-                      onSelect ? "cursor-pointer transition-colors hover:bg-slate-800/60 focus-visible:outline-none focus-visible:bg-slate-800/60" : ""
+                    className={`text-body align-top ${
+                      onSelect ? "cursor-pointer transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2" : ""
                     }`}
                     {...(onSelect && {
                       tabIndex: 0,
@@ -129,25 +129,25 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
                       <div className="flex items-center gap-3">
                         <UserAvatar user={host.user} />
                         <div className="min-w-0">
-                          <p className="text-white">{host.user.name}</p>
-                          <p className="text-gray-400 truncate">{host.user.email}</p>
+                          <p className="text-heading">{host.user.name}</p>
+                          <p className="text-muted truncate">{host.user.email}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {host.rate_category?.name ?? "—"}
-                      <span className="block text-xs text-gray-400">
+                      <span className="block text-xs text-muted">
                         {formatTenure(host.join_date)}
                         {host.rate_category_overridden && " · diatur admin"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {active.length === 0 && <span className="text-gray-500">—</span>}
+                        {active.length === 0 && <span className="text-faint">—</span>}
                         {active.map((assignment) => (
-                          <span key={assignment.id} className="px-2 py-0.5 rounded-md bg-slate-800 text-xs">
+                          <span key={assignment.id} className="px-2 py-0.5 rounded-md bg-surface-2 text-xs">
                             {assignment.brand.name}
-                            {assignment.is_leader && <span className="text-yellow-300"> ★</span>}
+                            {assignment.is_leader && <span className="text-warning"> ★</span>}
                           </span>
                         ))}
                       </div>
@@ -158,7 +158,7 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
                         <button
                           type="button"
                           onClick={() => setOpenId(open ? null : host.id)}
-                          className="px-3 py-1.5 rounded-md border border-slate-700 text-gray-300 hover:bg-slate-800"
+                          className="px-3 py-1.5 rounded-md border border-stroke-strong text-body hover:bg-surface-2"
                         >
                           {open ? "Tutup" : "Brand"}
                         </button>
@@ -187,26 +187,26 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
         </table>
 
         {hosts.data?.data.length === 0 && (
-          <p className="px-4 py-8 text-center text-gray-400">
+          <p className="px-4 py-8 text-center text-muted">
             Tidak ada host. Host muncul di sini setelah admin menyetujui akunnya.
           </p>
         )}
       </div>
 
       {hosts.data && hosts.data.last_page > 1 && (
-        <div className="flex items-center justify-between text-sm text-gray-400">
+        <div className="flex items-center justify-between text-sm text-muted">
           <span>
             Halaman {hosts.data.current_page} dari {hosts.data.last_page} · {hosts.data.total} host
           </span>
           <div className="flex gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40">
+            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
               Sebelumnya
             </button>
             <button
               type="button"
               disabled={page >= hosts.data.last_page}
               onClick={() => setPage(page + 1)}
-              className="px-3 py-1.5 rounded-md bg-slate-900 disabled:opacity-40"
+              className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40"
             >
               Berikutnya
             </button>

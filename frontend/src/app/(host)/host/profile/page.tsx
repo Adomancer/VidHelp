@@ -32,7 +32,7 @@ export default function HostProfilePage() {
 
   return (
     <div className="max-w-lg space-y-6">
-      <h1 className="text-xl font-bold text-white">Profil Saya</h1>
+      <h1 className="text-xl font-bold text-heading">Profil Saya</h1>
 
       {profile.error && <FormAlert tone="error">{profile.error}</FormAlert>}
 
@@ -46,7 +46,7 @@ export default function HostProfilePage() {
       <button
         type="button"
         onClick={logout}
-        className="w-full px-4 py-3 rounded-xl border border-red-400/40 text-red-300 hover:bg-red-500/10 transition-colors"
+        className="w-full px-4 py-3 rounded-xl border border-red-400/40 text-danger hover:bg-red-500/10 transition-colors"
       >
         Keluar
       </button>
@@ -78,17 +78,17 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
       <div className="flex items-center gap-4">
         <div className="flex flex-col items-center gap-2">
           <UserAvatar size="w-16 h-16" />
-          <label className="text-xs text-purple-300 hover:text-white cursor-pointer">
+          <label className="text-xs text-accent hover:text-heading cursor-pointer">
             {uploading ? "Mengunggah…" : "Ganti foto"}
             <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => upload(event.target.files?.[0])} />
           </label>
         </div>
         <div className="min-w-0">
-          <p className="text-white font-medium truncate">{user.name}</p>
-          <p className="text-sm text-gray-400 truncate">{user.email}</p>
-          <p className="text-xs text-purple-300 mt-1">{user.roles.map((role) => roleLabel(role.name)).join(", ")}</p>
+          <p className="text-heading font-medium truncate">{user.name}</p>
+          <p className="text-sm text-muted truncate">{user.email}</p>
+          <p className="text-xs text-accent mt-1">{user.roles.map((role) => roleLabel(role.name)).join(", ")}</p>
           {host && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-muted mt-1">
               {host.rate_category?.name ?? "Belum ada level tarif"} · bergabung {formatDate(host.join_date)} ({formatTenure(host.join_date)})
             </p>
           )}
@@ -143,13 +143,13 @@ function BrandsCard({ host }: { host: HostProfileData }) {
   return (
     <Card title="Brand saya">
       {host.assignments.length === 0 ? (
-        <p className="text-sm text-gray-400">Kamu belum ditugaskan ke brand mana pun.</p>
+        <p className="text-sm text-muted">Kamu belum ditugaskan ke brand mana pun.</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {host.assignments.map((assignment) => (
-            <li key={assignment.id} className="px-3 py-1.5 rounded-lg bg-slate-800 text-sm text-white">
+            <li key={assignment.id} className="px-3 py-1.5 rounded-lg bg-surface-2 text-sm text-heading">
               {assignment.brand.name}
-              {assignment.is_leader && <span className="text-yellow-300"> ★ Leader</span>}
+              {assignment.is_leader && <span className="text-warning"> ★ Leader</span>}
             </li>
           ))}
         </ul>
@@ -222,17 +222,17 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
           placeholder={current?.account_holder_name ?? "Sesuai yang tertera di rekening"}
           error={errors.account_holder_name}
         />
-        <p className="text-xs text-gray-400">Kosongkan kolom kalau tidak ingin mengubah data yang tersimpan.</p>
+        <p className="text-xs text-muted">Kosongkan kolom kalau tidak ingin mengubah data yang tersimpan.</p>
 
         <SubmitButton loading={loading}>Simpan</SubmitButton>
       </form>
 
-      <div className="border-t border-slate-800 pt-4 space-y-2">
-        <p className="text-sm text-gray-200">
+      <div className="border-t border-stroke pt-4 space-y-2">
+        <p className="text-sm text-body">
           Foto KTP:{" "}
-          {current?.has_ktp_image ? <span className="text-green-300">sudah diunggah ✓</span> : <span className="text-gray-400">belum diunggah</span>}
+          {current?.has_ktp_image ? <span className="text-success">sudah diunggah ✓</span> : <span className="text-muted">belum diunggah</span>}
         </p>
-        <label className="inline-block px-4 py-2 rounded-lg border border-slate-700 text-sm text-gray-300 hover:bg-slate-800 cursor-pointer">
+        <label className="inline-block px-4 py-2 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2 cursor-pointer">
           {uploading ? "Mengunggah…" : current?.has_ktp_image ? "Ganti foto KTP" : "Unggah foto KTP"}
           <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => uploadKtp(event.target.files?.[0])} />
         </label>

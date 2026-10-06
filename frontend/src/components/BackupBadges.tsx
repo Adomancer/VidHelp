@@ -1,11 +1,11 @@
 import type { BackupStatus, LetterStatus } from "@/lib/api";
 
 const statusStyles: Record<BackupStatus, [string, string]> = {
-  open: ["Mencari pengganti", "bg-blue-500/15 text-blue-200"],
-  pending: ["Menunggu keputusan admin", "bg-yellow-500/15 text-yellow-200"],
-  filled: ["Sudah ada pengganti", "bg-green-500/15 text-green-300"],
-  cancelled: ["Dibatalkan", "bg-slate-700 text-gray-300"],
-  rejected: ["Ditolak", "bg-red-500/15 text-red-300"],
+  open: ["Mencari pengganti", "bg-blue-500/15 text-info"],
+  pending: ["Menunggu keputusan admin", "bg-yellow-500/15 text-warning"],
+  filled: ["Sudah ada pengganti", "bg-green-500/15 text-success"],
+  cancelled: ["Dibatalkan", "bg-surface-3 text-body"],
+  rejected: ["Ditolak", "bg-red-500/15 text-danger"],
 };
 
 export function BackupStatusBadge({ status }: { status: BackupStatus }) {
@@ -16,13 +16,13 @@ export function BackupStatusBadge({ status }: { status: BackupStatus }) {
 /** Who may apply: everyone, or only the hosts the requester named. */
 export function RequestTypeBadge({ names }: { names: string[] }) {
   if (names.length === 0) return null;
-  return <span className="px-2 py-0.5 rounded-md text-xs bg-purple-500/15 text-purple-200">Diminta ke: {names.join(", ")}</span>;
+  return <span className="px-2 py-0.5 rounded-md text-xs bg-primary/15 text-accent">Diminta ke: {names.join(", ")}</span>;
 }
 
 const letterStyles: Partial<Record<LetterStatus, [string, string]>> = {
-  uploaded: ["Surat sakit sudah diunggah", "text-green-300"],
-  due: ["Perlu surat sakit", "text-yellow-200"],
-  late: ["Surat sakit terlambat", "text-red-300"],
+  uploaded: ["Surat sakit sudah diunggah", "text-success"],
+  due: ["Perlu surat sakit", "text-warning"],
+  late: ["Surat sakit terlambat", "text-danger"],
 };
 
 export function LetterBadge({ status }: { status: LetterStatus }) {

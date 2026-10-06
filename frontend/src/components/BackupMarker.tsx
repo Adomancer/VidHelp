@@ -4,14 +4,14 @@ import type { SlotBackupMarker } from "@/lib/api";
 export default function BackupMarker({ marker, mine = false }: { marker: SlotBackupMarker; mine?: boolean }) {
   if (marker.status === "filled") {
     return (
-      <span className="block text-xs text-green-300">
+      <span className="block text-xs text-success">
         {mine ? "Kamu libur · " : "↳ "}digantikan {marker.filler_name}
       </span>
     );
   }
 
   return (
-    <span className={`block text-xs ${marker.status === "open" ? "text-blue-200" : "text-yellow-200"}`}>
+    <span className={`block text-xs ${marker.status === "open" ? "text-info" : "text-warning"}`}>
       {marker.status === "open" ? "Mencari backup" : "Backup diajukan"}
     </span>
   );

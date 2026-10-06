@@ -35,7 +35,7 @@ export default function HoursChart({ days }: { days: { date: string; hours: numb
     <div>
       <div className="flex gap-2" aria-hidden="true">
         {/* Y axis */}
-        <div className="relative w-9 shrink-0 text-right text-[11px] text-gray-500" style={{ height: PLOT_HEIGHT }}>
+        <div className="relative w-9 shrink-0 text-right text-[11px] text-faint" style={{ height: PLOT_HEIGHT }}>
           {ticks.map((tick) => (
             <span key={tick} className="absolute right-0 leading-none" style={{ bottom: `${(tick / top) * 100}%`, transform: "translateY(50%)" }}>
               {tick} j
@@ -47,7 +47,7 @@ export default function HoursChart({ days }: { days: { date: string; hours: numb
           {/* Plot: hairline gridlines, then one column per day */}
           <div className="relative" style={{ height: PLOT_HEIGHT }}>
             {ticks.map((tick) => (
-              <div key={tick} className="absolute inset-x-0 h-px bg-slate-800" style={{ bottom: `${(tick / top) * 100}%` }} />
+              <div key={tick} className="absolute inset-x-0 h-px bg-surface-2" style={{ bottom: `${(tick / top) * 100}%` }} />
             ))}
             <div className="absolute inset-0 flex items-end gap-0.5">
               {days.map((day, index) => {
@@ -57,15 +57,15 @@ export default function HoursChart({ days }: { days: { date: string; hours: numb
                   <div key={day.date} className="group relative flex-1 h-full flex items-end justify-center">
                     {day.hours > 0 && (
                       <div
-                        className="w-full max-w-6 rounded-t bg-purple-500 group-hover:bg-purple-400"
+                        className="w-full max-w-6 rounded-t bg-primary group-hover:bg-primary-hover"
                         style={{ height: `${(day.hours / top) * 100}%` }}
                       />
                     )}
                     <div
-                      className={`pointer-events-none absolute bottom-full mb-1 ${tooltipSide} z-10 hidden group-hover:block whitespace-nowrap rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs shadow-xl`}
+                      className={`pointer-events-none absolute bottom-full mb-1 ${tooltipSide} z-10 hidden group-hover:block whitespace-nowrap rounded-lg border border-stroke-strong bg-canvas px-2.5 py-1.5 text-xs shadow-xl`}
                     >
-                      <span className="block text-gray-400">{label.full}</span>
-                      <span className="block text-white font-medium">{day.hours > 0 ? formatDuration(day.hours) : "Belum ada jam yang disetujui"}</span>
+                      <span className="block text-muted">{label.full}</span>
+                      <span className="block text-heading font-medium">{day.hours > 0 ? formatDuration(day.hours) : "Belum ada jam yang disetujui"}</span>
                     </div>
                   </div>
                 );
@@ -74,7 +74,7 @@ export default function HoursChart({ days }: { days: { date: string; hours: numb
           </div>
 
           {/* X axis: day of month; month name where it changes */}
-          <div className="flex gap-0.5 mt-1.5 text-[11px] text-gray-500">
+          <div className="flex gap-0.5 mt-1.5 text-[11px] text-faint">
             {days.map((day, index) => {
               const label = dayLabel(day.date);
               const showMonth = index === 0 || label.day === "1";

@@ -93,14 +93,14 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
       footer={
         <>
           <span className="flex-1" />
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-300 hover:bg-slate-800">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2">
             Batal
           </button>
           <button
             type="button"
             onClick={save}
             disabled={!backupDate || !cover || Boolean(existing) || saving}
-            className="px-5 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-5 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {saving ? "Menyimpan…" : "Simpan backup"}
           </button>
@@ -111,9 +111,9 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
         <section>
-          <h3 className="text-sm font-medium text-white mb-2">Tanggal</h3>
+          <h3 className="text-sm font-medium text-heading mb-2">Tanggal</h3>
           {dates.length === 0 ? (
-            <p className="text-sm text-gray-400">Slot ini tidak punya jadwal mendatang.</p>
+            <p className="text-sm text-muted">Slot ini tidak punya jadwal mendatang.</p>
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {dates.map((option) => (
@@ -125,7 +125,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
                     setCover("");
                   }}
                   className={`px-3 py-1.5 rounded-lg text-sm border ${
-                    option === backupDate ? "bg-purple-600 border-purple-500 text-white" : "border-slate-700 text-gray-300 hover:bg-slate-800"
+                    option === backupDate ? "bg-primary border-primary text-white" : "border-stroke-strong text-body hover:bg-surface-2"
                   }`}
                 >
                   {formatDayDate(option)}
@@ -134,7 +134,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
             </div>
           )}
           {existing && (
-            <p className="mt-2 text-sm text-amber-200">
+            <p className="mt-2 text-sm text-warning">
               Sudah ada backup di tanggal ini
               {existing.status === "filled" ? `: ${existing.filler_name} menggantikan.` : ", masih mencari pengganti."} Kelola di halaman Backup.
             </p>
@@ -144,26 +144,26 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
         {backupDate && !existing && (
           <section>
             <div className="flex items-center justify-between gap-3 mb-2">
-              <h3 className="text-sm font-medium text-white">Host pengganti</h3>
+              <h3 className="text-sm font-medium text-heading">Host pengganti</h3>
               <input
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Cari nama…"
-                className="w-40 px-3 py-1.5 rounded-lg bg-slate-950/60 border border-slate-700 text-sm text-white outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-40 px-3 py-1.5 rounded-lg bg-surface-2 border border-stroke-strong text-sm text-heading outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
 
-            {candidates.error && <p className="text-xs text-red-300">{candidates.error}</p>}
-            {candidates.loading && !candidates.data && <p className="text-xs text-gray-500">Memuat host…</p>}
+            {candidates.error && <p className="text-xs text-danger">{candidates.error}</p>}
+            {candidates.loading && !candidates.data && <p className="text-xs text-faint">Memuat host…</p>}
 
             <div role="radiogroup" aria-label="Host pengganti" className={`space-y-1 ${candidates.loading ? "opacity-60" : ""}`}>
-              {free.length > 0 && <p className="text-xs text-green-300/80 pt-1">Kosong di jam ini</p>}
+              {free.length > 0 && <p className="text-xs text-success/80 pt-1">Kosong di jam ini</p>}
               {free.map((candidate) => (
                 <label
                   key={candidate.host_id}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer border ${
-                    cover === candidate.host_id ? "border-purple-500 bg-purple-500/10" : "border-transparent bg-slate-800/50 hover:bg-slate-800"
+                    cover === candidate.host_id ? "border-primary bg-primary/10" : "border-transparent bg-surface-2 hover:bg-surface-2"
                   }`}
                 >
                   <input
@@ -171,37 +171,37 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
                     name="cover"
                     checked={cover === candidate.host_id}
                     onChange={() => setCover(candidate.host_id)}
-                    className="accent-purple-500"
+                    className="accent-primary"
                   />
                   <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="w-7 h-7" />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-sm text-white truncate">{candidate.name}</span>
-                    <span className="block text-xs text-gray-400">
-                      {candidate.rating != null && <span className="text-yellow-200">★ {candidate.rating.toFixed(1)} · </span>}
+                    <span className="block text-sm text-heading truncate">{candidate.name}</span>
+                    <span className="block text-xs text-muted">
+                      {candidate.rating != null && <span className="text-warning">★ {candidate.rating.toFixed(1)} · </span>}
                       {candidate.same_brand ? "Brand yang sama" : `Brand lain · kuota ${candidate.quota.quota_used}/${candidate.quota.quota_max}`}
                     </span>
                   </span>
                 </label>
               ))}
               {candidates.data && free.length === 0 && (
-                <p className="text-sm text-gray-400 py-1">{search ? "Tidak ada host kosong dengan nama itu." : "Tidak ada host yang kosong di jam ini."}</p>
+                <p className="text-sm text-muted py-1">{search ? "Tidak ada host kosong dengan nama itu." : "Tidak ada host yang kosong di jam ini."}</p>
               )}
 
               <label
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer border ${
-                  cover === OPEN ? "border-purple-500 bg-purple-500/10" : "border-dashed border-slate-700 hover:bg-slate-800/60"
+                  cover === OPEN ? "border-primary bg-primary/10" : "border-dashed border-stroke-strong hover:bg-surface-2"
                 }`}
               >
-                <input type="radio" name="cover" checked={cover === OPEN} onChange={() => setCover(OPEN)} className="accent-purple-500" />
-                <span className="text-sm text-gray-200">
+                <input type="radio" name="cover" checked={cover === OPEN} onChange={() => setCover(OPEN)} className="accent-primary" />
+                <span className="text-sm text-body">
                   Belum tahu, umumkan ke semua host
-                  <span className="block text-xs text-gray-400">Host bisa melamar; Admin memilih di halaman Backup.</span>
+                  <span className="block text-xs text-muted">Host bisa melamar; Admin memilih di halaman Backup.</span>
                 </span>
               </label>
 
               {busy.length > 0 && (
                 <div className="pt-1">
-                  <button type="button" onClick={() => setShowBusy(!showBusy)} className="text-xs text-gray-400 hover:text-white">
+                  <button type="button" onClick={() => setShowBusy(!showBusy)} className="text-xs text-muted hover:text-heading">
                     {showBusy ? "▾" : "▸"} Tidak tersedia ({busy.length})
                   </button>
                   {showBusy && (
@@ -209,8 +209,8 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
                       {busy.map((candidate) => (
                         <li key={candidate.host_id} className="flex items-center gap-3 rounded-lg px-3 py-1.5 opacity-60">
                           <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="w-6 h-6" />
-                          <span className="flex-1 min-w-0 text-sm text-gray-300 truncate">{candidate.name}</span>
-                          <span className="text-xs text-red-300/80 text-right">{candidate.ineligible_reason}</span>
+                          <span className="flex-1 min-w-0 text-sm text-body truncate">{candidate.name}</span>
+                          <span className="text-xs text-danger/80 text-right">{candidate.ineligible_reason}</span>
                         </li>
                       ))}
                     </ul>
@@ -223,8 +223,8 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
 
         {backupDate && !existing && (
           <section>
-            <h3 className="text-sm font-medium text-white mb-2">
-              Alasan <span className="font-normal text-gray-500">(opsional)</span>
+            <h3 className="text-sm font-medium text-heading mb-2">
+              Alasan <span className="font-normal text-faint">(opsional)</span>
             </h3>
             <div className="flex flex-wrap gap-1.5">
               {REASONS.map((reason) => (
@@ -234,7 +234,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
                   aria-pressed={reasonType === reason.value}
                   onClick={() => setReasonType(reasonType === reason.value ? null : reason.value)}
                   className={`px-3 py-1.5 rounded-lg text-sm border ${
-                    reasonType === reason.value ? "bg-slate-700 border-slate-500 text-white" : "border-slate-700 text-gray-300 hover:bg-slate-800"
+                    reasonType === reason.value ? "bg-surface-3 border-stroke-strong text-heading" : "border-stroke-strong text-body hover:bg-surface-2"
                   }`}
                 >
                   {reason.label}
@@ -247,7 +247,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
               rows={2}
               maxLength={1000}
               placeholder={`Catatan, misalnya "${hostName} ada acara keluarga"`}
-              className="mt-2 w-full px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-700 text-sm text-white outline-none focus:ring-2 focus:ring-purple-500"
+              className="mt-2 w-full px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-sm text-heading outline-none focus:ring-2 focus:ring-primary"
             />
           </section>
         )}

@@ -15,7 +15,7 @@ export default function HostSlipPage() {
 
   return (
     <div className="space-y-4">
-      <Link href="/host/pay" className="text-sm text-purple-300 hover:text-white print:hidden">
+      <Link href="/host/pay" className="text-sm text-accent hover:text-heading print:hidden">
         ← Gaji saya
       </Link>
       {slip.error && <FormAlert tone="error">{slip.error}</FormAlert>}

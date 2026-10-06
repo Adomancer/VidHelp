@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { RequireAuth } from "@/components/AuthProvider";
 import HostBottomNav from "@/components/HostBottomNav";
+import HostNav from "@/components/HostNav";
 import NotificationBell from "@/components/NotificationBell";
+import ThemeToggle from "@/components/ThemeToggle";
 import UserAvatar from "@/components/UserAvatar";
 
 export const metadata: Metadata = {
@@ -17,24 +19,25 @@ export default function HostLayout({
 }) {
   return (
     <RequireAuth roles={["host", "operator", "admin"]}>
-      <div className="min-h-screen bg-slate-950 flex flex-col">
-        {/* Top header — mobile */}
-        <header className="bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between md:px-8 print:hidden">
-          <h2 className="text-lg font-bold text-white">VidHelp</h2>
-          <div className="flex items-center gap-2">
-            <NotificationBell />
-            <Link href="/host/profile" aria-label="Profil saya">
-              <UserAvatar />
+      <div className="min-h-screen bg-canvas flex flex-col">
+        {/* Top bar; menu links show here on desktop, in the bottom bar on phones */}
+        <header className="sticky top-0 z-40 bg-surface border-b border-stroke shadow-card print:hidden">
+          <div className="mx-auto max-w-6xl h-14 px-4 md:px-8 flex items-center justify-between gap-4">
+            <Link href="/host/live" className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-white">V</span>
+              <span className="text-lg font-bold text-heading">VidHelp</span>
             </Link>
+            <HostNav variant="top" />
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <NotificationBell />
+              <Link href="/host/profile" aria-label="Profil saya" className="ml-1">
+                <UserAvatar />
+              </Link>
+            </div>
           </div>
         </header>
-  
-        {/* Main content — scrollable */}
-        <main className="flex-1 p-4 pb-28 overflow-auto md:p-8 md:pb-8">
-          {children}
-        </main>
-  
-        {/* Bottom navigation — phones only */}
+        <main className="flex-1 w-full mx-auto max-w-6xl p-4 pb-28 md:p-8 lg:pb-8">{children}</main>
         <HostBottomNav />
       </div>
     </RequireAuth>

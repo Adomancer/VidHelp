@@ -61,20 +61,20 @@ export default function Dialog({ title, description, onClose, dirty = false, foo
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`w-full ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92vh] flex flex-col bg-slate-900 border border-slate-800 rounded-t-2xl sm:rounded-2xl shadow-2xl outline-none`}
+        className={`w-full ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92vh] flex flex-col bg-surface border border-stroke rounded-t-2xl sm:rounded-[10px] shadow-2xl outline-none`}
       >
         <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
           <div className="min-w-0">
-            <h2 id={titleId} className="text-lg font-semibold text-white">
+            <h2 id={titleId} className="text-lg font-semibold text-heading">
               {title}
             </h2>
-            {description && <div className="mt-0.5 text-sm text-gray-400">{description}</div>}
+            {description && <div className="mt-0.5 text-sm text-muted">{description}</div>}
           </div>
           <button
             type="button"
             onClick={() => requestClose()}
             aria-label="Tutup"
-            className="-mr-1 w-8 h-8 shrink-0 rounded-lg text-gray-400 hover:bg-slate-800 hover:text-white"
+            className="-mr-1 w-8 h-8 shrink-0 rounded-lg text-muted hover:bg-surface-2 hover:text-heading"
           >
             ✕
           </button>
@@ -83,22 +83,22 @@ export default function Dialog({ title, description, onClose, dirty = false, foo
         <div className="flex-1 overflow-y-auto px-5 pb-5">{children}</div>
 
         {confirming ? (
-          <div className="flex flex-wrap items-center gap-3 border-t border-yellow-400/30 bg-yellow-500/10 px-5 py-4 rounded-b-2xl">
-            <p className="flex-1 min-w-48 text-sm text-yellow-100">Ada isian yang belum disimpan. Tutup dan buang perubahan?</p>
+          <div className="flex flex-wrap items-center gap-3 border-t border-yellow-400/30 bg-yellow-500/10 px-5 py-4 rounded-b-[10px]">
+            <p className="flex-1 min-w-48 text-sm text-warning">Ada isian yang belum disimpan. Tutup dan buang perubahan?</p>
             <button
               type="button"
               autoFocus
               onClick={() => setConfirming(false)}
-              className="px-4 py-2 rounded-lg text-sm text-gray-200 hover:bg-slate-800"
+              className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2"
             >
               Lanjut mengisi
             </button>
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm bg-yellow-500/20 text-yellow-100 hover:bg-yellow-500/30">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm bg-yellow-500/20 text-warning hover:bg-yellow-500/30">
               Buang perubahan
             </button>
           </div>
         ) : (
-          footer && <div className="flex flex-wrap items-center gap-2 border-t border-slate-800 px-5 py-4">{footer}</div>
+          footer && <div className="flex flex-wrap items-center gap-2 border-t border-stroke px-5 py-4">{footer}</div>
         )}
       </div>
     </div>,

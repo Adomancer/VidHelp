@@ -62,10 +62,10 @@ export default function ReportReview() {
                 <div className="flex items-center gap-3">
                   {attendance.host && <UserAvatar user={attendance.host.user} size="w-8 h-8" />}
                   <div>
-                    <p className="text-white">
+                    <p className="text-heading">
                       {attendance.host?.user.name} · {attendance.brand?.name}
                     </p>
-                    <p className="text-sm text-gray-400">
+                    <p className="text-sm text-muted">
                       {formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)} · batas laporan {formatDateTime(attendance.report_due_at)}
                     </p>
                   </div>
@@ -89,7 +89,7 @@ export default function ReportReview() {
 function Empty() {
   return (
     <Card>
-      <p className="text-sm text-gray-400">Tidak ada data.</p>
+      <p className="text-sm text-muted">Tidak ada data.</p>
     </Card>
   );
 }
@@ -99,19 +99,19 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
   const [hours, setHours] = useState(Math.min(report.duration_hours, report.scheduled_hours));
   const [note, setNote] = useState("");
   const attendance = report.attendance;
-  const input = "px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm";
+  const input = "px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading text-sm";
 
   return (
     <Card>
       <div className="flex items-start gap-3">
         <UserAvatar user={report.host.user} size="w-9 h-9" />
         <div className="flex-1 min-w-0">
-          <p className="text-white font-medium">
+          <p className="text-heading font-medium">
             {report.host.user.name} · {report.brand.name}
-            {attendance.backup_request_id && <span className="ml-2 text-xs text-green-300">backup</span>}
-            {attendance.event_claim_id && <span className="ml-2 text-xs text-yellow-200">event</span>}
+            {attendance.backup_request_id && <span className="ml-2 text-xs text-success">backup</span>}
+            {attendance.event_claim_id && <span className="ml-2 text-xs text-warning">event</span>}
           </p>
-          <p className="text-sm text-purple-200">{formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}</p>
+          <p className="text-sm text-accent">{formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}</p>
         </div>
       </div>
 
@@ -127,12 +127,12 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
         ))}
       </dl>
 
-      {report.notes && <p className="text-sm text-gray-300">“{report.notes}”</p>}
+      {report.notes && <p className="text-sm text-body">“{report.notes}”</p>}
 
       {(report.flag_reasons ?? []).length > 0 && (
         <ul className="flex flex-wrap gap-2">
           {report.flag_reasons!.map((reason) => (
-            <li key={reason} className="px-2 py-0.5 rounded-md bg-yellow-500/15 text-yellow-200 text-xs">
+            <li key={reason} className="px-2 py-0.5 rounded-md bg-yellow-500/15 text-warning text-xs">
               {FLAG_REASONS[reason] ?? reason}
             </li>
           ))}
@@ -140,10 +140,10 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
       )}
 
       {report.status === "flagged" ? (
-        <div className="flex flex-wrap items-end gap-2 border-t border-slate-800 pt-3">
+        <div className="flex flex-wrap items-end gap-2 border-t border-stroke pt-3">
           <DurationInput label="Waktu yang dibayar" hours={hours} onChange={setHours} compact />
           <label className="flex-1 min-w-40 space-y-1">
-            <span className="block text-xs text-gray-400">Catatan (wajib untuk menolak)</span>
+            <span className="block text-xs text-muted">Catatan (wajib untuk menolak)</span>
             <input value={note} onChange={(event) => setNote(event.target.value)} maxLength={255} className={`${input} w-full`} />
           </label>
           <button
@@ -157,13 +157,13 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
             type="button"
             disabled={!note.trim()}
             onClick={() => act(() => reportApi.reject(token, report.id, note))}
-            className="px-4 py-2 rounded-lg border border-red-400/40 text-red-300 text-sm hover:bg-red-500/10 disabled:opacity-40"
+            className="px-4 py-2 rounded-lg border border-red-400/40 text-danger text-sm hover:bg-red-500/10 disabled:opacity-40"
           >
             Tolak
           </button>
         </div>
       ) : (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted">
           {report.reviewer ? `${report.status === "approved" ? "Disetujui" : "Ditolak"} oleh ${report.reviewer.name}` : "Disetujui otomatis"}
           {report.reviewed_at && ` · ${formatDateTime(report.reviewed_at)}`}
           {report.review_note && ` · “${report.review_note}”`}
@@ -176,8 +176,8 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-gray-400">{label}</dt>
-      <dd className="text-white">{value}</dd>
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="text-heading">{value}</dd>
     </div>
   );
 }

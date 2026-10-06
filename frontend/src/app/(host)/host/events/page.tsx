@@ -12,12 +12,12 @@ export default function HostEventsPage() {
 
   return (
     <div className="max-w-3xl space-y-5">
-      <h1 className="text-xl font-bold text-white">Rebutan Event</h1>
+      <h1 className="text-xl font-bold text-heading">Rebutan Event</h1>
       {isHost ? (
         <EventClaimBoard events={events} />
       ) : (
         <Card>
-          <p className="text-sm text-gray-400">Halaman ini untuk host. Atur event dan bloknya di menu Events pada dashboard.</p>
+          <p className="text-sm text-muted">Halaman ini untuk host. Atur event dan bloknya di menu Events pada dashboard.</p>
         </Card>
       )}
     </div>

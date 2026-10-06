@@ -8,7 +8,7 @@ export default function ForgotPasswordPage() {
       <ForgotPasswordForm />
 
       <p className="text-center text-sm">
-        <Link href="/login" className="text-purple-300 hover:text-white">
+        <Link href="/login" className="text-accent hover:text-heading">
           Kembali ke halaman masuk
         </Link>
       </p>
