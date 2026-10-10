@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import HostEventNavLink from "./HostEventNavLink";
 import NavIcon, { type NavIconName } from "./NavIcon";
 
-const items: { href: string; label: string; icon: NavIconName }[] = [
+/** The host menu, shared by the desktop header and the phone tab bar (HostBottomNav). */
+export const hostMenuItems: { href: string; label: string; icon: NavIconName }[] = [
   { href: "/host/live", label: "Live", icon: "host" },
   { href: "/host/schedule", label: "Jadwal", icon: "calendar" },
   { href: "/host/events", label: "Event", icon: "event" },
@@ -29,7 +30,7 @@ export default function HostNav({ variant }: { variant: "bottom" | "top" }) {
           active ? "bg-primary/10 text-accent" : "text-body hover:bg-surface-2 hover:text-heading"
         }`;
 
-  const links = items.map((item) => {
+  const links = hostMenuItems.map((item) => {
     const active = isActive(item.href);
     const content = (
       <>
