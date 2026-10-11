@@ -4,12 +4,11 @@ import { useState } from "react";
 import { errorMessage, fieldErrors, scheduleApi, type ScheduleSlot } from "@/lib/api";
 import { toDateInput } from "@/lib/format";
 import { describeWeekly, formatLongDate, laterDate } from "@/lib/schedule";
-import { inputClass } from "@/lib/ui";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "./AuthProvider";
 import Dialog from "./Dialog";
+import DatePicker from "./DatePicker";
 import FormAlert from "./FormAlert";
 import type { ToastMessage } from "./Toast";
 
@@ -80,14 +79,7 @@ export default function StopSlotDialog({ slot, week, onClose, onSaved }: StopSlo
 
         <div className="space-y-1.5">
           <Label htmlFor="stop-from">Berhenti mulai</Label>
-          <input
-            id="stop-from"
-            type="date"
-            value={from}
-            min={today}
-            onChange={(event) => event.target.value && setFrom(event.target.value)}
-            className={cn(inputClass, "tabular-nums sm:w-48")}
-          />
+          <DatePicker id="stop-from" value={from} min={today} onChange={setFrom} className="sm:w-56" />
         </div>
 
         {alreadyEnded ? (

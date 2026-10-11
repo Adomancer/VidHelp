@@ -29,18 +29,14 @@ const CHANGED = "vidhelp:host-events-changed";
  */
 export function useHostEvents(enabled: boolean, refreshMs: number) {
   const { token } = useAuth();
-  const events = useApiData(`host-events-${enabled}`, () => (enabled ? eventApi.mine(token) : Promise.resolve({ events: [] as HostEvent[], my_brands: [] as string[] })));
+  const events = useApiData("my-events", () => eventApi.mine(token), { enabled, refetchInterval: refreshMs });
   const { reload } = events;
 
   useEffect(() => {
     if (!enabled) return;
-    const timer = setInterval(() => document.visibilityState === "visible" && reload(), refreshMs);
     window.addEventListener(CHANGED, reload);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener(CHANGED, reload);
-    };
-  }, [enabled, refreshMs, reload]);
+    return () => window.removeEventListener(CHANGED, reload);
+  }, [enabled, reload]);
 
   const claimable = (events.data?.events ?? []).reduce((total, event) => total + claimableBlocks(event).length, 0);
 

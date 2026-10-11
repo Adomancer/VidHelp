@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, ArrowRight, CalendarDays, FileText, Flag, RefreshCw, Ticket, Users, Video } from "lucide-react";
 import { dashboardApi } from "@/lib/api";
@@ -29,14 +28,11 @@ const shortcuts = [
 /** What needs the operator today, with one click to where it's handled. */
 export default function OperatorDashboardPage() {
   const { token } = useAuth();
-  const dashboard = useApiData("operator-dashboard", () => dashboardApi.operator(token).then((data) => ({ ...data, loadedAt: new Date() })));
+  const dashboard = useApiData("operator-dashboard", () => dashboardApi.operator(token).then((data) => ({ ...data, loadedAt: new Date() })), {
+    refetchInterval: REFRESH_MS,
+  });
   const { reload, loading } = dashboard;
   const stats = dashboard.data?.stats;
-
-  useEffect(() => {
-    const timer = setInterval(reload, REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [reload]);
 
   return (
     <div className="space-y-6">

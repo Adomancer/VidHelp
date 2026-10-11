@@ -2,16 +2,21 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Clock, Lock, Plus, Ticket } from "lucide-react";
+import { parseAsString, useQueryState } from "nuqs";
+import { id as indonesian } from "react-day-picker/locale";
 import { errorMessage, operatorApi, scheduleApi, type ReplacingEvent, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
 import { DAYS, formatShortDate, isoWeekday, previousDay, toDateInput } from "@/lib/format";
 import { addDays, addMonths, dayLong, formatLongDate, formatMonth, formatWeekRange, inEffectOn, monthGrid, monthStart, weekStart } from "@/lib/schedule";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "./AuthProvider";
 import BackupDialog from "./BackupDialog";
+import { parseDateInput } from "./DatePicker";
 import FormAlert from "./FormAlert";
 import ScheduleMonth from "./ScheduleMonth";
 import SearchableSelect from "./SearchableSelect";
@@ -68,30 +73,32 @@ function rememberBrand(id: string) {
 export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }) {
   const { token } = useAuth();
   const today = toDateInput();
-  const [chosenBrandId, setChosenBrandId] = useState("");
+  // The brand lives in the URL (?brand=…) for links and refreshes; otherwise the last one picked on this device
+  const [chosenBrandId, setChosenBrandId] = useQueryState("brand", parseAsString.withDefault(""));
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [view, setView] = useState<View>(rememberedView);
   const [week, setWeek] = useState(() => weekStart());
   const [month, setMonth] = useState(() => monthStart());
   const [mobileDay, setMobileDay] = useState(() => isoWeekday());
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const { show } = useToast();
-  const pickerRef = useRef<HTMLInputElement>(null);
   const swipeFrom = useRef<number | null>(null);
 
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const activeBrands = brands.data?.brands.filter((brand) => brand.status === "active") ?? [];
+  const linkedBrandId = activeBrands.some((brand) => brand.id === chosenBrandId) ? chosenBrandId : "";
   const brandId =
-    chosenBrandId || (activeBrands.length > 0 ? rememberedBrand(activeBrands.map((brand) => brand.id)) ?? activeBrands[0].id : "");
+    linkedBrandId || (activeBrands.length > 0 ? rememberedBrand(activeBrands.map((brand) => brand.id)) ?? activeBrands[0].id : "");
 
   // The week board loads 7 days; the month calendar every day its grid shows (5 or 6 weeks)
   const grid = monthGrid(month);
   const range = view === "week" ? { on: week, days: 7 } : { on: grid.start, days: grid.days };
-  const board = useApiData(`${brandId}|${range.on}|${range.days}`, () =>
+  const board = useApiData(`schedule-board|${brandId}|${range.on}|${range.days}`, () =>
     brandId
       ? scheduleApi.list(token, { brand_id: brandId, ...range })
       : Promise.resolve({ slots: [], backups: [], replacing_events: [] })
   );
-  const hosts = useApiData(brandId, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
+  const hosts = useApiData(`brand-hosts-${brandId}`, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
 
   const slots = board.data?.slots ?? [];
   const backups = board.data?.backups ?? [];
@@ -186,7 +193,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           <SearchableSelect
             value={brandId}
             onChange={(value) => {
-              setChosenBrandId(value);
+              void setChosenBrandId(value);
               rememberBrand(value);
             }}
             options={activeBrands.map((brand) => ({ value: brand.id, label: brand.name }))}
@@ -220,24 +227,30 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           >
             <ChevronRight />
           </IconButton>
-          <span className="relative">
-            <IconButton label="Pilih tanggal di kalender" onClick={() => openPicker(pickerRef.current)}>
-              <CalendarDays />
-            </IconButton>
-            <input
-              ref={pickerRef}
-              type="date"
-              tabIndex={-1}
-              aria-hidden="true"
-              value={view === "week" ? week : month}
-              onChange={(event) => {
-                if (!event.target.value) return;
-                if (view === "week") goToWeek(weekStart(event.target.value));
-                else setMonth(monthStart(event.target.value));
-              }}
-              className="pointer-events-none absolute inset-0 opacity-0"
-            />
-          </span>
+          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button type="button" variant="ghost" size="icon-sm" aria-label="Pilih tanggal di kalender" title="Pilih tanggal di kalender" className="text-body">
+                <CalendarDays />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-auto p-0">
+              <Calendar
+                mode="single"
+                required
+                selected={parseDateInput(view === "week" ? week : month)}
+                defaultMonth={parseDateInput(view === "week" ? week : month)}
+                onSelect={(day) => {
+                  const date = toDateInput(day);
+                  if (view === "week") goToWeek(weekStart(date));
+                  else setMonth(monthStart(date));
+                  setPickerOpen(false);
+                }}
+                locale={indonesian}
+                weekStartsOn={1}
+                autoFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {(view === "week" ? !isThisWeek : !isThisMonth) && (
@@ -532,15 +545,6 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
       {children}
     </Button>
   );
-}
-
-function openPicker(input: HTMLInputElement | null) {
-  if (!input) return;
-  try {
-    input.showPicker();
-  } catch {
-    input.focus();
-  }
 }
 
 function eventOn(events: ReplacingEvent[], date: string) {

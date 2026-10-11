@@ -1,10 +1,12 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
+import type { ColumnDef } from "@tanstack/react-table";
 import { CalendarRange, ChevronRight, Download, HandCoins, Plus, Send, Wallet } from "lucide-react";
-import { errorMessage, payrollApi, type CashAdvance, type PeriodListItem, type PeriodStatus } from "@/lib/api";
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
+import { errorMessage, payrollApi, type CashAdvance, type HostPayRow, type PeriodListItem, type PeriodStatus } from "@/lib/api";
 import { formatDate, formatDuration, formatRupiah } from "@/lib/format";
 import { inputClass, inputSmClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
@@ -15,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import ConfirmDialog from "./ConfirmDialog";
+import DataTable from "./DataTable";
 import Dialog from "./Dialog";
 import DurationInput from "./DurationInput";
 import EmptyState from "./EmptyState";
@@ -51,9 +54,11 @@ type Confirm = { title: string; body: string; label: string; destructive?: boole
 
 /**
  * Admin payroll: payment periods per brand (lock, pay, slips) and kasbon.
+ * The tab, brand filter, open period and kasbon filter live in the URL, so a refresh,
+ * a shared link or coming back from a slip shows the same view.
  */
 export default function PayrollDesk() {
-  const [tab, setTab] = useState<"periods" | "kasbon">("periods");
+  const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(["periods", "kasbon"] as const).withDefault("periods"));
 
   return (
     <div className="space-y-5">
@@ -64,16 +69,9 @@ export default function PayrollDesk() {
           ["kasbon", "Kasbon"],
         ] as const}
         value={tab}
-        onChange={setTab}
+        onChange={(next) => void setTab(next)}
       />
-      {tab === "periods" ? (
-        // The open period lives in the URL (?period=…), which isn't known while prerendering
-        <Suspense fallback={<TableSkeleton rows={5} columns={5} />}>
-          <Periods />
-        </Suspense>
-      ) : (
-        <Kasbon />
-      )}
+      {tab === "periods" ? <Periods /> : <Kasbon />}
     </div>
   );
 }
@@ -81,16 +79,13 @@ export default function PayrollDesk() {
 function Periods() {
   const { token } = useAuth();
   const brands = useApiData("payroll-brands", () => payrollApi.brands(token));
-  const [brandId, setBrandId] = useState("");
-  const periods = useApiData(`periods-${brandId}`, () => payrollApi.periods(token, brandId));
+  const [brandId, setBrandId] = useQueryState("brand", parseAsString.withDefault(""));
+  const periods = useApiData(`payroll-periods-${brandId}`, () => payrollApi.periods(token, brandId));
   const [error, setError] = useState<string | null>(null);
   const list = periods.data?.periods;
 
-  // The open period is in the URL, so a refresh, a shared link or coming back from a slip keeps it open
-  const router = useRouter();
-  const pathname = usePathname();
-  const selected = useSearchParams().get("period");
-  const select = (id: string | null) => router.replace(id ? `${pathname}?period=${id}` : pathname, { scroll: false });
+  const [selected, setSelected] = useQueryState("period");
+  const select = (id: string | null) => void setSelected(id);
   const current = list?.find((period) => period.id === selected);
 
   const withoutStart = brands.data?.brands.filter((brand) => brand.status === "active" && !brand.payroll_start_date) ?? [];
@@ -109,9 +104,7 @@ function Periods() {
       <NativeSelect
         wrapperClassName="sm:w-64"
         value={brandId}
-        onChange={(event) => {
-          setBrandId(event.target.value);
-        }}
+        onChange={(event) => void setBrandId(event.target.value)}
         aria-label="Brand"
       >
         <option value="">Semua brand</option>
@@ -128,55 +121,37 @@ function Periods() {
         {list?.length === 0 && <EmptyState icon={CalendarRange} title="Belum ada periode pembayaran" description="Periode dibuat otomatis setelah brand punya tanggal mulai penggajian." />}
 
         {list && list.length > 0 && (
-          <>
-            <table className="hidden w-full text-sm md:table">
-              <thead className="border-b border-border bg-muted/50 text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Brand · periode</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 text-right font-medium">Jam kerja</th>
-                  <th className="px-4 py-3 text-right font-medium">Ditagihkan</th>
-                  <th className="px-4 py-3 text-right font-medium">Gaji host</th>
-                  <th className="w-10 px-4 py-3">
-                    <span className="sr-only">Buka</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {list.map((period) => (
-                  <PeriodRow key={period.id} period={period} selected={period.id === selected} onClick={() => select(period.id)} />
-                ))}
-              </tbody>
-            </table>
-
-            <ul className="divide-y divide-border md:hidden">
-              {list.map((period) => (
-                <li key={period.id}>
-                  <button
-                    type="button"
-                    onClick={() => select(period.id)}
-                    className={cn("w-full space-y-2 p-4 text-left outline-none focus-visible:bg-muted/60", period.id === selected ? "bg-primary/[0.06]" : "active:bg-muted/60")}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground">{period.brand?.name}</p>
-                        <p className="text-xs text-muted-foreground tabular-nums">
-                          {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
-                        </p>
-                      </div>
-                      <PeriodBadge status={period.status} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground tabular-nums">
-                      <span>
-                        {formatDuration(period.achieved_hours)} / {period.target_hours} jam
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">{formatRupiah(period.total_amount)}</span>
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
+          <DataTable
+            columns={periodColumns}
+            data={list}
+            getRowId={(period) => period.id}
+            onRowClick={(period) => select(period.id)}
+            rowOpensDialog
+            rowClassName={(period) => cn("text-body", period.id === selected ? "bg-primary/[0.06] [&_svg]:text-brand" : "hover:bg-muted/40")}
+            renderMobile={(period) => (
+              <button
+                type="button"
+                onClick={() => select(period.id)}
+                className={cn("w-full space-y-2 p-4 text-left outline-none focus-visible:bg-muted/60", period.id === selected ? "bg-primary/[0.06]" : "active:bg-muted/60")}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground">{period.brand?.name}</p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
+                    </p>
+                  </div>
+                  <PeriodBadge status={period.status} />
+                </div>
+                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground tabular-nums">
+                  <span>
+                    {formatDuration(period.achieved_hours)} / {period.target_hours} jam
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatRupiah(period.total_amount)}</span>
+                </div>
+              </button>
+            )}
+          />
         )}
       </div>
 
@@ -203,44 +178,87 @@ function Periods() {
   );
 }
 
-function PeriodRow({ period, selected, onClick }: { period: PeriodListItem; selected: boolean; onClick: () => void }) {
-  return (
-    <tr
-      onClick={onClick}
-      tabIndex={0}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick();
-        }
-      }}
-      aria-haspopup="dialog"
-      className={cn("cursor-pointer text-body transition-colors outline-none focus-visible:bg-muted/60", selected ? "bg-primary/[0.06]" : "hover:bg-muted/40")}
-    >
-      <td className="px-4 py-3">
+const statusOrder: PeriodStatus[] = ["in_progress", "waiting_payment", "requested", "paid"];
+
+/** Sorting by "Brand · periode" goes by brand, then by start date. */
+const periodColumns: ColumnDef<PeriodListItem>[] = [
+  {
+    id: "period",
+    accessorFn: (period) => `${period.brand?.name ?? ""} ${period.period_start}`,
+    header: "Brand · periode",
+    cell: ({ row: { original: period } }) => (
+      <>
         <p className="font-medium text-foreground">{period.brand?.name}</p>
         <p className="text-xs text-muted-foreground tabular-nums">
           {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
         </p>
-      </td>
-      <td className="px-4 py-3">
-        <PeriodBadge status={period.status} />
-      </td>
-      <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">{formatDuration(period.worked_hours)}</td>
-      <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+      </>
+    ),
+  },
+  { id: "status", accessorFn: (period) => statusOrder.indexOf(period.status), header: "Status", cell: ({ row }) => <PeriodBadge status={row.original.status} /> },
+  {
+    accessorKey: "worked_hours",
+    header: "Jam kerja",
+    meta: { align: "right", cellClassName: "whitespace-nowrap" },
+    cell: ({ row }) => formatDuration(row.original.worked_hours),
+  },
+  {
+    accessorKey: "achieved_hours",
+    header: "Ditagihkan",
+    meta: { align: "right", cellClassName: "whitespace-nowrap" },
+    cell: ({ row: { original: period } }) => (
+      <>
         {formatDuration(period.achieved_hours)} <span className="text-xs text-muted-foreground">/ {period.target_hours} jam</span>
-      </td>
-      <td className="px-4 py-3 text-right font-medium whitespace-nowrap text-foreground tabular-nums">{formatRupiah(period.total_amount)}</td>
-      <td className="px-4 py-3">
-        <ChevronRight className={cn("ml-auto size-4 text-faint", selected && "text-brand")} aria-hidden="true" />
-      </td>
-    </tr>
-  );
-}
+      </>
+    ),
+  },
+  {
+    accessorKey: "total_amount",
+    header: "Gaji host",
+    meta: { align: "right", cellClassName: "font-medium whitespace-nowrap text-foreground" },
+    cell: ({ row }) => formatRupiah(row.original.total_amount),
+  },
+  {
+    id: "open",
+    header: () => <span className="sr-only">Buka</span>,
+    enableSorting: false,
+    meta: { headClassName: "w-10" },
+    cell: () => <ChevronRight className="ml-auto size-4 text-faint" aria-hidden="true" />,
+  },
+];
+
+/** Hosts' pay in a period: name, sessions, time, rate and pay, sortable. */
+const hostPayColumns: ColumnDef<HostPayRow>[] = [
+  { accessorKey: "name", header: "Host", meta: { headClassName: "px-5 py-2.5 md:px-6", cellClassName: "px-5 py-2.5 font-medium text-foreground md:px-6" } },
+  { accessorKey: "session_count", header: "Sesi", meta: { align: "right", headClassName: "px-3 py-2.5", cellClassName: "px-3 py-2.5" } },
+  {
+    accessorKey: "hours",
+    header: "Waktu",
+    meta: { align: "right", headClassName: "px-3 py-2.5", cellClassName: "px-3 py-2.5 whitespace-nowrap" },
+    cell: ({ row }) => formatDuration(row.original.hours),
+  },
+  {
+    accessorKey: "rate_per_hour",
+    header: "Tarif",
+    meta: { align: "right", headClassName: "hidden px-3 py-2.5 sm:table-cell", cellClassName: "hidden px-3 py-2.5 whitespace-nowrap text-muted-foreground sm:table-cell" },
+    cell: ({ row }) => formatRupiah(row.original.rate_per_hour),
+  },
+  {
+    accessorKey: "amount",
+    header: "Gaji",
+    meta: { align: "right", headClassName: "px-5 py-2.5 md:px-6", cellClassName: "px-5 py-2.5 whitespace-nowrap md:px-6" },
+    cell: ({ row: { original: host } }) => (
+      <>
+        <span className="font-medium text-foreground">{formatRupiah(host.amount)}</span>
+        {host.estimate && <span className="block text-[11px] text-muted-foreground">perkiraan</span>}
+      </>
+    ),
+  },
+];
 
 function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (text: string, tone?: "success" | "error") => void }) {
   const { token } = useAuth();
-  const detail = useApiData(`period-${periodId}`, () => payrollApi.period(token, periodId));
+  const detail = useApiData(`payroll-period-${periodId}`, () => payrollApi.period(token, periodId));
   const [confirm, setConfirm] = useState<Confirm>(null);
   // The desk is shared by the admin and finance panels; slips open in the same panel
   const slipsPath = usePathname().startsWith("/finance") ? "/finance/payroll/slips" : "/admin/payroll/slips";
@@ -384,33 +402,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
         {hosts.length === 0 ? (
           <p className="px-5 pb-3 text-sm text-muted-foreground md:px-6">Belum ada jam yang disetujui.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-y border-border bg-muted/50 text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-5 py-2.5 font-medium md:px-6">Host</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Sesi</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Waktu</th>
-                  <th className="hidden px-3 py-2.5 text-right font-medium sm:table-cell">Tarif</th>
-                  <th className="px-5 py-2.5 text-right font-medium md:px-6">Gaji</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {hosts.map((host) => (
-                  <tr key={host.host_id} className="text-body">
-                    <td className="px-5 py-2.5 font-medium text-foreground md:px-6">{host.name}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{host.session_count}</td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">{formatDuration(host.hours)}</td>
-                    <td className="hidden px-3 py-2.5 text-right whitespace-nowrap text-muted-foreground tabular-nums sm:table-cell">{formatRupiah(host.rate_per_hour)}</td>
-                    <td className="px-5 py-2.5 text-right whitespace-nowrap tabular-nums md:px-6">
-                      <span className="font-medium text-foreground">{formatRupiah(host.amount)}</span>
-                      {host.estimate && <span className="block text-[11px] text-muted-foreground">perkiraan</span>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable columns={hostPayColumns} data={hosts} getRowId={(host) => host.host_id} headerClassName="border-y" rowClassName={() => "text-body"} />
         )}
       </Card>
 
@@ -640,8 +632,11 @@ function installmentColor(installment: CashAdvance["installments"][number]): str
 
 function Kasbon() {
   const { token } = useAuth();
-  const [status, setStatus] = useState<"open" | "paid" | "">("open");
-  const advances = useApiData(`advances-${status}`, () => payrollApi.advances(token, status));
+  // "Semua" is "" for the API and "all" in the URL
+  const [statusParam, setStatusParam] = useQueryState("kasbon", parseAsStringLiteral(["open", "paid", "all"] as const).withDefault("open"));
+  const status = statusParam === "all" ? "" : statusParam;
+  const setStatus = (next: typeof status) => void setStatusParam(next || "all");
+  const advances = useApiData(`payroll-advances-${status}`, () => payrollApi.advances(token, status));
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<CashAdvance | null>(null);

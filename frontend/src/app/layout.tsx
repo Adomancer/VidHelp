@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
+import QueryProvider from "@/components/QueryProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { themeInitScript } from "@/lib/theme";
@@ -23,7 +25,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-full flex flex-col font-sans">
-        <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+        <QueryProvider>
+          <NuqsAdapter>
+            <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+          </NuqsAdapter>
+        </QueryProvider>
         <Toaster position="bottom-right" closeButton />
       </body>
     </html>

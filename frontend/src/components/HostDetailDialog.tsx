@@ -9,15 +9,17 @@ import { statusLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import AssignmentEditor from "./AssignmentEditor";
 import { useAuth } from "./AuthProvider";
+import DatePicker from "./DatePicker";
 import Dialog from "./Dialog";
 import DigitsField from "./DigitsField";
+import { FieldError } from "./FieldMessage";
 import FormAlert from "./FormAlert";
 import { ListSkeleton } from "./Loading";
 import SelectField from "./SelectField";
 import StatusBadge from "./StatusBadge";
-import TextField from "./TextField";
 import UserAvatar from "./UserAvatar";
 
 const FORM_ID = "host-settings";
@@ -36,7 +38,7 @@ interface HostDetailDialogProps {
 export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDetailDialogProps) {
   const { token } = useAuth();
   const [dirty, setDirty] = useState(false);
-  const host = useApiData(`host-${hostId}`, () => adminHostsApi.host(token, hostId));
+  const host = useApiData(`admin-host-${hostId}`, () => adminHostsApi.host(token, hostId));
   const rates = useApiData("rates", () => adminHostsApi.rateCategories(token));
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const detail = host.data?.host;
@@ -102,7 +104,20 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
                 )}
                 <DigitsField label="No. HP" name="phone" defaultValue={detail.phone} maxLength={15} placeholder="08…" error={errors.phone} />
                 <DigitsField label="No. HP wali" name="guardian_phone" defaultValue={detail.guardian_phone} maxLength={15} placeholder="08…" error={errors.guardian_phone} />
-                <TextField label="Tanggal bergabung" name="join_date" type="date" defaultValue={detail.join_date.slice(0, 10)} error={errors.join_date} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="join_date">Tanggal bergabung</Label>
+                  {/* A hidden input doesn't fire the form's change event, so mark the form as edited here */}
+                  <DatePicker
+                    id="join_date"
+                    name="join_date"
+                    defaultValue={detail.join_date.slice(0, 10)}
+                    onChange={() => setDirty(true)}
+                    captionLayout="dropdown"
+                    aria-invalid={errors.join_date ? true : undefined}
+                    aria-describedby={errors.join_date ? "join_date-error" : undefined}
+                  />
+                  <FieldError id="join_date-error">{errors.join_date}</FieldError>
+                </div>
                 <div className="space-y-1.5">
                   <span className="block text-sm font-medium text-foreground">Status</span>
                   <StatusBadge tone={detail.status === "active" ? "success" : detail.status === "banned" ? "danger" : "neutral"} dot>

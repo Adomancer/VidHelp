@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Flag, MessageSquareWarning, Search, ShieldAlert, ThumbsUp, Users } from "lucide-react";
+import { parseAsString, useQueryState } from "nuqs";
 import { errorMessage, operatorApi, pointsApi, type PointLog, type PointsHostDetail, type ViolationType } from "@/lib/api";
 import { formatDate, formatShortDate, toDateInput } from "@/lib/format";
 import { useMediaQuery } from "@/hooks/use-mobile";
@@ -14,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import ConfirmDialog from "./ConfirmDialog";
+import DatePicker from "./DatePicker";
 import Dialog from "./Dialog";
 import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
@@ -41,12 +43,13 @@ export const sourceLabels: Record<PointLog["source"], string> = {
  */
 export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
   const { token } = useAuth();
-  const [query, setQuery] = useState("");
-  const [search, setSearch] = useState("");
+  // The search lives in the URL (?q=…), so a refresh keeps it
+  const [search, setSearch] = useQueryState("q", parseAsString.withDefault(""));
+  const [query, setQuery] = useState(search);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const hosts = useApiData(`points-${search}`, () => pointsApi.hosts(token, search));
+  const hosts = useApiData(`points-hosts-${search}`, () => pointsApi.hosts(token, search));
   const wide = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => () => clearTimeout(debounce.current), []);
@@ -93,7 +96,7 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
                 const next = event.target.value;
                 setQuery(next);
                 clearTimeout(debounce.current);
-                debounce.current = setTimeout(() => setSearch(next.trim()), 300);
+                debounce.current = setTimeout(() => void setSearch(next.trim()), 300);
               }}
               placeholder="Cari host…"
               aria-label="Cari host"
@@ -149,7 +152,7 @@ type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
 
 function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: boolean; onChanged: (message: string, tone?: "success" | "error") => void }) {
   const { token } = useAuth();
-  const detail = useApiData(`points-host-${hostId}`, () => pointsApi.host(token, hostId));
+  const detail = useApiData(`points-detail-${hostId}`, () => pointsApi.host(token, hostId));
   const [form, setForm] = useState<"violation" | "complaint" | "sp" | null>(null);
   const [voiding, setVoiding] = useState<PointLog | null>(null);
 
@@ -373,7 +376,7 @@ function ViolationForm({ hostId, onDone, onCancel }: FormProps) {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="violation-date">Tanggal</Label>
-        <input id="violation-date" name="occurred_on" type="date" defaultValue={toDateInput()} max={toDateInput()} className={cn(inputClass, "tabular-nums")} />
+        <DatePicker id="violation-date" name="occurred_on" defaultValue={toDateInput()} max={toDateInput()} />
       </div>
       <div className="space-y-1.5 sm:col-span-2">
         <Label htmlFor="violation-reason">Kejadiannya</Label>
@@ -429,7 +432,7 @@ function ComplaintForm({ hostId, onDone, onCancel }: FormProps) {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="complaint-date">Tanggal</Label>
-        <input id="complaint-date" name="occurred_on" type="date" defaultValue={toDateInput()} max={toDateInput()} className={cn(inputClass, "tabular-nums")} />
+        <DatePicker id="complaint-date" name="occurred_on" defaultValue={toDateInput()} max={toDateInput()} />
       </div>
       <FormActions loading={loading} submitLabel="Catat" onCancel={onCancel} />
     </form>

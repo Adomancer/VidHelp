@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, ClipboardCheck, Layers, RefreshCw, Tag, TrendingDown, TrendingUp, Video, Wallet } from "lucide-react";
 import { dashboardApi, type AdminDashboard, type BrandProgress, type SessionState, type TodaySession } from "@/lib/api";
@@ -51,16 +51,13 @@ const BRAND_ROWS = 4;
 export default function AdminDashboardPage() {
   const { token } = useAuth();
   // Stamp each load so the header can say how fresh the numbers are
-  const dashboard = useApiData("admin-dashboard", () => dashboardApi.admin(token).then((data) => ({ data, loadedAt: new Date() })));
+  // Check-ins and new requests change through the day
+  const dashboard = useApiData("admin-dashboard", () => dashboardApi.admin(token).then((data) => ({ data, loadedAt: new Date() })), {
+    refetchInterval: REFRESH_MS,
+  });
   const { reload, loading } = dashboard;
   const data = dashboard.data?.data;
   const updatedAt = dashboard.data?.loadedAt;
-
-  // Check-ins and new requests change through the day
-  useEffect(() => {
-    const timer = setInterval(reload, REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [reload]);
 
   return (
     <div className="space-y-6">

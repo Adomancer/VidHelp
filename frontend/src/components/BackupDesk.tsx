@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, Clock, ExternalLink, Inbox, Plus, Star, UserRoundPlus } from "lucide-react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import {
   errorMessage,
   operatorBackupApi,
@@ -20,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "./AuthProvider";
 import { BackupStatusBadge, LetterBadge, reasonLabels, RequestTypeBadge } from "./BackupBadges";
 import ConfirmDialog from "./ConfirmDialog";
+import DatePicker from "./DatePicker";
 import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
 import { FieldError } from "./FieldMessage";
@@ -56,11 +58,12 @@ type Confirm = { title: string; body: string; label: string; run: () => Promise<
  */
 export default function BackupDesk() {
   const { token } = useAuth();
-  const [tab, setTab] = useState<Tab>("pending");
+  // The tab lives in the URL, so a refresh or the Back button keeps it
+  const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(tabs.map((option) => option.value)).withDefault("pending"));
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
-  const requests = useApiData(tab, () => operatorBackupApi.list(token, tab));
+  const requests = useApiData(`operator-backups-${tab}`, () => operatorBackupApi.list(token, tab));
   const list = requests.data?.requests;
 
   async function act(action: () => Promise<{ message: string }>) {
@@ -76,7 +79,7 @@ export default function BackupDesk() {
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <ToggleGroup label="Status backup" options={tabs} value={tab} onChange={setTab} />
+        <ToggleGroup label="Status backup" options={tabs} value={tab} onChange={(next) => void setTab(next)} />
         <Button type="button" variant="outline" onClick={() => setCreating(true)}>
           <Plus aria-hidden="true" />
           Ajukan untuk host
@@ -253,8 +256,8 @@ function RequestCard({ backup, act, onConfirm }: { backup: BackupRequest; act: A
 function CoverPicker({ backup, act, onConfirm }: { backup: BackupRequest; act: Act; onConfirm: (confirm: Confirm) => void }) {
   const { token } = useAuth();
   const [showEveryone, setShowEveryone] = useState(false);
-  const applicants = useApiData(`applicants-${backup.id}`, () => operatorBackupApi.applicants(token, backup.id));
-  const everyone = useApiData(`candidates-${backup.id}-${showEveryone}`, () =>
+  const applicants = useApiData(`backup-applicants-${backup.id}`, () => operatorBackupApi.applicants(token, backup.id));
+  const everyone = useApiData(`backup-everyone-${backup.id}-${showEveryone}`, () =>
     showEveryone ? operatorBackupApi.candidates(token, backup.id) : Promise.resolve({ candidates: [] })
   );
 
@@ -340,7 +343,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
   const { token } = useAuth();
   const [date, setDate] = useState(toDateInput());
   const [reasonType, setReasonType] = useState<BackupReason>("sick");
-  const slots = useApiData(`slots-on-${date}`, () => scheduleApi.list(token, { on: date }));
+  const slots = useApiData(`schedules-on-${date}`, () => scheduleApi.list(token, { on: date }));
   const weekday = isoWeekday(new Date(`${date}T00:00`));
   const daySlots = slots.data?.slots.filter((slot) => slot.day_of_week === weekday) ?? [];
 
@@ -365,14 +368,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
         )}
         <div className="space-y-1.5">
           <Label htmlFor="on-behalf-date">Tanggal</Label>
-          <input
-            id="on-behalf-date"
-            type="date"
-            value={date}
-            min={toDateInput()}
-            onChange={(event) => event.target.value && setDate(event.target.value)}
-            className={cn(inputClass, "tabular-nums")}
-          />
+          <DatePicker id="on-behalf-date" value={date} min={toDateInput()} onChange={setDate} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="on-behalf-slot">Sesi</Label>

@@ -12,9 +12,11 @@ import { inputClass, inputSmClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import ConfirmDialog from "./ConfirmDialog";
+import DatePicker from "./DatePicker";
 import Dialog from "./Dialog";
 import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
@@ -31,7 +33,7 @@ import { notify } from "./Toast";
  */
 export default function EventManager() {
   const { token } = useAuth();
-  const events = useApiData("events", () => eventApi.list(token));
+  const events = useApiData("operator-events", () => eventApi.list(token));
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -152,9 +154,9 @@ function EventListButton({ event, selected, onClick }: { event: EventListItem; s
 
 function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text: string, tone?: "success" | "error") => void }) {
   const { token } = useAuth();
-  const detail = useApiData(`event-${eventId}`, () => eventApi.show(token, eventId));
+  const detail = useApiData(`operator-event-${eventId}`, () => eventApi.show(token, eventId));
   const brandId = detail.data?.event.brand_id ?? "";
-  const hosts = useApiData(`event-hosts-${brandId}`, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
+  const hosts = useApiData(`brand-hosts-${brandId}`, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
@@ -331,25 +333,25 @@ function DayBlocksModal({
 
   return (
     <Modal title={formatDay(`${day}T00:00`)} description={`${eventName} · ${claimed}/${blocks.length} blok terisi`} onClose={onClose} wide>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-left text-xs text-muted-foreground">
-            <th className="w-28 pb-2 font-medium sm:w-32">Jam</th>
-            <th className="pb-2 font-medium">Host / status</th>
-            <th className="pb-2 text-right font-medium">
+      <Table>
+        <TableHeader className="bg-transparent">
+          <TableRow>
+            <TableHead className="w-28 px-0 pt-0 pb-2 sm:w-32">Jam</TableHead>
+            <TableHead className="px-0 pt-0 pb-2">Host / status</TableHead>
+            <TableHead className="px-0 pt-0 pb-2 text-right">
               <span className="sr-only">Aksi</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {blocks.map((block) => {
             const upcoming = new Date(block.end_at) > new Date();
             return (
-              <tr key={block.start_at} className={block.state === "past" && !block.claim ? "opacity-60" : ""}>
-                <td className="py-2.5 align-top font-medium whitespace-nowrap text-foreground tabular-nums">
+              <TableRow key={block.start_at} className={block.state === "past" && !block.claim ? "opacity-60" : ""}>
+                <TableCell className="px-0 py-2.5 align-top font-medium whitespace-nowrap text-foreground tabular-nums">
                   {formatClock(block.start_at)}–{formatClock(block.end_at)}
-                </td>
-                <td className="py-2.5">
+                </TableCell>
+                <TableCell className="px-0 py-2.5">
                   {block.claim ? (
                     <span className="font-medium text-foreground">{block.claim.host_name}</span>
                   ) : block.state === "unavailable" ? (
@@ -384,8 +386,8 @@ function DayBlocksModal({
                       </Button>
                     </div>
                   )}
-                </td>
-                <td className="py-2.5 text-right whitespace-nowrap align-top">
+                </TableCell>
+                <TableCell className="px-0 py-2.5 text-right align-top whitespace-nowrap">
                   {editable && upcoming ? (
                     <span className="inline-flex gap-1.5">
                       <Button type="button" variant="outline" size="xs" onClick={() => setAssigning(assigning === block.start_at ? null : block.start_at)}>
@@ -400,12 +402,12 @@ function DayBlocksModal({
                   ) : (
                     <span className="text-faint">–</span>
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             );
           })}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </Modal>
   );
 }
@@ -502,8 +504,8 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
           </NativeSelect>
         )}
         {field("Nama", "name", <input name="name" placeholder="PD 10.10" maxLength={100} className={input} />)}
-        {field("Hari pertama", "start_date", <input name="start_date" type="date" defaultValue={toDateInput()} min={toDateInput()} className={input} />)}
-        {field("Hari terakhir", "end_date", <input name="end_date" type="date" defaultValue={toDateInput()} min={toDateInput()} className={input} />)}
+        {field("Hari pertama", "start_date", <DatePicker name="start_date" defaultValue={toDateInput()} min={toDateInput()} />)}
+        {field("Hari terakhir", "end_date", <DatePicker name="end_date" defaultValue={toDateInput()} min={toDateInput()} />)}
         {field("Buka setiap hari jam", "daily_start_time", <input name="daily_start_time" type="time" defaultValue="10:00" className={input} />)}
         {field("Tutup jam (boleh lewat tengah malam)", "daily_end_time", <input name="daily_end_time" type="time" defaultValue="22:00" className={input} />)}
         {field(

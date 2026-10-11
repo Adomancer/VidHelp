@@ -2,12 +2,14 @@
 
 import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight, Crown, Download, Users } from "lucide-react";
+import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { errorMessage, operatorApi, type HostListItem } from "@/lib/api";
 import { formatTenure } from "@/lib/format";
 import { statusLabel } from "@/lib/labels";
-import { useApiData } from "@/lib/useApiData";
+import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import AssignmentEditor from "./AssignmentEditor";
 import { useAuth } from "./AuthProvider";
 import EmptyState from "./EmptyState";
@@ -23,18 +25,25 @@ import UserAvatar from "./UserAvatar";
 interface HostTableProps {
   /** Admin: clicking a row (anywhere on it) opens the host. */
   onSelect?: (host: HostListItem) => void;
-  /** Change it to load the list again (e.g. after a host was edited). */
-  refreshKey?: number;
   /** Operator: expand a row to manage the host's brands in place. */
   editableBrands?: boolean;
 }
 
-/** Searchable, brand-filterable host list shared by the operator and admin panels. */
-export default function HostTable({ onSelect, refreshKey = 0, editableBrands = false }: HostTableProps) {
+/** Brand filter and page live in the URL, so a refresh or the Back button keeps them. */
+const urlState = {
+  brand: parseAsString.withDefault(""),
+  page: parseAsInteger.withDefault(1),
+};
+
+/**
+ * Searchable, brand-filterable host list shared by the operator and admin panels.
+ * After editing a host, `invalidate("hosts-")` loads the list again.
+ */
+export default function HostTable({ onSelect, editableBrands = false }: HostTableProps) {
   const { token } = useAuth();
+  const invalidate = useInvalidate();
   const [chips, setChips] = useState<SearchChip[]>([]);
-  const [brandId, setBrandId] = useState("");
-  const [page, setPage] = useState(1);
+  const [{ brand: brandId, page }, setUrlState] = useQueryStates(urlState);
   const [openId, setOpenId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -58,7 +67,7 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
   }
 
   const brands = useApiData("brands", () => operatorApi.brands(token));
-  const hosts = useApiData(JSON.stringify({ filters, page, refreshKey }), () => operatorApi.hosts(token, { ...filters, page }));
+  const hosts = useApiData(`hosts-${JSON.stringify({ filters, page })}`, () => operatorApi.hosts(token, { ...filters, page }));
   const list = hosts.data?.data;
 
   const editor = (host: HostListItem) =>
@@ -68,8 +77,9 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
         assignments={host.assignments}
         brands={brands.data.brands}
         onChanged={() => {
-          hosts.reload();
-          brands.reload();
+          // The host's row and the brands' host counts and leaders
+          void invalidate("hosts-");
+          void invalidate("brands");
         }}
       />
     );
@@ -81,17 +91,14 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
           value={chips}
           onChange={(next) => {
             setChips(next);
-            setPage(1);
+            void setUrlState({ page: null });
           }}
         />
         <div className="flex gap-2">
           <NativeSelect
             wrapperClassName="flex-1 sm:w-52 sm:flex-none"
             value={brandId}
-            onChange={(event) => {
-              setBrandId(event.target.value);
-              setPage(1);
-            }}
+            onChange={(event) => void setUrlState({ brand: event.target.value, page: null })}
             aria-label="Filter brand"
           >
             <option value="">Semua brand</option>
@@ -122,28 +129,28 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
 
         {list && list.length > 0 && (
           <>
-            <table className="hidden w-full text-sm md:table">
-              <thead className="border-b border-border bg-muted/50 text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Host</th>
-                  <th className="px-4 py-3 font-medium">Level tarif</th>
-                  <th className="px-4 py-3 font-medium">Brand</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
+            <Table containerClassName="hidden md:block">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Host</TableHead>
+                  <TableHead>Level tarif</TableHead>
+                  <TableHead>Brand</TableHead>
+                  <TableHead>Status</TableHead>
                   {(editableBrands || onSelect) && (
-                    <th className="w-12 px-4 py-3">
+                    <TableHead className="w-12">
                       <span className="sr-only">Aksi</span>
-                    </th>
+                    </TableHead>
                   )}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {list.map((host) => {
                   const open = openId === host.id;
                   return (
                     <Fragment key={host.id}>
-                      <tr
+                      <TableRow
                         className={cn(
-                          "align-middle text-body transition-colors",
+                          "text-body",
                           onSelect && "cursor-pointer hover:bg-muted/40 focus-visible:bg-muted/60 focus-visible:outline-none",
                           open && "bg-muted/40"
                         )}
@@ -159,44 +166,44 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
                           },
                         })}
                       >
-                        <td className="px-4 py-3">
+                        <TableCell>
                           <HostCell host={host} />
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <RateCell host={host} />
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell>
                           <BrandChips host={host} />
-                        </td>
-                        <td className="px-4 py-3">
+                        </TableCell>
+                        <TableCell>
                           <HostStatus status={host.status} />
-                        </td>
+                        </TableCell>
                         {editableBrands && (
-                          <td className="px-4 py-3 text-right">
+                          <TableCell className="text-right">
                             <Button type="button" variant="outline" size="sm" onClick={() => setOpenId(open ? null : host.id)} aria-expanded={open}>
                               Brand
                               <ChevronDown className={cn("transition-transform", open && "rotate-180")} aria-hidden="true" />
                             </Button>
-                          </td>
+                          </TableCell>
                         )}
                         {onSelect && !editableBrands && (
-                          <td className="px-4 py-3 text-right">
+                          <TableCell className="text-right">
                             <ChevronRight className="ml-auto size-4 text-faint" aria-hidden="true" />
-                          </td>
+                          </TableCell>
                         )}
-                      </tr>
+                      </TableRow>
                       {open && (
-                        <tr>
-                          <td colSpan={5} className="bg-muted/30 px-4 pt-1 pb-4">
+                        <TableRow>
+                          <TableCell colSpan={5} className="bg-muted/30 pt-1 pb-4">
                             {editor(host)}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       )}
                     </Fragment>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
 
             <ul className="divide-y divide-border md:hidden">
               {list.map((host) => {
@@ -239,7 +246,7 @@ export default function HostTable({ onSelect, refreshKey = 0, editableBrands = f
         )}
       </div>
 
-      {hosts.data && <Pagination page={hosts.data.current_page} lastPage={hosts.data.last_page} total={hosts.data.total} unit="host" onChange={setPage} />}
+      {hosts.data && <Pagination page={hosts.data.current_page} lastPage={hosts.data.last_page} total={hosts.data.total} unit="host" onChange={(next) => void setUrlState({ page: next })} />}
     </div>
   );
 }

@@ -20,7 +20,7 @@ function monthLabel(monthYear: string): string {
 /** My points this period, my warning letters and my monthly ratings. */
 export default function HostScorePage() {
   const { token } = useAuth();
-  const performance = useApiData("performance", () => performanceApi.mine(token));
+  const performance = useApiData("my-performance", () => performanceApi.mine(token));
   const data = performance.data;
 
   return (

@@ -35,7 +35,7 @@ export default function SlotDetailDialog({ slot, date, backup, isAdmin, onClose,
   const { token } = useAuth();
   const [allHistory, setAllHistory] = useState(false);
   const [locking, setLocking] = useState(false);
-  const history = useApiData(`history-${slot.id}-${slot.is_locked}`, () => scheduleApi.history(token, slot.id));
+  const history = useApiData(`slot-history-${slot.id}-${slot.is_locked}`, () => scheduleApi.history(token, slot.id));
   const canChange = isAdmin || !slot.is_locked;
   const host = slot.assignment.host?.user;
   const entries = history.data?.history ?? [];

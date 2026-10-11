@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { authApi, type AuthUser, type RoleName } from "@/lib/api";
 import { clearSession, hasAnyRole, homePathFor, loadSession, saveSession, TWO_FACTOR_SETUP_PATH } from "@/lib/auth";
@@ -15,6 +16,9 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+/** The token the shared data cache was filled for; another account starts with an empty cache. */
+let cacheToken: string | null = null;
 
 /** The signed-in user. Only usable inside <RequireAuth>. */
 export function useAuth(): AuthContextValue {
@@ -38,6 +42,7 @@ export function RequireAuth({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<{ token: string; user: AuthUser } | null>(null);
   const rolesKey = roles.join("|");
 
@@ -54,6 +59,10 @@ export function RequireAuth({
       } else if (result.user.two_factor_setup_required && !allowTwoFactorSetup) {
         router.replace(TWO_FACTOR_SETUP_PATH);
       } else {
+        if (cacheToken !== result.token) {
+          queryClient.clear();
+          cacheToken = result.token;
+        }
         setSession(result);
       }
     });
@@ -61,7 +70,7 @@ export function RequireAuth({
     return () => {
       cancelled = true;
     };
-  }, [router, rolesKey, allowTwoFactorSetup]);
+  }, [router, queryClient, rolesKey, allowTwoFactorSetup]);
 
   const setUser = useCallback((user: AuthUser) => {
     setSession((current) => {
@@ -76,8 +85,10 @@ export function RequireAuth({
       await authApi.logout(session.token).catch(() => {}); // token may already be revoked
     }
     clearSession();
+    queryClient.clear();
+    cacheToken = null;
     router.replace("/login");
-  }, [router, session]);
+  }, [router, queryClient, session]);
 
   if (!session) {
     return (

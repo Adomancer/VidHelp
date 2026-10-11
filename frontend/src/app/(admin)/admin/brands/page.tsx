@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 import { Crown, Pencil, Plus, Tag } from "lucide-react";
 import { adminHostsApi, operatorApi, type BrandInput, type BrandSummary } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -9,6 +10,8 @@ import { textareaClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
+import DataTable from "@/components/DataTable";
+import DatePicker from "@/components/DatePicker";
 import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import { FieldError, FieldHint } from "@/components/FieldMessage";
@@ -24,11 +27,39 @@ import { notify } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
+function brandColumns(onEdit: (brand: BrandSummary) => void): ColumnDef<BrandSummary>[] {
+  return [
+    { accessorKey: "name", header: "Brand", cell: ({ row }) => <BrandName brand={row.original} /> },
+    {
+      accessorKey: "target_hours_per_period",
+      header: "Target / periode",
+      cell: ({ row }) => `${row.original.target_hours_per_period} jam`,
+      meta: { cellClassName: "tabular-nums" },
+    },
+    { accessorKey: "payment_cycle_days", header: "Siklus pembayaran", cell: ({ row }) => <Cycle brand={row.original} /> },
+    { accessorKey: "active_hosts_count", header: "Host", meta: { align: "right" } },
+    { id: "leader", accessorFn: (brand) => brand.leader?.name ?? "", header: "Leader", cell: ({ row }) => <Leader brand={row.original} /> },
+    { accessorKey: "status", header: "Status", cell: ({ row }) => <BrandStatus brand={row.original} /> },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Aksi</span>,
+      enableSorting: false,
+      meta: { headClassName: "w-14", cellClassName: "text-right" },
+      cell: ({ row }) => (
+        <Button type="button" variant="ghost" size="icon-sm" onClick={() => onEdit(row.original)} aria-label={`Ubah ${row.original.name}`} title="Ubah">
+          <Pencil />
+        </Button>
+      ),
+    },
+  ];
+}
+
 export default function AdminBrandsPage() {
   const { token } = useAuth();
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const [editing, setEditing] = useState<BrandSummary | "new" | null>(null);
   const list = brands.data?.brands;
+  const columns = useMemo(() => brandColumns(setEditing), []);
 
   return (
     <div className="space-y-6">
@@ -63,76 +94,40 @@ export default function AdminBrandsPage() {
         )}
 
         {list && list.length > 0 && (
-          <>
-            <table className="hidden w-full text-sm md:table">
-              <thead className="border-b border-border bg-muted/50 text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Brand</th>
-                  <th className="px-4 py-3 font-medium">Target / periode</th>
-                  <th className="px-4 py-3 font-medium">Siklus pembayaran</th>
-                  <th className="px-4 py-3 text-right font-medium">Host</th>
-                  <th className="px-4 py-3 font-medium">Leader</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="w-14 px-4 py-3">
-                    <span className="sr-only">Aksi</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border text-body">
-                {list.map((brand) => (
-                  <tr key={brand.id} className="transition-colors hover:bg-muted/40">
-                    <td className="px-4 py-3">
-                      <BrandName brand={brand} />
-                    </td>
-                    <td className="px-4 py-3 tabular-nums">{brand.target_hours_per_period} jam</td>
-                    <td className="px-4 py-3">
-                      <Cycle brand={brand} />
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{brand.active_hosts_count}</td>
-                    <td className="px-4 py-3">
-                      <Leader brand={brand} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <BrandStatus brand={brand} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button type="button" variant="ghost" size="icon-sm" onClick={() => setEditing(brand)} aria-label={`Ubah ${brand.name}`} title="Ubah">
-                        <Pencil />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <ul className="divide-y divide-border md:hidden">
-              {list.map((brand) => (
-                <li key={brand.id}>
-                  <button type="button" onClick={() => setEditing(brand)} className="w-full space-y-2 p-4 text-left outline-none active:bg-muted/60 focus-visible:bg-muted/60">
-                    <div className="flex items-start justify-between gap-3">
-                      <BrandName brand={brand} />
-                      <BrandStatus brand={brand} />
-                    </div>
-                    <dl className="grid grid-cols-3 gap-2 text-xs">
-                      <div>
-                        <dt className="text-muted-foreground">Target</dt>
-                        <dd className="font-medium text-foreground tabular-nums">{brand.target_hours_per_period} jam</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Siklus</dt>
-                        <dd className="font-medium text-foreground tabular-nums">{brand.payment_cycle_days} hari</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Host</dt>
-                        <dd className="font-medium text-foreground tabular-nums">{brand.active_hosts_count}</dd>
-                      </div>
-                    </dl>
-                    <Leader brand={brand} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </>
+          <DataTable
+            columns={columns}
+            data={list}
+            getRowId={(brand) => brand.id}
+            className="text-body"
+            rowClassName={() => "hover:bg-muted/40"}
+            renderMobile={(brand) => (
+              <button
+                type="button"
+                onClick={() => setEditing(brand)}
+                className="w-full space-y-2 p-4 text-left outline-none focus-visible:bg-muted/60 active:bg-muted/60"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <BrandName brand={brand} />
+                  <BrandStatus brand={brand} />
+                </div>
+                <dl className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <dt className="text-muted-foreground">Target</dt>
+                    <dd className="font-medium text-foreground tabular-nums">{brand.target_hours_per_period} jam</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Siklus</dt>
+                    <dd className="font-medium text-foreground tabular-nums">{brand.payment_cycle_days} hari</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Host</dt>
+                    <dd className="font-medium text-foreground tabular-nums">{brand.active_hosts_count}</dd>
+                  </div>
+                </dl>
+                <Leader brand={brand} />
+              </button>
+            )}
+          />
         )}
       </div>
 
@@ -172,7 +167,9 @@ function Cycle({ brand }: { brand: BrandSummary }) {
   return (
     <>
       <span className="tabular-nums">{brand.payment_cycle_days} hari</span>
-      <span className="block text-xs text-muted-foreground">{brand.payroll_start_date ? `mulai ${formatDate(brand.payroll_start_date)}` : "penggajian belum dimulai"}</span>
+      <span className="block text-xs text-muted-foreground">
+        {brand.payroll_start_date ? `mulai ${formatDate(brand.payroll_start_date)}` : "penggajian belum dimulai"}
+      </span>
     </>
   );
 }
@@ -240,14 +237,18 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           required
           error={errors.payment_cycle_days}
         />
-        <TextField
-          label="Mulai penggajian"
-          name="payroll_start_date"
-          type="date"
-          defaultValue={brand?.payroll_start_date ?? ""}
-          hint="Awal periode pertama."
-          error={errors.payroll_start_date}
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor="payroll_start_date">Mulai penggajian</Label>
+          <DatePicker
+            id="payroll_start_date"
+            name="payroll_start_date"
+            defaultValue={brand?.payroll_start_date?.slice(0, 10)}
+            clearable
+            placeholder="Belum dimulai"
+            aria-invalid={errors.payroll_start_date ? true : undefined}
+          />
+          {errors.payroll_start_date ? <FieldError>{errors.payroll_start_date}</FieldError> : <FieldHint>Awal periode pertama.</FieldHint>}
+        </div>
         {brand && (
           <SelectField
             label="Status"

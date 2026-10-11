@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, ViewTransition, type ReactNode } from "react";
+import { Suspense, useState, ViewTransition, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { useIsTablet } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import CommandMenu from "./CommandMenu";
+import { CardsSkeleton } from "./Loading";
 import NavIcon from "./NavIcon";
 import NotificationBell from "./NotificationBell";
 import type { SidebarGroup, SidebarLink } from "./SidebarLayout";
@@ -208,13 +209,18 @@ function ShellHeader({ panel, homeHref, links, search, hostSearchPath, mobileNav
   );
 }
 
-/** The page under the header; each page change fades in (React ViewTransition, see globals.css). */
+/**
+ * The page under the header; each page change fades in (React ViewTransition, see globals.css).
+ * Pages read filters from the URL (nuqs), which needs a Suspense boundary when Next prerenders them.
+ */
 function ShellContent({ mobileNav, children }: { mobileNav: boolean; children: ReactNode }) {
   const pathname = usePathname();
 
   return (
     <ViewTransition key={pathname} enter="page-enter" exit="page-exit" default="none">
-      <div className={cn("mx-auto w-full max-w-screen-2xl flex-1 p-4 md:p-6 2xl:p-8", mobileNav && "pb-28 md:pb-6")}>{children}</div>
+      <div className={cn("mx-auto w-full max-w-screen-2xl flex-1 p-4 md:p-6 2xl:p-8", mobileNav && "pb-28 md:pb-6")}>
+        <Suspense fallback={<CardsSkeleton />}>{children}</Suspense>
+      </div>
     </ViewTransition>
   );
 }

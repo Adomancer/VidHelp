@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { ChevronDown, Download, Star, Users } from "lucide-react";
+import { parseAsString, useQueryState } from "nuqs";
 import { errorMessage, pointsApi, type RatingRow } from "@/lib/api";
 import { formatDate, formatShortDate } from "@/lib/format";
-import { inputClass, inputSmClass } from "@/lib/ui";
+import { inputSmClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import { MonthPicker } from "@/components/DatePicker";
 import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import FormAlert from "@/components/FormAlert";
@@ -27,7 +29,9 @@ function thisMonth(): string {
 
 export default function AdminRatingsPage() {
   const { token } = useAuth();
-  const [month, setMonth] = useState(thisMonth());
+  // The month lives in the URL, so a refresh or a shared link opens the same month
+  const [monthParam, setMonth] = useQueryState("month", parseAsString.withDefault(thisMonth()));
+  const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : thisMonth();
   const [error, setError] = useState<string | null>(null);
   const ratings = useApiData(`ratings-${month}`, () => pointsApi.ratings(token, month));
   const [exporting, setExporting] = useState(false);
@@ -52,13 +56,7 @@ export default function AdminRatingsPage() {
         description="Beri rating 1–5 untuk setiap host per bulan. Saran rating adalah 5 dikurangi dampak pelanggaran bulan itu. Rating terbaru juga menentukan siapa yang otomatis dipilih untuk backup."
         actions={
           <>
-            <input
-              type="month"
-              value={month}
-              onChange={(event) => event.target.value && setMonth(event.target.value)}
-              aria-label="Bulan"
-              className={cn(inputClass, "w-auto tabular-nums")}
-            />
+            <MonthPicker value={month} onChange={(next) => void setMonth(next)} aria-label="Bulan" />
             <Button type="button" variant="outline" onClick={exportExcel} disabled={exporting} title="Rating, riwayat poin, dan riwayat SP bulan ini">
               <Download aria-hidden="true" />
               {exporting ? "Mengekspor…" : "Ekspor Excel"}

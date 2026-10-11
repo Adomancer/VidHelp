@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
 import { notificationApi, type AppNotification } from "@/lib/api";
@@ -20,16 +20,8 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  const count = useApiData("notification-count", () => notificationApi.unreadCount(token));
-  const list = useApiData(`notification-list-${open}`, () =>
-    open ? notificationApi.list(token) : Promise.resolve({ notifications: [] as AppNotification[], unread: 0 })
-  );
-  const reloadCount = count.reload;
-
-  useEffect(() => {
-    const timer = setInterval(reloadCount, POLL_MS);
-    return () => clearInterval(timer);
-  }, [reloadCount]);
+  const count = useApiData("notification-count", () => notificationApi.unreadCount(token), { refetchInterval: POLL_MS });
+  const list = useApiData("notification-list", () => notificationApi.list(token), { enabled: open });
 
   async function openNotification(notification: AppNotification) {
     if (!notification.read_at) await notificationApi.read(token, notification.id).catch(() => {});

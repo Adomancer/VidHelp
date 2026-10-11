@@ -33,7 +33,7 @@ type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
 
 export default function HostLivePage() {
   const { token } = useAuth();
-  const live = useApiData("live", () => liveApi.today(token));
+  const live = useApiData("live-today", () => liveApi.today(token));
   const [error, setError] = useState<string | null>(null);
   const now = useNow();
 

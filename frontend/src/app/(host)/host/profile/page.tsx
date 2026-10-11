@@ -36,7 +36,7 @@ const sections = [
 
 export default function HostProfilePage() {
   const { token, logout, setUser } = useAuth();
-  const profile = useApiData("profile", () => hostApi.profile(token));
+  const profile = useApiData("my-profile", () => hostApi.profile(token));
 
   /** Every profile endpoint returns the full profile; keep page + header in sync. */
   function applyUpdate(updated: MyProfile) {

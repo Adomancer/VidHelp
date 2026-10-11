@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { CalendarCheck } from "lucide-react";
 import { liveApi, type LiveSession } from "@/lib/api";
@@ -75,13 +74,8 @@ function upcoming(sessions: LiveSession[], now: Date): { session: LiveSession; l
 /** Sidebar card: what's next today, one click from the Live page. */
 function NextSession() {
   const { token } = useAuth();
-  const today = useApiData("shell-next-session", () => liveApi.today(token));
-  const { reload } = today;
-
-  useEffect(() => {
-    const timer = setInterval(() => document.visibilityState === "visible" && reload(), NEXT_SESSION_REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [reload]);
+  // Same data as the Live page, so both share one request
+  const today = useApiData("live-today", () => liveApi.today(token), { refetchInterval: NEXT_SESSION_REFRESH_MS });
 
   if (!today.data) return null;
   const next = upcoming(today.data.sessions, new Date());

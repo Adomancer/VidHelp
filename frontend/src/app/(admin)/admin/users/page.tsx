@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Archive, Ban, KeyRound, MoreHorizontal, Search, Trash2, UserPlus, Users } from "lucide-react";
-import { adminApi, errorMessage, type AuthUser, type EraseReason, type Paginated, type RoleName, type UserStatus } from "@/lib/api";
+import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
+import { adminApi, errorMessage, type AuthUser, type EraseReason, type RoleName, type UserStatus } from "@/lib/api";
 import { roleLabel, statusLabel } from "@/lib/labels";
 import { inputClass } from "@/lib/ui";
+import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
@@ -24,6 +26,7 @@ import { notify } from "@/components/Toast";
 import ToggleGroup from "@/components/ToggleGroup";
 import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +45,13 @@ const tabs = [
 
 type TabValue = (typeof tabs)[number][0];
 
+/** Tab, search and page live in the URL, so a refresh or a link keeps the same view. */
+const urlState = {
+  tab: parseAsStringLiteral(tabs.map(([value]) => value)).withDefault("pending"),
+  q: parseAsString.withDefault(""),
+  page: parseAsInteger.withDefault(1),
+};
+
 const roles: RoleName[] = ["host", "operator", "finance", "admin"];
 
 const statusTones: Record<UserStatus, Tone> = {
@@ -55,12 +65,8 @@ type Confirm = { kind: "reset2fa" | "deactivate" | "archive"; user: AuthUser } |
 
 export default function AdminUsersPage() {
   const { user: me, token } = useAuth();
-  const [tab, setTab] = useState<TabValue>("pending");
-  const [query, setQuery] = useState("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [reloads, setReloads] = useState(0);
-  const [result, setResult] = useState<{ key: string; users?: Paginated<AuthUser>; error?: string } | null>(null);
+  const [{ tab, q: search, page }, setUrlState] = useQueryStates(urlState);
+  const [query, setQuery] = useState(search);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -69,21 +75,9 @@ export default function AdminUsersPage() {
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const status = tab === "all" ? undefined : tab;
-  const requestKey = JSON.stringify({ status, search, page, reloads });
-  const loading = result?.key !== requestKey;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    adminApi
-      .users(token, { status, search, page })
-      .then((users) => !cancelled && setResult({ key: requestKey, users }))
-      .catch((caught) => !cancelled && setResult({ key: requestKey, error: errorMessage(caught) }));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [token, status, search, page, requestKey]);
+  const result = useApiData(`admin-users-${JSON.stringify({ status, search, page })}`, () => adminApi.users(token, { status, search, page }));
+  const invalidate = useInvalidate();
+  const reloadUsers = () => invalidate("admin-users-");
 
   useEffect(() => () => clearTimeout(debounce.current), []);
 
@@ -94,7 +88,7 @@ export default function AdminUsersPage() {
       const response = await action();
       const message = (response as { message?: string } | undefined)?.message;
       if (message) notify({ text: message });
-      setReloads((count) => count + 1);
+      reloadUsers();
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -103,20 +97,16 @@ export default function AdminUsersPage() {
   }
 
   function selectTab(next: TabValue) {
-    setTab(next);
-    setPage(1);
+    void setUrlState({ tab: next, page: null });
   }
 
   function type(next: string) {
     setQuery(next);
     clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => {
-      setSearch(next.trim());
-      setPage(1);
-    }, 300);
+    debounce.current = setTimeout(() => void setUrlState({ q: next.trim(), page: null }), 300);
   }
 
-  const users = result?.users;
+  const users = result.data;
 
   return (
     <div className="space-y-6">
@@ -147,11 +137,11 @@ export default function AdminUsersPage() {
       </div>
 
       {error && <FormAlert tone="error">{error}</FormAlert>}
-      {result?.error && <ErrorState message={result.error} onRetry={() => setReloads((count) => count + 1)} />}
+      {result.error && <ErrorState message={result.error} onRetry={result.reload} />}
 
       <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
-        <RefreshBar active={loading && Boolean(users)} />
-        {!users && !result?.error && <TableSkeleton rows={6} columns={4} />}
+        <RefreshBar active={result.loading && Boolean(users)} />
+        {!users && !result.error && <TableSkeleton rows={6} columns={4} />}
 
         {users && users.data.length === 0 && (
           <EmptyState
@@ -164,40 +154,40 @@ export default function AdminUsersPage() {
         {users && users.data.length > 0 && (
           <>
             {/* Laptop and tablet: a table */}
-            <table className="hidden w-full text-sm md:table">
-              <thead className="border-b border-border bg-muted/50 text-left text-xs font-medium text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Pengguna</th>
-                  <th className="px-4 py-3 font-medium">Mendaftar</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Peran</th>
-                  <th className="px-4 py-3">
+            <Table containerClassName="hidden md:block">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Pengguna</TableHead>
+                  <TableHead>Mendaftar</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Peran</TableHead>
+                  <TableHead>
                     <span className="sr-only">Aksi</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {users.data.map((user) => (
-                  <tr key={user.id} className="text-body transition-colors hover:bg-muted/40">
-                    <td className="px-4 py-3">
+                  <TableRow key={user.id} className="text-body hover:bg-muted/40">
+                    <TableCell>
                       <UserCell user={user} />
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
                       <Signup user={user} />
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
                       <UserStatusBadge user={user} />
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
                       <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} run={run} />
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
                       <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
 
             {/* Phones: one card per user */}
             <ul className="divide-y divide-border md:hidden">
@@ -219,7 +209,7 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      {users && <Pagination page={users.current_page} lastPage={users.last_page} total={users.total} unit="pengguna" onChange={setPage} />}
+      {users && <Pagination page={users.current_page} lastPage={users.last_page} total={users.total} unit="pengguna" onChange={(next) => void setUrlState({ page: next })} />}
 
       {creating && (
         <CreateAccountForm
@@ -227,7 +217,7 @@ export default function AdminUsersPage() {
             setCreating(false);
             notify({ text: message });
             selectTab("active");
-            setReloads((count) => count + 1);
+            reloadUsers();
           }}
           onCancel={() => setCreating(false)}
         />
@@ -239,7 +229,7 @@ export default function AdminUsersPage() {
           onDone={(message) => {
             setErasing(null);
             notify({ text: message });
-            setReloads((count) => count + 1);
+            reloadUsers();
           }}
           onCancel={() => setErasing(null)}
         />

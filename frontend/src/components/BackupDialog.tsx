@@ -52,7 +52,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const candidates = useApiData(`backup-candidates-${slot.id}-${backupDate}`, () =>
+  const candidates = useApiData(`slot-candidates-${slot.id}-${backupDate}`, () =>
     backupDate ? operatorBackupApi.slotCandidates(token, slot.id, backupDate) : Promise.resolve({ candidates: [] })
   );
   const matches = (candidates.data?.candidates ?? []).filter((candidate) => candidate.name.toLowerCase().includes(search.trim().toLowerCase()));

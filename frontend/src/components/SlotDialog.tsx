@@ -20,12 +20,13 @@ import {
   normalizeTime,
   toMinutes,
 } from "@/lib/schedule";
-import { inputClass, inputSmClass } from "@/lib/ui";
+import { inputClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "./AuthProvider";
 import Chip from "./Chip";
+import DatePicker from "./DatePicker";
 import Dialog from "./Dialog";
 import FormAlert from "./FormAlert";
 import HostDayTimeline, { type DayBlock } from "./HostDayTimeline";
@@ -141,7 +142,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
   // The host's day: what they already do (any brand) on the first date this slot runs
   const date = firstOn(form.day, startsOn);
   const hostId = assignment?.host_id;
-  const hostSlots = useApiData(`host-${hostId}-${date}`, () =>
+  const hostSlots = useApiData(`host-slots-${hostId}-${date}`, () =>
     hostId ? scheduleApi.list(token, { host_id: hostId, on: addDays(date, -1), days: 2 }) : Promise.resolve(null)
   );
   const busy: DayBlock[] = (hostSlots.data?.slots ?? [])
@@ -462,15 +463,10 @@ function TimeInput({ label, value, onChange, error }: { label: string; value: st
 
 function DateInput({ value, min, onChange, label }: { value: string; min?: string; onChange: (value: string) => void; label: string }) {
   return (
-    <input
-      type="date"
-      value={value}
-      min={min}
-      aria-label={label}
-      onClick={(event) => event.stopPropagation()}
-      onChange={(event) => event.target.value && onChange(event.target.value)}
-      className={cn(inputSmClass, "w-auto tabular-nums")}
-    />
+    // Clicks stay here (the calendar's too: React events bubble out of its portal), not on the option around it
+    <span onClick={(event) => event.stopPropagation()}>
+      <DatePicker value={value} min={min} onChange={onChange} aria-label={label} className="h-9 w-auto px-2.5 text-sm md:h-8" />
+    </span>
   );
 }
 

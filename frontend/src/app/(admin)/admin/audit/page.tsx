@@ -2,12 +2,14 @@
 
 import { Fragment, useState } from "react";
 import { ChevronDown, ClipboardList, Search, X } from "lucide-react";
+import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { adminApi, type AuditFilters, type AuditLogEntry } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { inputClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import DatePicker from "@/components/DatePicker";
 import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import FormAlert from "@/components/FormAlert";
@@ -17,6 +19,7 @@ import Pagination from "@/components/Pagination";
 import { NativeSelect } from "@/components/SelectField";
 import StatusBadge, { type Tone } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const actionLabels: Record<string, string> = {
   create: "Dibuat",
@@ -79,6 +82,14 @@ function humanize(value: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+const filterKeys = ["action", "target_table", "target_id", "user_id", "search", "from", "to"] as const satisfies readonly (keyof AuditFilters)[];
+
+/** Filters and page live in the URL, so a refresh or a shared link shows the same records. */
+const urlState = {
+  ...(Object.fromEntries(filterKeys.map((key) => [key, parseAsString])) as Record<(typeof filterKeys)[number], typeof parseAsString>),
+  page: parseAsInteger.withDefault(1),
+};
+
 function showValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "–";
   if (typeof value === "boolean") return value ? "ya" : "tidak";
@@ -88,16 +99,16 @@ function showValue(value: unknown): string {
 
 export default function AuditLogPage() {
   const { token } = useAuth();
-  const [filters, setFilters] = useState<AuditFilters>({});
-  const [page, setPage] = useState(1);
+  const [{ page, ...params }, setUrlState] = useQueryStates(urlState);
   const [openId, setOpenId] = useState<string | null>(null);
+  const filters: AuditFilters = {};
+  for (const key of filterKeys) if (params[key]) filters[key] = params[key];
 
   const result = useApiData(`audit-${JSON.stringify(filters)}-${page}`, () => adminApi.auditLogs(token, { ...filters, page }));
   const logs = result.data?.logs;
 
   function applyFilters(next: AuditFilters) {
-    setFilters(next);
-    setPage(1);
+    void setUrlState({ ...Object.fromEntries(filterKeys.map((key) => [key, next[key] || null])), page: null });
     setOpenId(null);
   }
 
@@ -181,14 +192,14 @@ export default function AuditLogPage() {
             </option>
           ))}
         </NativeSelect>
-        <label className="space-y-1 text-xs text-muted-foreground lg:w-40">
-          <span>Dari</span>
-          <input type="date" value={filters.from ?? ""} onChange={(event) => change("from", event.target.value)} className={cn(inputClass, "tabular-nums")} />
-        </label>
-        <label className="space-y-1 text-xs text-muted-foreground lg:w-40">
-          <span>Sampai</span>
-          <input type="date" value={filters.to ?? ""} onChange={(event) => change("to", event.target.value)} className={cn(inputClass, "tabular-nums")} />
-        </label>
+        <div className="space-y-1 text-xs text-muted-foreground lg:w-40">
+          <span id="audit-from">Dari</span>
+          <DatePicker value={filters.from ?? ""} onChange={(value) => change("from", value)} max={filters.to} placeholder="Awal" clearable aria-describedby="audit-from" />
+        </div>
+        <div className="space-y-1 text-xs text-muted-foreground lg:w-40">
+          <span id="audit-to">Sampai</span>
+          <DatePicker value={filters.to ?? ""} onChange={(value) => change("to", value)} min={filters.from} placeholder="Hari ini" clearable aria-describedby="audit-to" />
+        </div>
         {filtered && (
           <Button type="button" variant="ghost" onClick={() => applyFilters({})} className="text-muted-foreground">
             <X aria-hidden="true" />
@@ -214,52 +225,48 @@ export default function AuditLogPage() {
 
         {logs && logs.data.length > 0 && (
           <>
-            <table className="hidden w-full text-sm md:table">
-              <thead className="border-b border-border bg-muted/50 text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Waktu</th>
-                  <th className="px-4 py-3 font-medium">Siapa</th>
-                  <th className="px-4 py-3 font-medium">Aksi</th>
-                  <th className="px-4 py-3 font-medium">Data</th>
-                  <th className="px-4 py-3 font-medium">IP</th>
-                  <th className="w-10 px-4 py-3">
+            <Table containerClassName="hidden md:block">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Waktu</TableHead>
+                  <TableHead>Siapa</TableHead>
+                  <TableHead>Aksi</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>IP</TableHead>
+                  <TableHead className="w-10">
                     <span className="sr-only">Detail</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {logs.data.map((log) => {
                   const open = openId === log.id;
                   return (
                     <Fragment key={log.id}>
-                      <tr
-                        onClick={() => toggle(log.id)}
-                        className={cn("cursor-pointer text-body transition-colors hover:bg-muted/40", open && "bg-muted/40")}
-                        aria-expanded={open}
-                      >
-                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">{formatDateTime(log.created_at)}</td>
-                        <td className="px-4 py-3">{who(log)}</td>
-                        <td className="px-4 py-3">
+                      <TableRow onClick={() => toggle(log.id)} className={cn("cursor-pointer text-body hover:bg-muted/40", open && "bg-muted/40")} aria-expanded={open}>
+                        <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">{formatDateTime(log.created_at)}</TableCell>
+                        <TableCell>{who(log)}</TableCell>
+                        <TableCell>
                           <StatusBadge tone={actionTone(log.action)}>{actionLabel(log.action)}</StatusBadge>
-                        </td>
-                        <td className="px-4 py-3">{target(log)}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{log.ip_address ?? "–"}</td>
-                        <td className="px-4 py-3 text-right">
+                        </TableCell>
+                        <TableCell>{target(log)}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{log.ip_address ?? "–"}</TableCell>
+                        <TableCell className="text-right">
                           <ChevronDown className={cn("ml-auto size-4 text-faint transition-transform", open && "rotate-180")} aria-hidden="true" />
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                       {open && (
-                        <tr className="bg-muted/30">
-                          <td colSpan={6} className="px-4 py-4">
+                        <TableRow className="bg-muted/30">
+                          <TableCell colSpan={6} className="py-4">
                             <Details log={log} />
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       )}
                     </Fragment>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
 
             <ul className="divide-y divide-border md:hidden">
               {logs.data.map((log) => {
@@ -290,7 +297,7 @@ export default function AuditLogPage() {
         )}
       </div>
 
-      {logs && <Pagination page={logs.current_page} lastPage={logs.last_page} total={logs.total} unit="catatan" onChange={setPage} />}
+      {logs && <Pagination page={logs.current_page} lastPage={logs.last_page} total={logs.total} unit="catatan" onChange={(next) => void setUrlState({ page: next })} />}
     </div>
   );
 }
@@ -304,39 +311,37 @@ function Details({ log }: { log: AuditLogEntry }) {
   return (
     <div className="space-y-3">
       {fields.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-border bg-card">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Kolom</th>
-                {showBefore && <th className="px-3 py-2 font-medium">Sebelum</th>}
-                {showAfter && <th className="px-3 py-2 font-medium">{showBefore ? "Sesudah" : "Nilai"}</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {fields.map((field) => {
-                const before = showValue(log.old_value?.[field]);
-                const after = showValue(log.new_value?.[field]);
-                const changed = showBefore && showAfter && before !== after;
-                return (
-                  <tr key={field} className="align-top">
-                    <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{field}</td>
-                    {showBefore && (
-                      <td className="px-3 py-1.5 break-all">
-                        <span className={cn(changed && "rounded bg-destructive/10 px-1 text-destructive line-through decoration-destructive/40")}>{before}</span>
-                      </td>
-                    )}
-                    {showAfter && (
-                      <td className="px-3 py-1.5 break-all">
-                        <span className={cn(changed ? "rounded bg-success/10 px-1 text-success" : "text-foreground")}>{after}</span>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Table containerClassName="rounded-lg border border-border bg-card">
+          <TableHeader className="bg-transparent">
+            <TableRow>
+              <TableHead className="px-3 py-2">Kolom</TableHead>
+              {showBefore && <TableHead className="px-3 py-2">Sebelum</TableHead>}
+              {showAfter && <TableHead className="px-3 py-2">{showBefore ? "Sesudah" : "Nilai"}</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {fields.map((field) => {
+              const before = showValue(log.old_value?.[field]);
+              const after = showValue(log.new_value?.[field]);
+              const changed = showBefore && showAfter && before !== after;
+              return (
+                <TableRow key={field}>
+                  <TableCell className="px-3 py-1.5 align-top font-mono text-xs text-muted-foreground">{field}</TableCell>
+                  {showBefore && (
+                    <TableCell className="px-3 py-1.5 align-top break-all">
+                      <span className={cn(changed && "rounded bg-destructive/10 px-1 text-destructive line-through decoration-destructive/40")}>{before}</span>
+                    </TableCell>
+                  )}
+                  {showAfter && (
+                    <TableCell className="px-3 py-1.5 align-top break-all">
+                      <span className={cn(changed ? "rounded bg-success/10 px-1 text-success" : "text-foreground")}>{after}</span>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       ) : (
         <p className="text-sm text-muted-foreground">Tidak ada detail kolom untuk catatan ini.</p>
       )}

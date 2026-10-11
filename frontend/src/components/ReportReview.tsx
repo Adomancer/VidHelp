@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Clock, FileCheck2, Quote, X } from "lucide-react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { errorMessage, reportApi, type ReviewReport } from "@/lib/api";
 import { formatClock, formatDateTime, formatDuration, formatWindow } from "@/lib/format";
 import { FLAG_REASONS, formatMetric, metricLabel } from "@/lib/reportFields";
@@ -41,13 +42,14 @@ const emptyText: Record<Tab, string> = {
  */
 export default function ReportReview() {
   const { token } = useAuth();
-  const [tab, setTab] = useState<Tab>("flagged");
+  // The tab lives in the URL, so a refresh or the Back button keeps it
+  const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(tabs.map((option) => option.value)).withDefault("flagged"));
   const [error, setError] = useState<string | null>(null);
 
   const reports = useApiData(`reports-${tab}`, () =>
     tab === "missing" ? Promise.resolve({ reports: [], metrics: [] }) : reportApi.list(token, tab)
   );
-  const missing = useApiData(`missing-${tab}`, () => (tab === "missing" ? reportApi.missing(token) : Promise.resolve({ attendances: [] })));
+  const missing = useApiData(`reports-missing-${tab}`, () => (tab === "missing" ? reportApi.missing(token) : Promise.resolve({ attendances: [] })));
 
   async function act(action: () => Promise<{ message: string }>) {
     setError(null);
@@ -65,7 +67,7 @@ export default function ReportReview() {
 
   return (
     <div className="space-y-5">
-      <ToggleGroup label="Status laporan" options={tabs} value={tab} onChange={setTab} />
+      <ToggleGroup label="Status laporan" options={tabs} value={tab} onChange={(next) => void setTab(next)} />
 
       {error && <FormAlert tone="error">{error}</FormAlert>}
       {current.error && <ErrorState message={current.error} onRetry={current.reload} />}
