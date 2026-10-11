@@ -212,15 +212,15 @@ flowchart TD
 flowchart TD
   A["Pay period per brand:<br/>from payroll start, every N days"] --> B["Approved hours collect;<br/>finance can add hour adjustments"]
   B --> C["Period ends; nightly job sets<br/>Waiting for payment"]
-  C --> D{"Reports still<br/>waiting for review?"}
-  D -->|Yes| E["Request blocked<br/>until reviewed"]
+  C --> D{"Reports waiting for review,<br/>sick letters still due, or the<br/>previous period not requested?"}
+  D -->|Yes| E["Request blocked<br/>until resolved"]
   E --> D
-  D -->|No| F["Finance or admin requests payment:<br/>pay frozen at current rates;<br/>brand billed up to the target,<br/>extra hours carry to next period"]
+  D -->|No| F["Finance or admin requests payment:<br/>pay frozen at current rates;<br/>carried-in hours paid first, then this period's,<br/>up to the target (billed = paid);<br/>extra hours carry to next period,<br/>cut from every host by the same share"]
   F --> G{"Mistake found?"}
   G -->|Yes| H["Cancel the request with a reason:<br/>period reopens, carry-over undone"]
   H --> C
-  G -->|No, brand paid| I["Finance marks paid"]
-  I --> J["Salary slip per host;<br/>kasbon installment deducted if it fits"]
+  G -->|No, brand paid| I["Finance marks paid<br/>(optional transfer reference)"]
+  I --> J["Salary slip per host paid this period;<br/>kasbon installment deducted if it fits"]
   J --> K["Host notified,<br/>sees the slip in Pay"]
 ```
 
@@ -228,7 +228,9 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A(["Host asks for kasbon"]) --> B["Finance records it:<br/>amount, number of installments"]
+  A(["Host asks for kasbon"]) --> A2{"Open kasbon + new one<br/>within the monthly salary?<br/>(weekly slot hours × 52/12 × rate)"}
+  A2 -->|No| A3(["Refused"])
+  A2 -->|Yes| B["Finance records it:<br/>amount, number of installments"]
   B --> C["Installment schedule"]
   C --> D["Next salary slip, any brand"]
   D --> E{"Installment fits<br/>in the slip?"}

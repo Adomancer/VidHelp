@@ -6,9 +6,12 @@ import type { Brand, HostWithUser } from "./hosts";
 export type PeriodStatus = "in_progress" | "waiting_payment" | "requested" | "paid";
 
 export interface PeriodSummary {
+  /** Every approved hour this period, backups paid by another host included */
   worked_hours: number;
+  /** Backups the requesting host paid the cover for directly: billed to the brand, not on payroll */
+  host_paid_hours: number;
   carried_in_hours: number;
-  /** Billable to the brand: worked + carried in, capped at the target */
+  /** Billable to the brand: worked + carried in, capped at the target. Hosts are paid for the same hours. */
   achieved_hours: number;
   carried_out_hours: number;
   target_hours: number;
@@ -29,6 +32,8 @@ export interface PaymentPeriod {
     status: "requested" | "processing" | "paid";
     requested_at: string;
     paid_at: string | null;
+    /** The brand's transfer reference, noted when marking it paid */
+    payment_reference: string | null;
     requester?: { id: string; name: string } | null;
   } | null;
 }
@@ -38,6 +43,7 @@ export interface PaymentRequestRow {
   status: "requested" | "processing" | "paid" | "cancelled";
   requested_at: string;
   paid_at: string | null;
+  payment_reference: string | null;
   cancelled_at: string | null;
   cancel_reason: string | null;
   requester: { id: string; name: string } | null;
@@ -48,15 +54,37 @@ export interface PeriodListItem extends PaymentPeriod, PeriodSummary {
   hosts: number;
 }
 
+/** Backup hours a host covered that the requesting host paid them for directly (not on payroll) */
+export interface HostPaidCover {
+  payer: string;
+  hours: number;
+}
+
 export interface HostPayRow {
   host_id: string;
   name: string;
   session_count: number;
+  /** Hours over the last period's target, paid here first */
+  carried_in_hours: number;
+  /** Approved hours this period (backups paid by another host not included) */
+  worked_hours: number;
+  /** Paid in this period: carried in + worked − carried out */
   hours: number;
+  /** Over the brand's target: unpaid now, paid in the next period */
+  carried_out_hours: number;
   rate_per_hour: number;
   amount: number;
   /** true while the period is open: at today's rate, not final */
   estimate: boolean;
+  host_paid: HostPaidCover[];
+}
+
+/** Open kasbon may not exceed the host's monthly salary by schedule (weekly slot hours × 52/12 × rate). */
+export interface AdvanceLimit {
+  monthly_salary: number;
+  /** Installments not paid back yet */
+  outstanding: number;
+  available: number;
 }
 
 export interface HourAdjustment {
@@ -95,7 +123,11 @@ export interface SlipDetail {
   period_start: string;
   period_end: string;
   session_count: number;
+  carried_in_hours: number;
+  worked_hours: number;
+  /** Paid on this slip */
   hours: number;
+  carried_out_hours: number;
   rate_per_hour: number;
   gross_amount: number;
   advance_deduction: number;
@@ -148,6 +180,8 @@ export const payrollApi = {
       summary: PeriodSummary;
       /** Live reports in the period still waiting for review; payment can't be requested until 0 */
       pending_reports: number;
+      /** Sick-leave backups whose letter can still come (who pays the cover isn't known yet); blocks the request too */
+      pending_letters: number;
       requests: PaymentRequestRow[];
       hosts: HostPayRow[];
       adjustments: HourAdjustment[];
@@ -158,10 +192,11 @@ export const payrollApi = {
   removeAdjustment: (token: string, id: string) => del(`/finance/payroll/adjustments/${id}`, token),
   requestPayment: (token: string, periodId: string) => post(`/finance/payroll/periods/${periodId}/request`, token),
   cancelRequest: (token: string, periodId: string, reason: string) => post(`/finance/payroll/periods/${periodId}/cancel-request`, token, { reason }),
-  markPaid: (token: string, periodId: string) => post(`/finance/payroll/periods/${periodId}/paid`, token),
+  markPaid: (token: string, periodId: string, reference: string | null) => post(`/finance/payroll/periods/${periodId}/paid`, token, { reference }),
   exportUrl: (token: string, periodId: string) => apiFileUrl(`/finance/payroll/periods/${periodId}/export`, token),
   slip: (token: string, id: string) => api<{ slip: SlipDetail }>(`/finance/payroll/slips/${id}`, { token }),
   advances: (token: string, status: "open" | "paid" | "" = "") => api<{ advances: CashAdvance[] }>(`/finance/cash-advances${query({ status })}`, { token }),
+  advanceLimit: (token: string, hostId: string) => api<{ limit: AdvanceLimit }>(`/finance/cash-advances/limit/${hostId}`, { token }),
   createAdvance: (token: string, data: { host_id: string; type: CashAdvance["type"]; total_amount: number; installment_count: number; notes: string | null }) =>
     post("/finance/cash-advances", token, data),
   settleAdvance: (token: string, id: string, note: string | null) => post(`/finance/cash-advances/${id}/settle`, token, { note }),
@@ -178,9 +213,14 @@ export interface MyPay {
     period_end: string;
     status: PeriodStatus;
     session_count: number;
+    carried_in_hours: number;
+    worked_hours: number;
+    /** Paid in this period so far (over the brand's target carries to the next one) */
     hours: number;
+    carried_out_hours: number;
     rate_per_hour: number;
     estimate: number;
+    host_paid: HostPaidCover[];
   }[];
   slips: {
     id: string;

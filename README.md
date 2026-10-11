@@ -264,4 +264,4 @@ This is **Next.js 16**, which differs from older versions. Check `frontend/node_
 **Waiting on the agency's decision**
 - Late check-in rule (after how many minutes, how many points).
 - Live report template (real fields instead of GMV, orders, viewers).
-- Payroll carry-over for host pay.
+- Backup paid by the requesting host: whether the agency still pays the requester for that slot (now: the cover's hours are billed to the brand, but paid to nobody on payroll).

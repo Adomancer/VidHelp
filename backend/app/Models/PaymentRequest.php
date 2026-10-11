@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * The agency asking the brand to pay a locked period.
  */
 #[Fillable([
-    'payment_period_id', 'requested_by', 'requested_at', 'status', 'exported_report_url', 'paid_at',
+    'payment_period_id', 'requested_by', 'requested_at', 'status', 'exported_report_url', 'paid_at', 'payment_reference',
     'cancelled_at', 'cancelled_by', 'cancel_reason',
 ])]
 class PaymentRequest extends Model

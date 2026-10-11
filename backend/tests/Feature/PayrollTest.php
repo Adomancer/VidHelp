@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Attendance;
+use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\CashAdvance;
 use App\Models\HostBrandAssignment;
@@ -14,11 +15,14 @@ use App\Models\SalarySlip;
 use App\Models\ScheduleSlot;
 use App\Models\User;
 use App\Models\WorkSession;
+use App\Services\BackupService;
 use App\Services\PayrollService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PayrollTest extends TestCase
@@ -31,6 +35,9 @@ class PayrollTest extends TestCase
 
     /** Rate Rp 20.000/h (Magang) */
     private HostProfile $host;
+
+    /** The host's Sunday 19:00-22:00 slot: 3 h a week × 52/12 × Rp 20.000 = Rp 260.000 a month (the kasbon limit) */
+    private ScheduleSlot $slot;
 
     protected function setUp(): void
     {
@@ -47,6 +54,10 @@ class PayrollTest extends TestCase
             'name' => 'Brand A', 'target_hours_per_period' => 10, 'payment_cycle_days' => 7, 'payroll_start_date' => '2026-10-01',
         ]);
         $this->host = $this->newHost();
+        $this->slot = ScheduleSlot::create([
+            'assignment_id' => $this->host->assignments()->first()->id,
+            'day_of_week' => 7, 'start_time' => '19:00', 'end_time' => '22:00', 'effective_from' => '2026-09-01',
+        ]);
     }
 
     private function newHost(): HostProfile
@@ -60,14 +71,14 @@ class PayrollTest extends TestCase
     }
 
     /** A live report (with its attendance) for a 10:00 session. */
-    private function liveReport(HostProfile $host, string $date, float $hours, string $status, ?Brand $brand = null): LiveReport
+    private function liveReport(HostProfile $host, string $date, float $hours, string $status, ?Brand $brand = null, ?BackupRequest $backup = null): LiveReport
     {
         $brand ??= $this->brand;
         $start = CarbonImmutable::parse("{$date} 10:00");
         $end = $start->addMinutes((int) round($hours * 60));
 
         $attendance = Attendance::create([
-            'host_id' => $host->id, 'brand_id' => $brand->id, 'session_date' => $date,
+            'host_id' => $host->id, 'brand_id' => $brand->id, 'session_date' => $date, 'backup_request_id' => $backup?->id,
             'scheduled_start_at' => $start, 'scheduled_end_at' => $end, 'check_in_at' => $start, 'check_out_at' => $end,
             'report_due_at' => $start->addDay(),
         ]);
@@ -79,18 +90,29 @@ class PayrollTest extends TestCase
     }
 
     /** An approved work session (attendance → report → session), placed in its period. */
-    private function workSession(HostProfile $host, string $date, float $hours, ?Brand $brand = null): WorkSession
+    private function workSession(HostProfile $host, string $date, float $hours, ?Brand $brand = null, ?BackupRequest $backup = null): WorkSession
     {
-        $report = $this->liveReport($host, $date, $hours, 'approved', $brand);
+        $report = $this->liveReport($host, $date, $hours, 'approved', $brand, $backup);
         $attendance = $report->attendance;
 
         $session = WorkSession::create([
             'live_report_id' => $report->id, 'host_id' => $host->id, 'brand_id' => $report->brand_id, 'session_date' => $date,
-            'start_at' => $attendance->check_in_at, 'end_at' => $attendance->check_out_at, 'duration_hours' => $hours, 'session_type' => 'regular',
+            'start_at' => $attendance->check_in_at, 'end_at' => $attendance->check_out_at, 'duration_hours' => $hours,
+            'session_type' => $backup ? 'backup' : 'regular',
         ]);
         app(PayrollService::class)->assign($session);
 
         return $session->fresh();
+    }
+
+    /** The host's 10:00-12:00 slot on $date, filled by $cover. */
+    private function backup(string $date, string $reason, HostProfile $cover): BackupRequest
+    {
+        return BackupRequest::create([
+            'slot_id' => $this->slot->id, 'brand_id' => $this->brand->id, 'requesting_host_id' => $this->host->id,
+            'backup_date' => $date, 'start_at' => "{$date} 10:00", 'end_at' => "{$date} 12:00",
+            'reason_type' => $reason, 'status' => 'filled', 'filled_by_host_id' => $cover->id, 'auto_fill_at' => "{$date} 09:30",
+        ]);
     }
 
     /** Move past the first period (1-7 Oct) so it is waiting for payment. */
@@ -193,7 +215,7 @@ class PayrollTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
     }
 
-    public function test_request_locks_pay_at_todays_rate_and_carries_extra_hours(): void
+    public function test_request_locks_pay_at_todays_rate_and_splits_hours_over_the_target(): void
     {
         $other = $this->newHost();
         $other->update(['rate_category_id' => HostRateCategory::where('name', 'Baru')->value('id'), 'rate_category_overridden' => true]);
@@ -208,16 +230,144 @@ class PayrollTest extends TestCase
         // A later rate change does not touch the locked period
         HostRateCategory::where('name', 'Magang')->update(['rate_per_hour' => 99999]);
 
-        $detail = $this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$period->id}")
+        $hosts = collect($this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$period->id}")
             ->assertJsonPath('period.status', 'requested')
             ->assertJsonPath('summary.worked_hours', 12)
             ->assertJsonPath('summary.achieved_hours', 10) // capped at the target
             ->assertJsonPath('summary.carried_out_hours', 2)
-            ->assertJsonPath('summary.total_amount', 265000) // 7 × 20.000 + 5 × 25.000
-            ->json('hosts');
-        $this->assertFalse($detail[0]['estimate']);
+            ->assertJsonPath('summary.total_amount', 220850) // 5,83 × 20.000 + 4,17 × 25.000
+            ->json('hosts'))->keyBy('host_id');
+
+        // Both hosts get 10/12 of their hours now; the rest waits for the next period
+        $this->assertFalse($hosts[$this->host->id]['estimate']);
+        $this->assertSame([7, 5.83, 1.17], [$hosts[$this->host->id]['worked_hours'], $hosts[$this->host->id]['hours'], $hosts[$this->host->id]['carried_out_hours']]);
+        $this->assertSame([5, 4.17, 0.83], [$hosts[$other->id]['worked_hours'], $hosts[$other->id]['hours'], $hosts[$other->id]['carried_out_hours']]);
 
         $this->assertSame(2.0, $this->period('2026-10-08')->carried_in_hours);
+    }
+
+    public function test_carried_hours_are_paid_first_in_the_next_period(): void
+    {
+        $this->workSession($this->host, '2026-10-02', 12); // target 10
+        $first = $this->endFirstPeriod();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$first->id}/request")->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$first->id}/paid")->assertOk();
+
+        $slip = SalarySlip::firstOrFail();
+        $this->assertSame(200000.0, $slip->gross_amount);
+        $this->actingAs($this->admin)->getJson("/api/finance/payroll/slips/{$slip->id}")
+            ->assertJsonPath('slip.worked_hours', 12)
+            ->assertJsonPath('slip.hours', 10)
+            ->assertJsonPath('slip.carried_out_hours', 2);
+
+        // The 2 carried hours count first: only 8 more fit, the 9th carries again
+        $this->workSession($this->host, '2026-10-09', 9);
+        $second = $this->period('2026-10-08');
+        $this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$second->id}")
+            ->assertJsonPath('hosts.0.carried_in_hours', 2)
+            ->assertJsonPath('hosts.0.worked_hours', 9)
+            ->assertJsonPath('hosts.0.hours', 10)
+            ->assertJsonPath('hosts.0.carried_out_hours', 1)
+            ->assertJsonPath('summary.achieved_hours', 10)
+            ->assertJsonPath('summary.carried_out_hours', 1);
+
+        $this->actingAs($this->host->user)->getJson('/api/host/pay')
+            ->assertJsonPath('current.0.carried_in_hours', 2)
+            ->assertJsonPath('current.0.estimate', 200000);
+    }
+
+    public function test_carried_hours_alone_can_fill_the_next_period(): void
+    {
+        $other = $this->newHost();
+        $this->workSession($this->host, '2026-10-02', 16);
+        $this->workSession($other, '2026-10-03', 4); // 20 hours: half paid, half carried (host 8, other 2)
+        $first = $this->endFirstPeriod();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$first->id}/request")->assertOk();
+
+        // The 10 carried hours fill the next target, so the other host's new hours all carry again
+        $this->workSession($other, '2026-10-09', 3);
+        $hosts = collect($this->actingAs($this->admin)->getJson('/api/finance/payroll/periods/'.$this->period('2026-10-08')->id)
+            ->assertJsonPath('summary.carried_in_hours', 10)
+            ->assertJsonPath('summary.achieved_hours', 10)
+            ->assertJsonPath('summary.carried_out_hours', 3)
+            ->json('hosts'))->keyBy('host_id');
+
+        $this->assertSame([8, 8, 0], [$hosts[$this->host->id]['carried_in_hours'], $hosts[$this->host->id]['hours'], $hosts[$this->host->id]['carried_out_hours']]);
+        $this->assertSame([2, 2, 3], [$hosts[$other->id]['carried_in_hours'], $hosts[$other->id]['hours'], $hosts[$other->id]['carried_out_hours']]);
+    }
+
+    public function test_previous_period_with_hours_must_be_requested_first(): void
+    {
+        $this->workSession($this->host, '2026-10-02', 2);
+        $this->workSession($this->host, '2026-10-09', 2);
+        $this->travelTo(CarbonImmutable::parse('2026-10-15 09:00'));
+        $this->artisan('payroll:roll-periods');
+        $first = $this->period('2026-10-01');
+        $second = $this->period('2026-10-08');
+
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$second->id}/request")->assertJsonValidationErrors('period');
+
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$first->id}/request")->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$second->id}/request")->assertOk();
+    }
+
+    public function test_backup_the_requester_pays_for_counts_for_the_brand_but_not_on_payroll(): void
+    {
+        $cover = $this->newHost();
+        $this->workSession($cover, '2026-10-03', 2, backup: $this->backup('2026-10-03', 'permit', $cover));
+        $this->workSession($this->host, '2026-10-02', 3);
+        $period = $this->period('2026-10-01');
+
+        $hosts = collect($this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$period->id}")
+            ->assertJsonPath('summary.worked_hours', 5)
+            ->assertJsonPath('summary.host_paid_hours', 2)
+            ->assertJsonPath('summary.achieved_hours', 5) // the brand still pays for the live
+            ->assertJsonPath('summary.total_amount', 60000) // only the host's own 3 hours
+            ->json('hosts'))->keyBy('host_id');
+
+        $this->assertSame(0, $hosts[$cover->id]['hours']);
+        $this->assertSame([['payer' => $this->host->user->name, 'hours' => 2]], $hosts[$cover->id]['host_paid']);
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
+        $this->artisan('payroll:roll-periods');
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/paid")->assertOk();
+
+        $this->assertSame(2.0, $period->fresh()->host_paid_hours);
+        $this->assertSame(0, SalarySlip::where('host_id', $cover->id)->count());
+    }
+
+    public function test_sick_cover_with_a_letter_on_time_is_paid_by_the_agency(): void
+    {
+        Storage::fake('local');
+        $cover = $this->newHost();
+        $backup = $this->backup('2026-10-03', 'sick', $cover);
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-03 18:00')); // letter due 4 Oct 10:00
+        app(BackupService::class)->attachLetter($backup, UploadedFile::fake()->create('surat.pdf', 50, 'application/pdf'), $this->host->user);
+        $this->workSession($cover, '2026-10-03', 2, backup: $backup);
+
+        $this->actingAs($this->admin)->getJson('/api/finance/payroll/periods/'.$this->period('2026-10-01')->id)
+            ->assertJsonPath('summary.host_paid_hours', 0)
+            ->assertJsonPath('hosts.0.hours', 2)
+            ->assertJsonPath('hosts.0.amount', 40000);
+    }
+
+    public function test_sick_cover_waits_for_the_letter_and_without_one_the_requester_pays(): void
+    {
+        $cover = $this->newHost();
+        $this->travelTo(CarbonImmutable::parse('2026-10-07 13:00'));
+        $this->workSession($cover, '2026-10-07', 2, backup: $this->backup('2026-10-07', 'sick', $cover)); // letter due 8 Oct 10:00
+        $period = $this->endFirstPeriod(); // 8 Oct 09:00
+
+        $this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$period->id}")->assertJsonPath('pending_letters', 1);
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertJsonValidationErrors('period');
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-08 10:30'));
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
+        $this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$period->id}")
+            ->assertJsonPath('summary.host_paid_hours', 2)
+            ->assertJsonPath('summary.total_amount', 0);
     }
 
     public function test_locked_period_takes_no_changes_and_late_sessions_move_on(): void
@@ -248,7 +398,9 @@ class PayrollTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
         $this->artisan('payroll:roll-periods');
         $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
-        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/paid")->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/paid", ['reference' => 'TRF 0042'])->assertOk();
+
+        $this->assertSame('TRF 0042', $period->paymentRequest()->firstOrFail()->payment_reference);
 
         $slip = SalarySlip::firstOrFail();
         $this->assertSame(40000.0, $slip->gross_amount);
@@ -389,6 +541,38 @@ class PayrollTest extends TestCase
             ->assertJsonPath('advance.installments.3.amount', 5000);
 
         $this->actingAs($this->admin)->getJson('/api/finance/cash-advances')->assertJsonPath('advances.0.remaining_amount', 15000);
+    }
+
+    public function test_open_kasbon_may_not_exceed_the_monthly_salary_by_schedule(): void
+    {
+        $this->actingAs($this->admin)->getJson("/api/finance/cash-advances/limit/{$this->host->id}")
+            ->assertJsonPath('limit.monthly_salary', 260000)
+            ->assertJsonPath('limit.available', 260000);
+
+        $this->recordAdvance(200000, 2);
+
+        // Rp 200.000 still open of Rp 260.000: at most Rp 60.000 more
+        $this->actingAs($this->admin)->postJson('/api/finance/cash-advances', [
+            'host_id' => $this->host->id, 'type' => 'loan', 'total_amount' => 60001, 'installment_count' => 1,
+        ])->assertJsonValidationErrors('total_amount');
+        $this->recordAdvance(60000, 1);
+
+        $this->actingAs($this->admin)->getJson("/api/finance/cash-advances/limit/{$this->host->id}")
+            ->assertJsonPath('limit.outstanding', 260000)
+            ->assertJsonPath('limit.available', 0);
+
+        // No schedule, no monthly salary
+        $this->actingAs($this->admin)->postJson('/api/finance/cash-advances', [
+            'host_id' => $this->newHost()->id, 'type' => 'loan', 'total_amount' => 10000, 'installment_count' => 1,
+        ])->assertJsonValidationErrors('total_amount');
+    }
+
+    public function test_kasbon_paid_back_frees_the_limit_again(): void
+    {
+        $id = $this->recordAdvance(260000, 2);
+        $this->actingAs($this->admin)->postJson("/api/finance/cash-advances/{$id}/settle")->assertOk();
+
+        $this->recordAdvance(260000, 1);
     }
 
     public function test_kasbon_with_deductions_cannot_be_removed(): void

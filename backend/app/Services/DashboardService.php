@@ -124,7 +124,7 @@ class DashboardService
                     return ['id' => $brand->id, 'name' => $brand->name, 'period' => null];
                 }
 
-                $summary = $this->payroll->summary($period, $this->payroll->hostTotals($period));
+                $summary = $this->payroll->breakdown($period)['summary'];
 
                 return [
                     'id' => $brand->id,

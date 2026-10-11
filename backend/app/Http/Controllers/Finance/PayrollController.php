@@ -61,9 +61,9 @@ class PayrollController extends Controller
             ->limit(60)
             ->get()
             ->map(function (PaymentPeriod $period) {
-                $totals = $this->payroll->hostTotals($period);
+                ['hosts' => $hosts, 'summary' => $summary] = $this->payroll->breakdown($period);
 
-                return [...$period->toArray(), ...$this->payroll->summary($period, $totals), 'hosts' => $totals->count()];
+                return [...$period->toArray(), ...$summary, 'hosts' => $hosts->count()];
             });
 
         return response()->json(['periods' => $periods]);
@@ -74,14 +74,15 @@ class PayrollController extends Controller
      */
     public function show(PaymentPeriod $period): JsonResponse
     {
-        $totals = $this->payroll->hostTotals($period);
+        ['hosts' => $hosts, 'summary' => $summary] = $this->payroll->breakdown($period);
 
         return response()->json([
             'period' => $period->load(['brand:id,name', 'paymentRequest.requester:id,name']),
-            'summary' => $this->payroll->summary($period, $totals),
+            'summary' => $summary,
             'pending_reports' => $period->isLocked() ? 0 : $this->payroll->pendingReports($period),
+            'pending_letters' => $period->isLocked() ? 0 : $this->payroll->pendingCoverLetters($period),
             'requests' => $period->paymentRequests()->with(['requester:id,name', 'canceller:id,name'])->get(),
-            'hosts' => $totals,
+            'hosts' => $hosts,
             'adjustments' => $period->adjustments()->with(['host.user', 'creator:id,name'])->latest()->get(),
             'slips' => $period->slips()->with('host.user')->get(),
         ]);
@@ -141,9 +142,14 @@ class PayrollController extends Controller
         return response()->json(['message' => 'Pengajuan dibatalkan; periode bisa diubah lagi.']);
     }
 
-    public function markPaid(PaymentPeriod $period): JsonResponse
+    /**
+     * The brand paid, optionally with the transfer's reference number.
+     */
+    public function markPaid(Request $request, PaymentPeriod $period): JsonResponse
     {
-        $slips = $this->payroll->markPaid($period);
+        $validated = $request->validate(['reference' => 'nullable|string|max:100']);
+
+        $slips = $this->payroll->markPaid($period, $validated['reference'] ?? null);
 
         return response()->json(['message' => "Ditandai lunas; {$slips->count()} slip gaji dibuat."]);
     }

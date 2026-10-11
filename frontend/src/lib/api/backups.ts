@@ -34,6 +34,11 @@ export interface BackupRequest {
   filled_by_host_id: string | null;
   letter_status: LetterStatus;
   letter_due_at: string | null;
+  /**
+   * Who pays the cover: the agency when the requester was sick and the letter came on time;
+   * otherwise the requester, directly to the cover (outside payroll). null while a sick letter can still come.
+   */
+  cover_paid_by: "agency" | "requester" | null;
   brand: { id: string; name: string };
   requester?: HostWithUser;
   filler?: HostWithUser | null;

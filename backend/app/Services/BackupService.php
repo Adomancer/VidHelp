@@ -157,6 +157,11 @@ class BackupService
             'size_kb' => (int) ceil($file->getSize() / 1024),
             'uploaded_by' => $by->id,
         ]);
+
+        // Whether the letter was on time decides who pays the cover (see BackupRequest::coverPaidBy)
+        if (! $backup->letter_uploaded_at) {
+            $backup->update(['letter_uploaded_at' => now()]);
+        }
     }
 
     /**

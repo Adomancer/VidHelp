@@ -198,6 +198,14 @@ function RequestCard({ backup, act, onConfirm }: { backup: BackupRequest; act: A
           <span className="font-medium text-success">Digantikan {backup.filler.user.name}</span>
           {backup.auto_filled && <span className="text-xs text-muted-foreground">(disetujui otomatis)</span>}
           {backup.counts_toward_quota && <span className="text-xs text-muted-foreground">· brand lain, memakai kuota</span>}
+          <span className="text-xs text-muted-foreground">
+            ·{" "}
+            {backup.cover_paid_by === "agency"
+              ? "dibayar agensi"
+              : backup.cover_paid_by === "requester"
+                ? `dibayar langsung oleh ${backup.requester?.user.name ?? "host yang minta"}`
+                : "pembayar menunggu surat sakit"}
+          </span>
         </div>
       )}
 

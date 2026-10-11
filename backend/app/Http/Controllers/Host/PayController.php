@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CashAdvance;
 use App\Models\HostProfile;
 use App\Models\HourAdjustment;
+use App\Models\PaymentItem;
 use App\Models\PaymentPeriod;
 use App\Models\SalarySlip;
 use App\Models\WorkSession;
@@ -24,35 +25,42 @@ class PayController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $host = $this->host($request)->load('rateCategory');
-        $rate = (float) ($host->rateCategory?->rate_per_hour ?? 0);
+        $host = $this->host($request);
 
-        $openPeriodIds = WorkSession::where('host_id', $host->id)->whereNotNull('payment_period_id')->pluck('payment_period_id')
+        // Periods I worked in, and the ones my hours over a target carried into
+        $periodIds = WorkSession::where('host_id', $host->id)->whereNotNull('payment_period_id')->pluck('payment_period_id')
             ->merge(HourAdjustment::where('host_id', $host->id)->pluck('payment_period_id'))
+            ->merge(PaymentItem::where('host_id', $host->id)->where('carried_out_hours', '>', 0)->with('period')->get()
+                ->map(fn (PaymentItem $item) => $this->payroll->nextPeriod($item->period)?->id)
+                ->filter())
             ->unique();
 
         $current = PaymentPeriod::with('brand:id,name')
-            ->whereIn('id', $openPeriodIds)
+            ->whereIn('id', $periodIds)
             ->whereIn('status', ['in_progress', 'waiting_payment'])
             ->orderBy('period_start')
             ->get()
-            ->map(function (PaymentPeriod $period) use ($host, $rate) {
-                $sessions = WorkSession::where('payment_period_id', $period->id)->where('host_id', $host->id);
-                $adjustments = HourAdjustment::where('payment_period_id', $period->id)->where('host_id', $host->id);
-                $hours = max(0, round((float) $sessions->sum('duration_hours') + (float) $adjustments->sum('hours_added'), 2));
+            ->map(function (PaymentPeriod $period) use ($host) {
+                $row = $this->payroll->breakdown($period)['hosts']->firstWhere('host_id', $host->id);
 
-                return [
+                return $row ? [
                     'period_id' => $period->id,
                     'brand' => $period->brand->only('id', 'name'),
                     'period_start' => $period->period_start->toDateString(),
                     'period_end' => $period->period_end->toDateString(),
                     'status' => $period->status,
-                    'session_count' => max(0, $sessions->count() + (int) $adjustments->sum('sessions_added')),
-                    'hours' => $hours,
-                    'rate_per_hour' => $rate,
-                    'estimate' => round($hours * $rate),
-                ];
-            });
+                    'session_count' => $row['session_count'],
+                    'carried_in_hours' => $row['carried_in_hours'],
+                    'worked_hours' => $row['worked_hours'],
+                    'hours' => $row['hours'],
+                    'carried_out_hours' => $row['carried_out_hours'],
+                    'rate_per_hour' => $row['rate_per_hour'],
+                    'estimate' => $row['amount'],
+                    'host_paid' => $row['host_paid'],
+                ] : null;
+            })
+            ->filter()
+            ->values();
 
         return response()->json([
             'current' => $current,

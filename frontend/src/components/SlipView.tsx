@@ -49,7 +49,18 @@ export default function SlipView({ slip }: { slip: SlipDetail }) {
         <table className="w-full text-sm">
           <tbody className="divide-y divide-zinc-200">
             <Row label="Sesi live" value={String(slip.session_count)} />
-            <Row label="Durasi live" value={formatDuration(slip.hours)} />
+            {slip.carried_in_hours > 0 || slip.carried_out_hours > 0 ? (
+              <>
+                {slip.carried_in_hours > 0 && <Row label="Jam bawaan periode lalu" value={`+ ${formatDuration(slip.carried_in_hours)}`} />}
+                <Row label="Durasi live periode ini" value={formatDuration(slip.worked_hours)} />
+                {slip.carried_out_hours > 0 && (
+                  <Row label="Melewati target brand, dibayar di periode berikutnya" value={`− ${formatDuration(slip.carried_out_hours)}`} />
+                )}
+                <Row label="Jam dibayar" value={formatDuration(slip.hours)} strong />
+              </>
+            ) : (
+              <Row label="Durasi live" value={formatDuration(slip.hours)} />
+            )}
             <Row label="Tarif per jam" value={formatRupiah(slip.rate_per_hour)} />
             <Row label="Gaji kotor" value={formatRupiah(slip.gross_amount)} strong />
             {slip.deductions.map((deduction) => (

@@ -229,6 +229,13 @@ function NeedsTab({
   );
 }
 
+/** Who pays the host covering my session: the agency only for sickness with the letter on time. */
+function coverPayNote(paidBy: BackupRequest["cover_paid_by"], cover: string): string {
+  if (paidBy === "agency") return `Agensi yang membayar ${cover} karena surat sakitmu masuk tepat waktu.`;
+  if (paidBy === "requester") return `Kamu yang membayar ${cover} langsung untuk sesi ini, di luar gaji dari agensi.`;
+  return `Unggah surat sakit sebelum batas supaya agensi yang membayar ${cover}. Tanpa surat, kamu yang membayarnya langsung.`;
+}
+
 function MineTab({ requests, act, onNew }: { requests?: BackupRequest[]; act: Act; onNew: () => void }) {
   const { token } = useAuth();
   const [cancelling, setCancelling] = useState<BackupRequest | null>(null);
@@ -273,10 +280,13 @@ function MineTab({ requests, act, onNew }: { requests?: BackupRequest[]; act: Ac
             <RequestTypeBadge names={backup.nominees?.map((nominee) => nominee.host.user.name) ?? []} />
 
             {backup.status === "filled" && backup.filler && (
-              <p className="flex items-center gap-2 text-sm text-success">
-                <ArrowLeftRight className="size-3.5" aria-hidden="true" />
-                Digantikan {backup.filler.user.name}
-              </p>
+              <div className="space-y-0.5">
+                <p className="flex items-center gap-2 text-sm text-success">
+                  <ArrowLeftRight className="size-3.5" aria-hidden="true" />
+                  Digantikan {backup.filler.user.name}
+                </p>
+                <p className="text-xs text-muted-foreground">{coverPayNote(backup.cover_paid_by, backup.filler.user.name)}</p>
+              </div>
             )}
             {backup.status === "open" && <p className="text-xs text-muted-foreground">Menunggu host mendaftar.</p>}
             {backup.status === "pending" && <p className="text-xs text-muted-foreground">Sudah ada yang mendaftar. Admin akan memilih penggantinya.</p>}

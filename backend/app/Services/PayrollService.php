@@ -4,12 +4,15 @@ namespace App\Services;
 
 use App\Models\Brand;
 use App\Models\CashAdvance;
+use App\Models\CashAdvanceInstallment;
 use App\Models\HostProfile;
 use App\Models\HourAdjustment;
 use App\Models\LiveReport;
+use App\Models\PaymentItem;
 use App\Models\PaymentPeriod;
 use App\Models\PaymentRequest;
 use App\Models\SalarySlip;
+use App\Models\ScheduleSlot;
 use App\Models\User;
 use App\Models\WorkSession;
 use Carbon\CarbonImmutable;
@@ -22,11 +25,17 @@ use Illuminate\Validation\ValidationException;
  * Payment periods per brand, host pay, brand invoices (target cap + carry-over),
  * salary slips and kasbon deductions.
  *
- * Hosts are paid for every approved hour in the period; the target cap and carried
- * hours only change what the brand is invoiced. (Agency decision still open.)
+ * A period pays at most the brand's target: hours carried in from the last period first, then
+ * this period's hours. Hours over the target stay unpaid and carry to the next period, cut
+ * from every host by the same share. What the brand is billed and what hosts are paid always
+ * cover the same hours. Backups the requesting host pays the cover for directly count toward
+ * the target but are not on payroll.
  */
 class PayrollService
 {
+    /** The line for billed hours no host is paid for here (backups another host paid, hours carried before 2026-10-11). */
+    private const OFF_PAYROLL = 'off_payroll';
+
     public function __construct(private Notifier $notifier) {}
 
     /**
@@ -93,85 +102,223 @@ class PayrollService
     }
 
     /**
-     * Per-host pay: the snapshot once locked, otherwise live (sessions + adjustments at today's rate).
+     * Per-host pay and the brand invoice: the snapshot once locked, otherwise live (at today's rates).
      *
-     * @return Collection<int, array{host_id: string, name: string, session_count: int, hours: float, rate_per_hour: float, amount: float, estimate: bool}>
+     * hours = paid in this period: carried in + worked − carried out. worked_hours leaves out
+     * backups the requesting host paid the cover for (listed in host_paid instead).
+     * achieved_hours (billed) = carried in + all worked hours, capped at the target.
+     *
+     * @return array{
+     *     hosts: Collection<int, array{host_id: string, name: string, session_count: int, carried_in_hours: float, worked_hours: float, hours: float, carried_out_hours: float, rate_per_hour: float, amount: float, estimate: bool, host_paid: list<array{payer: string, hours: float}>}>,
+     *     summary: array{worked_hours: float, host_paid_hours: float, carried_in_hours: float, achieved_hours: float, carried_out_hours: float, target_hours: int, total_amount: float},
+     * }
      */
-    public function hostTotals(PaymentPeriod $period): Collection
+    public function breakdown(PaymentPeriod $period): array
     {
+        $hostPaid = $this->coverSessions($period)->where('paid_by', 'requester');
+
         if ($period->isLocked()) {
-            return $period->items()->with('host.user')->get()
-                ->map(fn ($item) => [
+            $hosts = $period->items()->with('host.user')->get()
+                ->map(fn (PaymentItem $item) => [
                     'host_id' => $item->host_id,
                     'name' => $item->host->user->name,
                     'session_count' => $item->session_count,
+                    'carried_in_hours' => $item->carried_in_hours,
+                    'worked_hours' => $item->worked_hours,
                     'hours' => $item->hours,
+                    'carried_out_hours' => $item->carried_out_hours,
                     'rate_per_hour' => $item->rate_per_hour,
                     'amount' => $item->amount,
                     'estimate' => false,
+                    'host_paid' => $this->paidByPayer($hostPaid, $item->host_id),
                 ])
                 ->sortBy('name')
                 ->values();
-        }
 
-        $sessions = WorkSession::where('payment_period_id', $period->id)
-            ->selectRaw('host_id, count(*) as sessions, sum(duration_hours) as hours')
-            ->groupBy('host_id')->get()->keyBy('host_id');
-        $adjustments = HourAdjustment::where('payment_period_id', $period->id)
-            ->selectRaw('host_id, sum(sessions_added) as sessions, sum(hours_added) as hours')
-            ->groupBy('host_id')->get()->keyBy('host_id');
-
-        return HostProfile::with(['user', 'rateCategory'])
-            ->whereIn('id', $sessions->keys()->merge($adjustments->keys())->unique())
-            ->get()
-            ->map(function (HostProfile $host) use ($sessions, $adjustments) {
-                $hours = max(0, round((float) ($sessions[$host->id]->hours ?? 0) + (float) ($adjustments[$host->id]->hours ?? 0), 2));
-                $count = max(0, (int) ($sessions[$host->id]->sessions ?? 0) + (int) ($adjustments[$host->id]->sessions ?? 0));
-                $rate = (float) ($host->rateCategory?->rate_per_hour ?? 0);
-
-                return [
-                    'host_id' => $host->id,
-                    'name' => $host->user->name,
-                    'session_count' => $count,
-                    'hours' => $hours,
-                    'rate_per_hour' => $rate,
-                    'amount' => round($hours * $rate),
-                    'estimate' => true,
-                ];
-            })
-            ->sortBy('name')
-            ->values();
-    }
-
-    /**
-     * What the brand is invoiced: worked + carried in, capped at the target; the rest carries out.
-     *
-     * @param  Collection<int, array>  $totals
-     */
-    public function summary(PaymentPeriod $period, Collection $totals): array
-    {
-        if ($period->isLocked()) {
-            return [
+            return ['hosts' => $hosts, 'summary' => [
                 'worked_hours' => $period->worked_hours,
+                'host_paid_hours' => $period->host_paid_hours,
                 'carried_in_hours' => $period->carried_in_hours,
                 'achieved_hours' => $period->achieved_hours,
                 'carried_out_hours' => $period->carried_out_hours,
                 'target_hours' => $period->target_hours,
-                'total_amount' => round($totals->sum('amount')),
-            ];
+                'total_amount' => round($hosts->sum('amount')),
+            ]];
         }
 
-        $worked = round($totals->sum('hours'), 2);
-        $available = $worked + $period->carried_in_hours;
+        $sessions = WorkSession::where('payment_period_id', $period->id)
+            ->whereNotIn('id', $hostPaid->pluck('session_id'))
+            ->get(['id', 'host_id', 'duration_hours'])
+            ->groupBy('host_id');
+        $adjustments = HourAdjustment::where('payment_period_id', $period->id)->get()->groupBy('host_id');
+        [$carriedIn, $offPayrollCarriedIn] = $this->carriedIn($period);
 
-        return [
-            'worked_hours' => $worked,
+        $hostIds = $sessions->keys()->merge($adjustments->keys())->merge(array_keys($carriedIn))->merge($hostPaid->pluck('host_id'))->unique();
+        $profiles = HostProfile::with(['user', 'rateCategory'])->whereIn('id', $hostIds)->get()->keyBy('id');
+
+        $lines = [];
+        foreach ($hostIds as $id) {
+            $lines[$id] = [
+                'carried_in' => $carriedIn[$id] ?? 0.0,
+                'worked' => max(0, round((float) ($sessions[$id] ?? collect())->sum('duration_hours') + (float) ($adjustments[$id] ?? collect())->sum('hours_added'), 2)),
+                'sessions' => max(0, ($sessions[$id] ?? collect())->count() + (int) ($adjustments[$id] ?? collect())->sum('sessions_added')),
+            ];
+        }
+        $lines[self::OFF_PAYROLL] = ['carried_in' => $offPayrollCarriedIn, 'worked' => round($hostPaid->sum('hours'), 2), 'sessions' => 0];
+        $split = $this->allocate($lines, $period->target_hours);
+
+        $hosts = $hostIds
+            ->map(function (string $id) use ($lines, $split, $profiles, $hostPaid) {
+                $rate = (float) ($profiles[$id]->rateCategory?->rate_per_hour ?? 0);
+
+                return [
+                    'host_id' => $id,
+                    'name' => $profiles[$id]->user->name,
+                    'session_count' => $lines[$id]['sessions'],
+                    'carried_in_hours' => $lines[$id]['carried_in'],
+                    'worked_hours' => $lines[$id]['worked'],
+                    'hours' => $split[$id]['paid'],
+                    'carried_out_hours' => $split[$id]['carried_out'],
+                    'rate_per_hour' => $rate,
+                    'amount' => round($split[$id]['paid'] * $rate),
+                    'estimate' => true,
+                    'host_paid' => $this->paidByPayer($hostPaid, $id),
+                ];
+            })
+            ->sortBy('name')
+            ->values();
+
+        return ['hosts' => $hosts, 'summary' => [
+            'worked_hours' => round(array_sum(array_column($lines, 'worked')), 2),
+            'host_paid_hours' => $lines[self::OFF_PAYROLL]['worked'],
             'carried_in_hours' => $period->carried_in_hours,
-            'achieved_hours' => round(min($available, $period->target_hours), 2),
-            'carried_out_hours' => round(max(0, $available - $period->target_hours), 2),
+            'achieved_hours' => round(array_sum(array_column($split, 'paid')), 2),
+            'carried_out_hours' => round(array_sum(array_column($split, 'carried_out')), 2),
             'target_hours' => $period->target_hours,
-            'total_amount' => round($totals->sum('amount')),
-        ];
+            'total_amount' => round($hosts->sum('amount')),
+        ]];
+    }
+
+    /**
+     * Fill the target with carried-in hours first, then this period's hours; what doesn't fit
+     * carries out. When a group doesn't fit, every line in it gets the same share of the room.
+     *
+     * @param  array<string, array{carried_in: float, worked: float}>  $lines
+     * @return array<string, array{paid: float, carried_out: float}>
+     */
+    private function allocate(array $lines, int $target): array
+    {
+        // Hundredths of an hour, so the shares add up exactly
+        $carried = array_map(fn (array $line) => (int) round($line['carried_in'] * 100), $lines);
+        $worked = array_map(fn (array $line) => (int) round($line['worked'] * 100), $lines);
+
+        $fromCarried = $this->apportion($carried, $target * 100);
+        $fromWorked = $this->apportion($worked, $target * 100 - array_sum($fromCarried));
+
+        $split = [];
+        foreach ($lines as $key => $line) {
+            $paid = $fromCarried[$key] + $fromWorked[$key];
+            $split[$key] = ['paid' => $paid / 100, 'carried_out' => ($carried[$key] + $worked[$key] - $paid) / 100];
+        }
+
+        return $split;
+    }
+
+    /**
+     * Everything if it fits in $room; otherwise $room split in proportion to the weights,
+     * the units left after rounding down going to the largest remainders.
+     *
+     * @param  array<string, int>  $weights
+     * @return array<string, int>
+     */
+    private function apportion(array $weights, int $room): array
+    {
+        $sum = array_sum($weights);
+        if ($sum <= $room) {
+            return $weights;
+        }
+
+        $shares = [];
+        $remainders = [];
+        foreach ($weights as $key => $weight) {
+            $shares[$key] = intdiv($weight * $room, $sum);
+            $remainders[$key] = ($weight * $room) % $sum;
+        }
+        arsort($remainders);
+        foreach (array_slice(array_keys($remainders), 0, $room - array_sum($shares)) as $key) {
+            $shares[$key]++;
+        }
+
+        return $shares;
+    }
+
+    /**
+     * Hours each host carries in from the previous period (once it is locked), and the carried
+     * hours no host is paid for (their part of off-payroll hours, or carried before 2026-10-11).
+     *
+     * @return array{0: array<string, float>, 1: float}
+     */
+    private function carriedIn(PaymentPeriod $period): array
+    {
+        $previous = $this->previousPeriod($period);
+        if (! $previous?->isLocked()) {
+            return [[], 0.0];
+        }
+
+        $perHost = $previous->items()->where('carried_out_hours', '>', 0)->get()
+            ->mapWithKeys(fn (PaymentItem $item) => [$item->host_id => $item->carried_out_hours])
+            ->all();
+
+        return [$perHost, max(0, round($period->carried_in_hours - array_sum($perHost), 2))];
+    }
+
+    /**
+     * Backup sessions in the period and who pays the cover (see BackupRequest::coverPaidBy):
+     * "agency", "requester" (directly, outside payroll) or null while a sick letter can still come.
+     *
+     * @return Collection<int, array{session_id: string, host_id: string, hours: float, paid_by: ?string, payer: string}>
+     */
+    private function coverSessions(PaymentPeriod $period): Collection
+    {
+        return WorkSession::where('payment_period_id', $period->id)
+            ->where('session_type', 'backup')
+            ->with('liveReport.attendance.backupRequest.requester.user')
+            ->get()
+            ->map(function (WorkSession $session) {
+                $request = $session->liveReport?->attendance?->backupRequest;
+
+                return [
+                    'session_id' => $session->id,
+                    'host_id' => $session->host_id,
+                    'hours' => $session->duration_hours,
+                    'paid_by' => $request ? $request->cover_paid_by : 'agency',
+                    'payer' => $request?->requester->user->name ?? '',
+                ];
+            });
+    }
+
+    /**
+     * A host's backup hours paid directly by the hosts they covered, per payer.
+     *
+     * @param  Collection<int, array{host_id: string, payer: string, hours: float}>  $hostPaid
+     * @return list<array{payer: string, hours: float}>
+     */
+    private function paidByPayer(Collection $hostPaid, string $hostId): array
+    {
+        return $hostPaid->where('host_id', $hostId)
+            ->groupBy('payer')
+            ->map(fn (Collection $covers, string $payer) => ['payer' => $payer, 'hours' => round($covers->sum('hours'), 2)])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Sick-leave backups in the period whose letter can still come: until then it isn't known
+     * whether the agency or the requesting host pays the cover.
+     */
+    public function pendingCoverLetters(PaymentPeriod $period): int
+    {
+        return $this->coverSessions($period)->whereNull('paid_by')->count();
     }
 
     /**
@@ -195,15 +342,34 @@ class PayrollService
                 $this->fail("{$pending} laporan live di periode ini masih menunggu dicek. Setujui atau tolak dulu.");
             }
 
-            $totals = $this->hostTotals($period);
-            $summary = $this->summary($period, $totals);
+            // Who pays a sick-leave cover is only known once the letter is in or its deadline passed
+            $letters = $this->pendingCoverLetters($period);
+            if ($letters > 0) {
+                $this->fail("{$letters} sesi backup karena sakit masih menunggu surat dokter. Tunggu suratnya diunggah atau batas waktunya lewat.");
+            }
+
+            // This period starts with the hours the previous one carries out
+            $previous = $this->previousPeriod($period);
+            if ($previous && ! $previous->isLocked() && $this->hasHours($previous)) {
+                $this->fail("Ajukan dulu periode sebelumnya ({$this->dates($previous)}); jam yang melewati targetnya dibawa ke periode ini.");
+            }
+
+            ['hosts' => $hosts, 'summary' => $summary] = $this->breakdown($period);
+
+            $next = $this->periodFor($period->brand, CarbonImmutable::parse($period->period_end->toDateString())->addDay());
+            if ($summary['carried_out_hours'] > 0 && $next?->isLocked()) {
+                $this->fail("Periode berikutnya ({$this->dates($next)}) sudah diajukan, jadi {$summary['carried_out_hours']} jam yang melewati target tidak bisa dibawa ke sana. Batalkan pengajuan periode itu dulu.");
+            }
 
             $period->items()->delete();
-            foreach ($totals as $row) {
+            foreach ($hosts as $row) {
                 $period->items()->create([
                     'host_id' => $row['host_id'],
                     'session_count' => $row['session_count'],
+                    'carried_in_hours' => $row['carried_in_hours'],
+                    'worked_hours' => $row['worked_hours'],
                     'hours' => $row['hours'],
+                    'carried_out_hours' => $row['carried_out_hours'],
                     'rate_per_hour' => $row['rate_per_hour'],
                     'amount' => $row['amount'],
                 ]);
@@ -211,13 +377,13 @@ class PayrollService
 
             $period->update([
                 'worked_hours' => $summary['worked_hours'],
+                'host_paid_hours' => $summary['host_paid_hours'],
                 'achieved_hours' => $summary['achieved_hours'],
                 'carried_out_hours' => $summary['carried_out_hours'],
                 'status' => 'requested',
                 'locked_at' => now(),
             ]);
 
-            $next = $this->periodFor($period->brand, CarbonImmutable::parse($period->period_end->toDateString())->addDay());
             if ($next && ! $next->isLocked()) {
                 $next->update(['carried_in_hours' => $summary['carried_out_hours']]);
             }
@@ -261,6 +427,7 @@ class PayrollService
             $period->items()->delete();
             $period->update([
                 'worked_hours' => 0,
+                'host_paid_hours' => 0,
                 'achieved_hours' => 0,
                 'carried_out_hours' => 0,
                 'status' => 'waiting_payment',
@@ -284,31 +451,51 @@ class PayrollService
             ->count();
     }
 
-    private function nextPeriod(PaymentPeriod $period): ?PaymentPeriod
+    public function nextPeriod(PaymentPeriod $period): ?PaymentPeriod
     {
         return PaymentPeriod::where('brand_id', $period->brand_id)
             ->whereDate('period_start', CarbonImmutable::parse($period->period_end->toDateString())->addDay())
             ->first();
     }
 
+    private function previousPeriod(PaymentPeriod $period): ?PaymentPeriod
+    {
+        return PaymentPeriod::where('brand_id', $period->brand_id)
+            ->whereDate('period_end', CarbonImmutable::parse($period->period_start->toDateString())->subDay())
+            ->first();
+    }
+
+    /** Whether anything in the period could be paid or carried. */
+    private function hasHours(PaymentPeriod $period): bool
+    {
+        return $period->carried_in_hours > 0 || $period->workSessions()->exists() || $period->adjustments()->exists();
+    }
+
+    /** "1 Okt – 7 Okt 2026" */
+    private function dates(PaymentPeriod $period): string
+    {
+        return $period->period_start->translatedFormat('j M').' – '.$period->period_end->translatedFormat('j M Y');
+    }
+
     /**
-     * The brand paid: close the period and create a salary slip per host (kasbon deducted).
+     * The brand paid: close the period and create a salary slip per host paid something (kasbon deducted).
      *
      * @return Collection<int, SalarySlip>
      */
-    public function markPaid(PaymentPeriod $period): Collection
+    public function markPaid(PaymentPeriod $period, ?string $reference = null): Collection
     {
-        return DB::transaction(function () use ($period) {
+        return DB::transaction(function () use ($period, $reference) {
             $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
 
             if ($period->status !== 'requested') {
                 $this->fail($period->status === 'paid' ? 'Periode ini sudah lunas.' : 'Ajukan pembayaran dulu.');
             }
 
-            $period->paymentRequest?->update(['status' => 'paid', 'paid_at' => now()]);
+            $period->paymentRequest?->update(['status' => 'paid', 'paid_at' => now(), 'payment_reference' => $reference]);
             $period->update(['status' => 'paid']);
 
-            return $period->items()->get()->map(function ($item) use ($period) {
+            // Hosts whose hours all carried over (or who only have backups paid by another host) get no slip
+            return $period->items()->where('hours', '>', 0)->get()->map(function ($item) use ($period) {
                 $slip = SalarySlip::create([
                     'host_id' => $item->host_id,
                     'payment_period_id' => $period->id,
@@ -329,7 +516,7 @@ class PayrollService
                     $item->host->user,
                     'slip_ready',
                     "Slip gaji siap: {$period->brand->name}",
-                    'Gaji bersih Rp '.number_format($slip->net_amount, 0, ',', '.')." untuk {$period->period_start->translatedFormat('j M')} – {$period->period_end->translatedFormat('j M Y')}.",
+                    'Gaji bersih '.$this->rupiah($slip->net_amount)." untuk {$this->dates($period)}.",
                     "/host/pay/slips/{$slip->id}",
                     dm: true,
                 );
@@ -391,11 +578,54 @@ class PayrollService
     }
 
     /**
-     * Record a kasbon and split it into equal installments (the last one takes the rounding).
+     * What a host earns in a month by their schedule: active weekly slot hours × 52/12 × their rate.
+     */
+    public function monthlySalary(HostProfile $host): float
+    {
+        $minutes = ScheduleSlot::activeOn(today())
+            ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
+            ->get()
+            ->sum(function (ScheduleSlot $slot) {
+                [$start, $end] = $slot->weekRange();
+
+                return $end - $start;
+            });
+
+        return round($minutes / 60 * 52 / 12 * (float) ($host->rateCategory?->rate_per_hour ?? 0));
+    }
+
+    /**
+     * How much more kasbon the host may take: open kasbon (installments not yet paid back)
+     * may not exceed their monthly salary.
+     *
+     * @return array{monthly_salary: float, outstanding: float, available: float}
+     */
+    public function advanceLimit(HostProfile $host): array
+    {
+        $salary = $this->monthlySalary($host);
+        $outstanding = (float) CashAdvanceInstallment::where('status', 'scheduled')
+            ->whereHas('advance', fn ($q) => $q->where('host_id', $host->id))
+            ->sum('amount');
+
+        return ['monthly_salary' => $salary, 'outstanding' => $outstanding, 'available' => max(0, $salary - $outstanding)];
+    }
+
+    /**
+     * Record a kasbon (within the host's limit) and split it into equal installments (the last one takes the rounding).
      */
     public function recordAdvance(HostProfile $host, array $attributes, User $by): CashAdvance
     {
         return DB::transaction(function () use ($host, $attributes, $by) {
+            // One kasbon at a time per host, so two at once can't both fit under the limit
+            $host = HostProfile::with('rateCategory')->lockForUpdate()->findOrFail($host->id);
+
+            $limit = $this->advanceLimit($host);
+            if ($attributes['total_amount'] > $limit['available']) {
+                throw ValidationException::withMessages(['total_amount' => [$limit['monthly_salary'] > 0
+                    ? 'Melebihi batas kasbon. Gaji bulanan dari jadwal '.$this->rupiah($limit['monthly_salary']).', kasbon berjalan '.$this->rupiah($limit['outstanding']).', jadi maksimal '.$this->rupiah($limit['available']).'.'
+                    : 'Host ini belum punya jadwal aktif atau tarif, jadi belum ada gaji bulanan untuk batas kasbon.']]);
+            }
+
             $advance = CashAdvance::create([
                 ...$attributes,
                 'host_id' => $host->id,
@@ -485,7 +715,10 @@ class PayrollService
             'period_start' => $slip->period->period_start->toDateString(),
             'period_end' => $slip->period->period_end->toDateString(),
             'session_count' => $item?->session_count ?? 0,
+            'carried_in_hours' => $item?->carried_in_hours ?? 0,
+            'worked_hours' => $item?->worked_hours ?? 0,
             'hours' => $item?->hours ?? 0,
+            'carried_out_hours' => $item?->carried_out_hours ?? 0,
             'rate_per_hour' => $item?->rate_per_hour ?? 0,
             'gross_amount' => $slip->gross_amount,
             'advance_deduction' => $slip->advance_deduction,
@@ -528,7 +761,7 @@ class PayrollService
     public function exportCsv(PaymentPeriod $period): string
     {
         $out = fopen('php://temp', 'r+');
-        $summary = $this->summary($period, $this->hostTotals($period));
+        $summary = $this->breakdown($period)['summary'];
 
         fputcsv($out, ['Brand', $period->brand->name]);
         fputcsv($out, ['Periode', $period->period_start->toDateString(), $period->period_end->toDateString()]);
@@ -566,6 +799,11 @@ class PayrollService
         fclose($out);
 
         return $csv;
+    }
+
+    private function rupiah(float $amount): string
+    {
+        return 'Rp '.number_format($amount, 0, ',', '.');
     }
 
     private function fail(string $message): never

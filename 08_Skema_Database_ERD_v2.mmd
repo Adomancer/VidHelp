@@ -283,6 +283,7 @@ erDiagram
         boolean auto_filled
         boolean counts_toward_quota "true jika host pengganti beda brand"
         boolean letter_penalty_applied "poin sudah dipotong karena surat sakit telat"
+        datetime letter_uploaded_at "surat sakit pertama masuk; tepat waktu = agensi bayar pengganti, selain itu host peminta bayar langsung"
         uuid filled_by_host_id FK
         datetime filled_at
         datetime cancelled_at
@@ -455,9 +456,10 @@ erDiagram
         date period_end
         int target_hours "snapshot target brand"
         decimal worked_hours "semua jam kerja + penyesuaian di periode ini"
-        decimal achieved_hours "ditagih ke brand: min(worked + carried_in, target)"
-        decimal carried_in_hours "sisa dari periode sebelumnya"
-        decimal carried_out_hours "kelebihan ke periode berikutnya"
+        decimal host_paid_hours "backup yang dibayar langsung host peminta: ditagih ke brand, tidak masuk gaji"
+        decimal achieved_hours "ditagih ke brand = dibayar ke host: min(worked + carried_in, target)"
+        decimal carried_in_hours "sisa dari periode sebelumnya, dibayar duluan"
+        decimal carried_out_hours "kelebihan ke periode berikutnya (belum dibayar)"
         enum status "in_progress, waiting_payment, requested, paid"
         datetime locked_at "terkunci setelah request payment"
         datetime created_at
@@ -469,7 +471,10 @@ erDiagram
         uuid payment_period_id FK "unik per (periode, host)"
         uuid host_id FK
         int session_count
-        decimal hours "host dibayar semua jam kerja (carry-over hanya untuk tagihan brand, belum final)"
+        decimal carried_in_hours "bawaan host ini dari periode lalu"
+        decimal worked_hours "jam kerja host ini di periode ini (tanpa backup yang dibayar host lain)"
+        decimal hours "dibayar: carried_in + worked - carried_out (maks target, dipotong proporsional)"
+        decimal carried_out_hours "jam host ini di atas target, dibayar di periode berikutnya"
         decimal rate_per_hour "snapshot saat periode ditutup"
         decimal amount
         datetime created_at
@@ -496,6 +501,7 @@ erDiagram
         enum status "requested, processing, paid"
         string exported_report_url "laporan CSV untuk brand"
         datetime paid_at
+        string payment_reference "opsional: nomor referensi transfer brand"
         datetime created_at
         datetime updated_at
     }

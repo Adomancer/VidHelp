@@ -227,15 +227,44 @@ const periodColumns: ColumnDef<PeriodListItem>[] = [
   },
 ];
 
-/** Hosts' pay in a period: name, sessions, time, rate and pay, sortable. */
+/**
+ * Hosts' pay in a period: name, sessions, time worked and paid, rate and pay, sortable.
+ * Paid time = carried in + worked − what carried over the brand's target.
+ */
 const hostPayColumns: ColumnDef<HostPayRow>[] = [
-  { accessorKey: "name", header: "Host", meta: { headClassName: "px-5 py-2.5 md:px-6", cellClassName: "px-5 py-2.5 font-medium text-foreground md:px-6" } },
+  {
+    accessorKey: "name",
+    header: "Host",
+    meta: { headClassName: "px-5 py-2.5 md:px-6", cellClassName: "px-5 py-2.5 md:px-6" },
+    cell: ({ row: { original: host } }) => (
+      <>
+        <span className="font-medium text-foreground">{host.name}</span>
+        {host.host_paid.map((cover) => (
+          <span key={cover.payer} className="block text-[11px] text-muted-foreground">
+            Backup {formatDuration(cover.hours)} dibayar langsung oleh {cover.payer}
+          </span>
+        ))}
+      </>
+    ),
+  },
   { accessorKey: "session_count", header: "Sesi", meta: { align: "right", headClassName: "px-3 py-2.5", cellClassName: "px-3 py-2.5" } },
   {
+    accessorKey: "worked_hours",
+    header: "Kerja",
+    meta: { align: "right", headClassName: "hidden px-3 py-2.5 sm:table-cell", cellClassName: "hidden px-3 py-2.5 whitespace-nowrap text-muted-foreground sm:table-cell" },
+    cell: ({ row }) => formatDuration(row.original.worked_hours),
+  },
+  {
     accessorKey: "hours",
-    header: "Waktu",
+    header: "Dibayar",
     meta: { align: "right", headClassName: "px-3 py-2.5", cellClassName: "px-3 py-2.5 whitespace-nowrap" },
-    cell: ({ row }) => formatDuration(row.original.hours),
+    cell: ({ row: { original: host } }) => (
+      <>
+        {formatDuration(host.hours)}
+        {host.carried_in_hours > 0 && <span className="block text-[11px] text-muted-foreground">+{formatDuration(host.carried_in_hours)} bawaan</span>}
+        {host.carried_out_hours > 0 && <span className="block text-[11px] text-warning">{formatDuration(host.carried_out_hours)} dibawa</span>}
+      </>
+    ),
   },
   {
     accessorKey: "rate_per_hour",
@@ -260,6 +289,8 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
   const { token } = useAuth();
   const detail = useApiData(`payroll-period-${periodId}`, () => payrollApi.period(token, periodId));
   const [confirm, setConfirm] = useState<Confirm>(null);
+  const [paying, setPaying] = useState(false);
+  const [reference, setReference] = useState("");
   // The desk is shared by the admin and finance panels; slips open in the same panel
   const slipsPath = usePathname().startsWith("/finance") ? "/finance/payroll/slips" : "/admin/payroll/slips";
 
@@ -285,9 +316,10 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
 
   if (detail.error) return <ErrorState message={detail.error} onRetry={detail.reload} />;
   if (!detail.data) return <CardsSkeleton count={2} />;
-  const { period, summary, pending_reports: pendingReports, requests, hosts, adjustments, slips } = detail.data;
+  const { period, summary, pending_reports: pendingReports, pending_letters: pendingLetters, requests, hosts, adjustments, slips } = detail.data;
   const locked = period.status === "requested" || period.status === "paid";
   const hasActions = period.status === "waiting_payment" || locked;
+  const paymentReference = period.payment_request?.payment_reference;
 
   return (
     <div className="space-y-4">
@@ -298,7 +330,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
             {period.status === "waiting_payment" && (
               <Button
                 type="button"
-                disabled={pendingReports > 0}
+                disabled={pendingReports > 0 || pendingLetters > 0}
                 onClick={() =>
                   setConfirm({
                     title: "Ajukan pembayaran?",
@@ -320,19 +352,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
               </Button>
             )}
             {period.status === "requested" && (
-              <Button
-                type="button"
-                variant="success"
-                onClick={() =>
-                  setConfirm({
-                    title: "Brand sudah membayar?",
-                    body: "Slip gaji dibuat untuk setiap host dan cicilan kasbon dipotong.",
-                    label: "Tandai lunas",
-                    destructive: false,
-                    run: () => payrollApi.markPaid(token, period.id),
-                  })
-                }
-              >
+              <Button type="button" variant="success" onClick={() => setPaying(true)}>
                 <Wallet aria-hidden="true" />
                 Tandai lunas
               </Button>
@@ -355,6 +375,12 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
             {pendingReports} laporan live di periode ini masih menunggu dicek. Pembayaran bisa diajukan setelah operator menyetujui atau menolaknya.
           </FormAlert>
         )}
+        {period.status !== "paid" && pendingLetters > 0 && (
+          <FormAlert tone="warning">
+            {pendingLetters} sesi backup karena sakit masih menunggu surat dokter. Kalau surat masuk tepat waktu agensi yang membayar penggantinya; kalau tidak, host yang
+            minta backup. Pembayaran bisa diajukan setelah suratnya masuk atau batas waktunya lewat.
+          </FormAlert>
+        )}
 
         <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border text-sm sm:grid-cols-3">
           <Stat label="Target" value={`${summary.target_hours} jam`} />
@@ -364,7 +390,14 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
           <Stat label="Dibawa ke periode berikutnya" value={formatDuration(summary.carried_out_hours)} />
           <Stat label="Gaji host" value={formatRupiah(summary.total_amount)} strong />
         </dl>
+        <p className="text-xs text-muted-foreground">
+          Host dibayar untuk jam yang ditagihkan: bawaan periode lalu dulu, lalu jam periode ini sampai target. Jam di atas target dibawa ke periode berikutnya,
+          dipotong sama rata dari semua host.
+          {summary.host_paid_hours > 0 &&
+            ` ${formatDuration(summary.host_paid_hours)} backup dibayar langsung oleh host yang minta backup: ikut ditagihkan, tapi tidak masuk gaji.`}
+        </p>
         {period.status === "in_progress" && <p className="text-xs text-muted-foreground">Gaji masih perkiraan dengan tarif hari ini sampai pembayaran diajukan.</p>}
+        {paymentReference && <p className="text-xs text-muted-foreground">Referensi transfer brand: {paymentReference}</p>}
         {period.status === "requested" && (
           <p className="text-xs text-muted-foreground">
             Membatalkan akan membuka kunci periode supaya jam bisa dikoreksi; ajukan lagi setelahnya. Jam yang disetujui saat periode terkunci tetap di periode
@@ -388,7 +421,11 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                       {request.canceller ? ` oleh ${request.canceller.name}` : ""}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground"> · {request.status === "paid" ? "lunas" : "aktif"}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {request.status === "paid" ? "lunas" : "aktif"}
+                      {request.payment_reference ? ` · ref ${request.payment_reference}` : ""}
+                    </span>
                   )}
                 </p>
                 {request.cancel_reason && <p className="text-xs text-muted-foreground">{request.cancel_reason}</p>}
@@ -462,6 +499,36 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
           onClose={() => setConfirm(null)}
         >
           {confirm.body}
+        </ConfirmDialog>
+      )}
+
+      {paying && (
+        <ConfirmDialog
+          title="Brand sudah membayar?"
+          confirmLabel="Tandai lunas"
+          destructive={false}
+          onConfirm={() => act(() => payrollApi.markPaid(token, period.id, reference.trim() || null))}
+          onClose={() => {
+            setPaying(false);
+            setReference("");
+          }}
+        >
+          <div className="space-y-3">
+            <p>Slip gaji dibuat untuk setiap host yang dibayar di periode ini, dan cicilan kasbon dipotong.</p>
+            <div className="space-y-1.5">
+              <Label htmlFor={`paid-reference-${period.id}`}>
+                Nomor referensi transfer <span className="font-normal text-muted-foreground">(opsional)</span>
+              </Label>
+              <input
+                id={`paid-reference-${period.id}`}
+                value={reference}
+                onChange={(event) => setReference(event.target.value)}
+                maxLength={100}
+                placeholder="mis. nomor referensi dari mutasi rekening"
+                className={inputClass}
+              />
+            </div>
+          </div>
         </ConfirmDialog>
       )}
     </div>
@@ -786,6 +853,10 @@ function Kasbon() {
 function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
   const hosts = useApiData("payroll-hosts-all", () => payrollApi.hosts(token));
+  const [chosenId, setChosenId] = useState("");
+  // The select shows the first host until one is picked
+  const hostId = chosenId || hosts.data?.hosts[0]?.host_id || "";
+  const limit = useApiData(`payroll-advance-limit-${hostId}`, () => payrollApi.advanceLimit(token, hostId), { enabled: hostId !== "" });
 
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) =>
@@ -809,7 +880,7 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         )}
         <div className="space-y-1.5">
           <Label htmlFor="advance-host">Host</Label>
-          <NativeSelect id="advance-host" name="host_id">
+          <NativeSelect id="advance-host" name="host_id" value={hostId} onChange={(event) => setChosenId(event.target.value)}>
             {hosts.data?.hosts.map((host) => (
               <option key={host.host_id} value={host.host_id}>
                 {host.name}
@@ -826,7 +897,13 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="advance-amount">Jumlah</Label>
-          <RupiahInput id="advance-amount" name="total_amount" placeholder="0" aria-invalid={errors.total_amount ? true : undefined} />
+          <RupiahInput
+            id="advance-amount"
+            name="total_amount"
+            placeholder="0"
+            aria-invalid={errors.total_amount ? true : undefined}
+            aria-describedby="advance-limit"
+          />
           <FieldError>{errors.total_amount}</FieldError>
         </div>
         <div className="space-y-1.5">
@@ -834,6 +911,13 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
           <input id="advance-installments" name="installment_count" type="number" min={1} max={24} defaultValue={1} className={cn(inputClass, "tabular-nums")} />
           <FieldError>{errors.installment_count}</FieldError>
         </div>
+        <p id="advance-limit" className={cn("text-xs text-muted-foreground sm:col-span-2", limit.loading && "opacity-60")}>
+          {!limit.data
+            ? "Kasbon berjalan tidak boleh melebihi gaji bulanan host menurut jadwalnya."
+            : limit.data.limit.monthly_salary === 0
+              ? "Host ini belum punya jadwal aktif atau tarif, jadi belum bisa kasbon."
+              : `Bisa kasbon sampai ${formatRupiah(limit.data.limit.available)}: gaji bulanan dari jadwal ${formatRupiah(limit.data.limit.monthly_salary)}, kasbon berjalan ${formatRupiah(limit.data.limit.outstanding)}.`}
+        </p>
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="advance-notes">
             Catatan <span className="font-normal text-muted-foreground">(opsional)</span>

@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * Cancelling the request unlocks it again (requested → waiting_payment).
  */
 #[Fillable([
-    'brand_id', 'period_start', 'period_end', 'target_hours', 'worked_hours', 'achieved_hours',
+    'brand_id', 'period_start', 'period_end', 'target_hours', 'worked_hours', 'host_paid_hours', 'achieved_hours',
     'carried_in_hours', 'carried_out_hours', 'status', 'locked_at',
 ])]
 class PaymentPeriod extends Model
@@ -30,6 +30,7 @@ class PaymentPeriod extends Model
             'period_end' => 'date:Y-m-d',
             'target_hours' => 'integer',
             'worked_hours' => 'float',
+            'host_paid_hours' => 'float',
             'achieved_hours' => 'float',
             'carried_in_hours' => 'float',
             'carried_out_hours' => 'float',

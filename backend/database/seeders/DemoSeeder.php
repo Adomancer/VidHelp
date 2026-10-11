@@ -6,6 +6,7 @@ use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
+use App\Models\HostRateCategory;
 use App\Models\PaymentPeriod;
 use App\Models\ScheduleSlot;
 use App\Models\User;
@@ -91,6 +92,11 @@ class DemoSeeder extends Seeder
         mt_srand(2026);
 
         DB::transaction(function () use ($attendance, $payroll, $backups, $start, $today) {
+            // Rates are seeded as Rp 0 placeholders; demo pay (and the kasbon limit) needs real-looking ones
+            foreach (['Magang' => 20000, 'Baru' => 25000, 'Di atas 1 tahun' => 30000] as $name => $rate) {
+                HostRateCategory::where('name', $name)->where('rate_per_hour', 0)->update(['rate_per_hour' => $rate]);
+            }
+
             $this->at($start->subDay()->setTime(9, 0), function () use ($start, $today) {
                 $this->createHosts($today);
                 $this->createBrandsAndSchedule($start);
@@ -247,10 +253,10 @@ class DemoSeeder extends Seeder
 
         match ($action) {
             'roll' => $payroll->rollPeriods(),
-            // Dimas borrows Rp 600.000, paid back in 3 installments from his slips
+            // Dimas borrows Rp 300.000 (his limit: 4 h a week × 52/12 × Rp 25.000 ≈ Rp 433.000), paid back in 3 installments
             'kasbon' => $payroll->recordAdvance($this->hosts[2], [
                 'type' => 'loan',
-                'total_amount' => 600000,
+                'total_amount' => 300000,
                 'installment_count' => 3,
                 'notes' => 'Biaya kos (demo)',
             ], $this->admin),

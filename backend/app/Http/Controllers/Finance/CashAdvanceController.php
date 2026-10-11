@@ -37,6 +37,14 @@ class CashAdvanceController extends Controller
         return response()->json(['advances' => $advances]);
     }
 
+    /**
+     * How much more kasbon a host may take: open kasbon may not exceed the monthly salary by their schedule.
+     */
+    public function limit(HostProfile $host): JsonResponse
+    {
+        return response()->json(['limit' => $this->payroll->advanceLimit($host->load('rateCategory'))]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([

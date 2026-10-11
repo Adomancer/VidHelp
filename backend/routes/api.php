@@ -173,6 +173,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
         // Kasbon (cash advances)
         Route::get('/cash-advances', [CashAdvanceController::class, 'index']);
+        Route::get('/cash-advances/limit/{host}', [CashAdvanceController::class, 'limit']);
         Route::post('/cash-advances', [CashAdvanceController::class, 'store']);
         Route::post('/cash-advances/{advance}/settle', [CashAdvanceController::class, 'settle']);
         Route::post('/cash-advances/{advance}/reschedule', [CashAdvanceController::class, 'reschedule']);

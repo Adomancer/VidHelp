@@ -21,9 +21,9 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  */
 #[Fillable([
     'slot_id', 'brand_id', 'requesting_host_id', 'created_by', 'backup_date', 'start_at', 'end_at',
-    'reason_type', 'reason', 'request_type', 'status', 'approved_by', 'approved_at', 'auto_fill_at', 'auto_filled', 'counts_toward_quota', 'letter_penalty_applied', 'no_cover_alerted_at', 'filled_by_host_id', 'filled_at', 'cancelled_at',
+    'reason_type', 'reason', 'request_type', 'status', 'approved_by', 'approved_at', 'auto_fill_at', 'auto_filled', 'counts_toward_quota', 'letter_penalty_applied', 'letter_uploaded_at', 'no_cover_alerted_at', 'filled_by_host_id', 'filled_at', 'cancelled_at',
 ])]
-#[Appends(['letter_status', 'letter_due_at'])]
+#[Appends(['letter_status', 'letter_due_at', 'cover_paid_by'])]
 class BackupRequest extends Model
 {
     use Auditable, HasUuids;
@@ -41,6 +41,7 @@ class BackupRequest extends Model
             'auto_filled' => 'boolean',
             'counts_toward_quota' => 'boolean',
             'letter_penalty_applied' => 'boolean',
+            'letter_uploaded_at' => 'datetime',
             'no_cover_alerted_at' => 'datetime',
         ];
     }
@@ -163,6 +164,24 @@ class BackupRequest extends Model
                 $this->letter_due_at->isPast() => 'late',
                 default => 'due',
             };
+        });
+    }
+
+    /**
+     * Who pays the cover: "agency" when the requester was sick and the letter came on time,
+     * otherwise "requester" (directly, outside payroll). Null while a sick letter can still come.
+     */
+    protected function coverPaidBy(): Attribute
+    {
+        return Attribute::get(function () {
+            if ($this->reason_type !== 'sick') {
+                return 'requester';
+            }
+            if ($this->letter_uploaded_at && $this->letter_uploaded_at->lte($this->letter_due_at)) {
+                return 'agency';
+            }
+
+            return $this->letter_due_at->isPast() ? 'requester' : null;
         });
     }
 }

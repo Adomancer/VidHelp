@@ -62,6 +62,17 @@ export default function HostPayPage() {
                           <p className="text-xs text-muted-foreground tabular-nums">
                             {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.session_count} sesi
                           </p>
+                          {period.carried_in_hours > 0 && (
+                            <p className="text-xs text-muted-foreground">+{formatDuration(period.carried_in_hours)} bawaan dari periode lalu, dibayar duluan</p>
+                          )}
+                          {period.carried_out_hours > 0 && (
+                            <p className="text-xs text-warning">{formatDuration(period.carried_out_hours)} melewati target brand, dibayar di periode berikutnya</p>
+                          )}
+                          {period.host_paid.map((cover) => (
+                            <p key={cover.payer} className="text-xs text-muted-foreground">
+                              Backup {formatDuration(cover.hours)} dibayar langsung oleh {cover.payer}, tidak lewat agensi
+                            </p>
+                          ))}
                         </div>
                         <div className="shrink-0 text-right">
                           <p className="text-base font-semibold whitespace-nowrap text-foreground tabular-nums">{formatRupiah(period.estimate)}</p>
