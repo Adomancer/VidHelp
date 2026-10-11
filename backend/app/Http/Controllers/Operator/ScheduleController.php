@@ -29,15 +29,19 @@ class ScheduleController extends Controller
     {
         $request->validate([
             'on' => 'nullable|date',
-            'days' => 'nullable|integer|between:1,7',
+            // Up to six weeks, so the month calendar loads in one request
+            'days' => 'nullable|integer|between:1,42',
             'brand_id' => 'nullable|uuid',
             'host_id' => 'nullable|uuid',
         ]);
 
         $from = ($request->date('on') ?? today())->startOfDay();
+        $days = $request->integer('days') ?: 1;
+        // Backups and events cover at least the week from `on` (the week board), or the whole range when longer
+        $until = $from->copy()->addDays(max($days, 7));
 
         $slots = ScheduleSlot::query()
-            ->activeDuring($from, $from->copy()->addDays(($request->integer('days') ?: 1) - 1))
+            ->activeDuring($from, $from->copy()->addDays($days - 1))
             ->with(['assignment.brand:id,name', 'assignment.host.user'])
             ->when($request->brand_id, fn ($q, $id) => $q->whereHas('assignment', fn ($q) => $q->where('brand_id', $id)))
             ->when($request->host_id, fn ($q, $id) => $q->whereHas('assignment', fn ($q) => $q->where('host_id', $id)))
@@ -45,22 +49,22 @@ class ScheduleController extends Controller
             ->orderBy('start_time')
             ->get();
 
-        // Backups in the 7 days from `on`, so the board can mark "covered by B" on that week's slots
+        // Backups in that range, so the board can mark "covered by B" on those slots
         $backups = BackupRequest::query()
             ->whereIn('status', ['pending', 'open', 'filled'])
             ->whereIn('slot_id', $slots->pluck('id'))
             ->whereDate('backup_date', '>=', $from)
-            ->whereDate('backup_date', '<', $from->copy()->addDays(7))
+            ->whereDate('backup_date', '<', $until)
             ->with('filler.user')
             ->get()
             ->map(fn (BackupRequest $backup) => $backup->slotMarker());
 
-        // Events replacing the regular schedule in that week (slots on those days don't run)
+        // Events replacing the regular schedule in that range (slots on those days don't run)
         $events = SpecialEvent::query()
             ->where('status', 'active')
             ->where('open_full_schedule', true)
             ->when($request->brand_id, fn ($q, $id) => $q->where('brand_id', $id))
-            ->whereDate('start_date', '<', $from->copy()->addDays(7))
+            ->whereDate('start_date', '<', $until)
             ->whereDate('end_date', '>=', $from)
             ->get(['id', 'brand_id', 'name', 'start_date', 'end_date']);
 

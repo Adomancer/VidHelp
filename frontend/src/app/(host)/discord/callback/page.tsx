@@ -3,18 +3,20 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { discordApi, errorMessage } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
 import { DISCORD_STATE_KEY } from "@/components/DiscordConnect";
 import FormAlert from "@/components/FormAlert";
+import { Button } from "@/components/ui/button";
 
 /** Discord redirects here after "Connect Discord"; finish linking, then back to the profile. */
 export default function DiscordCallbackPage() {
   return (
-    <div className="max-w-lg">
+    <div className="mx-auto max-w-lg pt-10">
       {/* useSearchParams needs a Suspense boundary */}
-      <Suspense fallback={<p className="text-muted">Menghubungkan Discord…</p>}>
+      <Suspense fallback={<Connecting />}>
         <FinishLink />
       </Suspense>
     </div>
@@ -54,14 +56,23 @@ function FinishLink() {
     });
   }, [router, searchParams, token]);
 
-  if (!error) return <p className="text-muted">Menghubungkan Discord…</p>;
+  if (!error) return <Connecting />;
 
   return (
     <Card>
       <FormAlert tone="error">{error}</FormAlert>
-      <Link href="/host/profile" className="text-sm text-accent hover:text-heading">
-        Kembali ke profil saya
-      </Link>
+      <Button asChild variant="outline">
+        <Link href="/host/profile">Kembali ke profil saya</Link>
+      </Button>
     </Card>
+  );
+}
+
+function Connecting() {
+  return (
+    <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      Menghubungkan Discord…
+    </p>
   );
 }

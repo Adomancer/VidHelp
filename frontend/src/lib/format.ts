@@ -74,9 +74,9 @@ export function formatDay(iso: string): string {
   return new Date(iso).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
 }
 
-/** "14:00" (local time) */
-export function formatClock(iso: string): string {
-  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+/** "14:00" (local time), with a colon like slot times (id-ID would give "14.00") */
+export function formatClock(value: string | Date): string {
+  return new Date(value).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":");
 }
 
 /** "Tue 6 Oct, 14:00–16:00" or "Tue 6 Oct, 23:00 – Wed 02:00" */
@@ -114,4 +114,28 @@ export function formatDuration(hours: number): string {
 
   if (h === 0) return `${m} menit`;
   return m === 0 ? `${h} jam` : `${h} jam ${m} menit`;
+}
+
+const relative = new Intl.RelativeTimeFormat("id-ID", { numeric: "auto" });
+
+/** "baru saja", "5 menit yang lalu", "kemarin"; older than a week falls back to the date. */
+export function formatRelative(iso: string, now: Date = new Date()): string {
+  const seconds = Math.round((new Date(iso).getTime() - now.getTime()) / 1000);
+  const abs = Math.abs(seconds);
+
+  if (abs < 45) return "baru saja";
+  if (abs < 3600) return relative.format(Math.round(seconds / 60), "minute");
+  if (abs < 86_400) return relative.format(Math.round(seconds / 3600), "hour");
+  if (abs < 7 * 86_400) return relative.format(Math.round(seconds / 86_400), "day");
+  return formatDateTime(iso);
+}
+
+/** "Hari ini", "Besok", or "Sel, 13 Okt" for a moment (ISO) or a date ("YYYY-MM-DD"). */
+export function dayWord(value: string, now: Date = new Date()): string {
+  const day = new Date(value.length === 10 ? `${value}T00:00` : value);
+  const start = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const diff = Math.round((start(day) - start(now)) / 86_400_000);
+  if (diff === 0) return "Hari ini";
+  if (diff === 1) return "Besok";
+  return day.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
 }

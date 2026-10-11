@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { formValue, useApiForm } from "@/lib/useApiForm";
+import { Button } from "@/components/ui/button";
 import FormAlert from "./FormAlert";
+import PasswordField from "./PasswordField";
 import SubmitButton from "./SubmitButton";
-import TextField from "./TextField";
 
 /** Opened from the emailed link: /reset-password?token=...&email=... */
 export default function ResetPasswordForm() {
@@ -28,16 +29,23 @@ export default function ResetPasswordForm() {
   );
 
   if (!token || !email) {
-    return <FormAlert tone="error">Link reset ini tidak lengkap. Silakan minta link baru.</FormAlert>;
+    return (
+      <div className="space-y-4">
+        <FormAlert tone="error">Link reset ini tidak lengkap. Silakan minta link baru.</FormAlert>
+        <Button asChild variant="outline" className="w-full">
+          <Link href="/forgot-password">Minta link baru</Link>
+        </Button>
+      </div>
+    );
   }
 
   if (done) {
     return (
-      <div className="space-y-4 text-center">
+      <div className="space-y-4">
         <FormAlert tone="success">{done}</FormAlert>
-        <Link href="/login" className="inline-block text-sm text-accent hover:text-heading">
-          Ke halaman masuk
-        </Link>
+        <Button asChild size="lg" className="w-full">
+          <Link href="/login">Ke halaman masuk</Link>
+        </Button>
       </div>
     );
   }
@@ -49,10 +57,10 @@ export default function ResetPasswordForm() {
       {errors.email && <FormAlert tone="error">{errors.email}</FormAlert>}
 
       <p className="text-sm text-body">
-        Membuat kata sandi baru untuk <span className="text-heading">{email}</span>
+        Untuk akun <span className="font-medium text-foreground">{email}</span>
       </p>
-      <TextField label="Kata sandi baru" name="password" type="password" autoComplete="new-password" minLength={8} required error={errors.password} />
-      <TextField label="Ulangi kata sandi baru" name="password_confirmation" type="password" autoComplete="new-password" required />
+      <PasswordField label="Kata sandi baru" name="password" autoComplete="new-password" minLength={8} required error={errors.password} />
+      <PasswordField label="Ulangi kata sandi baru" name="password_confirmation" autoComplete="new-password" required />
 
       <SubmitButton loading={loading}>Atur ulang kata sandi</SubmitButton>
     </form>

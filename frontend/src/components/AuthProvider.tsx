@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { authApi, type AuthUser, type RoleName } from "@/lib/api";
 import { clearSession, hasAnyRole, homePathFor, loadSession, saveSession, TWO_FACTOR_SETUP_PATH } from "@/lib/auth";
 
@@ -80,8 +81,9 @@ export function RequireAuth({
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-canvas flex items-center justify-center">
-        <p className="text-muted text-sm">Memuat…</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background" aria-busy="true">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-xs">V</span>
+        <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label="Memuat" />
       </div>
     );
   }

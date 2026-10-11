@@ -11,7 +11,7 @@ export default function BackupTimingNote() {
   const settings = useApiData("public-settings", () => settingsApi.public(token)).data?.settings;
 
   return (
-    <p className="text-sm text-muted mt-1">
+    <p>
       Host langsung memasang permintaan di papan backup; setujui atau tolak host yang mendaftar untuk menggantikan.
       {settings && (
         <>

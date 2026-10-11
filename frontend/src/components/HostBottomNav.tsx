@@ -1,71 +1,166 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronRight, LogOut } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "./AuthProvider";
-import { useHostEvents } from "./EventClaimBoard";
-import { hostMenuItems } from "./HostNav";
-import NavIcon from "./NavIcon";
+import NavIcon, { type NavIconName } from "./NavIcon";
+import { ThemeSwitcher } from "./ThemeToggle";
+import UserAvatar from "./UserAvatar";
 
-/** The Event badge checks less often than the event board itself. */
-const BADGE_REFRESH_MS = 60_000;
+interface TabItem {
+  href: string;
+  label: string;
+  icon: NavIconName;
+}
+
+/** Always one tap away: the things with a time limit. */
+const tabs: TabItem[] = [
+  { href: "/host/live", label: "Live", icon: "live" },
+  { href: "/host/schedule", label: "Jadwal", icon: "calendar" },
+  { href: "/host/events", label: "Event", icon: "event" },
+  { href: "/host/backups", label: "Backup", icon: "backup" },
+];
+
+/** In the "Lainnya" sheet. */
+const more: (TabItem & { description: string })[] = [
+  { href: "/host/pay", label: "Gaji", icon: "payroll", description: "Perkiraan, slip dan kasbon" },
+  { href: "/host/rating", label: "Skor", icon: "rating", description: "Poin, SP dan rating" },
+  { href: "/host/brands", label: "Brand", icon: "brand", description: "Product knowledge" },
+  { href: "/host/profile", label: "Profil", icon: "profile", description: "Data diri dan keamanan" },
+];
+
+const isAt = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
 /**
- * The host menu on phones and tablets (the desktop header has it from `lg`). The open
- * page's item rises out of the bar as a brand-colored bubble; Event shows how many
- * blocks I could still grab. Follows the light/dark theme tokens.
+ * The host menu on phones (from `md` the sidebar takes over): four tabs and "Lainnya",
+ * which opens the rest as a sheet. Event shows how many blocks I could still take.
  */
-export default function HostBottomNav() {
+export default function HostBottomNav({ claimable = 0 }: { claimable?: number }) {
   const pathname = usePathname();
-  const { user } = useAuth();
-  const isHost = user.roles.some((role) => role.name === "host");
-  const { claimable } = useHostEvents(isHost, BADGE_REFRESH_MS);
+  const { user, logout } = useAuth();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const moreActive = more.some((item) => isAt(pathname, item.href));
+  const badge = claimable > 0 ? (claimable > 99 ? "99+" : String(claimable)) : null;
 
   return (
-    <nav
-      aria-label="Menu host"
-      className="fixed inset-x-0 bottom-0 z-50 lg:hidden print:hidden rounded-t-3xl border-t border-stroke bg-surface/95 backdrop-blur shadow-[0_-6px_20px_rgb(17_25_40/0.08)] dark:shadow-[0_-8px_24px_rgb(0_0_0/0.45)] pb-[env(safe-area-inset-bottom)]"
-    >
-      <ul className="mx-auto grid max-w-xl grid-cols-7 px-1">
-        {hostMenuItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          const badge = item.href === "/host/events" && claimable > 0 ? (claimable > 99 ? "99+" : String(claimable)) : null;
+    <>
+      <nav
+        aria-label="Menu host"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden print:hidden"
+      >
+        <ul className="mx-auto grid max-w-lg grid-cols-5">
+          {tabs.map((item) => {
+            const active = isAt(pathname, item.href);
+            const itemBadge = item.href === "/host/events" ? badge : null;
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={itemBadge ? `${item.label}, ${itemBadge} blok bisa diambil` : item.label}
+                  className="group flex h-16 flex-col items-center justify-center gap-1 outline-none"
+                >
+                  <TabIcon icon={item.icon} active={active} badge={itemBadge} />
+                  <TabLabel active={active}>{item.label}</TabLabel>
+                </Link>
+              </li>
+            );
+          })}
+          <li>
+            <button
+              type="button"
+              onClick={() => setSheetOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={sheetOpen}
+              className="group flex h-16 w-full flex-col items-center justify-center gap-1 outline-none"
+            >
+              <TabIcon icon="more" active={moreActive} />
+              <TabLabel active={moreActive}>Lainnya</TabLabel>
+            </button>
+          </li>
+        </ul>
+      </nav>
 
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                aria-label={badge ? `${item.label}, ${badge} blok bisa diambil` : item.label}
-                className="group relative flex h-16 flex-col items-center justify-end pb-2 outline-none"
-              >
-                {/* The bubble: rises above the bar for the open page, ringed in the page color */}
-                <span
-                  className={`relative flex items-center justify-center rounded-full transition-all duration-300 ease-out ${
-                    active
-                      ? "-translate-y-4 h-12 w-12 bg-gradient-to-br from-primary to-primary-hover text-white ring-4 ring-canvas shadow-lg shadow-primary/35"
-                      : "h-8 w-8 text-muted group-hover:text-heading group-focus-visible:ring-2 group-focus-visible:ring-primary"
-                  }`}
-                >
-                  <NavIcon name={item.icon} className={active ? "h-6 w-6" : "h-5 w-5"} />
-                  {badge && (
-                    <span className="absolute -right-1.5 -top-1 min-w-4 h-4 rounded-full bg-pink-500 px-1 text-center text-[10px] font-semibold leading-4 text-white ring-2 ring-surface">
-                      {badge}
-                    </span>
-                  )}
-                </span>
-                <span
-                  className={`text-[11px] leading-none transition-colors ${
-                    active ? "-mt-2.5 font-semibold text-accent" : "mt-1 text-muted group-hover:text-heading"
-                  }`}
-                >
-                  {item.label}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="bottom" className="max-h-[85dvh] gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)] md:hidden">
+          <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-border" aria-hidden="true" />
+          <SheetHeader className="flex-row items-center gap-3 px-5 pt-3 pb-4">
+            <UserAvatar size="size-10 text-sm" />
+            <div className="min-w-0">
+              <SheetTitle className="truncate text-base font-semibold">{user.name}</SheetTitle>
+              <SheetDescription className="truncate">{user.email}</SheetDescription>
+            </div>
+          </SheetHeader>
+
+          <div className="space-y-5 overflow-y-auto px-5 pb-5">
+            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+              {more.map((item) => {
+                const active = isAt(pathname, item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      onClick={() => setSheetOpen(false)}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex min-h-14 items-center gap-3 px-4 py-3 transition-colors outline-none active:bg-muted focus-visible:bg-muted",
+                        active && "bg-primary/[0.06]"
+                      )}
+                    >
+                      <span className={cn("flex size-9 items-center justify-center rounded-lg", active ? "bg-primary/10 text-brand" : "bg-muted text-muted-foreground")}>
+                        <NavIcon name={item.icon} className="size-[18px]" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={cn("block text-sm font-medium", active ? "text-brand" : "text-foreground")}>{item.label}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{item.description}</span>
+                      </span>
+                      <ChevronRight className="size-4 text-faint" aria-hidden="true" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Tema</p>
+              <ThemeSwitcher />
+            </div>
+
+            <Button type="button" variant="outline" size="lg" onClick={() => void logout()} className="w-full text-destructive hover:text-destructive">
+              <LogOut aria-hidden="true" />
+              Keluar
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </>
   );
+}
+
+/** The open tab gets a soft pill behind its icon. */
+function TabIcon({ icon, active, badge }: { icon: NavIconName; active: boolean; badge?: string | null }) {
+  return (
+    <span
+      className={cn(
+        "relative flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200 group-focus-visible:ring-3 group-focus-visible:ring-ring/50",
+        active ? "bg-primary/12 text-brand" : "text-muted-foreground group-active:bg-muted"
+      )}
+    >
+      <NavIcon name={icon} className="size-5" />
+      {badge && (
+        <span className="absolute -top-0.5 right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none font-semibold text-primary-foreground ring-2 ring-background tabular-nums">
+          {badge}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function TabLabel({ active, children }: { active: boolean; children: React.ReactNode }) {
+  return <span className={cn("text-[11px] leading-none", active ? "font-semibold text-brand" : "font-medium text-muted-foreground")}>{children}</span>;
 }

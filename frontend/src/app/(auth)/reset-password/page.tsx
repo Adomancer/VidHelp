@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import AuthCard from "@/components/AuthCard";
+import { ListSkeleton } from "@/components/Loading";
 import ResetPasswordForm from "@/components/ResetPasswordForm";
 
 export default function ResetPasswordPage() {
   return (
-    <AuthCard subtitle="Buat kata sandi baru">
+    <AuthCard title="Buat kata sandi baru" subtitle="Minimal 8 karakter.">
       {/* useSearchParams needs a Suspense boundary */}
-      <Suspense fallback={<p className="text-center text-body">Memuat…</p>}>
+      <Suspense fallback={<ListSkeleton rows={2} />}>
         <ResetPasswordForm />
       </Suspense>
     </AuthCard>

@@ -1,31 +1,35 @@
 "use client";
 
 import { useState } from "react";
+import { Link2, Send, Unlink } from "lucide-react";
 import { discordApi, errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import FormAlert from "./FormAlert";
+import StatusBadge from "./StatusBadge";
+import { notify } from "./Toast";
 
 export const DISCORD_STATE_KEY = "vidhelp_discord_state";
 
 /**
  * Link a Discord account so the bot can send direct messages (backup picks, SPs, salary slips, …).
  */
-export default function DiscordConnect() {
+export default function DiscordConnect({ id }: { id?: string }) {
   const { token } = useAuth();
   const status = useApiData("discord-status", () => discordApi.status(token));
-  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function run(action: () => Promise<{ message: string }>) {
     setBusy(true);
-    setNotice(null);
+    setError(null);
     try {
-      setNotice({ tone: "success", text: (await action()).message });
+      notify({ text: (await action()).message });
     } catch (caught) {
-      setNotice({ tone: "error", text: errorMessage(caught) });
+      setError(errorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -39,7 +43,7 @@ export default function DiscordConnect() {
       sessionStorage.setItem(DISCORD_STATE_KEY, state);
       window.location.assign((await discordApi.connectUrl(token, state)).url);
     } catch (caught) {
-      setNotice({ tone: "error", text: errorMessage(caught) });
+      setError(errorMessage(caught));
       setBusy(false);
     }
   }
@@ -48,47 +52,40 @@ export default function DiscordConnect() {
   const link = status.data.link;
 
   return (
-    <Card title="Discord" description="Dapatkan pesan langsung dari bot VidHelp saat kamu dipilih jadi backup, mendapat SP, atau slip gaji sudah siap.">
-      {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
+    <Card
+      id={id}
+      title="Discord"
+      description="Dapatkan pesan langsung dari bot VidHelp saat kamu dipilih jadi backup, mendapat SP, atau slip gaji sudah siap."
+      action={link ? <StatusBadge tone="success" dot>Terhubung</StatusBadge> : undefined}
+    >
+      {error && <FormAlert tone="error">{error}</FormAlert>}
 
       {link ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <p className="text-sm text-body">
-            Terhubung sebagai <span className="text-heading font-medium">{link.discord_username}</span>
-            <span className="text-muted"> sejak {formatDate(link.linked_at)}</span>
+            Terhubung sebagai <span className="font-medium text-foreground">{link.discord_username}</span>
+            <span className="text-muted-foreground"> sejak {formatDate(link.linked_at)}</span>
           </p>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => run(() => discordApi.test(token))}
-              className="px-3 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50"
-            >
+            <Button type="button" disabled={busy} onClick={() => run(() => discordApi.test(token))}>
+              <Send aria-hidden="true" />
               Kirim pesan percobaan
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => run(() => discordApi.unlink(token))}
-              className="px-3 py-2 rounded-lg border border-stroke-strong text-body text-sm hover:bg-surface-2 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="button" variant="outline" disabled={busy} onClick={() => run(() => discordApi.unlink(token))}>
+              <Unlink aria-hidden="true" />
               Putuskan
-            </button>
+            </Button>
           </div>
-          <p className="text-xs text-muted">
+          <p className="text-xs text-muted-foreground">
             Tidak menerima pesan? Gabung ke server Discord agensi dan aktifkan &quot;Allow direct messages from server members&quot; di
             Privacy Settings server tersebut.
           </p>
         </div>
       ) : (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={connect}
-          className="w-full py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary-hover disabled:opacity-50"
-        >
+        <Button type="button" size="lg" disabled={busy} onClick={connect} className="w-full sm:w-auto">
+          <Link2 aria-hidden="true" />
           Hubungkan Discord
-        </button>
+        </Button>
       )}
     </Card>
   );

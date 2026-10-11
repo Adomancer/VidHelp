@@ -1,11 +1,22 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import { ChevronDown, ClipboardList, Search, X } from "lucide-react";
 import { adminApi, type AuditFilters, type AuditLogEntry } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
+import { inputClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
 import FormAlert from "@/components/FormAlert";
+import { RefreshBar, TableSkeleton } from "@/components/Loading";
+import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
+import { NativeSelect } from "@/components/SelectField";
+import StatusBadge, { type Tone } from "@/components/StatusBadge";
+import { Button } from "@/components/ui/button";
 
 const actionLabels: Record<string, string> = {
   create: "Dibuat",
@@ -53,13 +64,11 @@ const tableLabels: Record<string, string> = {
 
 const tableLabel = (table: string) => tableLabels[table] ?? humanize(table);
 
-function actionTone(action: string): string {
-  if (action === "delete" || action.endsWith("_failed") || action === "two_factor_reset" || action === "two_factor_disabled") {
-    return "bg-red-500/15 text-danger";
-  }
-  if (action === "create" || action === "approve" || action === "login") return "bg-green-500/15 text-success";
-  if (action.startsWith("two_factor") || action.startsWith("recovery")) return "bg-primary/15 text-accent";
-  return "bg-surface-3 text-body";
+function actionTone(action: string): Tone {
+  if (action === "delete" || action.endsWith("_failed") || action === "two_factor_reset" || action === "two_factor_disabled") return "danger";
+  if (action === "create" || action === "approve" || action === "login") return "success";
+  if (action.startsWith("two_factor") || action.startsWith("recovery")) return "brand";
+  return "neutral";
 }
 
 const actionLabel = (action: string) => actionLabels[action] ?? humanize(action);
@@ -71,7 +80,7 @@ function humanize(value: string): string {
 }
 
 function showValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "") return "–";
   if (typeof value === "boolean") return value ? "ya" : "tidak";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
@@ -94,181 +103,194 @@ export default function AuditLogPage() {
 
   const change = (key: keyof AuditFilters, value: string) => applyFilters({ ...filters, [key]: value || undefined });
   const scoped = filters.target_id || filters.user_id;
+  const filtered = Object.values(filters).some(Boolean);
+  const toggle = (id: string) => setOpenId(openId === id ? null : id);
+
+  const who = (log: AuditLogEntry) =>
+    log.user ? (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          applyFilters({ ...filters, user_id: log.user!.id });
+        }}
+        className="rounded text-left outline-none hover:text-brand focus-visible:ring-3 focus-visible:ring-ring/50"
+        title="Tampilkan semua yang dilakukan orang ini"
+      >
+        <span className="block font-medium text-foreground">{log.user.name}</span>
+        <span className="block text-xs text-muted-foreground">{log.user.email}</span>
+      </button>
+    ) : (
+      <span className="text-muted-foreground">{log.action === "login_failed" ? "Tidak dikenal" : "Sistem"}</span>
+    );
+
+  const target = (log: AuditLogEntry) =>
+    log.target_table ? (
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          if (log.target_id) applyFilters({ ...filters, target_table: log.target_table!, target_id: log.target_id });
+        }}
+        className="rounded text-left outline-none hover:text-brand focus-visible:ring-3 focus-visible:ring-ring/50"
+        title="Tampilkan riwayat data ini"
+      >
+        <span className="block text-xs text-muted-foreground">{tableLabel(log.target_table)}</span>
+        <span className="block text-foreground">{log.target_label ?? log.target_id?.slice(0, 8)}</span>
+      </button>
+    ) : (
+      <span className="text-faint">–</span>
+    );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Log Audit</h1>
-        <p className="text-sm text-muted mt-1">Setiap aktivitas masuk dan setiap perubahan data penting: siapa, kapan, apa yang berubah, dan dari mana.</p>
-      </div>
+      <PageHeader title="Log audit" description="Setiap aktivitas masuk dan setiap perubahan data penting: siapa, kapan, apa yang berubah, dan dari mana." />
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
         <form
+          className="relative sm:col-span-2 lg:w-60"
           onSubmit={(event) => {
             event.preventDefault();
             change("search", String(new FormData(event.currentTarget).get("search") ?? "").trim());
           }}
         >
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input
             key={filters.search ?? ""}
             name="search"
             type="search"
             defaultValue={filters.search}
             placeholder="Cari orang, data, atau IP…"
-            className="w-64 px-3 py-2 rounded-lg bg-surface border border-stroke text-sm text-heading placeholder-faint outline-none focus:ring-2 focus:ring-primary"
+            aria-label="Cari"
+            className={cn(inputClass, "pl-9")}
           />
         </form>
-        <select
-          value={filters.action ?? ""}
-          onChange={(event) => change("action", event.target.value)}
-          className="px-3 py-2 rounded-lg bg-surface border border-stroke text-sm text-heading"
-          aria-label="Aksi"
-        >
+        <NativeSelect wrapperClassName="lg:w-44" value={filters.action ?? ""} onChange={(event) => change("action", event.target.value)} aria-label="Aksi">
           <option value="">Semua aksi</option>
           {result.data?.actions.map((action) => (
             <option key={action} value={action}>
               {actionLabel(action)}
             </option>
           ))}
-        </select>
-        <select
-          value={filters.target_table ?? ""}
-          onChange={(event) => change("target_table", event.target.value)}
-          className="px-3 py-2 rounded-lg bg-surface border border-stroke text-sm text-heading"
-          aria-label="Jenis data"
-        >
+        </NativeSelect>
+        <NativeSelect wrapperClassName="lg:w-48" value={filters.target_table ?? ""} onChange={(event) => change("target_table", event.target.value)} aria-label="Jenis data">
           <option value="">Semua data</option>
           {result.data?.target_tables.map((table) => (
             <option key={table} value={table}>
               {tableLabel(table)}
             </option>
           ))}
-        </select>
-        <label className="text-xs text-muted">
-          Dari
-          <input
-            type="date"
-            value={filters.from ?? ""}
-            onChange={(event) => change("from", event.target.value)}
-            className="block mt-1 px-3 py-1.5 rounded-lg bg-surface border border-stroke text-sm text-heading [color-scheme:dark]"
-          />
+        </NativeSelect>
+        <label className="space-y-1 text-xs text-muted-foreground lg:w-40">
+          <span>Dari</span>
+          <input type="date" value={filters.from ?? ""} onChange={(event) => change("from", event.target.value)} className={cn(inputClass, "tabular-nums")} />
         </label>
-        <label className="text-xs text-muted">
-          Sampai
-          <input
-            type="date"
-            value={filters.to ?? ""}
-            onChange={(event) => change("to", event.target.value)}
-            className="block mt-1 px-3 py-1.5 rounded-lg bg-surface border border-stroke text-sm text-heading [color-scheme:dark]"
-          />
+        <label className="space-y-1 text-xs text-muted-foreground lg:w-40">
+          <span>Sampai</span>
+          <input type="date" value={filters.to ?? ""} onChange={(event) => change("to", event.target.value)} className={cn(inputClass, "tabular-nums")} />
         </label>
-        {Object.values(filters).some(Boolean) && (
-          <button type="button" onClick={() => applyFilters({})} className="px-3 py-2 text-sm text-accent hover:text-heading">
+        {filtered && (
+          <Button type="button" variant="ghost" onClick={() => applyFilters({})} className="text-muted-foreground">
+            <X aria-hidden="true" />
             Hapus filter
-          </button>
+          </Button>
         )}
       </div>
 
       {scoped && (
-        <FormAlert tone="warning">
+        <FormAlert tone="info">
           Hanya menampilkan riwayat {filters.target_id ? "satu data" : "satu orang"}.{" "}
-          <button type="button" onClick={() => applyFilters({ ...filters, target_id: undefined, user_id: undefined })} className="underline">
+          <button type="button" onClick={() => applyFilters({ ...filters, target_id: undefined, user_id: undefined })} className="font-medium underline underline-offset-2">
             Tampilkan semua
           </button>
         </FormAlert>
       )}
-      {result.error && <FormAlert tone="error">{result.error}</FormAlert>}
+      {result.error && <ErrorState message={result.error} onRetry={result.reload} />}
 
-      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${result.loading ? "opacity-60" : ""}`}>
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
-            <tr>
-              <th className="px-4 py-3 font-medium">Waktu</th>
-              <th className="px-4 py-3 font-medium">Siapa</th>
-              <th className="px-4 py-3 font-medium">Aksi</th>
-              <th className="px-4 py-3 font-medium">Data</th>
-              <th className="px-4 py-3 font-medium">IP</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stroke">
-            {logs?.data.map((log) => (
-              <Fragment key={log.id}>
-                <tr
-                  onClick={() => setOpenId(openId === log.id ? null : log.id)}
-                  className={`text-body cursor-pointer hover:bg-surface-2 ${openId === log.id ? "bg-surface-2" : ""}`}
-                >
-                  <td className="px-4 py-3 whitespace-nowrap text-muted">{formatDateTime(log.created_at)}</td>
-                  <td className="px-4 py-3">
-                    {log.user ? (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          applyFilters({ ...filters, user_id: log.user!.id });
-                        }}
-                        className="text-left hover:text-accent"
-                        title="Tampilkan semua yang dilakukan orang ini"
-                      >
-                        <span className="block text-heading">{log.user.name}</span>
-                        <span className="block text-xs text-muted">{log.user.email}</span>
-                      </button>
-                    ) : (
-                      <span className="text-muted">{log.action === "login_failed" ? "Tidak dikenal" : "Sistem"}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-md text-xs whitespace-nowrap ${actionTone(log.action)}`}>{actionLabel(log.action)}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {log.target_table ? (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (log.target_id) applyFilters({ ...filters, target_table: log.target_table!, target_id: log.target_id });
-                        }}
-                        className="text-left hover:text-accent"
-                        title="Tampilkan riwayat data ini"
-                      >
-                        <span className="block text-muted text-xs">{tableLabel(log.target_table)}</span>
-                        <span className="block text-heading">{log.target_label ?? log.target_id?.slice(0, 8)}</span>
-                      </button>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-muted font-mono text-xs">{log.ip_address ?? "—"}</td>
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+        <RefreshBar active={result.loading && Boolean(logs)} />
+        {!logs && !result.error && <TableSkeleton rows={8} columns={5} />}
+        {logs?.data.length === 0 && <EmptyState icon={ClipboardList} title="Tidak ada catatan" description="Tidak ada aktivitas yang cocok dengan filter ini." />}
+
+        {logs && logs.data.length > 0 && (
+          <>
+            <table className="hidden w-full text-sm md:table">
+              <thead className="border-b border-border bg-muted/50 text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Waktu</th>
+                  <th className="px-4 py-3 font-medium">Siapa</th>
+                  <th className="px-4 py-3 font-medium">Aksi</th>
+                  <th className="px-4 py-3 font-medium">Data</th>
+                  <th className="px-4 py-3 font-medium">IP</th>
+                  <th className="w-10 px-4 py-3">
+                    <span className="sr-only">Detail</span>
+                  </th>
                 </tr>
-                {openId === log.id && (
-                  <tr className="bg-surface-2">
-                    <td colSpan={5} className="px-4 py-4">
-                      <Details log={log} />
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {logs.data.map((log) => {
+                  const open = openId === log.id;
+                  return (
+                    <Fragment key={log.id}>
+                      <tr
+                        onClick={() => toggle(log.id)}
+                        className={cn("cursor-pointer text-body transition-colors hover:bg-muted/40", open && "bg-muted/40")}
+                        aria-expanded={open}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">{formatDateTime(log.created_at)}</td>
+                        <td className="px-4 py-3">{who(log)}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge tone={actionTone(log.action)}>{actionLabel(log.action)}</StatusBadge>
+                        </td>
+                        <td className="px-4 py-3">{target(log)}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{log.ip_address ?? "–"}</td>
+                        <td className="px-4 py-3 text-right">
+                          <ChevronDown className={cn("ml-auto size-4 text-faint transition-transform", open && "rotate-180")} aria-hidden="true" />
+                        </td>
+                      </tr>
+                      {open && (
+                        <tr className="bg-muted/30">
+                          <td colSpan={6} className="px-4 py-4">
+                            <Details log={log} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
 
-        {logs && logs.data.length === 0 && <p className="px-4 py-8 text-center text-muted">Tidak ada catatan untuk filter ini.</p>}
+            <ul className="divide-y divide-border md:hidden">
+              {logs.data.map((log) => {
+                const open = openId === log.id;
+                return (
+                  <li key={log.id} className={cn("space-y-3 p-4", open && "bg-muted/30")}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 text-sm">{who(log)}</div>
+                      <StatusBadge tone={actionTone(log.action)}>{actionLabel(log.action)}</StatusBadge>
+                    </div>
+                    <div className="text-sm">{target(log)}</div>
+                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                      <span className="tabular-nums">
+                        {formatDateTime(log.created_at)}
+                        {log.ip_address && ` · ${log.ip_address}`}
+                      </span>
+                      <Button type="button" variant="ghost" size="xs" onClick={() => toggle(log.id)} aria-expanded={open}>
+                        Detail
+                        <ChevronDown className={cn("transition-transform", open && "rotate-180")} aria-hidden="true" />
+                      </Button>
+                    </div>
+                    {open && <Details log={log} />}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
       </div>
 
-      {logs && logs.last_page > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted">
-          <span>
-            Halaman {logs.current_page} dari {logs.last_page} · {logs.total} catatan
-          </span>
-          <div className="flex gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
-              Sebelumnya
-            </button>
-            <button type="button" disabled={page >= logs.last_page} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
-              Berikutnya
-            </button>
-          </div>
-        </div>
-      )}
+      {logs && <Pagination page={logs.current_page} lastPage={logs.last_page} total={logs.total} unit="catatan" onChange={setPage} />}
     </div>
   );
 }
@@ -282,29 +304,48 @@ function Details({ log }: { log: AuditLogEntry }) {
   return (
     <div className="space-y-3">
       {fields.length > 0 ? (
-        <table className="text-sm">
-          <thead className="text-left text-xs text-muted">
-            <tr>
-              <th className="pr-6 pb-1 font-medium">Kolom</th>
-              {showBefore && <th className="pr-6 pb-1 font-medium">Sebelum</th>}
-              {showAfter && <th className="pb-1 font-medium">{showBefore ? "Sesudah" : "Nilai"}</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {fields.map((field) => (
-              <tr key={field} className="align-top">
-                <td className="pr-6 py-0.5 text-muted font-mono text-xs">{field}</td>
-                {showBefore && <td className="pr-6 py-0.5 text-danger break-all">{showValue(log.old_value?.[field])}</td>}
-                {showAfter && <td className="py-0.5 text-success break-all">{showValue(log.new_value?.[field])}</td>}
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Kolom</th>
+                {showBefore && <th className="px-3 py-2 font-medium">Sebelum</th>}
+                {showAfter && <th className="px-3 py-2 font-medium">{showBefore ? "Sesudah" : "Nilai"}</th>}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {fields.map((field) => {
+                const before = showValue(log.old_value?.[field]);
+                const after = showValue(log.new_value?.[field]);
+                const changed = showBefore && showAfter && before !== after;
+                return (
+                  <tr key={field} className="align-top">
+                    <td className="px-3 py-1.5 font-mono text-xs text-muted-foreground">{field}</td>
+                    {showBefore && (
+                      <td className="px-3 py-1.5 break-all">
+                        <span className={cn(changed && "rounded bg-destructive/10 px-1 text-destructive line-through decoration-destructive/40")}>{before}</span>
+                      </td>
+                    )}
+                    {showAfter && (
+                      <td className="px-3 py-1.5 break-all">
+                        <span className={cn(changed ? "rounded bg-success/10 px-1 text-success" : "text-foreground")}>{after}</span>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <p className="text-sm text-muted">Tidak ada detail kolom untuk catatan ini.</p>
+        <p className="text-sm text-muted-foreground">Tidak ada detail kolom untuk catatan ini.</p>
       )}
-      <p className="text-xs text-faint">
-        {log.target_id && <>ID data {log.target_id} · </>}
+      <p className="text-xs text-muted-foreground">
+        {log.target_id && (
+          <>
+            ID data <span className="font-mono">{log.target_id}</span> ·{" "}
+          </>
+        )}
         {log.user_agent ?? "Browser tidak dikenal"}
       </p>
       <p className="text-xs text-faint">&quot;[hidden]&quot; berarti kolom itu berubah, tapi nilainya (kata sandi, KTP, nomor rekening) tidak pernah disimpan di log.</p>

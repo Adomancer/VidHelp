@@ -1,118 +1,217 @@
 "use client";
 
 import { useState } from "react";
+import { Crown, Pencil, Plus, Tag } from "lucide-react";
 import { adminHostsApi, operatorApi, type BrandInput, type BrandSummary } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { statusLabel } from "@/lib/labels";
+import { textareaClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
+import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
+import { FieldError, FieldHint } from "@/components/FieldMessage";
+import FormActions from "@/components/FormActions";
 import FormAlert from "@/components/FormAlert";
+import { RefreshBar, TableSkeleton } from "@/components/Loading";
 import Modal from "@/components/Modal";
+import PageHeader from "@/components/PageHeader";
 import SelectField from "@/components/SelectField";
-import SubmitButton from "@/components/SubmitButton";
+import StatusBadge from "@/components/StatusBadge";
 import TextField from "@/components/TextField";
+import { notify } from "@/components/Toast";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 export default function AdminBrandsPage() {
   const { token } = useAuth();
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const [editing, setEditing] = useState<BrandSummary | "new" | null>(null);
+  const list = brands.data?.brands;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-heading">Brand</h1>
-          <p className="text-sm text-muted mt-1">Host ditugaskan ke brand di halaman Host milik operator.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setEditing("new")}
-          className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover"
-        >
-          Brand baru
-        </button>
+      <PageHeader
+        title="Brand"
+        description="Target jam, siklus pembayaran dan product knowledge tiap brand. Host ditugaskan ke brand di halaman Host."
+        actions={
+          <Button type="button" onClick={() => setEditing("new")}>
+            <Plus aria-hidden="true" />
+            Brand baru
+          </Button>
+        }
+      />
+
+      {brands.error && <ErrorState message={brands.error} onRetry={brands.reload} />}
+
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+        <RefreshBar active={brands.loading && Boolean(list)} />
+        {!list && !brands.error && <TableSkeleton rows={4} columns={5} />}
+        {list?.length === 0 && (
+          <EmptyState
+            icon={Tag}
+            title="Belum ada brand"
+            description="Tambahkan brand pertama untuk mulai menyusun jadwal dan penggajian."
+            action={
+              <Button type="button" variant="outline" onClick={() => setEditing("new")}>
+                <Plus aria-hidden="true" />
+                Brand baru
+              </Button>
+            }
+          />
+        )}
+
+        {list && list.length > 0 && (
+          <>
+            <table className="hidden w-full text-sm md:table">
+              <thead className="border-b border-border bg-muted/50 text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Brand</th>
+                  <th className="px-4 py-3 font-medium">Target / periode</th>
+                  <th className="px-4 py-3 font-medium">Siklus pembayaran</th>
+                  <th className="px-4 py-3 text-right font-medium">Host</th>
+                  <th className="px-4 py-3 font-medium">Leader</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="w-14 px-4 py-3">
+                    <span className="sr-only">Aksi</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border text-body">
+                {list.map((brand) => (
+                  <tr key={brand.id} className="transition-colors hover:bg-muted/40">
+                    <td className="px-4 py-3">
+                      <BrandName brand={brand} />
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">{brand.target_hours_per_period} jam</td>
+                    <td className="px-4 py-3">
+                      <Cycle brand={brand} />
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{brand.active_hosts_count}</td>
+                    <td className="px-4 py-3">
+                      <Leader brand={brand} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <BrandStatus brand={brand} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Button type="button" variant="ghost" size="icon-sm" onClick={() => setEditing(brand)} aria-label={`Ubah ${brand.name}`} title="Ubah">
+                        <Pencil />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <ul className="divide-y divide-border md:hidden">
+              {list.map((brand) => (
+                <li key={brand.id}>
+                  <button type="button" onClick={() => setEditing(brand)} className="w-full space-y-2 p-4 text-left outline-none active:bg-muted/60 focus-visible:bg-muted/60">
+                    <div className="flex items-start justify-between gap-3">
+                      <BrandName brand={brand} />
+                      <BrandStatus brand={brand} />
+                    </div>
+                    <dl className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <dt className="text-muted-foreground">Target</dt>
+                        <dd className="font-medium text-foreground tabular-nums">{brand.target_hours_per_period} jam</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Siklus</dt>
+                        <dd className="font-medium text-foreground tabular-nums">{brand.payment_cycle_days} hari</dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">Host</dt>
+                        <dd className="font-medium text-foreground tabular-nums">{brand.active_hosts_count}</dd>
+                      </div>
+                    </dl>
+                    <Leader brand={brand} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
 
       {editing && (
         <BrandForm
           key={editing === "new" ? "new" : editing.id}
           brand={editing === "new" ? null : editing}
-          onDone={() => {
+          onDone={(name) => {
             setEditing(null);
+            notify({ text: editing === "new" ? `Brand ${name} dibuat` : `Brand ${name} disimpan` });
             brands.reload();
           }}
           onCancel={() => setEditing(null)}
         />
       )}
-
-      {brands.error && <FormAlert tone="error">{brands.error}</FormAlert>}
-
-      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${brands.loading ? "opacity-60" : ""}`}>
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
-            <tr>
-              <th className="px-4 py-3 font-medium">Brand</th>
-              <th className="px-4 py-3 font-medium">Target / periode</th>
-              <th className="px-4 py-3 font-medium">Siklus pembayaran</th>
-              <th className="px-4 py-3 font-medium">Host</th>
-              <th className="px-4 py-3 font-medium">Leader</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stroke text-body">
-            {brands.data?.brands.map((brand) => (
-              <tr key={brand.id}>
-                <td className="px-4 py-3 text-heading">
-                  {brand.name}
-                  {brand.is_obs && <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-500/20 text-info text-xs">OBS</span>}
-                </td>
-                <td className="px-4 py-3">{brand.target_hours_per_period} jam</td>
-                <td className="px-4 py-3">
-                  {brand.payment_cycle_days} hari
-                  <span className="block text-xs text-faint">
-                    {brand.payroll_start_date ? `mulai ${formatDate(brand.payroll_start_date)}` : "penggajian belum dimulai"}
-                  </span>
-                </td>
-                <td className="px-4 py-3">{brand.active_hosts_count}</td>
-                <td className="px-4 py-3">{brand.leader?.name ?? <span className="text-faint">—</span>}</td>
-                <td className="px-4 py-3">{statusLabel(brand.status)}</td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setEditing(brand)}
-                    title={`Ubah data ${brand.name}: nama, target jam, siklus pembayaran, dan status`}
-                    aria-label={`Ubah ${brand.name}`}
-                    className="px-3 py-1.5 rounded-md border border-stroke-strong text-body hover:bg-surface-2"
-                  >
-                    Ubah
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {brands.data?.brands.length === 0 && <p className="px-4 py-8 text-center text-muted">Belum ada brand.</p>}
-      </div>
     </div>
   );
 }
 
-function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; onDone: () => void; onCancel: () => void }) {
+function BrandName({ brand }: { brand: BrandSummary }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-brand" aria-hidden="true">
+        {brand.name.charAt(0).toUpperCase()}
+      </span>
+      <span className="truncate font-medium text-foreground">{brand.name}</span>
+      {brand.is_obs && (
+        <StatusBadge tone="info" className="h-5 px-1.5 text-[10px]">
+          OBS
+        </StatusBadge>
+      )}
+    </div>
+  );
+}
+
+function Cycle({ brand }: { brand: BrandSummary }) {
+  return (
+    <>
+      <span className="tabular-nums">{brand.payment_cycle_days} hari</span>
+      <span className="block text-xs text-muted-foreground">{brand.payroll_start_date ? `mulai ${formatDate(brand.payroll_start_date)}` : "penggajian belum dimulai"}</span>
+    </>
+  );
+}
+
+function Leader({ brand }: { brand: BrandSummary }) {
+  if (!brand.leader) return <span className="text-xs text-faint">Belum ada leader</span>;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm">
+      <Crown className="size-3.5 text-warning" aria-label="Leader" />
+      {brand.leader.name}
+    </span>
+  );
+}
+
+function BrandStatus({ brand }: { brand: BrandSummary }) {
+  return (
+    <StatusBadge tone={brand.status === "active" ? "success" : "neutral"} dot>
+      {statusLabel(brand.status)}
+    </StatusBadge>
+  );
+}
+
+function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; onDone: (name: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
-  const { loading, errors, error, handleSubmit } = useApiForm((data) => {
-    const input: BrandInput = {
-      name: formValue(data, "name"),
-      is_obs: data.get("is_obs") === "on",
-      product_knowledge: formValue(data, "product_knowledge") || null,
-      target_hours_per_period: Number(formValue(data, "target_hours_per_period")),
-      payment_cycle_days: Number(formValue(data, "payment_cycle_days")),
-      payroll_start_date: formValue(data, "payroll_start_date") || null,
-      status: (formValue(data, "status") || "active") as BrandInput["status"],
-    };
-    return brand ? adminHostsApi.updateBrand(token, brand.id, input) : adminHostsApi.createBrand(token, input);
-  }, onDone);
+  const { loading, errors, error, handleSubmit } = useApiForm(
+    (data) => {
+      const input: BrandInput = {
+        name: formValue(data, "name"),
+        is_obs: data.get("is_obs") === "on",
+        product_knowledge: formValue(data, "product_knowledge") || null,
+        target_hours_per_period: Number(formValue(data, "target_hours_per_period")),
+        payment_cycle_days: Number(formValue(data, "payment_cycle_days")),
+        payroll_start_date: formValue(data, "payroll_start_date") || null,
+        status: (formValue(data, "status") || "active") as BrandInput["status"],
+      };
+      return brand ? adminHostsApi.updateBrand(token, brand.id, input) : adminHostsApi.createBrand(token, input);
+    },
+    (_result, form) => onDone(String(new FormData(form).get("name") ?? ""))
+  );
 
   return (
     <Modal title={brand ? `Ubah ${brand.name}` : "Brand baru"} onClose={onCancel} wide>
@@ -142,10 +241,11 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           error={errors.payment_cycle_days}
         />
         <TextField
-          label="Mulai penggajian (awal periode pertama)"
+          label="Mulai penggajian"
           name="payroll_start_date"
           type="date"
           defaultValue={brand?.payroll_start_date ?? ""}
+          hint="Awal periode pertama."
           error={errors.payroll_start_date}
         />
         {brand && (
@@ -159,14 +259,12 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
             ]}
           />
         )}
-        <label className="flex items-center gap-2 text-sm text-body sm:col-span-2">
-          <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="accent-primary" />
-          Brand OBS (live pakai OBS)
+        <label className="flex items-center gap-2.5 self-end rounded-lg border border-border px-3 py-2.5 text-sm text-body sm:col-span-2">
+          <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="size-4 accent-primary" />
+          Brand OBS <span className="text-muted-foreground">(live pakai OBS)</span>
         </label>
         <div className="space-y-1.5 sm:col-span-2">
-          <label htmlFor="product_knowledge" className="block text-sm font-medium text-body">
-            Product knowledge
-          </label>
+          <Label htmlFor="product_knowledge">Product knowledge</Label>
           <textarea
             id="product_knowledge"
             name="product_knowledge"
@@ -174,21 +272,15 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
             defaultValue={brand?.product_knowledge ?? ""}
             placeholder="Produk, harga, promo, poin penting saat live, link katalog…"
             aria-invalid={errors.product_knowledge ? true : undefined}
-            className={`w-full px-4 py-2.5 rounded-xl bg-surface-2 border text-heading outline-none focus:ring-2 focus:ring-primary ${
-              errors.product_knowledge ? "border-red-400" : "border-stroke-strong"
-            }`}
+            className={textareaClass}
           />
-          <p className="text-xs text-muted">Host yang ditugaskan ke brand ini melihatnya di halaman Brand mereka. Link bisa diklik.</p>
-          {errors.product_knowledge && <p className="text-sm text-danger">{errors.product_knowledge}</p>}
+          {errors.product_knowledge ? (
+            <FieldError>{errors.product_knowledge}</FieldError>
+          ) : (
+            <FieldHint>Host yang ditugaskan ke brand ini melihatnya di halaman Brand mereka. Link bisa diklik.</FieldHint>
+          )}
         </div>
-        <div className="flex gap-3 sm:col-span-2">
-          <div className="w-40">
-            <SubmitButton loading={loading}>Simpan</SubmitButton>
-          </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
-            Batal
-          </button>
-        </div>
+        <FormActions loading={loading} submitLabel="Simpan" onCancel={onCancel} />
       </form>
     </Modal>
   );

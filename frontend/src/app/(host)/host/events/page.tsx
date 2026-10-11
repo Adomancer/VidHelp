@@ -1,8 +1,13 @@
 "use client";
 
+import { RefreshCw, Ticket } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
+import EmptyState from "@/components/EmptyState";
 import EventClaimBoard, { BOARD_REFRESH_MS, useHostEvents } from "@/components/EventClaimBoard";
+import PageHeader from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
 
 /** "Rebutan event": hosts grab blocks of the events staff set up for their brands. */
 export default function HostEventsPage() {
@@ -11,13 +16,24 @@ export default function HostEventsPage() {
   const events = useHostEvents(isHost, BOARD_REFRESH_MS);
 
   return (
-    <div className="max-w-3xl space-y-5">
-      <h1 className="text-xl font-bold text-heading">Rebutan Event</h1>
+    <div className="space-y-6">
+      <PageHeader
+        title="Rebutan event"
+        description="Siapa cepat dia dapat. Ambil blok live event dari brand kamu; tiap event punya batas blok per host."
+        actions={
+          isHost && (
+            <Button type="button" variant="outline" onClick={events.reload} disabled={events.loading}>
+              <RefreshCw className={cn(events.loading && "animate-spin")} aria-hidden="true" />
+              Segarkan
+            </Button>
+          )
+        }
+      />
       {isHost ? (
         <EventClaimBoard events={events} />
       ) : (
         <Card>
-          <p className="text-sm text-muted">Halaman ini untuk host. Atur event dan bloknya di menu Events pada dashboard.</p>
+          <EmptyState icon={Ticket} title="Halaman ini untuk host" description="Atur event dan bloknya di menu Event pada dashboard." />
         </Card>
       )}
     </div>

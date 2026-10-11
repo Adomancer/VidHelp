@@ -49,14 +49,14 @@ export default function HostDayTimeline({ busy, available, selection, onPick, di
           const minute = minuteAt(event.clientX);
           if (!isBusy(minute)) onPick(minute);
         }}
-        className={`relative h-10 rounded-lg bg-surface-2 border border-stroke-strong overflow-hidden ${disabled ? "" : "cursor-copy"}`}
+        className={`relative h-10 overflow-hidden rounded-lg border border-input bg-muted/50 ${disabled ? "" : "cursor-copy"}`}
       >
         {/* Hour grid */}
         {Array.from({ length: 23 }, (_, index) => (
           <span
             key={index}
             aria-hidden="true"
-            className={`absolute inset-y-0 w-px ${(index + 1) % 6 === 0 ? "bg-surface-3" : "bg-stroke"}`}
+            className={`absolute inset-y-0 w-px ${(index + 1) % 6 === 0 ? "bg-input" : "bg-border"}`}
             style={{ left: percent((index + 1) * 60) }}
           />
         ))}
@@ -65,7 +65,7 @@ export default function HostDayTimeline({ busy, available, selection, onPick, di
           <span
             key={`free-${index}`}
             title={`Biasanya bisa: ${block.label}`}
-            className="absolute inset-y-0 bg-green-500/15 border-x border-green-400/30"
+            className="absolute inset-y-0 border-x border-success/30 bg-success/12"
             style={{ left: percent(block.start), width: percent(block.end - block.start) }}
           />
         ))}
@@ -74,7 +74,7 @@ export default function HostDayTimeline({ busy, available, selection, onPick, di
           <span
             key={`busy-${index}`}
             title={block.label}
-            className="absolute inset-y-1 rounded bg-slate-500/80 text-[10px] leading-8 px-1 text-white truncate cursor-not-allowed"
+            className="absolute inset-y-1 cursor-not-allowed truncate rounded bg-foreground/60 px-1 text-[10px] leading-8 font-medium text-background"
             style={{ left: percent(block.start), width: percent(block.end - block.start) }}
           >
             {block.label}
@@ -84,7 +84,7 @@ export default function HostDayTimeline({ busy, available, selection, onPick, di
         {shown && shown.end > shown.start && (
           <span
             aria-hidden="true"
-            className="absolute inset-y-0.5 rounded-md border-2 border-primary bg-primary/25 pointer-events-none"
+            className="pointer-events-none absolute inset-y-0.5 rounded-md border-2 border-primary bg-primary/20"
             style={{ left: percent(shown.start), width: percent(shown.end - shown.start) }}
           />
         )}
@@ -102,15 +102,15 @@ export default function HostDayTimeline({ busy, available, selection, onPick, di
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-2.5 rounded-sm bg-slate-500/80" /> Sudah live
+          <span className="h-2.5 w-3 rounded-sm bg-foreground/60" /> Sudah live
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-2.5 rounded-sm bg-green-500/25 border border-green-400/40" /> Biasanya bisa
+          <span className="h-2.5 w-3 rounded-sm border border-success/40 bg-success/20" /> Biasanya bisa
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-2.5 rounded-sm border-2 border-primary" /> Slot ini
+          <span className="h-2.5 w-3 rounded-sm border-2 border-primary" /> Slot ini
         </span>
         {!disabled && <span className="text-faint">Klik area kosong untuk mengisi jam.</span>}
       </div>

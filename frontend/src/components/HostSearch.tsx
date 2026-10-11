@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { Search, X } from "lucide-react";
 import { operatorApi, type HostListItem } from "@/lib/api";
 import { useApiData } from "@/lib/useApiData";
 import { useAuth } from "./AuthProvider";
@@ -102,17 +103,15 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
     <div ref={containerRef} className="relative flex-1">
       <div
         onClick={() => inputRef.current?.focus()}
-        className="flex flex-wrap items-center gap-1.5 min-h-[42px] w-full px-2.5 py-1.5 rounded-lg bg-surface border border-stroke cursor-text focus-within:ring-2 focus-within:ring-primary"
+        className="flex min-h-10 w-full cursor-text flex-wrap items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 py-1 shadow-xs transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 md:min-h-9 dark:bg-input/30"
       >
-        <svg className="w-4 h-4 shrink-0 text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
-        </svg>
+        <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 
         {value.map((chip, index) => (
           <span
             key={chip.kind === "host" ? chip.id : `text-${chip.text}`}
-            className={`flex items-center gap-1.5 rounded-md py-0.5 pl-1 pr-1.5 text-xs ${
-              chip.kind === "host" ? "bg-primary/20 text-accent" : "bg-surface-3 text-heading"
+            className={`flex h-6 items-center gap-1.5 rounded-md pr-1 pl-1 text-xs font-medium ${
+              chip.kind === "host" ? "bg-primary/10 text-brand" : "bg-secondary text-foreground"
             }`}
           >
             {chip.kind === "host" ? (
@@ -130,9 +129,9 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
                 onChange(value.filter((_, at) => at !== index));
               }}
               aria-label={`Hapus ${chip.kind === "host" ? chip.name : chip.text}`}
-              className="ml-0.5 text-muted hover:text-heading"
+              className="ml-0.5 flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
             >
-              ✕
+              <X className="size-3" aria-hidden="true" />
             </button>
           </span>
         ))}
@@ -149,7 +148,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
           aria-activedescendant={open && options[active] ? `${listId}-${active}` : undefined}
           aria-label="Cari host"
           placeholder={value.length > 0 ? "Tambah host atau kata kunci…" : "Ketik nama/email atau pilih host (bisa lebih dari satu)…"}
-          className="flex-1 min-w-[12rem] bg-transparent py-1 text-heading placeholder-faint outline-none"
+          className="min-w-[12rem] flex-1 bg-transparent py-1 text-base text-foreground outline-none placeholder:text-muted-foreground md:text-sm"
         />
 
         {value.length > 0 && (
@@ -159,7 +158,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
               event.stopPropagation();
               onChange([]);
             }}
-            className="shrink-0 rounded-md px-2 py-0.5 text-xs text-muted hover:bg-surface-2 hover:text-heading"
+            className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             Hapus semua
           </button>
@@ -167,7 +166,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
       </div>
 
       {open && (
-        <ul id={listId} role="listbox" aria-multiselectable="true" className="absolute z-30 mt-1 w-full max-h-80 overflow-y-auto rounded-lg border border-stroke-strong bg-surface-2 p-1 shadow-xl">
+        <ul id={listId} role="listbox" aria-multiselectable="true" className="absolute z-30 mt-1.5 max-h-80 w-full overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 animate-in fade-in-0 zoom-in-95 duration-100">
           {options.map((option, index) => (
             <li
               key={option.kind === "text" ? "text" : option.host.id}
@@ -179,30 +178,30 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
                 event.preventDefault(); // keep focus in the input
                 choose(option);
               }}
-              className={`flex items-center gap-3 rounded-md px-2.5 py-2 cursor-pointer ${index === active ? "bg-surface-3" : ""}`}
+              className={`flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2 ${index === active ? "bg-muted" : ""}`}
             >
               {option.kind === "text" ? (
                 <>
-                  <span className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full bg-surface-3 text-body" aria-hidden="true">
-                    🔍
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden="true">
+                    <Search className="size-3.5" />
                   </span>
                   <span className="min-w-0 text-sm">
-                    <span className="text-heading">Cari “{option.text}”</span>
-                    <span className="block text-xs text-muted">Semua host yang nama atau emailnya memuat teks ini</span>
+                    <span className="text-foreground">Cari “{option.text}”</span>
+                    <span className="block text-xs text-muted-foreground">Semua host yang nama atau emailnya memuat teks ini</span>
                   </span>
                 </>
               ) : (
                 <>
                   <UserAvatar user={option.host.user} size="w-7 h-7" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm text-heading truncate">{option.host.user.name}</span>
-                    <span className="block text-xs text-muted truncate">{option.host.user.email}</span>
+                    <span className="block text-sm text-foreground truncate">{option.host.user.name}</span>
+                    <span className="block text-xs text-muted-foreground truncate">{option.host.user.email}</span>
                   </span>
                   <span className="hidden sm:flex flex-wrap justify-end gap-1">
                     {option.host.assignments
                       .filter((assignment) => assignment.status === "active")
                       .map((assignment) => (
-                        <span key={assignment.id} className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-body">
+                        <span key={assignment.id} className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-body">
                           {assignment.brand.name}
                         </span>
                       ))}
@@ -212,9 +211,9 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
             </li>
           ))}
 
-          {suggestions.loading && !suggestions.data && <li className="px-3 py-2 text-sm text-muted">Memuat host…</li>}
+          {suggestions.loading && !suggestions.data && <li className="px-3 py-2 text-sm text-muted-foreground">Memuat host…</li>}
           {suggestions.data && hosts.length === 0 && (
-            <li className="px-3 py-2 text-sm text-muted">{typed ? "Tidak ada host dengan nama/email itu." : "Semua host sudah dipilih."}</li>
+            <li className="px-3 py-2 text-sm text-muted-foreground">{typed ? "Tidak ada host dengan nama/email itu." : "Semua host sudah dipilih."}</li>
           )}
           {suggestions.data && suggestions.data.total > suggestions.data.data.length && (
             <li className="px-3 py-1.5 text-xs text-faint">

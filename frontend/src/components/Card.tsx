@@ -1,14 +1,33 @@
-/** White (dark: navy) panel used for sections on dashboard pages. */
-export default function Card({ title, description, children }: { title?: string; description?: string; children: React.ReactNode }) {
+import { cn } from "@/lib/utils";
+
+interface CardProps {
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  /** Buttons or a link at the right of the title. */
+  action?: React.ReactNode;
+  className?: string;
+  /** Classes for the body under the title. */
+  bodyClassName?: string;
+  id?: string;
+  children: React.ReactNode;
+}
+
+/** A section panel: optional title row (with an action on the right) and the content below. */
+export default function Card({ title, description, action, className, bodyClassName, id, children }: CardProps) {
+  const hasHeader = Boolean(title || action);
+
   return (
-    <section className="bg-surface border border-stroke rounded-[10px] shadow-card p-5 md:p-6 space-y-4">
-      {title && (
-        <div>
-          <h2 className="text-lg font-semibold text-heading">{title}</h2>
-          {description && <p className="text-sm text-muted mt-1">{description}</p>}
+    <section id={id} className={cn("relative rounded-xl border border-border bg-card text-card-foreground shadow-xs dark:shadow-none", className)}>
+      {hasHeader && (
+        <div className="flex items-start justify-between gap-4 px-5 pt-5 md:px-6">
+          <div className="min-w-0">
+            {title && <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>}
+            {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+          </div>
+          {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
         </div>
       )}
-      {children}
+      <div className={cn("space-y-4 p-5 md:px-6", hasHeader && "pt-4", bodyClassName)}>{children}</div>
     </section>
   );
 }

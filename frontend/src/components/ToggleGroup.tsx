@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useLayoutEffect, useState, useCallback } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export interface ToggleOption<T extends string> {
   value: T;
@@ -11,45 +12,32 @@ interface ToggleGroupProps<T extends string> {
   options: readonly ToggleOption<T>[] | readonly (readonly [T, string])[];
   value: T;
   onChange: (value: T) => void;
+  className?: string;
+  /** Accessible name for the group. */
+  label?: string;
 }
 
 /**
- * A group of buttons where exactly one is active at a time.
- *
- * Features a sliding pill indicator that smoothly animates between the active
- * button on click. Matches the project's dark theme (slate-900 inactive,
- * purple-600 active) with smooth transitions.
+ * A segmented control: exactly one option is active, and the white indicator
+ * slides to it.
  */
-export default function ToggleGroup<T extends string>({
-  options,
-  value,
-  onChange,
-}: ToggleGroupProps<T>) {
+export default function ToggleGroup<T extends string>({ options, value, onChange, className, label }: ToggleGroupProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
 
-  // Normalise options into { value, label } objects
-  const items: ToggleOption<T>[] = options.map((opt) =>
-    Array.isArray(opt) ? { value: opt[0] as T, label: opt[1] as string } : (opt as ToggleOption<T>)
+  const items: ToggleOption<T>[] = options.map((option) =>
+    Array.isArray(option) ? { value: option[0] as T, label: option[1] as string } : (option as ToggleOption<T>)
   );
 
   const measure = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const active = container.querySelector<HTMLButtonElement>("[data-active='true']");
-    if (!active) return;
-    setPill({
-      left: active.offsetLeft,
-      width: active.offsetWidth,
-    });
+    const active = containerRef.current?.querySelector<HTMLButtonElement>("[data-active='true']");
+    if (active) setPill({ left: active.offsetLeft, width: active.offsetWidth });
   }, []);
 
-  // Recalculate on value or items change (useLayoutEffect to avoid flash)
   useLayoutEffect(() => {
     measure();
   }, [value, measure]);
 
-  // Also handle resize (responsive)
   useLayoutEffect(() => {
     const observer = new ResizeObserver(measure);
     if (containerRef.current) observer.observe(containerRef.current);
@@ -59,30 +47,32 @@ export default function ToggleGroup<T extends string>({
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex gap-1 rounded-xl bg-surface border border-stroke p-1"
+      role="radiogroup"
+      aria-label={label}
+      className={cn("relative inline-flex max-w-full gap-1 overflow-x-auto rounded-lg bg-muted p-1 [scrollbar-width:none]", className)}
     >
-      {/* Sliding pill indicator */}
       {pill && (
         <span
           aria-hidden="true"
-          className="absolute top-1 bottom-1 rounded-lg bg-primary shadow-lg shadow-primary/25 transition-all duration-300 ease-out"
+          className="absolute top-1 bottom-1 rounded-md bg-card shadow-xs ring-1 ring-foreground/5 transition-all duration-200 ease-out dark:bg-secondary"
           style={{ left: pill.left, width: pill.width }}
         />
       )}
 
       {items.map((option) => {
-        const isActive = value === option.value;
+        const active = value === option.value;
         return (
           <button
             key={option.value}
             type="button"
-            data-active={isActive}
+            role="radio"
+            aria-checked={active}
+            data-active={active}
             onClick={() => onChange(option.value)}
-            className={`relative z-10 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-              isActive
-                ? "text-heading"
-                : "text-muted hover:text-body"
-            }`}
+            className={cn(
+              "relative z-10 h-8 shrink-0 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
           >
             {option.label}
           </button>

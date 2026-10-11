@@ -1,7 +1,8 @@
 import type { RoleName } from "@/lib/api";
+import AppShell from "./AppShell";
 import { RequireAuth } from "./AuthProvider";
-import AdminShell from "./AdminShell";
 import type { NavIconName } from "./NavIcon";
+import type { AccountLink } from "./UserMenu";
 
 export interface SidebarLink {
   href: string;
@@ -18,16 +19,22 @@ interface SidebarLayoutProps {
   panel: string;
   roles: RoleName[];
   links: SidebarGroup[];
+  /** Where the logo goes. */
+  homeHref: string;
+  accountLinks?: AccountLink[];
+  /** The ⌘K palette; with `hostSearchPath` it also finds hosts. */
+  search?: boolean;
+  hostSearchPath?: string;
   children: React.ReactNode;
 }
 
-/** Sidebar + top header shell shared by the admin, operator and finance panels. */
-export default function SidebarLayout({ panel, roles, links, children }: SidebarLayoutProps) {
+/** Sidebar + header shell shared by the admin, operator and finance panels. */
+export default function SidebarLayout({ panel, roles, links, homeHref, accountLinks, search, hostSearchPath, children }: SidebarLayoutProps) {
   return (
     <RequireAuth roles={roles}>
-      <AdminShell panel={panel} links={links}>
+      <AppShell panel={panel} homeHref={homeHref} links={links} accountLinks={accountLinks} search={search} hostSearchPath={hostSearchPath}>
         {children}
-      </AdminShell>
+      </AppShell>
     </RequireAuth>
   );
 }

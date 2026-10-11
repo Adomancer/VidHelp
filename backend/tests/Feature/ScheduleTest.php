@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\HostBrandAssignment;
 use App\Models\ScheduleSlot;
@@ -315,6 +316,26 @@ class ScheduleTest extends TestCase
         $this->actingAs($this->operator)->getJson("{$url}&days=7")->assertJsonCount(1, 'slots');
     }
 
+    public function test_month_view_returns_backups_across_the_whole_range(): void
+    {
+        $brand = $this->brand();
+        $assignment = $this->assignment($brand);
+        $slot = ScheduleSlot::findOrFail($this->addSlot($assignment, 1, '10:00', '12:00')->json('slot.id'));
+        $monday = today()->next('Monday');
+        $later = $monday->copy()->addWeeks(3)->toDateString();
+        BackupRequest::create([
+            'slot_id' => $slot->id, 'brand_id' => $brand->id, 'requesting_host_id' => $assignment->host_id,
+            'backup_date' => $later, 'start_at' => "{$later} 10:00", 'end_at' => "{$later} 12:00",
+            'reason_type' => 'sick', 'status' => 'open', 'auto_fill_at' => "{$later} 09:30",
+        ]);
+
+        $url = "/api/operator/schedules?brand_id={$brand->id}&on={$monday->toDateString()}";
+        // The week board still sees only its own week; the month calendar sees all six weeks
+        $this->actingAs($this->operator)->getJson("{$url}&days=7")->assertOk()->assertJsonCount(0, 'backups');
+        $this->actingAs($this->operator)->getJson("{$url}&days=42")->assertOk()->assertJsonCount(1, 'backups');
+        $this->actingAs($this->operator)->getJson("{$url}&days=43")->assertJsonValidationErrors('days');
+    }
+
     public function test_leaving_a_brand_removes_the_hosts_slots(): void
     {
         $assignment = $this->assignment($this->brand());
@@ -353,6 +374,24 @@ class ScheduleTest extends TestCase
             ->assertOk()
             ->assertJsonCount(2, 'slots')
             ->assertJsonCount(1, 'upcoming');
+    }
+
+    public function test_host_calendar_sees_backups_weeks_ahead(): void
+    {
+        $assignment = $this->assignment($this->brand());
+        $slot = ScheduleSlot::findOrFail($this->addSlot($assignment, 1, '10:00', '12:00')->json('slot.id'));
+        $later = today()->next('Monday')->addWeeks(2)->toDateString();
+        BackupRequest::create([
+            'slot_id' => $slot->id, 'brand_id' => $assignment->brand_id, 'requesting_host_id' => $assignment->host_id,
+            'backup_date' => $later, 'start_at' => "{$later} 10:00", 'end_at' => "{$later} 12:00",
+            'reason_type' => 'permit', 'status' => 'open', 'auto_fill_at' => "{$later} 09:30",
+        ]);
+        $host = $assignment->host->user;
+
+        // The default week doesn't reach it; the 4-week calendar does
+        $this->actingAs($host)->getJson('/api/host/schedules')->assertOk()->assertJsonCount(0, 'absences');
+        $this->actingAs($host)->getJson('/api/host/schedules?days=28')->assertOk()->assertJsonCount(1, 'absences');
+        $this->actingAs($host)->getJson('/api/host/schedules?days=43')->assertJsonValidationErrors('days');
     }
 
     public function test_host_replaces_weekly_availability(): void

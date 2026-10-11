@@ -2,17 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Crown, Eye } from "lucide-react";
 import { adminHostsApi, errorMessage, operatorApi, type AdminHostDetail, type RateCategory } from "@/lib/api";
 import { formatDate, formatRupiah, formatTenure } from "@/lib/format";
 import { statusLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
+import { Button } from "@/components/ui/button";
 import AssignmentEditor from "./AssignmentEditor";
 import { useAuth } from "./AuthProvider";
 import Dialog from "./Dialog";
 import DigitsField from "./DigitsField";
 import FormAlert from "./FormAlert";
+import { ListSkeleton } from "./Loading";
 import SelectField from "./SelectField";
+import StatusBadge from "./StatusBadge";
 import TextField from "./TextField";
 import UserAvatar from "./UserAvatar";
 
@@ -55,15 +59,16 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
   return (
     <Dialog
       size="lg"
+      placement="side"
       onClose={onClose}
       dirty={dirty && !loading}
       title={
         detail ? (
           <span className="flex items-center gap-3">
-            <UserAvatar user={detail.user} size="w-10 h-10" />
+            <UserAvatar user={detail.user} size="size-10 text-sm" />
             <span className="min-w-0">
               <span className="block truncate">{detail.user.name}</span>
-              <span className="block text-sm font-normal text-muted truncate">{detail.user.email}</span>
+              <span className="block text-sm font-normal text-muted-foreground truncate">{detail.user.email}</span>
             </span>
           </span>
         ) : (
@@ -72,23 +77,17 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
       }
       footer={
         <>
-          <span className="flex-1" />
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2">
+          <Button type="button" variant="outline" onClick={onClose}>
             Batal
-          </button>
-          <button
-            type="submit"
-            form={FORM_ID}
-            disabled={loading || !detail || !rates.data}
-            className="px-5 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-hover disabled:opacity-40"
-          >
+          </Button>
+          <Button type="submit" form={FORM_ID} disabled={loading || !detail || !rates.data}>
             {loading ? "Menyimpan…" : "Simpan"}
-          </button>
+          </Button>
         </>
       }
     >
       {host.error && <FormAlert tone="error">{host.error}</FormAlert>}
-      {!detail && !host.error && <p className="text-sm text-muted">Memuat…</p>}
+      {!detail && !host.error && <ListSkeleton rows={4} />}
 
       {detail && (
         <div className="space-y-6">
@@ -104,12 +103,14 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
                 <DigitsField label="No. HP" name="phone" defaultValue={detail.phone} maxLength={15} placeholder="08…" error={errors.phone} />
                 <DigitsField label="No. HP wali" name="guardian_phone" defaultValue={detail.guardian_phone} maxLength={15} placeholder="08…" error={errors.guardian_phone} />
                 <TextField label="Tanggal bergabung" name="join_date" type="date" defaultValue={detail.join_date.slice(0, 10)} error={errors.join_date} />
-                <div className="space-y-1">
-                  <span className="block text-sm font-medium text-body">Status</span>
-                  <p className="text-sm text-heading">{statusLabel(detail.status)}</p>
-                  <p className="text-xs text-muted">
+                <div className="space-y-1.5">
+                  <span className="block text-sm font-medium text-foreground">Status</span>
+                  <StatusBadge tone={detail.status === "active" ? "success" : detail.status === "banned" ? "danger" : "neutral"} dot>
+                    {statusLabel(detail.status)}
+                  </StatusBadge>
+                  <p className="text-xs text-muted-foreground">
                     Mengikuti status akun. Ubah di halaman{" "}
-                    <Link href="/admin/users" className="text-accent hover:text-heading">
+                    <Link href="/admin/users" className="font-medium text-brand hover:underline">
                       Pengguna
                     </Link>
                     .
@@ -122,7 +123,7 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
             ) : rates.error ? (
               <FormAlert tone="error">{rates.error}</FormAlert>
             ) : (
-              <p className="text-sm text-muted">Memuat…</p>
+              <ListSkeleton rows={2} />
             )}
           </Section>
 
@@ -130,7 +131,15 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
             <SensitiveData host={detail} />
           </Section>
 
-          <Section title="Brand" description="★ Leader — satu brand maksimal punya satu leader. Perubahan brand langsung tersimpan.">
+          <Section
+            title="Brand"
+            description={
+              <span className="inline-flex flex-wrap items-center gap-1">
+                <Crown className="size-3.5 text-warning" aria-hidden="true" />
+                Leader: satu brand maksimal punya satu leader. Perubahan brand langsung tersimpan.
+              </span>
+            }
+          >
             {brands.data ? (
               <AssignmentEditor
                 hostId={detail.id}
@@ -142,7 +151,7 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
                 }}
               />
             ) : (
-              <p className="text-sm text-muted">Memuat…</p>
+              <ListSkeleton rows={2} />
             )}
           </Section>
         </div>
@@ -151,12 +160,12 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
   );
 }
 
-function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function Section({ title, description, children }: { title: string; description?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="space-y-3">
-      <div className="border-b border-stroke pb-2">
-        <h3 className="text-sm font-semibold text-heading">{title}</h3>
-        {description && <p className="text-xs text-muted mt-0.5">{description}</p>}
+    <section className="space-y-4">
+      <div className="border-b border-border pb-2.5">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
       </div>
       {children}
     </section>
@@ -178,7 +187,7 @@ function RateSelect({ host, rates, error }: { host: AdminHostDetail; rates: Rate
           ...rates.map((rate) => ({ value: rate.id, label: `${rate.name} · ${formatRupiah(rate.rate_per_hour)}/jam (diatur manual)` })),
         ]}
       />
-      <p className="text-xs text-muted mt-1">
+      <p className="mt-1.5 text-xs text-muted-foreground">
         Saat ini: {current} · di agensi {formatTenure(host.join_date)} (sejak {formatDate(host.join_date)})
       </p>
     </>
@@ -210,9 +219,9 @@ function SensitiveData({ host }: { host: AdminHostDetail }) {
     <div className="space-y-3">
       <dl className="grid gap-3 sm:grid-cols-2">
         {rows.map(([label, value]) => (
-          <div key={label} className="rounded-lg bg-surface-2 px-3 py-2">
-            <dt className="text-xs text-muted">{label}</dt>
-            <dd className="text-heading font-mono">{value || <span className="text-faint font-sans">belum diisi</span>}</dd>
+          <div key={label} className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd className="mt-0.5 text-sm text-foreground tabular-nums">{value || <span className="text-faint">belum diisi</span>}</dd>
           </div>
         ))}
       </dl>
@@ -221,11 +230,12 @@ function SensitiveData({ host }: { host: AdminHostDetail }) {
       {data?.has_ktp_image ? (
         ktpUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- private blob URL
-          <img src={ktpUrl} alt="Foto KTP" className="max-h-80 rounded-lg border border-stroke-strong" />
+          <img src={ktpUrl} alt="Foto KTP" className="max-h-80 rounded-lg border border-border" />
         ) : (
-          <button type="button" onClick={showKtp} className="px-4 py-2 rounded-lg border border-stroke-strong text-body text-sm hover:bg-surface-2">
+          <Button type="button" variant="outline" onClick={showKtp}>
+            <Eye aria-hidden="true" />
             Lihat foto KTP
-          </button>
+          </Button>
         )
       ) : (
         <p className="text-sm text-faint">Belum ada foto KTP.</p>

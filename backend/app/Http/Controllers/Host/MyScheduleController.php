@@ -14,10 +14,14 @@ class MyScheduleController extends Controller
 {
     /**
      * My weekly slots across all brands: the ones in effect today, plus ones
-     * that start later (e.g. a schedule change from next week).
+     * that start later (e.g. a schedule change from next week). Backups and
+     * event blocks cover the next `days` days (7 by default, up to six weeks
+     * for the calendar).
      */
     public function index(Request $request): JsonResponse
     {
+        $request->validate(['days' => 'nullable|integer|between:1,42']);
+        $until = today()->addDays($request->integer('days') ?: 7);
         $profile = $request->user()->hostProfile;
 
         if (! $profile) {
@@ -32,16 +36,16 @@ class MyScheduleController extends Controller
             ->orderBy('day_of_week')
             ->orderBy('start_time');
 
-        $nextWeek = fn () => BackupRequest::query()
+        $ahead = fn () => BackupRequest::query()
             ->where('end_at', '>', now())
-            ->where('start_at', '<', today()->addDays(7));
+            ->where('start_at', '<', $until);
 
         return response()->json([
             'slots' => $mine()->activeOn(today())->get(),
             'upcoming' => $mine()->where('status', 'active')->whereDate('effective_from', '>', today())->get(),
 
-            // Backups I'm covering for someone else in the next 7 days
-            'covers' => $nextWeek()
+            // Backups I'm covering for someone else in that range
+            'covers' => $ahead()
                 ->where('status', 'filled')
                 ->where('filled_by_host_id', $profile->id)
                 ->with(['brand:id,name', 'requester.user'])
@@ -49,19 +53,19 @@ class MyScheduleController extends Controller
                 ->get()
                 ->map(fn (BackupRequest $backup) => $backup->publicSummary()),
 
-            // My own sessions in the next 7 days that someone else covers (or is being arranged)
-            'absences' => $nextWeek()
+            // My own sessions in that range that someone else covers (or is being arranged)
+            'absences' => $ahead()
                 ->whereIn('status', ['pending', 'open', 'filled'])
                 ->where('requesting_host_id', $profile->id)
                 ->with('filler.user')
                 ->get()
                 ->map(fn (BackupRequest $backup) => $backup->slotMarker()),
 
-            // Event blocks I claimed in the next 7 days
+            // Event blocks I claimed in that range
             'event_claims' => EventSlotClaim::active()
                 ->where('host_id', $profile->id)
                 ->where('end_at', '>', now())
-                ->where('start_at', '<', today()->addDays(7))
+                ->where('start_at', '<', $until)
                 ->with('event:id,name,brand_id', 'event.brand:id,name')
                 ->orderBy('start_at')
                 ->get()
@@ -74,12 +78,12 @@ class MyScheduleController extends Controller
                     'end_at' => $claim->end_at,
                 ]),
 
-            // Events replacing my brands' regular schedule on some of the next 7 days
+            // Events replacing my brands' regular schedule on some days in that range
             'replacing_events' => SpecialEvent::query()
                 ->where('status', 'active')
                 ->where('open_full_schedule', true)
                 ->whereIn('brand_id', $profile->assignments()->where('status', 'active')->pluck('brand_id'))
-                ->whereDate('start_date', '<', today()->addDays(7))
+                ->whereDate('start_date', '<', $until)
                 ->whereDate('end_date', '>=', today())
                 ->get(['id', 'brand_id', 'name', 'start_date', 'end_date']),
         ]);

@@ -8,6 +8,7 @@ import { homePathFor, saveSession } from "@/lib/auth";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import FormAlert from "./FormAlert";
 import GoogleButton from "./GoogleButton";
+import PasswordField from "./PasswordField";
 import SubmitButton from "./SubmitButton";
 import TextField from "./TextField";
 import TwoFactorChallengeForm from "./TwoFactorChallengeForm";
@@ -33,33 +34,38 @@ export default function LoginForm() {
 
   return (
     <div className="space-y-6">
+      <GoogleButton />
+      <Divider />
+
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
-        <TextField label="Email" name="email" type="email" autoComplete="email" required error={errors.email} />
-        <TextField label="Kata sandi" name="password" type="password" autoComplete="current-password" required error={errors.password} />
-
-        <div className="text-right">
-          <Link href="/forgot-password" className="text-sm text-accent hover:text-heading">
-            Lupa kata sandi?
-          </Link>
-        </div>
+        <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="nama@email.com" required error={errors.email} />
+        <PasswordField
+          label="Kata sandi"
+          name="password"
+          autoComplete="current-password"
+          required
+          error={errors.password}
+          labelAside={
+            <Link href="/forgot-password" className="text-sm font-medium text-brand hover:underline">
+              Lupa kata sandi?
+            </Link>
+          }
+        />
 
         <SubmitButton loading={loading}>Masuk</SubmitButton>
       </form>
-
-      <Divider />
-      <GoogleButton />
     </div>
   );
 }
 
 export function Divider() {
   return (
-    <div className="flex items-center gap-3 text-xs text-muted">
-      <span className="h-px flex-1 bg-stroke" />
-      atau
-      <span className="h-px flex-1 bg-stroke" />
+    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+      <span className="h-px flex-1 bg-border" />
+      atau dengan email
+      <span className="h-px flex-1 bg-border" />
     </div>
   );
 }

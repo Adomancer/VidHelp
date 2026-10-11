@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ArrowLeftRight, Clock, Inbox, LifeBuoy, Plus, Upload } from "lucide-react";
 import {
   errorMessage,
   hostBackupApi,
@@ -11,81 +12,113 @@ import {
   type BackupRequestType,
 } from "@/lib/api";
 import { formatDateTime, formatDuration, formatWindow } from "@/lib/format";
+import { textareaClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { BackupStatusBadge, LetterBadge, reasonLabels, RequestTypeBadge } from "@/components/BackupBadges";
 import Card from "@/components/Card";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import Dialog from "@/components/Dialog";
+import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
+import { FieldError, FieldHint } from "@/components/FieldMessage";
 import FormAlert from "@/components/FormAlert";
-import Modal from "@/components/Modal";
+import { CardsSkeleton, ListSkeleton } from "@/components/Loading";
+import PageHeader from "@/components/PageHeader";
+import { NativeSelect } from "@/components/SelectField";
+import StatusBadge from "@/components/StatusBadge";
 import SubmitButton from "@/components/SubmitButton";
+import { notify } from "@/components/Toast";
+import ToggleGroup from "@/components/ToggleGroup";
 import UserAvatar from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Tab = "needs" | "mine";
+type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
 
 export default function HostBackupsPage() {
   const { token } = useAuth();
   const [tab, setTab] = useState<Tab>("needs");
-  const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
 
   const mine = useApiData("backups-mine", () => hostBackupApi.mine(token));
   const needs = useApiData("backups-needs", () => hostBackupApi.needs(token));
 
-  /** Run a button action, show its message, refresh both lists. */
+  /** Run a button action, toast its message, refresh both lists. */
   async function act(action: () => Promise<{ message: string }>) {
-    setNotice(null);
+    setError(null);
     try {
-      const { message } = await action();
-      setNotice({ tone: "success", text: message });
+      notify({ text: (await action()).message });
     } catch (caught) {
-      setNotice({ tone: "error", text: errorMessage(caught) });
+      setError(errorMessage(caught));
     }
     mine.reload();
     needs.reload();
   }
 
+  const openRequests = mine.data?.requests.filter((request) => request.status === "open" || request.status === "pending").length ?? 0;
+
   return (
-    <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-heading">Backup</h1>
+    <div className="space-y-6">
+      <PageHeader
+        title="Backup"
+        description="Gantikan host lain yang berhalangan, atau minta pengganti untuk sesimu."
+        actions={
+          <Button type="button" onClick={() => setFormOpen(true)}>
+            <Plus aria-hidden="true" />
+            Saya butuh backup
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-surface border border-stroke">
-        {(
-          [
-            ["needs", "Butuh backup"],
-            ["mine", "Permintaan saya"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setTab(value)}
-            className={`py-2 rounded-lg text-sm ${tab === value ? "bg-primary text-white" : "text-body hover:bg-surface-2"}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {error && <FormAlert tone="error">{error}</FormAlert>}
+      {(mine.error || needs.error) && <ErrorState message={(mine.error ?? needs.error)!} onRetry={() => (mine.reload(), needs.reload())} />}
 
-      {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
-      {(mine.error || needs.error) && <FormAlert tone="error">{mine.error ?? needs.error}</FormAlert>}
+      <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="gap-5">
+        <TabsList className="h-10 w-full sm:w-fit">
+          <TabsTrigger value="needs" className="px-3">
+            Butuh pengganti
+            {needs.data && needs.data.needs.length > 0 && <CountPill>{needs.data.needs.length}</CountPill>}
+          </TabsTrigger>
+          <TabsTrigger value="mine" className="px-3">
+            Permintaan saya
+            {openRequests > 0 && <CountPill>{openRequests}</CountPill>}
+          </TabsTrigger>
+        </TabsList>
 
-      {tab === "needs" ? (
-        <NeedsTab covers={mine.data?.covers ?? []} needs={needs.data?.needs} quota={mine.data?.quota} act={act} />
-      ) : (
-        <MineTab
-          requests={mine.data?.requests}
-          act={act}
-          onRequested={(message) => {
-            setNotice({ tone: "success", text: message });
+        <TabsContent value="needs">
+          <NeedsTab covers={mine.data?.covers ?? []} needs={needs.data?.needs} quota={mine.data?.quota} act={act} />
+        </TabsContent>
+        <TabsContent value="mine">
+          <MineTab requests={mine.data?.requests} act={act} onNew={() => setFormOpen(true)} />
+        </TabsContent>
+      </Tabs>
+
+      {formOpen && (
+        <RequestForm
+          onDone={(message) => {
+            setFormOpen(false);
+            setTab("mine");
+            notify({ text: message });
             mine.reload();
           }}
+          onCancel={() => setFormOpen(false)}
         />
       )}
     </div>
   );
 }
 
-type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
+function CountPill({ children }: { children: React.ReactNode }) {
+  return <span className="ml-1 rounded-full bg-primary/12 px-1.5 text-[11px] font-semibold text-brand tabular-nums">{children}</span>;
+}
 
 function NeedsTab({
   covers,
@@ -99,171 +132,204 @@ function NeedsTab({
   act: Act;
 }) {
   const { token } = useAuth();
+  const [dropping, setDropping] = useState<BackupNeed | null>(null);
   const upcomingCovers = covers.filter((cover) => new Date(cover.end_at) > new Date());
 
   return (
-    <div className="space-y-4">
-      {upcomingCovers.length > 0 && (
-        <Card title="Kamu menggantikan">
-          <ul className="space-y-2">
-            {upcomingCovers.map((cover) => (
-              <li key={cover.id} className="rounded-lg bg-green-500/10 border border-green-400/30 px-3 py-2 space-y-1">
-                <p className="text-heading">{cover.brand.name}</p>
-                <p className="text-sm text-success">{formatWindow(cover.start_at, cover.end_at)}</p>
-                <p className="text-xs text-muted">untuk {cover.requester_name}</p>
-                {new Date(cover.start_at) > new Date() && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      confirm("Batal jadi backup? Permintaan akan dibuka lagi untuk host lain dan kamu kena potongan poin.") &&
-                      act(() => hostBackupApi.drop(token, cover.id))
-                    }
-                    className="text-xs text-danger hover:text-danger"
-                  >
-                    Saya tidak bisa
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
-
-      {quota && (
-        <p className="text-xs text-muted">
-          Membantu brand lain bulan ini: {quota.quota_used}/{quota.quota_max}. Menggantikan di brand sendiri tidak dihitung.
-        </p>
-      )}
-
-      {needs?.length === 0 && (
-        <Card>
-          <p className="text-sm text-muted">Saat ini tidak ada yang butuh backup.</p>
-        </Card>
-      )}
-
-      {needs?.map((need) => {
-        const applied = need.my_application?.status === "applied";
-
-        return (
-          <Card key={need.id}>
-            {need.asked_me && <p className="text-xs font-medium text-accent">{need.requester_name} meminta kamu menggantikan sesi ini</p>}
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-heading font-medium">{need.brand.name}</p>
-                <p className="text-sm text-accent">{formatWindow(need.start_at, need.end_at)}</p>
-                <p className="text-xs text-muted mt-1">
-                  untuk {need.requester_name} · {need.same_brand ? "brand kamu" : "brand lain (memakai kuota)"}
-                </p>
-              </div>
-              {applied ? (
-                <button
-                  type="button"
-                  onClick={() => act(() => hostBackupApi.withdraw(token, need.id))}
-                  className="shrink-0 px-3 py-1.5 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2"
-                >
-                  Tarik diri
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={Boolean(need.ineligible_reason)}
-                  onClick={() => act(() => hostBackupApi.apply(token, need.id))}
-                  className="shrink-0 px-3 py-1.5 rounded-lg bg-primary text-sm text-white hover:bg-primary-hover disabled:opacity-40"
-                >
-                  Daftar
-                </button>
-              )}
-            </div>
-            {!need.asked_me && <RequestTypeBadge names={need.nominee_names} />}
-            {applied && <p className="text-xs text-success">Kamu sudah mendaftar. Menunggu persetujuan admin.</p>}
-            {!applied && need.ineligible_reason && <p className="text-xs text-muted">{need.ineligible_reason}</p>}
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="min-w-0 space-y-3">
+        {!needs && <CardsSkeleton count={2} />}
+        {needs?.length === 0 && (
+          <Card>
+            <EmptyState icon={Inbox} title="Tidak ada yang butuh backup" description="Kami beri tahu lewat notifikasi kalau ada host yang butuh pengganti." />
           </Card>
-        );
-      })}
+        )}
+
+        <ul className="grid gap-3 xl:grid-cols-2">
+          {needs?.map((need) => {
+            const applied = need.my_application?.status === "applied";
+            return (
+              <li key={need.id} className={cn("space-y-3 rounded-xl border bg-card p-4 shadow-xs dark:shadow-none", need.asked_me ? "border-primary/40" : "border-border")}>
+                {need.asked_me && <StatusBadge tone="brand">{need.requester_name} meminta kamu</StatusBadge>}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground">{need.brand.name}</p>
+                    <p className="flex items-center gap-1.5 text-sm text-body tabular-nums">
+                      <Clock className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                      {formatWindow(need.start_at, need.end_at)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      untuk {need.requester_name} · {need.same_brand ? "brand kamu" : "brand lain (memakai kuota)"}
+                    </p>
+                  </div>
+                  {applied ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => act(() => hostBackupApi.withdraw(token, need.id))}>
+                      Tarik diri
+                    </Button>
+                  ) : (
+                    <Button type="button" size="sm" disabled={Boolean(need.ineligible_reason)} onClick={() => act(() => hostBackupApi.apply(token, need.id))}>
+                      Daftar
+                    </Button>
+                  )}
+                </div>
+                {!need.asked_me && <RequestTypeBadge names={need.nominee_names} />}
+                {applied && <p className="text-xs font-medium text-success">Kamu sudah mendaftar. Menunggu persetujuan admin.</p>}
+                {!applied && need.ineligible_reason && <p className="text-xs text-muted-foreground">{need.ineligible_reason}</p>}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="space-y-6 lg:sticky lg:top-20">
+        <Card title="Kamu menggantikan">
+          {upcomingCovers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Belum ada sesi yang kamu gantikan.</p>
+          ) : (
+            <ul className="space-y-2">
+              {upcomingCovers.map((cover) => (
+                <li key={cover.id} className="space-y-1 rounded-lg border border-l-[3px] border-border border-l-success px-3 py-2.5">
+                  <p className="text-sm font-medium text-foreground">{cover.brand.name}</p>
+                  <p className="text-xs text-body tabular-nums">{formatWindow(cover.start_at, cover.end_at)}</p>
+                  <p className="text-xs text-muted-foreground">untuk {cover.requester_name}</p>
+                  {new Date(cover.start_at) > new Date() && (
+                    <Button type="button" variant="link" size="xs" onClick={() => setDropping(cover)} className="h-auto p-0 text-destructive">
+                      Saya tidak bisa
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        {quota && (
+          <Card title="Kuota brand lain" description="Menggantikan di brand sendiri tidak dihitung.">
+            <div className="space-y-1.5">
+              <p className="text-sm text-body">
+                <span className="text-lg font-semibold text-foreground tabular-nums">{quota.quota_used}</span> / {quota.quota_max} bulan ini
+              </p>
+              <Progress value={(quota.quota_used / Math.max(1, quota.quota_max)) * 100} aria-label="Kuota backup brand lain" className="h-1.5" />
+            </div>
+          </Card>
+        )}
+      </div>
+
+      {dropping && (
+        <ConfirmDialog
+          title="Batal jadi backup?"
+          confirmLabel="Ya, saya tidak bisa"
+          onConfirm={() => act(() => hostBackupApi.drop(token, dropping.id))}
+          onClose={() => setDropping(null)}
+        >
+          Permintaan {dropping.brand.name} ({formatWindow(dropping.start_at, dropping.end_at)}) dibuka lagi untuk host lain, dan kamu kena potongan poin.
+        </ConfirmDialog>
+      )}
     </div>
   );
 }
 
-function MineTab({ requests, act, onRequested }: { requests?: BackupRequest[]; act: Act; onRequested: (message: string) => void }) {
+function MineTab({ requests, act, onNew }: { requests?: BackupRequest[]; act: Act; onNew: () => void }) {
   const { token } = useAuth();
-  const [formOpen, setFormOpen] = useState(false);
+  const [cancelling, setCancelling] = useState<BackupRequest | null>(null);
+
+  if (!requests) return <ListSkeleton rows={3} />;
+
+  if (requests.length === 0) {
+    return (
+      <Card>
+        <EmptyState
+          icon={LifeBuoy}
+          title="Belum pernah mengajukan backup"
+          description="Kalau berhalangan live, ajukan backup supaya host lain bisa menggantikan."
+          action={
+            <Button type="button" variant="outline" onClick={onNew}>
+              <Plus aria-hidden="true" />
+              Saya butuh backup
+            </Button>
+          }
+        />
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <button
-        type="button"
-        onClick={() => setFormOpen(true)}
-        className="w-full px-4 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary-hover"
-      >
-        Saya butuh backup
-      </button>
-      {formOpen && (
-        <RequestForm
-          onDone={(message) => {
-            setFormOpen(false);
-            onRequested(message);
-          }}
-          onCancel={() => setFormOpen(false)}
-        />
-      )}
+    <>
+      <ul className="grid gap-3 lg:grid-cols-2">
+        {requests.map((backup) => (
+          <li key={backup.id} className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-xs dark:shadow-none">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{backup.brand.name}</p>
+                <p className="text-sm text-body tabular-nums">{formatWindow(backup.start_at, backup.end_at)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {reasonLabels[backup.reason_type]}
+                  {backup.reason && ` · ${backup.reason}`}
+                </p>
+              </div>
+              <BackupStatusBadge status={backup.status} />
+            </div>
 
-      {requests?.length === 0 && <p className="text-sm text-muted text-center">Kamu belum pernah mengajukan backup.</p>}
+            <RequestTypeBadge names={backup.nominees?.map((nominee) => nominee.host.user.name) ?? []} />
 
-      {requests?.map((backup) => (
-        <Card key={backup.id}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-heading font-medium">{backup.brand.name}</p>
-              <p className="text-sm text-accent">{formatWindow(backup.start_at, backup.end_at)}</p>
-              <p className="text-xs text-muted mt-1">
-                {reasonLabels[backup.reason_type]}
-                {backup.reason && ` · ${backup.reason}`}
+            {backup.status === "filled" && backup.filler && (
+              <p className="flex items-center gap-2 text-sm text-success">
+                <ArrowLeftRight className="size-3.5" aria-hidden="true" />
+                Digantikan {backup.filler.user.name}
               </p>
-            </div>
-            <BackupStatusBadge status={backup.status} />
-          </div>
+            )}
+            {backup.status === "open" && <p className="text-xs text-muted-foreground">Menunggu host mendaftar.</p>}
+            {backup.status === "pending" && <p className="text-xs text-muted-foreground">Sudah ada yang mendaftar. Admin akan memilih penggantinya.</p>}
 
-          <RequestTypeBadge names={backup.nominees?.map((nominee) => nominee.host.user.name) ?? []} />
+            {backup.letter_status !== "not_needed" && (
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/60 px-3 py-2">
+                <div className="min-w-0">
+                  <LetterBadge status={backup.letter_status} />
+                  {backup.letter_status !== "uploaded" && backup.letter_due_at && (
+                    <p className="text-xs text-muted-foreground">batas {formatDateTime(backup.letter_due_at)}</p>
+                  )}
+                </div>
+                <Button asChild variant="outline" size="sm" className="cursor-pointer">
+                  <label>
+                    <Upload aria-hidden="true" />
+                    {backup.letter_status === "uploaded" ? "Ganti surat" : "Unggah surat"}
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) act(() => hostBackupApi.uploadLetter(token, backup.id, file));
+                      }}
+                    />
+                  </label>
+                </Button>
+              </div>
+            )}
 
-          {backup.status === "filled" && backup.filler && (
-            <p className="text-sm text-success">Digantikan {backup.filler.user.name}</p>
-          )}
-          {backup.status === "open" && <p className="text-xs text-muted">Menunggu host mendaftar.</p>}
-          {backup.status === "pending" && <p className="text-xs text-muted">Sudah ada yang mendaftar. Admin akan memilih penggantinya.</p>}
+            {(backup.status === "pending" || backup.status === "open") && (
+              <div className="flex justify-end border-t border-border pt-3">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setCancelling(backup)} className="text-destructive hover:text-destructive">
+                  Batalkan permintaan
+                </Button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
 
-          {backup.letter_status !== "not_needed" && (
-            <div className="flex flex-wrap items-center gap-3">
-              <LetterBadge status={backup.letter_status} />
-              {backup.letter_status !== "uploaded" && backup.letter_due_at && (
-                <span className="text-xs text-muted">batas {formatDateTime(backup.letter_due_at)}</span>
-              )}
-              <label className="text-xs text-accent hover:text-heading cursor-pointer">
-                {backup.letter_status === "uploaded" ? "Ganti surat" : "Unggah surat"}
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="sr-only"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) act(() => hostBackupApi.uploadLetter(token, backup.id, file));
-                  }}
-                />
-              </label>
-            </div>
-          )}
-
-          {(backup.status === "pending" || backup.status === "open") && (
-            <button
-              type="button"
-              onClick={() => confirm("Batalkan permintaan backup ini?") && act(() => hostBackupApi.cancel(token, backup.id))}
-              className="text-xs text-danger hover:text-danger"
-            >
-              Batalkan permintaan
-            </button>
-          )}
-        </Card>
-      ))}
-    </div>
+      {cancelling && (
+        <ConfirmDialog
+          title="Batalkan permintaan backup?"
+          confirmLabel="Batalkan permintaan"
+          cancelLabel="Kembali"
+          onConfirm={() => act(() => hostBackupApi.cancel(token, cancelling.id))}
+          onClose={() => setCancelling(null)}
+        >
+          {cancelling.brand.name}, {formatWindow(cancelling.start_at, cancelling.end_at)}. Kamu tetap harus live di sesi ini.
+        </ConfirmDialog>
+      )}
+    </>
   );
 }
 
@@ -304,119 +370,123 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
   // Nothing to request for (yet): no form, so it can't be sent without a session
   if (!occurrence) {
     return (
-      <Modal title="Ajukan backup" onClose={onCancel}>
+      <Dialog
+        title="Ajukan backup"
+        size="sm"
+        onClose={onCancel}
+        footer={
+          <Button type="button" variant="outline" onClick={onCancel}>
+            Tutup
+          </Button>
+        }
+      >
         {slots.error && <FormAlert tone="error">{slots.error}</FormAlert>}
-        <p className="text-sm text-muted">{slots.data ? "Tidak ada sesi yang masih bisa kamu ajukan backup." : "Memuat sesi kamu…"}</p>
-        {slots.data && settings && (
-          <p className="text-xs text-muted">
-            Sesi yang kurang dari {formatDuration(settings["backup.request_min_hours_before"])} lagi tidak ditampilkan. Kalau mendadak tidak bisa,
-            hubungi admin.
-          </p>
+        {!slots.data && !slots.error && <ListSkeleton rows={2} />}
+        {slots.data && (
+          <EmptyState
+            compact
+            icon={Clock}
+            title="Tidak ada sesi yang bisa diajukan"
+            description={
+              settings
+                ? `Sesi yang kurang dari ${formatDuration(settings["backup.request_min_hours_before"])} lagi tidak ditampilkan. Kalau mendadak tidak bisa, hubungi admin.`
+                : undefined
+            }
+          />
         )}
-        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-xl text-body hover:bg-surface-2">
-          Tutup
-        </button>
-      </Modal>
+      </Dialog>
     );
   }
 
   return (
-    <Modal title="Ajukan backup" description="Pilih sesi yang tidak bisa kamu jalani. Langsung masuk ke papan backup; admin yang menyetujui penggantinya." onClose={onCancel}>
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <Dialog
+      title="Ajukan backup"
+      description="Pilih sesi yang tidak bisa kamu jalani. Langsung masuk ke papan backup; admin yang menyetujui penggantinya."
+      onClose={onCancel}
+      closeOnOutsideClick={false}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
-        <div className="space-y-1">
-          <label htmlFor="occurrence" className="block text-sm font-medium text-body">
-            Sesi
-          </label>
-          <select
+        <div className="space-y-1.5">
+          <Label htmlFor="occurrence">Sesi</Label>
+          <NativeSelect
             id="occurrence"
             value={occurrence}
             onChange={(event) => {
               setPickedOccurrence(event.target.value);
               setHostIds([]); // who is free depends on the session
             }}
-            className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-stroke-strong text-heading"
           >
             {slots.data?.slots.map((slot) => (
               <option key={`${slot.slot_id}|${slot.date}`} value={`${slot.slot_id}|${slot.date}`}>
                 {formatWindow(slot.start_at, slot.end_at)} · {slot.brand.name}
               </option>
             ))}
-          </select>
-          {settings && (
-            <p className="text-xs text-muted">
-              Ajukan paling lambat {formatDuration(settings["backup.request_min_hours_before"])} sebelum sesi. Kalau lebih mendadak, hubungi
-              admin.
-            </p>
+          </NativeSelect>
+          {errors.slot_id || errors.backup_date ? (
+            <FieldError>{errors.slot_id ?? errors.backup_date}</FieldError>
+          ) : (
+            settings && (
+              <FieldHint>
+                Ajukan paling lambat {formatDuration(settings["backup.request_min_hours_before"])} sebelum sesi. Kalau lebih mendadak, hubungi admin.
+              </FieldHint>
+            )
           )}
-          {(errors.slot_id || errors.backup_date) && <p className="text-sm text-danger">{errors.slot_id ?? errors.backup_date}</p>}
         </div>
 
-        <fieldset className="space-y-1">
-          <legend className="block text-sm font-medium text-body">Alasan</legend>
-          <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(reasonLabels) as BackupReason[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setReasonType(value)}
-                className={`py-2 rounded-lg text-sm ${reasonType === value ? "bg-primary text-white" : "bg-surface-2 text-body"}`}
-              >
-                {reasonLabels[value]}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        <div className="space-y-1">
-          <label htmlFor="reason" className="block text-sm font-medium text-body">
-            Keterangan (opsional)
-          </label>
-          <textarea
-            id="reason"
-            name="reason"
-            rows={2}
-            maxLength={1000}
-            className="w-full px-4 py-2.5 rounded-xl bg-surface-2 border border-stroke-strong text-heading outline-none focus:ring-2 focus:ring-primary"
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-foreground">Alasan</p>
+          <ToggleGroup
+            label="Alasan"
+            options={(Object.keys(reasonLabels) as BackupReason[]).map((value) => [value, reasonLabels[value]] as const)}
+            value={reasonType}
+            onChange={setReasonType}
+            className="grid w-full grid-cols-3"
           />
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="letter" className="block text-sm font-medium text-body">
-            {reasonType === "sick" ? "Surat dokter" : "Lampiran"} (boleh menyusul)
-          </label>
+        <div className="space-y-1.5">
+          <Label htmlFor="reason">
+            Keterangan <span className="font-normal text-muted-foreground">(opsional)</span>
+          </Label>
+          <textarea id="reason" name="reason" rows={2} maxLength={1000} className={textareaClass} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="letter">
+            {reasonType === "sick" ? "Surat dokter" : "Lampiran"} <span className="font-normal text-muted-foreground">(boleh menyusul)</span>
+          </Label>
           <input
             id="letter"
             name="letter"
             type="file"
             accept="image/*,application/pdf"
-            className="block w-full text-sm text-body file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-surface-2 file:text-body"
+            className="block w-full rounded-lg border border-dashed border-input bg-muted/40 p-2 text-sm text-body file:mr-3 file:rounded-md file:border-0 file:bg-card file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:shadow-xs"
           />
-          {reasonType === "sick" && settings && (
-            <p className="text-xs text-muted">
-              Kalau belum ada, unggah paling lambat {formatDuration(settings["backup.sick_letter_grace_hours"])} setelah sesi
-              dimulai, atau poinmu dipotong.
-            </p>
+          {errors.letter ? (
+            <FieldError>{errors.letter}</FieldError>
+          ) : (
+            reasonType === "sick" &&
+            settings && (
+              <FieldHint>
+                Kalau belum ada, unggah paling lambat {formatDuration(settings["backup.sick_letter_grace_hours"])} setelah sesi dimulai, atau poinmu
+                dipotong.
+              </FieldHint>
+            )
           )}
-          {errors.letter && <p className="text-sm text-danger">{errors.letter}</p>}
         </div>
 
-        <fieldset className="space-y-2">
-          <legend className="block text-sm font-medium text-body">Siapa yang bisa menggantikan</legend>
-          <div className="grid grid-cols-2 gap-2">
-            {requestTypes.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => setRequestType(option.value)}
-                className={`py-2 rounded-lg text-sm ${requestType === option.value ? "bg-primary text-white" : "bg-surface-2 text-body"}`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-muted">{requestTypes.find((option) => option.value === requestType)?.hint}</p>
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-foreground">Siapa yang bisa menggantikan</p>
+          <ToggleGroup
+            label="Siapa yang bisa menggantikan"
+            options={requestTypes.map((option) => [option.value, option.label] as const)}
+            value={requestType}
+            onChange={setRequestType}
+            className="grid w-full grid-cols-2"
+          />
+          <FieldHint>{requestTypes.find((option) => option.value === requestType)?.hint}</FieldHint>
           {requestType === "direct" && occurrence && settings && (
             <NomineePicker
               slotId={slotId}
@@ -427,17 +497,19 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
               onChange={setHostIds}
             />
           )}
-          {errors.host_ids && <p className="text-sm text-danger">{errors.host_ids}</p>}
-        </fieldset>
+          <FieldError>{errors.host_ids}</FieldError>
+        </div>
 
-        <div className="flex gap-3">
-          <SubmitButton loading={loading}>Kirim permintaan</SubmitButton>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
+        <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" size="lg" onClick={onCancel}>
             Batal
-          </button>
+          </Button>
+          <SubmitButton loading={loading} className="sm:w-auto">
+            Kirim permintaan
+          </SubmitButton>
         </div>
       </form>
-    </Modal>
+    </Dialog>
   );
 }
 
@@ -466,13 +538,13 @@ function NomineePicker({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 pt-2">
       <p className="text-xs text-body">
-        Dipilih {selected.length} · pilih {min} sampai {max} host
+        Dipilih <span className="font-semibold text-foreground tabular-nums">{selected.length}</span> · pilih {min} sampai {max} host
       </p>
       {candidates.error && <FormAlert tone="error">{candidates.error}</FormAlert>}
-      {candidates.loading && !candidates.data && <p className="text-xs text-muted">Memuat host…</p>}
-      <ul className="max-h-64 overflow-y-auto space-y-1.5">
+      {candidates.loading && !candidates.data && <ListSkeleton rows={3} />}
+      <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
         {candidates.data?.candidates.map((candidate) => {
           const checked = selected.includes(candidate.host_id);
           const disabled = !candidate.eligible || (full && !checked);
@@ -480,15 +552,17 @@ function NomineePicker({
           return (
             <li key={candidate.host_id}>
               <label
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 ${checked ? "bg-primary/20 border border-primary/40" : "bg-surface-2 border border-transparent"} ${disabled ? "opacity-50" : "cursor-pointer"}`}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
+                  checked ? "border-primary/40 bg-primary/[0.06]" : "border-border",
+                  disabled ? "opacity-50" : "cursor-pointer hover:bg-muted/60"
+                )}
               >
-                <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(candidate.host_id)} className="accent-primary" />
-                <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="w-7 h-7" />
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm text-heading truncate">{candidate.name}</span>
-                  <span className="block text-xs text-muted truncate">
-                    {candidate.ineligible_reason ?? (candidate.same_brand ? "Brand kamu" : "Brand lain")}
-                  </span>
+                <Checkbox checked={checked} disabled={disabled} onCheckedChange={() => toggle(candidate.host_id)} />
+                <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="size-7 text-xs" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-foreground">{candidate.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{candidate.ineligible_reason ?? (candidate.same_brand ? "Brand kamu" : "Brand lain")}</span>
                 </span>
               </label>
             </li>

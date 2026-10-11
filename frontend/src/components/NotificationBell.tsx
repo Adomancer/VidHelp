@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Bell, BellOff, CheckCheck } from "lucide-react";
 import { notificationApi, type AppNotification } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "./AuthProvider";
 
 const POLL_MS = 60_000;
 
-/**
- * The bell: unread count (refreshed every minute) and a dropdown of recent notifications.
- * `align` picks which side the panel opens toward.
- */
-export default function NotificationBell({ align = "right" }: { align?: "left" | "right" }) {
+/** The bell: unread count (refreshed every minute) and a panel of recent notifications. */
+export default function NotificationBell({ align = "end" }: { align?: "start" | "end" }) {
   const { token } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const panel = useRef<HTMLDivElement>(null);
 
   const count = useApiData("notification-count", () => notificationApi.unreadCount(token));
   const list = useApiData(`notification-list-${open}`, () =>
@@ -29,16 +30,6 @@ export default function NotificationBell({ align = "right" }: { align?: "left" |
     const timer = setInterval(reloadCount, POLL_MS);
     return () => clearInterval(timer);
   }, [reloadCount]);
-
-  // Close when clicking outside the panel
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (panel.current && !panel.current.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [open]);
 
   async function openNotification(notification: AppNotification) {
     if (!notification.read_at) await notificationApi.read(token, notification.id).catch(() => {});
@@ -54,65 +45,84 @@ export default function NotificationBell({ align = "right" }: { align?: "left" |
   }
 
   const unread = count.data?.unread ?? 0;
+  const notifications = list.data?.notifications ?? [];
+  const loading = list.loading && notifications.length === 0;
 
   return (
-    <div className="relative" ref={panel}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-label={unread > 0 ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"}
-        className="relative w-9 h-9 rounded-full flex items-center justify-center text-body hover:bg-surface-2 hover:text-heading"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-        {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div
-          className={`absolute z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-stroke-strong bg-surface shadow-2xl ${
-            align === "right" ? "right-0" : "left-0"
-          }`}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={unread > 0 ? `Notifikasi, ${unread} belum dibaca` : "Notifikasi"}
+          className="relative text-muted-foreground hover:text-foreground"
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-stroke">
-            <p className="text-sm font-medium text-heading">Notifikasi</p>
-            {unread > 0 && (
-              <button type="button" onClick={readAll} className="text-xs text-accent hover:text-heading">
-                Tandai semua dibaca
-              </button>
-            )}
-          </div>
-          <ul className="max-h-96 overflow-y-auto divide-y divide-stroke">
-            {list.loading && !list.data?.notifications.length && <li className="px-4 py-6 text-center text-sm text-muted">Memuat…</li>}
-            {list.data && !list.loading && list.data.notifications.length === 0 && (
-              <li className="px-4 py-6 text-center text-sm text-muted">Belum ada notifikasi.</li>
-            )}
-            {list.data?.notifications.map((notification) => (
-              <li key={notification.id}>
-                <button
-                  type="button"
-                  onClick={() => openNotification(notification)}
-                  className={`w-full text-left px-4 py-3 hover:bg-surface-2 ${notification.read_at ? "" : "bg-primary/10"}`}
-                >
-                  <span className="flex items-start gap-2">
-                    {!notification.read_at && <span className="mt-1.5 w-2 h-2 shrink-0 rounded-full bg-accent" aria-hidden="true" />}
-                    <span className="min-w-0">
-                      <span className="block text-sm text-heading">{notification.title}</span>
-                      {notification.body && <span className="block text-xs text-muted mt-0.5">{notification.body}</span>}
-                      <span className="block text-[11px] text-faint mt-1">{formatDateTime(notification.created_at)}</span>
-                    </span>
-                  </span>
-                </button>
+          <Bell />
+          {unread > 0 && (
+            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white ring-2 ring-background tabular-nums">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent align={align} sideOffset={8} className="w-[min(24rem,calc(100vw-1.5rem))] gap-0 p-0">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+          <p className="text-sm font-semibold text-foreground">Notifikasi</p>
+          {unread > 0 && (
+            <Button type="button" variant="ghost" size="xs" onClick={readAll} className="text-brand hover:text-brand">
+              <CheckCheck aria-hidden="true" />
+              Tandai semua dibaca
+            </Button>
+          )}
+        </div>
+
+        <ul className="max-h-[min(26rem,70vh)] divide-y divide-border overflow-y-auto overscroll-contain">
+          {loading &&
+            [0, 1, 2].map((index) => (
+              <li key={index} className="space-y-2 px-4 py-3">
+                <Skeleton className="h-3.5 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
               </li>
             ))}
-          </ul>
-        </div>
-      )}
-    </div>
+
+          {list.data && !list.loading && notifications.length === 0 && (
+            <li className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+              <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <BellOff className="size-4" aria-hidden="true" />
+              </span>
+              <p className="text-sm font-medium text-foreground">Belum ada notifikasi</p>
+              <p className="text-xs text-muted-foreground">Kabar soal jadwal, backup dan gaji muncul di sini.</p>
+            </li>
+          )}
+
+          {notifications.map((notification) => (
+            <li key={notification.id}>
+              <button
+                type="button"
+                onClick={() => openNotification(notification)}
+                className={cn(
+                  "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-muted focus-visible:bg-muted",
+                  !notification.read_at && "bg-primary/[0.04]"
+                )}
+              >
+                <span
+                  className={cn("mt-1.5 size-2 shrink-0 rounded-full", notification.read_at ? "bg-transparent" : "bg-primary")}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className={cn("block text-sm", notification.read_at ? "text-body" : "font-medium text-foreground")}>{notification.title}</span>
+                  {notification.body && <span className="mt-0.5 block text-xs text-muted-foreground">{notification.body}</span>}
+                  <span className="mt-1 block text-[11px] text-faint" title={new Date(notification.created_at).toLocaleString("id-ID")}>
+                    {formatRelative(notification.created_at)}
+                  </span>
+                </span>
+                {!notification.read_at && <span className="sr-only">(belum dibaca)</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -5,13 +5,17 @@ import { useRouter } from "next/navigation";
 import AuthCard from "@/components/AuthCard";
 import { RequireAuth, useAuth } from "@/components/AuthProvider";
 import TwoFactorSetup from "@/components/TwoFactorSetup";
+import { Button } from "@/components/ui/button";
 import { hasAnyRole, homePathFor } from "@/lib/auth";
 
 /** Admins and finance land here after sign-in until they have set up 2FA. */
 export default function TwoFactorSetupPage() {
   return (
     <RequireAuth roles={["admin", "finance"]} allowTwoFactorSetup>
-      <AuthCard subtitle="Amankan akun kamu">
+      <AuthCard
+        title="Amankan akun kamu"
+        subtitle="Akun admin dan finance mengelola data pribadi dan pembayaran, jadi wajib verifikasi dua langkah: setelah kata sandi atau Google, kamu juga memasukkan kode dari aplikasi di HP."
+      >
         <RequiredSetup />
       </AuthCard>
     </RequireAuth>
@@ -33,14 +37,10 @@ function RequiredSetup() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-body text-center">
-        Akun admin dan finance mengelola data pribadi dan pembayaran, jadi wajib verifikasi dua langkah: setelah kata sandi atau
-        Google, kamu juga memasukkan kode dari aplikasi di HP.
-      </p>
       <TwoFactorSetup onDone={(updated) => router.replace(homePathFor(updated))} />
-      <button type="button" onClick={logout} className="w-full text-sm text-muted hover:text-heading">
+      <Button type="button" variant="ghost" onClick={logout} className="w-full text-muted-foreground">
         Keluar
-      </button>
+      </Button>
     </div>
   );
 }

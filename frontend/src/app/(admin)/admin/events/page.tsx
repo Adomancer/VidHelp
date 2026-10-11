@@ -1,14 +1,13 @@
 import EventManager from "@/components/EventManager";
+import PageHeader from "@/components/PageHeader";
 
 export default function AdminEventsPage() {
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Event Khusus</h1>
-        <p className="text-sm text-muted mt-1">
-          PD, double date, dan kampanye lainnya. Host dari brand mengambil blok yang sudah ditentukan; kamu bisa menunjuk atau menarik kembali blok mana pun.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Event khusus"
+        description="PD, double date, dan kampanye lainnya. Host dari brand mengambil blok yang sudah ditentukan; kamu bisa menunjuk atau menarik kembali blok mana pun."
+      />
       <EventManager />
     </div>
   );

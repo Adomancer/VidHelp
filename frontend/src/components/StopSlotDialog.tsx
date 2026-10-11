@@ -4,6 +4,10 @@ import { useState } from "react";
 import { errorMessage, fieldErrors, scheduleApi, type ScheduleSlot } from "@/lib/api";
 import { toDateInput } from "@/lib/format";
 import { describeWeekly, formatLongDate, laterDate } from "@/lib/schedule";
+import { inputClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "./AuthProvider";
 import Dialog from "./Dialog";
 import FormAlert from "./FormAlert";
@@ -53,48 +57,45 @@ export default function StopSlotDialog({ slot, week, onClose, onSaved }: StopSlo
   return (
     <Dialog
       title="Hentikan jadwal?"
+      size="sm"
       onClose={onClose}
       footer={
         <>
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2">
+          <Button type="button" variant="outline" onClick={onClose}>
             Batal
-          </button>
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={stop}
-            disabled={saving || alreadyEnded || from < today}
-            className="px-5 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
+          </Button>
+          <Button type="button" variant="danger" onClick={stop} disabled={saving || alreadyEnded || from < today}>
             {saving ? "Menghentikan…" : "Hentikan jadwal"}
-          </button>
+          </Button>
         </>
       }
     >
       <div className="space-y-4">
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
-        <p className="text-heading">
-          Hentikan jadwal <strong>{hostName}</strong> {weekly} mulai <strong>{formatLongDate(from)}</strong>?
+        <p className="text-sm text-body">
+          Hentikan jadwal <strong className="font-semibold text-foreground">{hostName}</strong> {weekly} mulai{" "}
+          <strong className="font-semibold text-foreground">{formatLongDate(from)}</strong>?
         </p>
 
-        <label className="flex flex-wrap items-center gap-2 text-sm text-body">
-          Berhenti mulai
+        <div className="space-y-1.5">
+          <Label htmlFor="stop-from">Berhenti mulai</Label>
           <input
+            id="stop-from"
             type="date"
             value={from}
             min={today}
             onChange={(event) => event.target.value && setFrom(event.target.value)}
-            className="px-2 py-1 rounded-md bg-surface-2 border border-stroke-strong text-heading [color-scheme:dark]"
+            className={cn(inputClass, "tabular-nums sm:w-48")}
           />
-        </label>
+        </div>
 
         {alreadyEnded ? (
           <FormAlert tone="warning">Jadwal ini sudah berakhir pada {formatLongDate(slot.effective_to!)}.</FormAlert>
         ) : removesAll ? (
-          <p className="text-sm text-muted">Jadwal ini belum pernah berjalan sebelum tanggal itu, jadi akan dihapus seluruhnya.</p>
+          <p className="text-sm text-muted-foreground">Jadwal ini belum pernah berjalan sebelum tanggal itu, jadi akan dihapus seluruhnya.</p>
         ) : (
-          <p className="text-sm text-muted">Jadwal sebelum tanggal ini tetap tersimpan untuk riwayat dan payroll.</p>
+          <p className="text-sm text-muted-foreground">Jadwal sebelum tanggal ini tetap tersimpan untuk riwayat dan payroll.</p>
         )}
       </div>
     </Dialog>

@@ -1,22 +1,38 @@
 "use client";
 
 import { useState } from "react";
+import { Camera, CircleCheck, Crown, LogOut, Upload } from "lucide-react";
 import { errorMessage, hostApi, type MyProfile } from "@/lib/api";
 import { formatDate, formatTenure } from "@/lib/format";
 import { roleLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
-import FormAlert from "@/components/FormAlert";
-import SubmitButton from "@/components/SubmitButton";
 import DigitsField from "@/components/DigitsField";
-import TextField from "@/components/TextField";
-import UserAvatar from "@/components/UserAvatar";
 import DiscordConnect from "@/components/DiscordConnect";
+import ErrorState from "@/components/ErrorState";
+import FormAlert from "@/components/FormAlert";
+import { CardsSkeleton } from "@/components/Loading";
+import PageHeader from "@/components/PageHeader";
 import PasswordForm from "@/components/PasswordForm";
+import StatusBadge from "@/components/StatusBadge";
+import SubmitButton from "@/components/SubmitButton";
+import TextField from "@/components/TextField";
+import { notify } from "@/components/Toast";
+import UserAvatar from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
 
 type HostProfileData = NonNullable<MyProfile["host_profile"]>;
+
+const sections = [
+  { id: "data-pribadi", label: "Data pribadi" },
+  { id: "brand", label: "Brand", hostOnly: true },
+  { id: "identitas", label: "KTP & bank", hostOnly: true },
+  { id: "discord", label: "Discord" },
+  { id: "keamanan", label: "Kata sandi" },
+];
 
 export default function HostProfilePage() {
   const { token, logout, setUser } = useAuth();
@@ -31,25 +47,46 @@ export default function HostProfilePage() {
   const host = profile.data?.host_profile ?? null;
 
   return (
-    <div className="max-w-lg space-y-6">
-      <h1 className="text-xl font-bold text-heading">Profil Saya</h1>
+    <div className="space-y-6">
+      <PageHeader title="Profil saya" description="Data diri, rekening untuk gaji, dan keamanan akun." />
 
-      {profile.error && <FormAlert tone="error">{profile.error}</FormAlert>}
+      {profile.error && <ErrorState message={profile.error} onRetry={profile.reload} />}
 
-      <HeaderCard host={host} onUpdated={applyUpdate} />
-      {profile.data && <PersonalForm data={profile.data} onUpdated={applyUpdate} />}
-      {host && <BrandsCard host={host} />}
-      {host && <IdentityForm host={host} onUpdated={applyUpdate} />}
-      <DiscordConnect />
-      <PasswordForm />
+      <div className="grid items-start gap-6 lg:grid-cols-[12rem_minmax(0,1fr)] xl:grid-cols-[13rem_minmax(0,48rem)]">
+        <nav aria-label="Bagian profil" className="hidden lg:sticky lg:top-20 lg:block">
+          <ul className="space-y-0.5 text-sm">
+            {sections
+              .filter((section) => !section.hostOnly || host)
+              .map((section) => (
+                <li key={section.id}>
+                  <a
+                    href={`#${section.id}`}
+                    className="block rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  >
+                    {section.label}
+                  </a>
+                </li>
+              ))}
+          </ul>
+        </nav>
 
-      <button
-        type="button"
-        onClick={logout}
-        className="w-full px-4 py-3 rounded-xl border border-red-400/40 text-danger hover:bg-red-500/10 transition-colors"
-      >
-        Keluar
-      </button>
+        <div className="min-w-0 space-y-6 [&>section]:scroll-mt-20">
+          <HeaderCard host={host} onUpdated={applyUpdate} />
+          {!profile.data && !profile.error && <CardsSkeleton count={2} />}
+          {profile.data && <PersonalForm data={profile.data} onUpdated={applyUpdate} />}
+          {host && <BrandsCard host={host} />}
+          {host && <IdentityForm host={host} onUpdated={applyUpdate} />}
+          <DiscordConnect id="discord" />
+          <PasswordForm id="keamanan" />
+
+          <Card title="Keluar" description="Keluar dari VidHelp di perangkat ini.">
+            <Button type="button" variant="outline" onClick={() => void logout()} className="w-full text-destructive hover:text-destructive sm:w-auto">
+              <LogOut aria-hidden="true" />
+              Keluar
+            </Button>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
@@ -66,6 +103,7 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
     setError(null);
     try {
       onUpdated(await hostApi.uploadPhoto(token, file));
+      notify({ text: "Foto profil diperbarui" });
     } catch (caught) {
       setError(errorMessage(caught));
     } finally {
@@ -75,21 +113,36 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
 
   return (
     <Card>
-      <div className="flex items-center gap-4">
-        <div className="flex flex-col items-center gap-2">
-          <UserAvatar size="w-16 h-16" />
-          <label className="text-xs text-accent hover:text-heading cursor-pointer">
-            {uploading ? "Mengunggah…" : "Ganti foto"}
-            <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => upload(event.target.files?.[0])} />
-          </label>
-        </div>
-        <div className="min-w-0">
-          <p className="text-heading font-medium truncate">{user.name}</p>
-          <p className="text-sm text-muted truncate">{user.email}</p>
-          <p className="text-xs text-accent mt-1">{user.roles.map((role) => roleLabel(role.name)).join(", ")}</p>
+      <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+        <label className="group relative shrink-0 cursor-pointer rounded-full focus-within:ring-3 focus-within:ring-ring/50" title="Ganti foto">
+          <UserAvatar size="size-20 text-2xl" />
+          <span
+            className={cn(
+              "absolute right-0 bottom-0 flex size-7 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-xs transition-transform group-hover:scale-105",
+              uploading && "animate-pulse"
+            )}
+          >
+            <Camera className="size-3.5" aria-hidden="true" />
+          </span>
+          <span className="sr-only">{uploading ? "Mengunggah foto…" : "Ganti foto profil"}</span>
+          <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => upload(event.target.files?.[0])} />
+        </label>
+        <div className="min-w-0 space-y-1.5">
+          <div>
+            <p className="truncate text-lg font-semibold text-foreground">{user.name}</p>
+            <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-1.5 sm:justify-start">
+            {user.roles.map((role) => (
+              <StatusBadge key={role.name} tone="brand">
+                {roleLabel(role.name)}
+              </StatusBadge>
+            ))}
+            {host && <StatusBadge tone="neutral">{host.rate_category?.name ?? "Belum ada level tarif"}</StatusBadge>}
+          </div>
           {host && (
-            <p className="text-xs text-muted mt-1">
-              {host.rate_category?.name ?? "Belum ada level tarif"} · bergabung {formatDate(host.join_date)} ({formatTenure(host.join_date)})
+            <p className="text-xs text-muted-foreground">
+              Bergabung {formatDate(host.join_date)} · {formatTenure(host.join_date)}
             </p>
           )}
         </div>
@@ -101,7 +154,6 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
 
 function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profile: MyProfile) => void }) {
   const { token } = useAuth();
-  const [saved, setSaved] = useState<string | null>(null);
   const host = data.host_profile;
 
   const { loading, errors, error, handleSubmit } = useApiForm(
@@ -114,26 +166,29 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
         }),
       }),
     (updated) => {
-      setSaved(updated.message);
+      notify({ text: updated.message });
       onUpdated(updated);
     }
   );
 
   return (
-    <Card title="Data pribadi">
+    <Card id="data-pribadi" title="Data pribadi">
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
-        {saved && <FormAlert tone="success">{saved}</FormAlert>}
 
         <TextField label="Nama lengkap" name="name" defaultValue={data.user.name} autoComplete="name" required error={errors.name} />
         {host && (
-          <>
+          <div className="grid gap-4 sm:grid-cols-2">
             <DigitsField label="No. HP (WhatsApp)" name="phone" defaultValue={host.phone} maxLength={15} placeholder="08…" autoComplete="tel" error={errors.phone} />
             <DigitsField label="No. HP wali / keluarga" name="guardian_phone" defaultValue={host.guardian_phone} maxLength={15} placeholder="08…" error={errors.guardian_phone} />
-          </>
+          </div>
         )}
 
-        <SubmitButton loading={loading}>Simpan</SubmitButton>
+        <div className="flex justify-end">
+          <SubmitButton loading={loading} size="default" className="sm:w-auto">
+            Simpan
+          </SubmitButton>
+        </div>
       </form>
     </Card>
   );
@@ -141,15 +196,20 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
 
 function BrandsCard({ host }: { host: HostProfileData }) {
   return (
-    <Card title="Brand saya">
+    <Card id="brand" title="Brand saya" description="Diatur oleh operator.">
       {host.assignments.length === 0 ? (
-        <p className="text-sm text-muted">Kamu belum ditugaskan ke brand mana pun.</p>
+        <p className="text-sm text-muted-foreground">Kamu belum ditugaskan ke brand mana pun.</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
           {host.assignments.map((assignment) => (
-            <li key={assignment.id} className="px-3 py-1.5 rounded-lg bg-surface-2 text-sm text-heading">
+            <li key={assignment.id} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground">
               {assignment.brand.name}
-              {assignment.is_leader && <span className="text-warning"> ★ Leader</span>}
+              {assignment.is_leader && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">
+                  <Crown className="size-3.5" aria-hidden="true" />
+                  Leader
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -164,7 +224,6 @@ function BrandsCard({ host }: { host: HostProfileData }) {
  */
 function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (profile: MyProfile) => void }) {
   const { token } = useAuth();
-  const [saved, setSaved] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const current = host.sensitive_data;
@@ -177,7 +236,7 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
     },
     (updated, form) => {
       form.reset();
-      setSaved(updated.message);
+      notify({ text: updated.message });
       onUpdated(updated);
     }
   );
@@ -188,6 +247,7 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
     setUploadError(null);
     try {
       onUpdated(await hostApi.uploadKtpImage(token, file));
+      notify({ text: "Foto KTP tersimpan" });
     } catch (caught) {
       setUploadError(errorMessage(caught));
     } finally {
@@ -196,10 +256,9 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
   }
 
   return (
-    <Card title="KTP & rekening bank" description="Dibutuhkan untuk penggajian. Disimpan terenkripsi; hanya admin yang bisa melihat nomor lengkapnya.">
+    <Card id="identitas" title="KTP & rekening bank" description="Dibutuhkan untuk penggajian. Disimpan terenkripsi; hanya admin yang bisa melihat nomor lengkapnya.">
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
-        {saved && <FormAlert tone="success">{saved}</FormAlert>}
 
         <DigitsField
           label="Nomor KTP (NIK)"
@@ -208,36 +267,52 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
           placeholder={current?.ktp_number_masked ?? "16 digit"}
           error={errors.ktp_number}
         />
-        <TextField label="Bank" name="bank_name" placeholder={current?.bank_name ?? "mis. BCA"} error={errors.bank_name} />
-        <DigitsField
-          label="Nomor rekening"
-          name="bank_account"
-          maxLength={20}
-          placeholder={current?.bank_account_masked ?? "Hanya angka"}
-          error={errors.bank_account}
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField label="Bank" name="bank_name" placeholder={current?.bank_name ?? "mis. BCA"} error={errors.bank_name} />
+          <DigitsField
+            label="Nomor rekening"
+            name="bank_account"
+            maxLength={20}
+            placeholder={current?.bank_account_masked ?? "Hanya angka"}
+            error={errors.bank_account}
+          />
+        </div>
         <TextField
           label="Nama pemilik rekening"
           name="account_holder_name"
           placeholder={current?.account_holder_name ?? "Sesuai yang tertera di rekening"}
+          hint="Kosongkan kolom yang tidak ingin diubah."
           error={errors.account_holder_name}
         />
-        <p className="text-xs text-muted">Kosongkan kolom kalau tidak ingin mengubah data yang tersimpan.</p>
 
-        <SubmitButton loading={loading}>Simpan</SubmitButton>
+        <div className="flex justify-end">
+          <SubmitButton loading={loading} size="default" className="sm:w-auto">
+            Simpan
+          </SubmitButton>
+        </div>
       </form>
 
-      <div className="border-t border-stroke pt-4 space-y-2">
-        <p className="text-sm text-body">
-          Foto KTP:{" "}
-          {current?.has_ktp_image ? <span className="text-success">sudah diunggah ✓</span> : <span className="text-muted">belum diunggah</span>}
-        </p>
-        <label className="inline-block px-4 py-2 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2 cursor-pointer">
-          {uploading ? "Mengunggah…" : current?.has_ktp_image ? "Ganti foto KTP" : "Unggah foto KTP"}
-          <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => uploadKtp(event.target.files?.[0])} />
-        </label>
-        {uploadError && <FormAlert tone="error">{uploadError}</FormAlert>}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground">Foto KTP</p>
+          {current?.has_ktp_image ? (
+            <p className="flex items-center gap-1 text-xs text-success">
+              <CircleCheck className="size-3.5" aria-hidden="true" />
+              Sudah diunggah
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Belum diunggah</p>
+          )}
+        </div>
+        <Button asChild variant="outline" className={cn("cursor-pointer", uploading && "pointer-events-none opacity-60")}>
+          <label>
+            <Upload aria-hidden="true" />
+            {uploading ? "Mengunggah…" : current?.has_ktp_image ? "Ganti foto" : "Unggah foto"}
+            <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => uploadKtp(event.target.files?.[0])} />
+          </label>
+        </Button>
       </div>
+      {uploadError && <FormAlert tone="error">{uploadError}</FormAlert>}
     </Card>
   );
 }

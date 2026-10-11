@@ -53,7 +53,15 @@ const links: SidebarGroup[] = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarLayout panel="Panel Admin" roles={["admin"]} links={links}>
+    <SidebarLayout
+      panel="Panel Admin"
+      roles={["admin"]}
+      links={links}
+      homeHref="/admin/dashboard"
+      accountLinks={[{ href: "/admin/security", label: "Keamanan akun", icon: "security" }]}
+      search
+      hostSearchPath="/admin/hosts?host="
+    >
       {children}
     </SidebarLayout>
   );

@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+import { Dialog as DialogPrimitive } from "radix-ui";
+import { TriangleAlert, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+export type DialogSize = "sm" | "md" | "lg" | "xl";
 
 interface DialogProps {
   title: ReactNode;
@@ -9,99 +14,119 @@ interface DialogProps {
   onClose: () => void;
   /** Unsaved entries: closing with Esc, a click outside or × asks first. */
   dirty?: boolean;
-  /** Buttons along the bottom. */
+  /** Buttons along the bottom; they stay in view while the body scrolls. */
   footer?: ReactNode;
-  size?: "md" | "lg";
+  size?: DialogSize;
+  /** A click outside closes it (default). Off for long forms, so a stray click doesn't lose them. */
+  closeOnOutsideClick?: boolean;
+  /** `side`: a full-height panel from the right on `sm` up (detail views next to a list). */
+  placement?: "center" | "side";
   children: ReactNode;
 }
 
+const widths: Record<DialogSize, string> = {
+  sm: "sm:max-w-md",
+  md: "sm:max-w-lg",
+  lg: "sm:max-w-2xl",
+  xl: "sm:max-w-4xl",
+};
+
+const placements = {
+  // A centered panel that fades and scales in
+  center:
+    "sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[calc(100dvh-4rem)] sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:pb-0 sm:duration-150 sm:data-open:fade-in-0 sm:data-open:slide-in-from-bottom-0 sm:data-open:zoom-in-95",
+  // A full-height panel sliding in from the right
+  side: "h-[92dvh] sm:inset-y-0 sm:right-0 sm:left-auto sm:h-dvh sm:max-h-none sm:w-full sm:rounded-none sm:rounded-l-xl sm:pb-0 sm:duration-200 sm:data-open:slide-in-from-bottom-0 sm:data-open:slide-in-from-right",
+};
+
 /**
- * A modal over the page, so the page behind keeps its place. Render it to open it.
- * Closes with Esc or a click outside.
+ * A modal over the page, so the page behind keeps its place. Render it to open it; the parent
+ * unmounts it to close. A bottom sheet on phones, a centered panel from `sm` up.
  */
-export default function Dialog({ title, description, onClose, dirty = false, footer, size = "md", children }: DialogProps) {
+export default function Dialog({
+  title,
+  description,
+  onClose,
+  dirty = false,
+  footer,
+  size = "md",
+  closeOnOutsideClick = true,
+  placement = "center",
+  children,
+}: DialogProps) {
   const [confirming, setConfirming] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
-  const titleId = useId();
 
   const requestClose = useCallback(() => (dirty ? setConfirming(true) : onClose()), [dirty, onClose]);
 
-  // While open: the page behind doesn't scroll; focus comes back to where it was afterwards
-  useEffect(() => {
-    const previousFocus = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
+  return (
+    <DialogPrimitive.Root open onOpenChange={(open) => !open && requestClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 duration-150 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 dark:bg-black/60" />
+        <DialogPrimitive.Content
+          ref={panelRef}
+          // Without a description, say so explicitly (Radix warns otherwise)
+          {...(!description && { "aria-describedby": undefined })}
+          onOpenAutoFocus={(event) => {
+            // Keep an `autoFocus` field's focus; otherwise focus the panel, not the × button
+            event.preventDefault();
+            const panel = panelRef.current;
+            if (panel && !panel.contains(document.activeElement)) panel.focus();
+          }}
+          onEscapeKeyDown={(event) => {
+            event.preventDefault();
+            requestClose();
+          }}
+          onInteractOutside={(event) => {
+            event.preventDefault();
+            if (closeOnOutsideClick) requestClose();
+          }}
+          className={cn(
+            "fixed z-50 flex flex-col bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/10 outline-none",
+            // Phones: a sheet rising from the bottom
+            "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)] duration-300 ease-out data-open:animate-in data-open:slide-in-from-bottom",
+            placements[placement],
+            widths[size]
+          )}
+        >
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" aria-hidden="true" />
 
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      previousFocus?.focus();
-    };
-  }, []);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        requestClose();
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [requestClose]);
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-[2px] sm:p-4"
-      onMouseDown={(event) => event.target === event.currentTarget && requestClose()}
-    >
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className={`w-full ${size === "lg" ? "sm:max-w-2xl" : "sm:max-w-lg"} max-h-[92vh] flex flex-col bg-surface border border-stroke rounded-t-2xl sm:rounded-[10px] shadow-2xl outline-none`}
-      >
-        <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-lg font-semibold text-heading">
-              {title}
-            </h2>
-            {description && <div className="mt-0.5 text-sm text-muted">{description}</div>}
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-border px-5 py-4 sm:px-6">
+            <div className="min-w-0">
+              <DialogPrimitive.Title className="text-base font-semibold tracking-tight text-foreground">{title}</DialogPrimitive.Title>
+              {description && (
+                <DialogPrimitive.Description asChild>
+                  <div className="mt-1 text-sm text-muted-foreground">{description}</div>
+                </DialogPrimitive.Description>
+              )}
+            </div>
+            <Button type="button" variant="ghost" size="icon-sm" onClick={requestClose} aria-label="Tutup" className="-mt-1 -mr-2 shrink-0 text-muted-foreground">
+              <X />
+            </Button>
           </div>
-          <button
-            type="button"
-            onClick={() => requestClose()}
-            aria-label="Tutup"
-            className="-mr-1 w-8 h-8 shrink-0 rounded-lg text-muted hover:bg-surface-2 hover:text-heading"
-          >
-            ✕
-          </button>
-        </div>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">{children}</div>
 
-        {confirming ? (
-          <div className="flex flex-wrap items-center gap-3 border-t border-yellow-400/30 bg-yellow-500/10 px-5 py-4 rounded-b-[10px]">
-            <p className="flex-1 min-w-48 text-sm text-warning">Ada isian yang belum disimpan. Tutup dan buang perubahan?</p>
-            <button
-              type="button"
-              autoFocus
-              onClick={() => setConfirming(false)}
-              className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2"
-            >
-              Lanjut mengisi
-            </button>
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm bg-yellow-500/20 text-warning hover:bg-yellow-500/30">
-              Buang perubahan
-            </button>
-          </div>
-        ) : (
-          footer && <div className="flex flex-wrap items-center gap-2 border-t border-stroke px-5 py-4">{footer}</div>
-        )}
-      </div>
-    </div>,
-    document.body
+          {confirming ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-warning/30 bg-warning/10 px-5 py-3.5 sm:rounded-b-xl sm:px-6">
+              <TriangleAlert className="size-4 shrink-0 text-warning" aria-hidden="true" />
+              <p className="min-w-48 flex-1 text-sm text-warning">Ada isian yang belum disimpan. Tutup dan buang perubahan?</p>
+              <Button type="button" variant="ghost" autoFocus onClick={() => setConfirming(false)}>
+                Lanjut mengisi
+              </Button>
+              <Button type="button" variant="destructive" onClick={onClose}>
+                Buang perubahan
+              </Button>
+            </div>
+          ) : (
+            footer && (
+              <div className={cn("flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-muted/40 px-5 py-3.5 sm:px-6", placement === "center" && "sm:rounded-b-xl")}>
+                {footer}
+              </div>
+            )
+          )}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

@@ -12,5 +12,5 @@ export default function AdminHostRedirect() {
     router.replace(`/admin/hosts?host=${id}`);
   }, [id, router]);
 
-  return <p className="text-muted">Membuka host…</p>;
+  return <p className="text-sm text-muted-foreground">Membuka host…</p>;
 }

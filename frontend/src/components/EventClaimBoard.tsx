@@ -1,14 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CalendarDays, Check, Clock, PartyPopper, Timer } from "lucide-react";
 import { errorMessage, eventApi, type EventBlock, type HostEvent } from "@/lib/api";
 import { groupByDay } from "@/lib/events";
 import { formatDate, toDateInput } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { useAuth } from "./AuthProvider";
 import Dialog from "./Dialog";
-import FormAlert from "./FormAlert";
-import Toast, { useToast } from "./Toast";
+import EmptyState from "./EmptyState";
+import ErrorState from "./ErrorState";
+import { CardsSkeleton } from "./Loading";
+import StatusBadge, { type Tone } from "./StatusBadge";
+import { useToast } from "./Toast";
 
 /** How often the board refreshes while open: others may be grabbing blocks too. */
 export const BOARD_REFRESH_MS = 15_000;
@@ -68,7 +75,7 @@ type HostEventsState = ReturnType<typeof useHostEvents>;
  */
 export default function EventClaimBoard({ events }: { events: HostEventsState }) {
   const { token } = useAuth();
-  const { toast, show, dismiss } = useToast();
+  const { show } = useToast();
   const [pending, setPending] = useState<string | null>(null);
   const [releasing, setReleasing] = useState<{ event: HostEvent; block: EventBlock } | null>(null);
   const list = events.data?.events ?? [];
@@ -112,34 +119,21 @@ export default function EventClaimBoard({ events }: { events: HostEventsState })
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-muted">
-          Siapa cepat dia dapat. Ambil blok live event dari brand kamu; tiap event punya batas blok per host.
-        </p>
-        <button
-          type="button"
-          onClick={events.reload}
-          disabled={events.loading}
-          className="shrink-0 px-3 py-1.5 rounded-lg border border-stroke-strong text-xs text-body hover:bg-surface-2 disabled:opacity-60"
-        >
-          {events.loading ? "Memuat…" : "↻ Segarkan"}
-        </button>
-      </div>
-
-      {events.error && <FormAlert tone="error">{events.error}</FormAlert>}
+    <div className="space-y-6">
+      {events.error && <ErrorState message={events.error} onRetry={events.reload} />}
+      {!events.data && !events.error && <CardsSkeleton count={2} />}
 
       {events.data && list.length === 0 && (
-        <div className="rounded-xl border border-dashed border-stroke-strong px-4 py-10 text-center">
-          <p className="text-3xl" aria-hidden="true">
-            🎪
-          </p>
-          <p className="mt-2 text-heading font-medium">Belum ada event untuk brand kamu</p>
-          <p className="mt-1 text-sm text-muted">
-            {events.data.my_brands.length === 0
-              ? "Kamu belum ditugaskan ke brand mana pun, jadi belum ada event yang bisa diambil. Minta Admin menambahkan kamu ke brand."
-              : `Event hanya muncul untuk host di brand event itu. Brand kamu: ${events.data.my_brands.join(", ")}. Kamu akan dapat notifikasi begitu event baru dibuka.`}
-          </p>
+        <div className="rounded-xl border border-dashed border-input bg-card/50">
+          <EmptyState
+            icon={PartyPopper}
+            title="Belum ada event untuk brand kamu"
+            description={
+              events.data.my_brands.length === 0
+                ? "Kamu belum ditugaskan ke brand mana pun, jadi belum ada event yang bisa diambil. Minta admin menambahkan kamu ke brand."
+                : `Event hanya muncul untuk host di brand event itu. Brand kamu: ${events.data.my_brands.join(", ")}. Kamu akan dapat notifikasi begitu event baru dibuka.`
+            }
+          />
         </div>
       )}
 
@@ -158,28 +152,26 @@ export default function EventClaimBoard({ events }: { events: HostEventsState })
       {releasing && (
         <Dialog
           title="Lepas blok ini?"
+          size="sm"
           onClose={() => setReleasing(null)}
           footer={
             <>
-              <button type="button" onClick={() => setReleasing(null)} className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2">
+              <Button type="button" variant="outline" onClick={() => setReleasing(null)}>
                 Batal
-              </button>
-              <span className="flex-1" />
-              <button type="button" onClick={release} className="px-5 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-500">
+              </Button>
+              <Button type="button" variant="destructive" onClick={release}>
                 Lepas blok
-              </button>
+              </Button>
             </>
           }
         >
-          <p className="text-heading">
+          <p className="font-medium text-foreground">
             {releasing.event.name}, {shortDay(toDateInput(new Date(releasing.block.start_at)))} {clock(releasing.block.start_at)}–
-            {clock(releasing.block.end_at)}.
+            {clock(releasing.block.end_at)}
           </p>
-          <p className="mt-2 text-sm text-muted">Host lain bisa langsung mengambilnya, dan belum tentu bisa kamu ambil lagi.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Host lain bisa langsung mengambilnya, dan belum tentu bisa kamu ambil lagi.</p>
         </Dialog>
       )}
-
-      <Toast toast={toast} onDismiss={dismiss} />
     </div>
   );
 }
@@ -207,85 +199,89 @@ function EventPanel({
     days.find(([, blocks]) => blocks.some((block) => block.state !== "past"))?.[0] ??
     days[0]?.[0];
   const blocks = days.find(([date]) => date === day)?.[1] ?? [];
+  const share = Math.min(100, (event.my_claims / Math.max(1, event.max_slots_per_host)) * 100);
 
   return (
-    <section className="rounded-[10px] border border-stroke bg-surface shadow-card overflow-hidden">
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
       {/* What the event is */}
-      <div className="p-4 space-y-3 border-b border-stroke">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+      <div className="space-y-4 border-b border-border p-5 md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-heading font-semibold truncate">{event.name}</h2>
-              <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-body">{event.brand?.name}</span>
-              {event.open_full_schedule && (
-                <span className="rounded-md bg-yellow-400/15 px-2 py-0.5 text-[11px] text-warning">Menggantikan jadwal reguler</span>
-              )}
+              <h2 className="truncate text-base font-semibold text-foreground">{event.name}</h2>
+              <StatusBadge tone="neutral">{event.brand?.name}</StatusBadge>
+              {event.open_full_schedule && <StatusBadge tone="warning">Menggantikan jadwal reguler</StatusBadge>}
             </div>
-            <dl className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-              <div>
-                <dt className="sr-only">Tanggal</dt>
+            <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <dt>
+                  <CalendarDays className="size-3.5" aria-hidden="true" />
+                  <span className="sr-only">Tanggal</span>
+                </dt>
                 <dd>
-                  📅 {formatDate(event.start_date)}
+                  {formatDate(event.start_date)}
                   {event.end_date !== event.start_date ? ` – ${formatDate(event.end_date)}` : ""}
                 </dd>
               </div>
-              <div>
-                <dt className="sr-only">Jam</dt>
-                <dd>
-                  🕒 {event.daily_start_time}–{event.daily_end_time}
+              <div className="flex items-center gap-1.5">
+                <dt>
+                  <Clock className="size-3.5" aria-hidden="true" />
+                  <span className="sr-only">Jam</span>
+                </dt>
+                <dd className="tabular-nums">
+                  {event.daily_start_time}–{event.daily_end_time}
                 </dd>
               </div>
-              <div>
-                <dt className="sr-only">Panjang blok</dt>
-                <dd>⏱ Blok {blockLength(event.block_minutes)}</dd>
+              <div className="flex items-center gap-1.5">
+                <dt>
+                  <Timer className="size-3.5" aria-hidden="true" />
+                  <span className="sr-only">Panjang blok</span>
+                </dt>
+                <dd>Blok {blockLength(event.block_minutes)}</dd>
               </div>
             </dl>
           </div>
-          <span
-            className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-medium ${free > 0 ? "bg-primary/15 text-accent" : "bg-surface-2 text-muted"}`}
-          >
+          <StatusBadge tone={free > 0 ? "brand" : "neutral"} className="h-7 px-2.5">
             {free > 0 ? `${free} blok tersisa` : "Semua terisi"}
-          </span>
+          </StatusBadge>
         </div>
 
         {/* My share of this event */}
         <div className="space-y-1.5">
-          <div className="flex justify-between text-xs">
+          <div className="flex justify-between gap-3 text-xs">
             <span className="text-body">
-              Blokmu: <span className="font-medium text-heading">{event.my_claims}</span> dari {event.max_slots_per_host}
+              Blokmu <span className="font-semibold text-foreground tabular-nums">{event.my_claims}</span> dari {event.max_slots_per_host}
             </span>
-            <span className="text-faint">
+            <span className="text-muted-foreground tabular-nums">
               {taken}/{event.blocks.length} blok sudah diambil
             </span>
           </div>
-          <div className="h-1.5 rounded-full bg-surface-2 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${full ? "bg-green-400" : "bg-primary"}`}
-              style={{ width: `${Math.min(100, (event.my_claims / Math.max(1, event.max_slots_per_host)) * 100)}%` }}
-            />
-          </div>
+          <Progress value={share} aria-label="Kuota blokmu" className="h-1.5" indicatorClassName={full ? "bg-success" : undefined} />
           {full && <p className="text-xs text-success">Kuota kamu penuh. Lepas satu blok kalau ingin mengambil yang lain.</p>}
         </div>
 
         {days.length > 1 && (
-          <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Hari event">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" role="tablist" aria-label="Hari event">
             {days.map(([date, dayBlocks]) => {
               const open = dayBlocks.filter((block) => block.state === "free").length;
               const mine = dayBlocks.some((block) => block.state === "mine");
+              const selected = date === day;
               return (
                 <button
                   key={date}
                   type="button"
                   role="tab"
-                  aria-selected={date === day}
+                  aria-selected={selected}
                   onClick={() => setChosenDay(date)}
-                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-left ${
-                    date === day ? "bg-primary border-primary text-white" : "border-stroke-strong text-body hover:bg-surface-2"
-                  }`}
+                  className={cn(
+                    "shrink-0 rounded-lg border px-3 py-2 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    selected ? "border-primary bg-primary/10" : "border-border hover:bg-muted"
+                  )}
                 >
-                  <span className="block text-xs font-medium">{shortDay(date)}</span>
-                  <span className={`block text-[11px] ${date === day ? "text-accent" : open > 0 ? "text-accent" : "text-faint"}`}>
-                    {mine ? "✓ ada blokmu" : open > 0 ? `${open} kosong` : "penuh"}
+                  <span className={cn("block text-xs font-semibold", selected ? "text-brand" : "text-foreground")}>{shortDay(date)}</span>
+                  <span className={cn("flex items-center gap-1 text-[11px]", mine ? "text-success" : open > 0 ? "text-brand" : "text-faint")}>
+                    {mine && <Check className="size-3" aria-hidden="true" />}
+                    {mine ? "ada blokmu" : open > 0 ? `${open} kosong` : "penuh"}
                   </span>
                 </button>
               );
@@ -295,53 +291,34 @@ function EventPanel({
       </div>
 
       {/* The blocks of the chosen day */}
-      <table className="w-full table-fixed text-sm">
-        <caption className="sr-only">Blok {day ? shortDay(day) : ""}</caption>
-        <thead>
-          <tr className="bg-surface-2 text-left text-[11px] uppercase tracking-wide text-faint">
-            <th scope="col" className="w-32 sm:w-40 px-4 py-2 font-medium">
-              Jam
-            </th>
-            <th scope="col" className="hidden sm:table-cell w-28 px-2 py-2 font-medium">
-              Durasi
-            </th>
-            <th scope="col" className="px-2 py-2 font-medium">
-              Status
-            </th>
-            <th scope="col" className="w-28 sm:w-32 px-4 py-2 font-medium text-right">
-              Aksi
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-stroke">
-          {blocks.map((block) => (
-            <BlockRow
-              key={block.start_at}
-              block={block}
-              minutes={event.block_minutes}
-              full={full}
-              pending={pending === block.start_at}
-              busy={pending !== null}
-              onClaim={() => onClaim(block)}
-              onRelease={() => onRelease(block)}
-            />
-          ))}
-        </tbody>
-      </table>
+      <ul className="grid gap-2 p-4 sm:grid-cols-2 md:p-5 xl:grid-cols-3 2xl:grid-cols-4" aria-label={`Blok ${day ? shortDay(day) : ""}`}>
+        {blocks.map((block) => (
+          <BlockTile
+            key={block.start_at}
+            block={block}
+            minutes={event.block_minutes}
+            full={full}
+            pending={pending === block.start_at}
+            busy={pending !== null}
+            onClaim={() => onClaim(block)}
+            onRelease={() => onRelease(block)}
+          />
+        ))}
+      </ul>
     </section>
   );
 }
 
-const statusStyles: Record<EventBlock["state"], string> = {
-  free: "bg-primary/15 text-accent",
-  mine: "bg-green-500/15 text-success",
-  taken: "bg-surface-2 text-body",
-  busy: "bg-amber-500/10 text-warning",
-  unavailable: "bg-surface-2 text-muted",
-  past: "bg-surface-2 text-faint",
+const stateTones: Record<EventBlock["state"], Tone> = {
+  free: "brand",
+  mine: "success",
+  taken: "neutral",
+  busy: "warning",
+  unavailable: "neutral",
+  past: "neutral",
 };
 
-function BlockRow({
+function BlockTile({
   block,
   minutes,
   full,
@@ -360,7 +337,7 @@ function BlockRow({
 }) {
   const status: Record<EventBlock["state"], string> = {
     free: "Kosong",
-    mine: "✓ Punyamu",
+    mine: "Punyamu",
     taken: `Diambil ${block.claim?.host_name ?? "host lain"}`,
     busy: "Bentrok dengan jadwalmu",
     unavailable: "Ada jadwal reguler",
@@ -369,42 +346,40 @@ function BlockRow({
   const canRelease = block.state === "mine" && Boolean(block.claim) && new Date(block.start_at) > new Date();
 
   return (
-    <tr className={`${block.state === "mine" ? "bg-green-500/5" : ""} ${block.state === "past" ? "opacity-50" : ""}`}>
-      <td className="px-4 py-2.5 whitespace-nowrap font-medium tabular-nums text-heading">
-        {clock(block.start_at)}–{clock(block.end_at)}
-      </td>
-      <td className="hidden sm:table-cell px-2 py-2.5 whitespace-nowrap text-muted">{blockLength(minutes)}</td>
-      <td className="px-2 py-2.5">
-        <span
-          title={block.reason ?? undefined}
-          className={`inline-block max-w-full truncate rounded-md px-2 py-0.5 text-xs align-middle ${statusStyles[block.state]}`}
+    <li
+      className={cn(
+        "flex items-center gap-3 rounded-lg border px-3.5 py-3 transition-colors",
+        block.state === "free" ? "border-primary/30 bg-primary/[0.03]" : block.state === "mine" ? "border-success/40 bg-success/[0.06]" : "border-border",
+        block.state === "past" && "opacity-55"
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-foreground tabular-nums">
+          {clock(block.start_at)}–{clock(block.end_at)}
+          <span className="ml-1.5 text-xs font-normal text-muted-foreground">{blockLength(minutes)}</span>
+        </p>
+        <StatusBadge tone={stateTones[block.state]} title={block.reason ?? undefined} className="mt-1 h-5 max-w-full px-1.5 text-[11px]">
+          {block.state === "mine" && <Check className="size-3" aria-hidden="true" />}
+          <span className="truncate">{status[block.state]}</span>
+        </StatusBadge>
+      </div>
+      {block.state === "free" && (
+        <Button
+          type="button"
+          size="sm"
+          onClick={onClaim}
+          disabled={full || busy}
+          title={full ? "Kuota kamu untuk event ini sudah penuh" : undefined}
+          className="min-w-20 active:scale-[0.97]"
         >
-          {status[block.state]}
-        </span>
-      </td>
-      <td className="px-4 py-2.5 text-right whitespace-nowrap">
-        {block.state === "free" && (
-          <button
-            type="button"
-            onClick={onClaim}
-            disabled={full || busy}
-            title={full ? "Kuota kamu untuk event ini sudah penuh" : undefined}
-            className="min-w-20 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-hover active:scale-[0.97] transition disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {pending ? "Mengambil…" : "Ambil"}
-          </button>
-        )}
-        {canRelease && (
-          <button
-            type="button"
-            onClick={onRelease}
-            className="min-w-20 rounded-lg border border-red-400/40 px-3 py-1.5 text-xs font-medium text-danger hover:bg-red-500/10"
-          >
-            Lepas
-          </button>
-        )}
-        {block.state !== "free" && !canRelease && <span className="text-faint">—</span>}
-      </td>
-    </tr>
+          {pending ? "Mengambil…" : "Ambil"}
+        </Button>
+      )}
+      {canRelease && (
+        <Button type="button" size="sm" variant="outline" onClick={onRelease} className="min-w-20 text-destructive hover:text-destructive">
+          Lepas
+        </Button>
+      )}
+    </li>
   );
 }

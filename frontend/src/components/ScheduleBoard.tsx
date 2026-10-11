@@ -1,27 +1,46 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
+import { ArrowLeftRight, CalendarDays, ChevronLeft, ChevronRight, Clock, Lock, Plus, Ticket } from "lucide-react";
 import { errorMessage, operatorApi, scheduleApi, type ReplacingEvent, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
 import { DAYS, formatShortDate, isoWeekday, previousDay, toDateInput } from "@/lib/format";
-import { addDays, dayLong, formatLongDate, formatWeekRange, inEffectOn, weekStart } from "@/lib/schedule";
+import { addDays, addMonths, dayLong, formatLongDate, formatMonth, formatWeekRange, inEffectOn, monthGrid, monthStart, weekStart } from "@/lib/schedule";
 import { useApiData } from "@/lib/useApiData";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "./AuthProvider";
 import BackupDialog from "./BackupDialog";
 import FormAlert from "./FormAlert";
+import ScheduleMonth from "./ScheduleMonth";
 import SearchableSelect from "./SearchableSelect";
 import SlotDetailDialog from "./SlotDetailDialog";
 import SlotDialog from "./SlotDialog";
 import StopSlotDialog from "./StopSlotDialog";
-import Toast, { useToast, type ToastMessage } from "./Toast";
+import { useToast, type ToastMessage } from "./Toast";
+import ToggleGroup from "./ToggleGroup";
 
 type OpenDialog =
   | { kind: "detail"; slot: ScheduleSlot; date: string }
-  | { kind: "slot"; slot?: ScheduleSlot; day?: number }
+  | { kind: "slot"; slot?: ScheduleSlot; day?: number; week?: string }
   | { kind: "backup"; slot: ScheduleSlot; date: string }
-  | { kind: "stop"; slot: ScheduleSlot }
+  | { kind: "stop"; slot: ScheduleSlot; week?: string }
   | null;
 
+type View = "month" | "week";
+
 const BRAND_KEY = "vidhelp.schedule.brand";
+const VIEW_KEY = "vidhelp.schedule.view";
+
+/** The view picked last time on this device; the month by default. */
+function rememberedView(): View {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "week" ? "week" : "month";
+  } catch {
+    return "month";
+  }
+}
 
 /** The brand opened last time, if it's still one of `ids`. */
 function rememberedBrand(ids: string[]): string | undefined {
@@ -42,18 +61,20 @@ function rememberBrand(id: string) {
 }
 
 /**
- * One brand's week, Monday to Sunday. Every change happens in a dialog over the board:
- * click a slot to see it first, "+" to add one. Operators and admins use it; only
- * admins can lock (`isAdmin`).
+ * One brand's schedule as a month calendar (default) or a week board, Monday to Sunday.
+ * Every change happens in a dialog over the board: open a slot to see it first, "+" to
+ * add one. Operators and admins use it; only admins can lock (`isAdmin`).
  */
 export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }) {
   const { token } = useAuth();
   const today = toDateInput();
   const [chosenBrandId, setChosenBrandId] = useState("");
+  const [view, setView] = useState<View>(rememberedView);
   const [week, setWeek] = useState(() => weekStart());
+  const [month, setMonth] = useState(() => monthStart());
   const [mobileDay, setMobileDay] = useState(() => isoWeekday());
   const [dialog, setDialog] = useState<OpenDialog>(null);
-  const { toast, show, dismiss } = useToast();
+  const { show } = useToast();
   const pickerRef = useRef<HTMLInputElement>(null);
   const swipeFrom = useRef<number | null>(null);
 
@@ -62,9 +83,12 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
   const brandId =
     chosenBrandId || (activeBrands.length > 0 ? rememberedBrand(activeBrands.map((brand) => brand.id)) ?? activeBrands[0].id : "");
 
-  const board = useApiData(`${brandId}|${week}`, () =>
+  // The week board loads 7 days; the month calendar every day its grid shows (5 or 6 weeks)
+  const grid = monthGrid(month);
+  const range = view === "week" ? { on: week, days: 7 } : { on: grid.start, days: grid.days };
+  const board = useApiData(`${brandId}|${range.on}|${range.days}`, () =>
     brandId
-      ? scheduleApi.list(token, { brand_id: brandId, on: week, days: 7 })
+      ? scheduleApi.list(token, { brand_id: brandId, ...range })
       : Promise.resolve({ slots: [], backups: [], replacing_events: [] })
   );
   const hosts = useApiData(brandId, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
@@ -95,6 +119,20 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
     setWeek(start);
     setMobileDay(start === weekStart() ? isoWeekday() : 1);
   }
+
+  function switchView(next: View) {
+    setView(next);
+    // Keep looking at the same time: the week of the month's first day (or today), or that week's month
+    if (next === "week") goToWeek(monthStart() === month ? weekStart() : weekStart(month));
+    else setMonth(monthStart(week));
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Private mode: the view just isn't remembered
+    }
+  }
+
+  const isThisMonth = month === monthStart();
 
   /** After a save: back to the board, refreshed, with a note that can take it back. */
   function saved(message: ToastMessage) {
@@ -137,7 +175,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
 
   if (brands.error) return <FormAlert tone="error">{brands.error}</FormAlert>;
   if (brands.data && activeBrands.length === 0) {
-    return <FormAlert tone="warning">Belum ada brand yang aktif. Admin dapat membuatnya di halaman Brands.</FormAlert>;
+    return <FormAlert tone="warning">Belum ada brand yang aktif. Admin dapat membuatnya di halaman Brand.</FormAlert>;
   }
 
   return (
@@ -156,178 +194,233 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           />
         </div>
 
-        <div className="flex items-center gap-1 rounded-lg border border-stroke bg-surface p-1">
-          <IconButton label="Minggu sebelumnya" onClick={() => goToWeek(addDays(week, -7))}>
-            ‹
+        <ToggleGroup
+          label="Tampilan jadwal"
+          options={[
+            ["month", "Bulan"],
+            ["week", "Minggu"],
+          ] as const}
+          value={view}
+          onChange={switchView}
+        />
+
+        <div className="flex items-center gap-0.5 rounded-lg border border-input bg-card p-0.5 shadow-xs">
+          <IconButton
+            label={view === "week" ? "Minggu sebelumnya" : "Bulan sebelumnya"}
+            onClick={() => (view === "week" ? goToWeek(addDays(week, -7)) : setMonth(addMonths(month, -1)))}
+          >
+            <ChevronLeft />
           </IconButton>
-          <span className="px-2 min-w-44 text-center text-sm font-medium text-heading tabular-nums">{formatWeekRange(week)}</span>
-          <IconButton label="Minggu berikutnya" onClick={() => goToWeek(addDays(week, 7))}>
-            ›
+          <span className="min-w-36 px-2 text-center text-sm font-medium text-foreground tabular-nums capitalize sm:min-w-44">
+            {view === "week" ? formatWeekRange(week) : formatMonth(month)}
+          </span>
+          <IconButton
+            label={view === "week" ? "Minggu berikutnya" : "Bulan berikutnya"}
+            onClick={() => (view === "week" ? goToWeek(addDays(week, 7)) : setMonth(addMonths(month, 1)))}
+          >
+            <ChevronRight />
           </IconButton>
           <span className="relative">
             <IconButton label="Pilih tanggal di kalender" onClick={() => openPicker(pickerRef.current)}>
-              <CalendarIcon />
+              <CalendarDays />
             </IconButton>
             <input
               ref={pickerRef}
               type="date"
               tabIndex={-1}
               aria-hidden="true"
-              value={week}
-              onChange={(event) => event.target.value && goToWeek(weekStart(event.target.value))}
-              className="absolute inset-0 opacity-0 pointer-events-none [color-scheme:dark]"
+              value={view === "week" ? week : month}
+              onChange={(event) => {
+                if (!event.target.value) return;
+                if (view === "week") goToWeek(weekStart(event.target.value));
+                else setMonth(monthStart(event.target.value));
+              }}
+              className="pointer-events-none absolute inset-0 opacity-0"
             />
           </span>
         </div>
 
-        {!isThisWeek && (
-          <button
+        {(view === "week" ? !isThisWeek : !isThisMonth) && (
+          <Button
             type="button"
-            onClick={() => goToWeek(weekStart())}
-            className="px-3 py-2 rounded-lg text-sm text-accent border border-primary/40 hover:bg-primary/10"
+            variant="outline"
+            onClick={() => (view === "week" ? goToWeek(weekStart()) : setMonth(monthStart()))}
+            className="text-brand"
           >
-            Minggu ini
-          </button>
+            {view === "week" ? "Minggu ini" : "Bulan ini"}
+          </Button>
         )}
 
-        <button
-          type="button"
-          onClick={() => setDialog({ kind: "slot", day: mobileDay })}
-          disabled={!brandId}
-          className="ml-auto px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover disabled:opacity-50"
-        >
-          + Tambah slot
-        </button>
+        <Button type="button" onClick={() => setDialog({ kind: "slot", day: mobileDay })} disabled={!brandId} className="ml-auto">
+          <Plus aria-hidden="true" />
+          Tambah slot
+        </Button>
       </div>
-
-      {/* What needs attention this week */}
-      <p className="text-sm text-muted">
-        <span className="text-body">{isThisWeek ? "Minggu ini" : "Minggu tersebut"}:</span> {sessions} slot
-        {uncovered > 0 && <span className="text-warning"> · {uncovered} belum ada host pengganti</span>}
-        {events.length > 0 && <span className="text-warning"> · {events.length} event</span>}
-        {board.loading && <span className="text-faint"> · memuat…</span>}
-      </p>
 
       {board.error && <FormAlert tone="error">{board.error}</FormAlert>}
 
-      {/* Phones: one day at a time, tabs on top (swipe to move) */}
-      <div className="lg:hidden grid grid-cols-7 gap-1" role="tablist" aria-label="Hari">
-        {days.map((day) => (
-          <button
-            key={day.value}
-            type="button"
-            role="tab"
-            aria-selected={mobileDay === day.value}
-            onClick={() => setMobileDay(day.value)}
-            className={`rounded-lg px-0.5 py-1.5 text-center border ${
-              mobileDay === day.value
-                ? "bg-primary border-primary text-white"
-                : day.date === today
-                  ? "border-primary/60 text-accent"
-                  : "border-stroke text-body"
-            }`}
-          >
-            <span className="block text-xs">{day.short}</span>
-            <span className="block text-sm font-medium tabular-nums">{Number(day.date.slice(8))}</span>
-            <span
-              aria-hidden="true"
-              className={`mx-auto mt-0.5 block w-1 h-1 rounded-full ${day.event ? "bg-yellow-300" : day.slots.length > 0 ? "bg-current" : "bg-transparent"}`}
-            />
-          </button>
-        ))}
-      </div>
+      {view === "month" && (!brandId || (board.loading && slots.length === 0)) ? (
+        // Nothing to count yet: no zeros that read like an empty month
+        <div className="space-y-4" aria-busy="true" aria-label="Memuat jadwal">
+          <Skeleton className="h-[74px] rounded-xl" />
+          <Skeleton className="h-[34rem] rounded-xl" />
+        </div>
+      ) : view === "month" ? (
+        <ScheduleMonth
+          key={month}
+          month={month}
+          gridStart={grid.start}
+          gridDays={grid.days}
+          today={today}
+          slots={slots}
+          backups={backups}
+          events={events}
+          hosts={hosts.data?.assignments ?? []}
+          loading={board.loading}
+          onOpenSlot={(slot, date) => setDialog({ kind: "detail", slot, date })}
+          onAddSlot={(day, date) => setDialog({ kind: "slot", day, week: weekStart(date) })}
+        />
+      ) : (
+        <>
+          {/* What needs attention this week */}
+          <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{isThisWeek ? "Minggu ini" : "Minggu tersebut"}:</span>
+            <span className="tabular-nums">{sessions} slot</span>
+            {uncovered > 0 && <span className="font-medium text-warning">· {uncovered} belum ada host pengganti</span>}
+            {events.length > 0 && <span className="font-medium text-warning">· {events.length} event</span>}
+            {board.loading && <span className="text-faint">· memuat…</span>}
+          </p>
 
-      <div
-        className={`grid grid-cols-1 lg:grid-cols-7 gap-2 transition-opacity ${board.loading ? "opacity-60" : ""}`}
-        onTouchStart={(event) => (swipeFrom.current = event.touches[0].clientX)}
-        onTouchEnd={(event) => {
-          if (swipeFrom.current === null) return;
-          const moved = event.changedTouches[0].clientX - swipeFrom.current;
-          swipeFrom.current = null;
-          if (Math.abs(moved) > 60) setMobileDay((day) => Math.min(7, Math.max(1, day + (moved < 0 ? 1 : -1))));
-        }}
-      >
-        {days.map((day) => {
-          const isToday = day.date === today;
-          const empty = day.slots.length === 0 && day.carried.length === 0;
-
-          return (
-            <section
-              key={day.value}
-              aria-label={`${day.long} ${formatLongDate(day.date)}`}
-              className={`${mobileDay === day.value ? "flex" : "hidden"} lg:flex flex-col gap-1.5 min-h-40 rounded-xl border p-2 ${
-                isToday ? "border-primary bg-primary/5" : "border-stroke bg-surface"
-              }`}
-            >
-              <header className="flex items-center justify-between gap-1 px-0.5">
-                <h3 className="text-sm font-medium text-heading">
-                  <span className="lg:hidden">{day.long}</span>
-                  <span className="hidden lg:inline">{day.short}</span>
-                  <span className={`ml-1 text-xs font-normal ${isToday ? "text-accent" : "text-faint"}`}>{formatShortDate(day.date)}</span>
-                </h3>
-                {isToday && <span className="lg:hidden xl:inline text-[10px] rounded bg-primary px-1.5 py-0.5 text-white">Hari ini</span>}
-                <button
-                  type="button"
-                  onClick={() => setDialog({ kind: "slot", day: day.value })}
-                  aria-label={`Tambah slot hari ${day.long}`}
-                  title={`Tambah slot hari ${day.long}`}
-                  className="w-6 h-6 shrink-0 rounded-md text-muted hover:bg-surface-2 hover:text-heading"
-                >
-                  +
-                </button>
-              </header>
-
-              {day.event && (
-                <div className="rounded-md bg-yellow-400/15 border border-yellow-400/30 px-2 py-1 text-[11px] text-warning">
-                  <span className="font-medium">★ {day.event.name}</span>
-                  <span className="block text-warning/70">Slot reguler diganti blok event</span>
-                </div>
-              )}
-
-              {day.carried.map((slot) => (
-                <button
-                  key={`carry-${slot.id}`}
-                  type="button"
-                  onClick={() => setDialog({ kind: "detail", slot, date: addDays(day.date, -1) })}
-                  className={`w-full text-left rounded-lg border border-dashed border-stroke-strong hover:bg-surface-2 px-2 py-1.5 ${
-                    day.eventDayBefore ? "opacity-40" : ""
-                  }`}
-                >
-                  <span className="block text-[11px] text-muted">
-                    Lanjutan dari {dayLong(slot.day_of_week)}, {slot.start_time}
-                  </span>
-                  <span className="block text-xs text-body truncate">
-                    s.d. {slot.end_time} · {coverName(slot, backups, addDays(day.date, -1))}
-                  </span>
-                </button>
-              ))}
-
-              {day.slots.map((slot) => (
-                <SlotCard
-                  key={slot.id}
-                  slot={slot}
-                  backup={markerOn(backups, slot.id, day.date)}
-                  replaced={Boolean(day.event)}
-                  onOpen={() => setDialog({ kind: "detail", slot, date: day.date })}
+          {/* Phones: one day at a time, tabs on top (swipe to move) */}
+          <div className="lg:hidden grid grid-cols-7 gap-1" role="tablist" aria-label="Hari">
+            {days.map((day) => (
+              <button
+                key={day.value}
+                type="button"
+                role="tab"
+                aria-selected={mobileDay === day.value}
+                onClick={() => setMobileDay(day.value)}
+                className={cn(
+                  "rounded-lg border px-0.5 py-1.5 text-center transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  mobileDay === day.value
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : day.date === today
+                      ? "border-primary/50 bg-primary/5 text-brand"
+                      : "border-border bg-card text-body"
+                )}
+              >
+                <span className="block text-[11px]">{day.short}</span>
+                <span className="block text-sm font-semibold tabular-nums">{Number(day.date.slice(8))}</span>
+                <span
+                  aria-hidden="true"
+                  className={cn("mx-auto mt-0.5 block size-1 rounded-full", day.event ? "bg-warning" : day.slots.length > 0 ? "bg-current" : "bg-transparent")}
                 />
-              ))}
+              </button>
+            ))}
+          </div>
 
-              {empty && !day.event && (
-                <div className="flex-1 flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-stroke px-2 py-4 text-center">
-                  <p className="text-xs text-faint">Belum ada jadwal.</p>
-                  <button
-                    type="button"
-                    onClick={() => setDialog({ kind: "slot", day: day.value })}
-                    className="text-xs text-accent hover:text-heading"
-                  >
-                    Tambah slot
-                  </button>
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </div>
+          <div
+            className={`grid grid-cols-1 lg:grid-cols-7 gap-2 transition-opacity ${board.loading ? "opacity-60" : ""}`}
+            onTouchStart={(event) => (swipeFrom.current = event.touches[0].clientX)}
+            onTouchEnd={(event) => {
+              if (swipeFrom.current === null) return;
+              const moved = event.changedTouches[0].clientX - swipeFrom.current;
+              swipeFrom.current = null;
+              if (Math.abs(moved) > 60) setMobileDay((day) => Math.min(7, Math.max(1, day + (moved < 0 ? 1 : -1))));
+            }}
+          >
+            {days.map((day) => {
+              const isToday = day.date === today;
+              const empty = day.slots.length === 0 && day.carried.length === 0;
+
+              return (
+                <section
+                  key={day.value}
+                  aria-label={`${day.long} ${formatLongDate(day.date)}`}
+                  className={cn(
+                    mobileDay === day.value ? "flex" : "hidden",
+                    "min-h-40 flex-col gap-1.5 rounded-xl border p-2 shadow-xs lg:flex dark:shadow-none",
+                    isToday ? "border-primary/50 bg-primary/[0.04] ring-1 ring-primary/15" : "border-border bg-card"
+                  )}
+                >
+                  <header className="flex items-center justify-between gap-1 px-0.5">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      <span className="lg:hidden">{day.long}</span>
+                      <span className="hidden lg:inline">{day.short}</span>
+                      <span className={cn("ml-1 text-xs font-normal", isToday ? "text-brand" : "text-muted-foreground")}>{formatShortDate(day.date)}</span>
+                    </h3>
+                    {isToday && <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground lg:hidden 2xl:inline">Hari ini</span>}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => setDialog({ kind: "slot", day: day.value })}
+                      aria-label={`Tambah slot hari ${day.long}`}
+                      title={`Tambah slot hari ${day.long}`}
+                      className="text-muted-foreground"
+                    >
+                      <Plus />
+                    </Button>
+                  </header>
+
+                  {day.event && (
+                    <div className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-[11px] text-warning">
+                      <span className="flex items-center gap-1 font-semibold">
+                        <Ticket className="size-3 shrink-0" aria-hidden="true" />
+                        {day.event.name}
+                      </span>
+                      <span className="block opacity-80">Slot reguler diganti blok event</span>
+                    </div>
+                  )}
+
+                  {day.carried.map((slot) => (
+                    <button
+                      key={`carry-${slot.id}`}
+                      type="button"
+                      onClick={() => setDialog({ kind: "detail", slot, date: addDays(day.date, -1) })}
+                      className={cn(
+                        "w-full rounded-lg border border-dashed border-input px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
+                        day.eventDayBefore && "opacity-40"
+                      )}
+                    >
+                      <span className="block text-[11px] text-muted-foreground">
+                        Lanjutan dari {dayLong(slot.day_of_week)}, {slot.start_time}
+                      </span>
+                      <span className="block text-xs text-body truncate">
+                        s.d. {slot.end_time} · {coverName(slot, backups, addDays(day.date, -1))}
+                      </span>
+                    </button>
+                  ))}
+
+                  {day.slots.map((slot) => (
+                    <SlotCard
+                      key={slot.id}
+                      slot={slot}
+                      backup={markerOn(backups, slot.id, day.date)}
+                      replaced={Boolean(day.event)}
+                      onOpen={() => setDialog({ kind: "detail", slot, date: day.date })}
+                    />
+                  ))}
+
+                  {empty && !day.event && (
+                    <div className="flex flex-1 flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border px-2 py-4 text-center">
+                      <p className="text-xs text-muted-foreground">Belum ada jadwal</p>
+                      <button
+                        type="button"
+                        onClick={() => setDialog({ kind: "slot", day: day.value })}
+                        className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        <Plus className="size-3" aria-hidden="true" />
+                        Tambah slot
+                      </button>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {dialog?.kind === "detail" && (
         <SlotDetailDialog
@@ -337,9 +430,9 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           backup={markerOn(backups, dialog.slot.id, dialog.date)}
           isAdmin={isAdmin}
           onClose={() => setDialog(null)}
-          onEdit={() => setDialog({ kind: "slot", slot: dialog.slot })}
+          onEdit={() => setDialog({ kind: "slot", slot: dialog.slot, week: weekStart(dialog.date) })}
           onBackup={() => setDialog({ kind: "backup", slot: dialog.slot, date: dialog.date })}
-          onStop={() => setDialog({ kind: "stop", slot: dialog.slot })}
+          onStop={() => setDialog({ kind: "stop", slot: dialog.slot, week: weekStart(dialog.date) })}
           onToggleLock={() => toggleLock(dialog.slot, dialog.date)}
         />
       )}
@@ -348,7 +441,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           hosts={hosts.data.assignments}
           slot={dialog.slot}
           day={dialog.day}
-          week={week}
+          week={dialog.week ?? week}
           isAdmin={isAdmin}
           onClose={() => setDialog(null)}
           onSaved={saved}
@@ -357,9 +450,8 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
       {dialog?.kind === "backup" && (
         <BackupDialog slot={dialog.slot} date={dialog.date} markers={backups} onClose={() => setDialog(null)} onSaved={saved} />
       )}
-      {dialog?.kind === "stop" && <StopSlotDialog slot={dialog.slot} week={week} onClose={() => setDialog(null)} onSaved={saved} />}
+      {dialog?.kind === "stop" && <StopSlotDialog slot={dialog.slot} week={dialog.week ?? week} onClose={() => setDialog(null)} onSaved={saved} />}
 
-      <Toast toast={toast} onDismiss={dismiss} />
     </div>
   );
 }
@@ -373,24 +465,26 @@ function SlotCard({ slot, backup, replaced, onOpen }: { slot: ScheduleSlot; back
     <button
       type="button"
       onClick={onOpen}
-      className={`w-full text-left rounded-lg border-l-[3px] px-2 py-1.5 transition-colors ${
-        pd ? "border-amber-400 bg-amber-500/10 hover:bg-amber-500/20" : "border-primary bg-primary/10 hover:bg-primary/20"
-      } ${replaced ? "opacity-45" : ""}`}
+      className={cn(
+        "w-full rounded-md border-l-[3px] px-2 py-1.5 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        pd ? "border-warning bg-warning/10 hover:bg-warning/15" : "border-primary bg-primary/[0.07] hover:bg-primary/[0.12]",
+        replaced && "opacity-45"
+      )}
     >
       <span className="flex items-start justify-between gap-1">
-        <span className={`text-xs font-medium tabular-nums ${pd ? "text-warning" : "text-accent"}`}>
+        <span className={cn("text-xs font-semibold tabular-nums", pd ? "text-warning" : "text-brand")}>
           {slot.start_time}–{slot.end_time}
-          {slot.crosses_midnight && <span className="text-[10px] text-muted"> +1</span>}
+          {slot.crosses_midnight && <span className="text-[10px] text-muted-foreground"> +1</span>}
         </span>
-        <span className="flex items-center gap-0.5 text-muted">
+        <span className="flex items-center gap-0.5 text-muted-foreground">
           {slot.is_locked && (
-            <Hint text="Dikunci oleh Admin">
-              <LockIcon />
+            <Hint text="Dikunci oleh admin">
+              <Lock className="size-3" />
             </Hint>
           )}
           {slot.effective_to && (
             <Hint text={`Sementara, sampai ${formatShortDate(slot.effective_to)}`}>
-              <ClockIcon />
+              <Clock className="size-3" />
             </Hint>
           )}
           {backup && (
@@ -403,17 +497,17 @@ function SlotCard({ slot, backup, replaced, onOpen }: { slot: ScheduleSlot; back
                     : "Butuh backup, belum ada host pengganti"
               }
             >
-              <SwapIcon className={covered ? "text-success" : "text-warning"} />
+              <ArrowLeftRight className={cn("size-3", covered ? "text-success" : "text-warning")} />
             </Hint>
           )}
         </span>
       </span>
-      <span className={`block text-sm truncate ${covered ? "text-success" : "text-heading"}`}>{covered ? backup.filler_name : hostName}</span>
+      <span className={cn("block truncate text-sm font-medium", covered ? "text-success" : "text-foreground")}>{covered ? backup.filler_name : hostName}</span>
       <span className="flex items-center justify-between gap-1 text-[10px]">
-        <span className={pd ? "text-warning/80" : "text-accent/70"}>{pd ? "PD" : "Reguler"}</span>
-        {covered && <span className="text-faint truncate">ganti {hostName}</span>}
+        <span className={pd ? "font-medium text-warning" : "text-muted-foreground"}>{pd ? "PD" : "Reguler"}</span>
+        {covered && <span className="truncate text-muted-foreground">ganti {hostName}</span>}
       </span>
-      {replaced && <span className="block text-[10px] text-warning/80">Diganti blok event</span>}
+      {replaced && <span className="block text-[10px] text-warning">Diganti blok event</span>}
     </button>
   );
 }
@@ -421,26 +515,22 @@ function SlotCard({ slot, backup, replaced, onOpen }: { slot: ScheduleSlot; back
 /** A small icon with a tooltip on hover (and its text for screen readers). */
 function Hint({ text, children }: { text: string; children: ReactNode }) {
   return (
-    <span className="group/hint relative inline-flex" aria-label={text} role="img">
-      {children}
-      <span className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden whitespace-nowrap rounded-md border border-stroke-strong bg-canvas px-2 py-1 text-[11px] text-heading shadow-lg group-hover/hint:block">
-        {text}
-      </span>
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex" aria-label={text} role="img">
+          {children}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{text}</TooltipContent>
+    </Tooltip>
   );
 }
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="w-8 h-8 flex items-center justify-center rounded-md text-lg text-body hover:bg-surface-2 hover:text-heading"
-    >
+    <Button type="button" variant="ghost" size="icon-sm" onClick={onClick} aria-label={label} title={label} className="text-body">
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -467,39 +557,3 @@ function coverName(slot: ScheduleSlot, markers: SlotBackupMarker[], date: string
   return marker?.status === "filled" ? `${marker.filler_name} (backup)` : (slot.assignment.host?.user.name ?? "Host");
 }
 
-const iconProps = { width: 12, height: 12, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
-
-function LockIcon() {
-  return (
-    <svg {...iconProps} aria-hidden="true">
-      <rect x="5" y="11" width="14" height="10" rx="2" />
-      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg {...iconProps} aria-hidden="true">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
-function SwapIcon({ className }: { className: string }) {
-  return (
-    <svg {...iconProps} className={className} aria-hidden="true">
-      <path d="M4 8h13l-3-3M20 16H7l3 3" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg {...iconProps} width={16} height={16} aria-hidden="true">
-      <rect x="3" y="5" width="18" height="16" rx="2" />
-      <path d="M3 10h18M8 3v4M16 3v4" />
-    </svg>
-  );
-}

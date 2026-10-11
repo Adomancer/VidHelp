@@ -1,14 +1,19 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import AuthCard from "@/components/AuthCard";
 import ForgotPasswordForm from "@/components/ForgotPasswordForm";
 
 export default function ForgotPasswordPage() {
   return (
-    <AuthCard subtitle="Atur ulang kata sandi">
+    <AuthCard
+      title="Lupa kata sandi?"
+      subtitle="Masukkan email kamu, nanti kami kirim link untuk membuat kata sandi baru. Bisa juga dipakai kalau kamu daftar lewat Google dan belum punya kata sandi."
+    >
       <ForgotPasswordForm />
 
       <p className="text-center text-sm">
-        <Link href="/login" className="text-accent hover:text-heading">
+        <Link href="/login" className="inline-flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" aria-hidden="true" />
           Kembali ke halaman masuk
         </Link>
       </p>

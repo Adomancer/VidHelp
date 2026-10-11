@@ -1,47 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Archive, Ban, KeyRound, MoreHorizontal, Search, Trash2, UserPlus, Users } from "lucide-react";
 import { adminApi, errorMessage, type AuthUser, type EraseReason, type Paginated, type RoleName, type UserStatus } from "@/lib/api";
 import { roleLabel, statusLabel } from "@/lib/labels";
+import { inputClass } from "@/lib/ui";
 import { formValue, useApiForm } from "@/lib/useApiForm";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
+import FormActions from "@/components/FormActions";
 import FormAlert from "@/components/FormAlert";
+import { TableSkeleton, RefreshBar } from "@/components/Loading";
 import Modal from "@/components/Modal";
-import SelectField from "@/components/SelectField";
-import SubmitButton from "@/components/SubmitButton";
+import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
+import SelectField, { NativeSelect } from "@/components/SelectField";
+import StatusBadge, { type Tone } from "@/components/StatusBadge";
 import TextField from "@/components/TextField";
+import { notify } from "@/components/Toast";
+import ToggleGroup from "@/components/ToggleGroup";
+import UserAvatar from "@/components/UserAvatar";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-const tabs: { label: string; status?: UserStatus }[] = [
-  { label: "Menunggu persetujuan", status: "pending" },
-  { label: "Aktif", status: "active" },
-  { label: "Nonaktif", status: "inactive" },
-  { label: "Diarsipkan", status: "archived" },
-  { label: "Semua" },
-];
+const tabs = [
+  ["pending", "Menunggu persetujuan"],
+  ["active", "Aktif"],
+  ["inactive", "Nonaktif"],
+  ["archived", "Diarsipkan"],
+  ["all", "Semua"],
+] as const;
+
+type TabValue = (typeof tabs)[number][0];
 
 const roles: RoleName[] = ["host", "operator", "finance", "admin"];
 
-const statusStyles: Record<UserStatus, string> = {
-  pending: "bg-yellow-500/15 text-warning",
-  active: "bg-green-500/15 text-success",
-  inactive: "bg-surface-3 text-body",
-  archived: "bg-surface-2 text-muted",
+const statusTones: Record<UserStatus, Tone> = {
+  pending: "warning",
+  active: "success",
+  inactive: "neutral",
+  archived: "neutral",
 };
 
-type Notice = { tone: "success" | "error"; text: string } | null;
+type Confirm = { kind: "reset2fa" | "deactivate" | "archive"; user: AuthUser } | null;
 
 export default function AdminUsersPage() {
   const { user: me, token } = useAuth();
-  const [status, setStatus] = useState<UserStatus | undefined>("pending");
+  const [tab, setTab] = useState<TabValue>("pending");
+  const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [reloads, setReloads] = useState(0);
   const [result, setResult] = useState<{ key: string; users?: Paginated<AuthUser>; error?: string } | null>(null);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [erasing, setErasing] = useState<AuthUser | null>(null);
+  const [confirm, setConfirm] = useState<Confirm>(null);
+  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  const status = tab === "all" ? undefined : tab;
   const requestKey = JSON.stringify({ status, search, page, reloads });
   const loading = result?.key !== requestKey;
 
@@ -51,49 +78,154 @@ export default function AdminUsersPage() {
     adminApi
       .users(token, { status, search, page })
       .then((users) => !cancelled && setResult({ key: requestKey, users }))
-      .catch((error) => !cancelled && setResult({ key: requestKey, error: errorMessage(error) }));
+      .catch((caught) => !cancelled && setResult({ key: requestKey, error: errorMessage(caught) }));
 
     return () => {
       cancelled = true;
     };
   }, [token, status, search, page, requestKey]);
 
+  useEffect(() => () => clearTimeout(debounce.current), []);
+
   async function run(userId: string, action: () => Promise<unknown>) {
     setBusyId(userId);
-    setNotice(null);
+    setError(null);
     try {
       const response = await action();
       const message = (response as { message?: string } | undefined)?.message;
-      if (message) setNotice({ tone: "success", text: message });
+      if (message) notify({ text: message });
       setReloads((count) => count + 1);
-    } catch (error) {
-      setNotice({ tone: "error", text: errorMessage(error) });
+    } catch (caught) {
+      setError(errorMessage(caught));
     } finally {
       setBusyId(null);
     }
   }
 
-  function selectTab(next?: UserStatus) {
-    setStatus(next);
+  function selectTab(next: TabValue) {
+    setTab(next);
     setPage(1);
+  }
+
+  function type(next: string) {
+    setQuery(next);
+    clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => {
+      setSearch(next.trim());
+      setPage(1);
+    }, 300);
   }
 
   const users = result?.users;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-heading">Manajemen Pengguna</h1>
-        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-primary text-sm text-white hover:bg-primary-hover">
-          Buat akun
-        </button>
+      <PageHeader
+        title="Pengguna"
+        description="Setujui pendaftar baru, atur peran, dan kelola akun yang sudah tidak aktif."
+        actions={
+          <Button type="button" onClick={() => setCreating(true)}>
+            <UserPlus aria-hidden="true" />
+            Buat akun
+          </Button>
+        }
+      />
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <ToggleGroup label="Status pengguna" options={tabs} value={tab} onChange={selectTab} />
+        <div className="relative lg:w-72">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => type(event.target.value)}
+            placeholder="Cari nama atau email…"
+            aria-label="Cari pengguna"
+            className={cn(inputClass, "pl-9")}
+          />
+        </div>
       </div>
+
+      {error && <FormAlert tone="error">{error}</FormAlert>}
+      {result?.error && <ErrorState message={result.error} onRetry={() => setReloads((count) => count + 1)} />}
+
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+        <RefreshBar active={loading && Boolean(users)} />
+        {!users && !result?.error && <TableSkeleton rows={6} columns={4} />}
+
+        {users && users.data.length === 0 && (
+          <EmptyState
+            icon={Users}
+            title={tab === "pending" ? "Tidak ada yang menunggu persetujuan" : "Pengguna tidak ditemukan"}
+            description={search ? `Tidak ada yang cocok dengan "${search}".` : undefined}
+          />
+        )}
+
+        {users && users.data.length > 0 && (
+          <>
+            {/* Laptop and tablet: a table */}
+            <table className="hidden w-full text-sm md:table">
+              <thead className="border-b border-border bg-muted/50 text-left text-xs font-medium text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Pengguna</th>
+                  <th className="px-4 py-3 font-medium">Mendaftar</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Peran</th>
+                  <th className="px-4 py-3">
+                    <span className="sr-only">Aksi</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {users.data.map((user) => (
+                  <tr key={user.id} className="text-body transition-colors hover:bg-muted/40">
+                    <td className="px-4 py-3">
+                      <UserCell user={user} />
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                      <Signup user={user} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <UserStatusBadge user={user} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} run={run} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Phones: one card per user */}
+            <ul className="divide-y divide-border md:hidden">
+              {users.data.map((user) => (
+                <li key={user.id} className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <UserCell user={user} />
+                    <UserStatusBadge user={user} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <Signup user={user} inline />
+                    <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} run={run} />
+                  </div>
+                  <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} stretch />
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
+      {users && <Pagination page={users.current_page} lastPage={users.last_page} total={users.total} unit="pengguna" onChange={setPage} />}
 
       {creating && (
         <CreateAccountForm
           onDone={(message) => {
             setCreating(false);
-            setNotice({ tone: "success", text: message });
+            notify({ text: message });
             selectTab("active");
             setReloads((count) => count + 1);
           }}
@@ -106,204 +238,171 @@ export default function AdminUsersPage() {
           user={erasing}
           onDone={(message) => {
             setErasing(null);
-            setNotice({ tone: "success", text: message });
+            notify({ text: message });
             setReloads((count) => count + 1);
           }}
           onCancel={() => setErasing(null)}
         />
       )}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.label}
-              type="button"
-              onClick={() => selectTab(tab.status)}
-              className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                status === tab.status ? "bg-primary text-white" : "bg-surface text-body hover:bg-surface-2"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            setSearch(String(new FormData(event.currentTarget).get("search") ?? ""));
-            setPage(1);
-          }}
+      {confirm?.kind === "reset2fa" && (
+        <ConfirmDialog
+          title={`Reset 2FA ${confirm.user.name}?`}
+          confirmLabel="Reset 2FA"
+          onConfirm={() => run(confirm.user.id, () => adminApi.resetTwoFactor(token, confirm.user.id))}
+          onClose={() => setConfirm(null)}
         >
-          <input
-            name="search"
-            type="search"
-            placeholder="Cari nama atau email…"
-            className="w-full lg:w-72 px-4 py-2 rounded-lg bg-surface border border-stroke text-heading placeholder-faint outline-none focus:ring-2 focus:ring-primary"
-          />
-        </form>
-      </div>
-
-      {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
-      {result?.error && <FormAlert tone="error">{result.error}</FormAlert>}
-
-      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${loading ? "opacity-60" : ""}`}>
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
-            <tr>
-              <th className="px-4 py-3 font-medium">Pengguna</th>
-              <th className="px-4 py-3 font-medium">Mendaftar</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Peran</th>
-              <th className="px-4 py-3 font-medium text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stroke">
-            {users?.data.map((user) => {
-              const isMe = user.id === me.id;
-              const busy = busyId === user.id;
-              const erased = Boolean(user.erased_at);
-
-              return (
-                <tr key={user.id} className="text-body">
-                  <td className="px-4 py-3">
-                    <p className="text-heading">
-                      {user.name}
-                      {user.two_factor_enabled && (
-                        <span className="ml-2 px-1.5 py-0.5 rounded bg-primary/15 text-[10px] text-accent align-middle">2FA</span>
-                      )}
-                    </p>
-                    {!erased && <p className="text-muted">{user.email}</p>}
-                  </td>
-                  <td className="px-4 py-3 text-muted whitespace-nowrap">
-                    {new Date(user.created_at).toLocaleDateString("id-ID")}
-                    <span className="block text-xs">
-                      {user.signup_source === "admin_created" ? "oleh admin" : user.has_password ? "email" : "Google"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-md text-xs ${statusStyles[user.status]}`}>
-                      {erased ? "Dihapus" : statusLabel(user.status)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={user.roles[0]?.name ?? "host"}
-                      disabled={isMe || busy || erased}
-                      onChange={(event) => run(user.id, () => adminApi.setRole(token, user.id, event.target.value as RoleName))}
-                      className="bg-surface-2 border border-stroke-strong rounded-md px-2 py-1 text-heading disabled:opacity-50"
-                    >
-                      {roles.map((role) => (
-                        <option key={role} value={role}>
-                          {roleLabel(role)}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3 text-right whitespace-nowrap space-x-2">
-                    {user.two_factor_enabled && !isMe && (
-                      <ActionButton
-                        tone="purple"
-                        disabled={busy}
-                        onClick={() =>
-                          window.confirm(
-                            `Reset 2FA untuk ${user.name}? Dia akan dikeluarkan dan harus mengatur 2FA lagi. Lakukan hanya kalau HP dan kode pemulihannya hilang.`
-                          ) && run(user.id, () => adminApi.resetTwoFactor(token, user.id))
-                        }
-                      >
-                        Reset 2FA
-                      </ActionButton>
-                    )}
-                    {!erased && user.status !== "active" && (
-                      <ActionButton tone="green" disabled={busy} onClick={() => run(user.id, () => adminApi.activateUser(token, user.id))}>
-                        {user.status === "pending" ? "Setujui" : user.status === "archived" ? "Pulihkan" : "Aktifkan"}
-                      </ActionButton>
-                    )}
-                    {user.status === "active" && !isMe && (
-                      <ActionButton
-                        disabled={busy}
-                        onClick={() =>
-                          window.confirm(`Nonaktifkan ${user.name} sementara? Dia tidak bisa masuk, tapi jadwalnya tetap ada.`) &&
-                          run(user.id, () => adminApi.deactivateUser(token, user.id))
-                        }
-                      >
-                        Nonaktifkan
-                      </ActionButton>
-                    )}
-                    {(user.status === "active" || user.status === "inactive") && !isMe && (
-                      <ActionButton
-                        tone="red"
-                        disabled={busy}
-                        onClick={() =>
-                          window.confirm(
-                            `Arsipkan ${user.name}? Pakai ini kalau orangnya sudah keluar: tidak bisa masuk, slotnya berakhir hari ini, dan backup-nya dilepas.`
-                          ) && run(user.id, () => adminApi.archiveUser(token, user.id))
-                        }
-                      >
-                        Arsipkan
-                      </ActionButton>
-                    )}
-                    {user.status === "archived" && !erased && (
-                      <ActionButton tone="red" disabled={busy} onClick={() => setErasing(user)}>
-                        Hapus permanen
-                      </ActionButton>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        {users && users.data.length === 0 && (
-          <p className="px-4 py-8 text-center text-muted">
-            {status === "pending" ? "Tidak ada yang menunggu persetujuan." : "Pengguna tidak ditemukan."}
-          </p>
-        )}
-      </div>
-
-      {users && users.last_page > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted">
-          <span>
-            Halaman {users.current_page} dari {users.last_page} · {users.total} pengguna
-          </span>
-          <div className="flex gap-2">
-            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
-              Sebelumnya
-            </button>
-            <button type="button" disabled={page >= users.last_page} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-md bg-surface disabled:opacity-40">
-              Berikutnya
-            </button>
-          </div>
-        </div>
+          Dia akan dikeluarkan dan harus mengatur 2FA lagi. Lakukan hanya kalau HP dan kode pemulihannya hilang.
+        </ConfirmDialog>
+      )}
+      {confirm?.kind === "deactivate" && (
+        <ConfirmDialog
+          title={`Nonaktifkan ${confirm.user.name}?`}
+          confirmLabel="Nonaktifkan"
+          destructive={false}
+          onConfirm={() => run(confirm.user.id, () => adminApi.deactivateUser(token, confirm.user.id))}
+          onClose={() => setConfirm(null)}
+        >
+          Sementara tidak bisa masuk, tapi jadwalnya tetap ada. Bisa diaktifkan lagi kapan saja.
+        </ConfirmDialog>
+      )}
+      {confirm?.kind === "archive" && (
+        <ConfirmDialog
+          title={`Arsipkan ${confirm.user.name}?`}
+          confirmLabel="Arsipkan"
+          onConfirm={() => run(confirm.user.id, () => adminApi.archiveUser(token, confirm.user.id))}
+          onClose={() => setConfirm(null)}
+        >
+          Pakai ini kalau orangnya sudah keluar: tidak bisa masuk, slotnya berakhir hari ini, dan backup-nya dilepas.
+        </ConfirmDialog>
       )}
     </div>
   );
 }
 
-const buttonTones = {
-  plain: "border border-stroke-strong text-body hover:bg-surface-2",
-  green: "bg-green-600 text-white hover:bg-green-500",
-  red: "border border-red-400/40 text-danger hover:bg-red-500/10",
-  purple: "border border-primary/40 text-accent hover:bg-primary/10",
-};
-
-function ActionButton({
-  tone = "plain",
-  disabled,
-  onClick,
-  children,
-}: {
-  tone?: keyof typeof buttonTones;
-  disabled: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
+function UserCell({ user }: { user: AuthUser }) {
+  const erased = Boolean(user.erased_at);
   return (
-    <button type="button" disabled={disabled} onClick={onClick} className={`px-3 py-1.5 rounded-md disabled:opacity-50 ${buttonTones[tone]}`}>
-      {children}
-    </button>
+    <div className="flex min-w-0 items-center gap-3">
+      <UserAvatar user={user} size="size-9 text-sm" />
+      <div className="min-w-0">
+        <p className="flex items-center gap-2 font-medium text-foreground">
+          <span className="truncate">{user.name}</span>
+          {user.two_factor_enabled && (
+            <StatusBadge tone="brand" className="h-5 px-1.5 text-[10px]">
+              2FA
+            </StatusBadge>
+          )}
+        </p>
+        {!erased && <p className="truncate text-xs text-muted-foreground">{user.email}</p>}
+      </div>
+    </div>
+  );
+}
+
+function Signup({ user, inline = false }: { user: AuthUser; inline?: boolean }) {
+  const source = user.signup_source === "admin_created" ? "oleh admin" : user.has_password ? "email" : "Google";
+  const date = new Date(user.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return inline ? (
+    <span>
+      Daftar {date} · {source}
+    </span>
+  ) : (
+    <>
+      <span className="tabular-nums">{date}</span>
+      <span className="block text-xs">{source}</span>
+    </>
+  );
+}
+
+function UserStatusBadge({ user }: { user: AuthUser }) {
+  if (user.erased_at) return <StatusBadge tone="danger">Dihapus</StatusBadge>;
+  return (
+    <StatusBadge tone={statusTones[user.status]} dot>
+      {statusLabel(user.status)}
+    </StatusBadge>
+  );
+}
+
+function RoleSelect({ user, disabled, run }: { user: AuthUser; disabled: boolean; run: (userId: string, action: () => Promise<unknown>) => Promise<void> }) {
+  const { token } = useAuth();
+  return (
+    <NativeSelect
+      small
+      wrapperClassName="w-32"
+      value={user.roles[0]?.name ?? "host"}
+      disabled={disabled}
+      aria-label={`Peran ${user.name}`}
+      onChange={(event) => run(user.id, () => adminApi.setRole(token, user.id, event.target.value as RoleName))}
+    >
+      {roles.map((role) => (
+        <option key={role} value={role}>
+          {roleLabel(role)}
+        </option>
+      ))}
+    </NativeSelect>
+  );
+}
+
+/** The likely next step as a button; everything else in the "…" menu. */
+function RowActions({
+  user,
+  isMe,
+  busy,
+  run,
+  onConfirm,
+  onErase,
+  stretch = false,
+}: {
+  user: AuthUser;
+  isMe: boolean;
+  busy: boolean;
+  run: (userId: string, action: () => Promise<unknown>) => Promise<void>;
+  onConfirm: (confirm: Confirm) => void;
+  onErase: (user: AuthUser) => void;
+  stretch?: boolean;
+}) {
+  const { token } = useAuth();
+  const erased = Boolean(user.erased_at);
+  const canActivate = !erased && user.status !== "active";
+  const menu = [
+    user.two_factor_enabled && !isMe && { key: "reset2fa", label: "Reset 2FA", icon: KeyRound, onSelect: () => onConfirm({ kind: "reset2fa", user }) },
+    user.status === "active" && !isMe && { key: "deactivate", label: "Nonaktifkan", icon: Ban, onSelect: () => onConfirm({ kind: "deactivate", user }) },
+    (user.status === "active" || user.status === "inactive") &&
+      !isMe && { key: "archive", label: "Arsipkan", icon: Archive, destructive: true, onSelect: () => onConfirm({ kind: "archive", user }) },
+    user.status === "archived" && !erased && { key: "erase", label: "Hapus permanen", icon: Trash2, destructive: true, onSelect: () => onErase(user) },
+  ].filter(Boolean) as { key: string; label: string; icon: typeof Ban; destructive?: boolean; onSelect: () => void }[];
+
+  if (!canActivate && menu.length === 0) return null;
+
+  return (
+    <div className={cn("flex items-center justify-end gap-2", stretch && "[&>button:first-child]:flex-1")}>
+      {canActivate && (
+        <Button type="button" size="sm" variant={user.status === "pending" ? "default" : "outline"} disabled={busy} onClick={() => run(user.id, () => adminApi.activateUser(token, user.id))}>
+          {user.status === "pending" ? "Setujui" : user.status === "archived" ? "Pulihkan" : "Aktifkan"}
+        </Button>
+      )}
+      {menu.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="ghost" size="icon-sm" disabled={busy} aria-label={`Aksi lain untuk ${user.name}`}>
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {menu.map((item, index) => (
+              <div key={item.key}>
+                {item.destructive && index > 0 && !menu[index - 1].destructive && <DropdownMenuSeparator />}
+                <DropdownMenuItem variant={item.destructive ? "destructive" : "default"} onSelect={item.onSelect}>
+                  <item.icon aria-hidden="true" />
+                  {item.label}
+                </DropdownMenuItem>
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
   );
 }
 
@@ -322,11 +421,7 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
   );
 
   return (
-    <Modal
-      title="Buat akun"
-      description="Akun langsung aktif. Berikan email dan kata sandinya ke orang tersebut untuk masuk."
-      onClose={onCancel}
-    >
+    <Modal title="Buat akun" description="Akun langsung aktif. Berikan email dan kata sandinya ke orang tersebut untuk masuk." onClose={onCancel}>
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -337,14 +432,7 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
         <TextField label="Email" name="email" type="email" autoComplete="off" error={errors.email} />
         <TextField label="Kata sandi" name="password" type="text" autoComplete="new-password" placeholder="Minimal 8 karakter" error={errors.password} />
         <SelectField label="Peran" name="role" defaultValue="host" error={errors.role} options={roles.map((role) => ({ value: role, label: roleLabel(role) }))} />
-        <div className="sm:col-span-2 flex gap-3">
-          <div className="w-44">
-            <SubmitButton loading={loading}>Buat akun</SubmitButton>
-          </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
-            Batal
-          </button>
-        </div>
+        <FormActions loading={loading} submitLabel="Buat akun" onCancel={onCancel} />
       </form>
     </Modal>
   );
@@ -368,11 +456,11 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
   );
 
   return (
-    <Modal
-      title={`Hapus ${user.name} permanen`}
-      description="Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini tidak bisa dibatalkan."
-      onClose={onCancel}
-    >
+    <Modal title={`Hapus ${user.name} permanen`} onClose={onCancel}>
+      <FormAlert tone="warning">
+        Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini
+        tidak bisa dibatalkan.
+      </FormAlert>
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
@@ -381,14 +469,7 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
         )}
         <SelectField label="Alasan" name="reason" error={errors.reason} options={eraseReasons} />
         <TextField label="Catatan (opsional)" name="note" maxLength={500} placeholder="mis. diminta lewat WhatsApp tgl 5 Okt" error={errors.note} />
-        <div className="sm:col-span-2 flex gap-3">
-          <div className="w-52">
-            <SubmitButton loading={loading}>Hapus permanen</SubmitButton>
-          </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
-            Batal
-          </button>
-        </div>
+        <FormActions loading={loading} submitLabel="Hapus permanen" onCancel={onCancel} variant="danger" />
       </form>
     </Modal>
   );

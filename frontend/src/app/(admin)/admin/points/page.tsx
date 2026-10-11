@@ -1,15 +1,14 @@
 import PointsDesk from "@/components/PointsDesk";
+import PageHeader from "@/components/PageHeader";
 import ViolationTypesEditor from "@/components/ViolationTypesEditor";
 
 export default function AdminPointsPage() {
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Poin &amp; SP</h1>
-        <p className="text-sm text-muted mt-1">
-          Catat pelanggaran, batalkan catatan yang salah, serta terbitkan atau batalkan surat peringatan secara manual.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Poin & SP"
+        description="Catat pelanggaran, batalkan catatan yang salah, serta terbitkan atau batalkan surat peringatan secara manual."
+      />
       <PointsDesk isAdmin />
       <ViolationTypesEditor />
     </div>

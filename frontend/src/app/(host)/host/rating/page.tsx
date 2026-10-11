@@ -1,11 +1,16 @@
 "use client";
 
+import { FileWarning, ShieldCheck, Star, ThumbsUp } from "lucide-react";
 import { performanceApi } from "@/lib/api";
 import { formatDate, formatShortDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
-import FormAlert from "@/components/FormAlert";
+import EmptyState from "@/components/EmptyState";
+import ErrorState from "@/components/ErrorState";
+import { CardsSkeleton } from "@/components/Loading";
+import PageHeader from "@/components/PageHeader";
 import PointsMeter, { SpBadge } from "@/components/PointsMeter";
 
 function monthLabel(monthYear: string): string {
@@ -19,72 +24,88 @@ export default function HostScorePage() {
   const data = performance.data;
 
   return (
-    <div className="max-w-lg space-y-5">
-      <h1 className="text-xl font-bold text-heading">Skor Saya</h1>
-      {performance.error && <FormAlert tone="error">{performance.error}</FormAlert>}
+    <div className="space-y-6">
+      <PageHeader title="Skor saya" description="Poin disiplin, surat peringatan dan rating bulanan dari agensi." />
+      {performance.error && <ErrorState message={performance.error} onRetry={performance.reload} />}
+      {!data && !performance.error && <CardsSkeleton count={2} className="lg:grid-cols-2" />}
 
       {data && (
-        <>
-          <Card>
-            <p className="text-xs text-muted">
-              Poin {formatDate(data.period.start)} – {formatDate(data.period.end)}. Kembali ke {data.opening_points} saat periode berikutnya
-              dimulai.
-            </p>
-            <PointsMeter points={data.points} opening={data.opening_points} thresholds={data.thresholds} />
-          </Card>
-
-          <Card title="Potongan periode ini">
-            {data.logs.length === 0 && <p className="text-sm text-muted">Tidak ada, pertahankan!</p>}
-            <ul className="space-y-2">
-              {data.logs.map((log) => (
-                <li key={log.id} className="rounded-lg bg-surface-2 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-heading">{log.violation_type?.name ?? "Penyesuaian"}</span>
-                    <span className={`text-sm font-medium ${log.points_change < 0 ? "text-danger" : "text-success"}`}>
-                      {log.points_change > 0 ? "+" : ""}
-                      {log.points_change}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted">
-                    {formatShortDate(log.occurred_on)}
-                    {log.reason ? ` · ${log.reason}` : ""}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </Card>
-
-          {data.warning_letters.length > 0 && (
-            <Card title="Surat peringatan">
-              <ul className="space-y-2">
-                {data.warning_letters.map((letter) => (
-                  <li key={letter.id} className="flex items-start gap-3">
-                    <SpBadge level={letter.level} />
-                    <div>
-                      <p className="text-sm text-heading">{letter.reason}</p>
-                      <p className="text-xs text-muted">{formatDate(letter.issued_at)}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          <div className="space-y-6">
+            <Card
+              title="Poin periode ini"
+              description={`${formatDate(data.period.start)} – ${formatDate(data.period.end)}. Kembali ke ${data.opening_points} saat periode berikutnya dimulai.`}
+            >
+              <PointsMeter points={data.points} opening={data.opening_points} thresholds={data.thresholds} />
             </Card>
-          )}
 
-          <Card title="Rating bulanan">
-            {data.ratings.length === 0 && <p className="text-sm text-muted">Kamu belum pernah dinilai.</p>}
-            <ul className="space-y-2">
-              {data.ratings.map((rating) => (
-                <li key={rating.id} className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm text-heading">{monthLabel(rating.month_year)}</p>
-                    {rating.note && <p className="text-xs text-muted">{rating.note}</p>}
-                  </div>
-                  <span className="text-lg font-semibold text-warning">★ {rating.rating.toFixed(1)}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </>
+            <Card title="Potongan periode ini">
+              {data.logs.length === 0 ? (
+                <EmptyState compact icon={ThumbsUp} title="Tidak ada potongan" description="Pertahankan!" />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {data.logs.map((log) => (
+                    <li key={log.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{log.violation_type?.name ?? "Penyesuaian"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatShortDate(log.occurred_on)}
+                          {log.reason ? ` · ${log.reason}` : ""}
+                        </p>
+                      </div>
+                      <span className={cn("shrink-0 text-sm font-semibold tabular-nums", log.points_change < 0 ? "text-destructive" : "text-success")}>
+                        {log.points_change > 0 ? "+" : ""}
+                        {log.points_change}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card title="Surat peringatan">
+              {data.warning_letters.length === 0 ? (
+                <EmptyState compact icon={ShieldCheck} title="Tidak ada surat peringatan" />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {data.warning_letters.map((letter) => (
+                    <li key={letter.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                      <FileWarning className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-foreground">{letter.reason}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(letter.issued_at)}</p>
+                      </div>
+                      <SpBadge level={letter.level} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card title="Rating bulanan">
+              {data.ratings.length === 0 ? (
+                <EmptyState compact icon={Star} title="Belum pernah dinilai" />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {data.ratings.map((rating) => (
+                    <li key={rating.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{monthLabel(rating.month_year)}</p>
+                        {rating.note && <p className="text-xs text-muted-foreground">{rating.note}</p>}
+                      </div>
+                      <span className="inline-flex shrink-0 items-center gap-1.5 text-base font-semibold text-foreground tabular-nums">
+                        <Star className="size-4 fill-warning text-warning" aria-hidden="true" />
+                        {rating.rating.toFixed(1)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        </div>
       )}
     </div>
   );

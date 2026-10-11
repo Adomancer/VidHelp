@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, type InputHTMLAttributes } from "react";
+import { TriangleAlert } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { inputClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
+import { FieldError } from "./FieldMessage";
 
 interface DigitsFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "defaultValue" | "onChange" | "maxLength"> {
   label: string;
@@ -51,11 +56,9 @@ export default function DigitsField({ label, name, defaultValue, error, maxLengt
   const invalid = Boolean(error) || warning;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={name} className="block text-sm font-medium text-body">
-          {label}
-        </label>
+        <Label htmlFor={name}>{label}</Label>
         {exactLength && (
           <span className={`text-xs tabular-nums ${value.length === exactLength ? "text-success" : "text-faint"}`}>
             {value.length}/{exactLength} digit
@@ -73,17 +76,15 @@ export default function DigitsField({ label, name, defaultValue, error, maxLengt
         onChange={(event) => change(event.target.value)}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={warning ? `${name}-warning` : undefined}
-        className={`w-full px-4 py-2.5 rounded-xl bg-surface-2 border text-heading tabular-nums placeholder-faint outline-none focus:ring-2 focus:ring-primary transition-colors ${
-          invalid ? "border-red-400" : "border-stroke-strong"
-        } ${className}`}
+        className={cn(inputClass, "tabular-nums", className)}
         {...props}
       />
       {warning && (
         <p id={`${name}-warning`} role="alert" className="flex items-center gap-1.5 text-sm text-warning">
-          <span aria-hidden="true">⚠</span> {label} hanya boleh diisi angka (0–9).
+          <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" /> {label} hanya boleh diisi angka (0–9).
         </p>
       )}
-      {error && !warning && <p className="text-sm text-danger">{error}</p>}
+      {!warning && <FieldError>{error}</FieldError>}
     </div>
   );
 }

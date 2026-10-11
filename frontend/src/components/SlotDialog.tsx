@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { Moon } from "lucide-react";
 import { errorMessage, fieldErrors, scheduleApi, type BrandHost, type ScheduleSlot, type SlotConflict, type SlotInput } from "@/lib/api";
 import { DAYS, isoWeekday, nextDay, previousDay, toDateInput } from "@/lib/format";
 import {
@@ -19,8 +20,12 @@ import {
   normalizeTime,
   toMinutes,
 } from "@/lib/schedule";
+import { inputClass, inputSmClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "./AuthProvider";
+import Chip from "./Chip";
 import Dialog from "./Dialog";
 import FormAlert from "./FormAlert";
 import HostDayTimeline, { type DayBlock } from "./HostDayTimeline";
@@ -212,7 +217,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
   if (hosts.length === 0 && !slot) {
     return (
       <Dialog title="Tambah slot" onClose={onClose} footer={<CloseButton onClick={onClose} />}>
-        <p className="text-sm text-body">Belum ada host di brand ini. Tugaskan host di halaman Hosts terlebih dahulu.</p>
+        <p className="text-sm text-body">Belum ada host di brand ini. Tugaskan host di halaman Host terlebih dahulu.</p>
       </Dialog>
     );
   }
@@ -235,26 +240,21 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
           <CloseButton onClick={onClose} />
         ) : (
           <>
-            <span className="flex-1 text-xs text-faint">
+            <span className={cn("mr-auto text-xs", blocked ? "text-destructive" : "text-muted-foreground")} aria-live="polite">
               {checking ? "Memeriksa bentrok…" : blocked ? "Perbaiki bentrok dulu untuk menyimpan." : !complete ? "Lengkapi host dan jam." : ""}
             </span>
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2">
+            <Button type="button" variant="outline" onClick={onClose}>
               Batal
-            </button>
-            <button
-              type="button"
-              onClick={save}
-              disabled={!complete || checking || blocked || saving}
-              className="px-5 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed"
-            >
+            </Button>
+            <Button type="button" onClick={save} disabled={!complete || checking || blocked || saving}>
               {saving ? "Menyimpan…" : "Simpan"}
-            </button>
+            </Button>
           </>
         )
       }
     >
       <fieldset disabled={readOnly || saving} className="space-y-6">
-        {readOnly && <FormAlert tone="warning">Dikunci oleh Admin. Hubungi Admin untuk mengubah.</FormAlert>}
+        {readOnly && <FormAlert tone="warning">Dikunci oleh admin. Hubungi admin untuk mengubah.</FormAlert>}
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
         <Step number={1} title="Siapa yang live?">
@@ -267,8 +267,8 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
           />
           <FieldError message={errors.assignment_id} />
           {assignment && (
-            <div className="mt-3 rounded-xl bg-surface-2 border border-stroke p-3 space-y-2">
-              <p className="text-xs text-muted">
+            <div className="mt-3 space-y-2 rounded-xl border border-border bg-muted/40 p-3">
+              <p className="text-xs text-muted-foreground">
                 Jadwal {hostName} di semua brand, {formatDayDate(date)}
                 {hostSlots.loading && " · memuat…"}
               </p>
@@ -286,20 +286,17 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
         <Step number={2} title="Hari dan jam">
           <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Hari">
             {DAYS.map((option) => (
-              <button
+              <Chip
                 key={option.value}
-                type="button"
                 role="radio"
                 aria-checked={form.day === option.value}
+                aria-pressed={undefined}
+                selected={form.day === option.value}
                 onClick={() => set("day", option.value)}
-                className={`min-w-12 px-2.5 py-1.5 rounded-lg text-sm border transition-colors ${
-                  form.day === option.value
-                    ? "bg-primary border-primary text-white"
-                    : "border-stroke-strong text-body hover:bg-surface-2"
-                }`}
+                className="min-w-12 justify-center"
               >
                 {option.short}
-              </button>
+              </Chip>
             ))}
           </div>
           <FieldError message={errors.day_of_week} />
@@ -309,14 +306,15 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
             <TimeInput label="Selesai" value={form.end} onChange={(value) => set("end", value)} error={problems.end ?? errors.end_time} />
           </div>
           {hint !== null && start && end && (
-            <p className={`mt-2 text-sm ${toMinutes(end) < toMinutes(start) ? "text-info" : "text-muted"}`}>
+            <p className={cn("mt-2 flex items-center gap-1.5 text-sm", toMinutes(end) < toMinutes(start) ? "text-info" : "text-muted-foreground")}>
+              {toMinutes(end) < toMinutes(start) && <Moon className="size-3.5 shrink-0" aria-hidden="true" />}
               {toMinutes(end) < toMinutes(start)
-                ? `🌙 Berakhir esok hari (${dayLong(nextDay(form.day))}) pukul ${end} · ${formatMinutes(hint)}`
+                ? `Berakhir esok hari (${dayLong(nextDay(form.day))}) pukul ${end} · ${formatMinutes(hint)}`
                 : `Durasi ${formatMinutes(hint)}`}
             </p>
           )}
           {conflicts && conflicts.length > 0 && (
-            <div role="alert" className="mt-3 rounded-xl border border-red-400/50 bg-red-500/10 px-4 py-3 text-sm text-danger space-y-1">
+            <div role="alert" className="mt-3 space-y-1 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               <p className="font-medium">Bentrok dengan jadwal lain:</p>
               <ul className="list-disc pl-5 space-y-0.5">
                 {conflicts.map((conflict) => (
@@ -336,7 +334,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
           {asksWhen ? (
             <div className="space-y-2">
               <Choice checked={form.applyMode === "week"} onSelect={() => set("applyMode", "week")}>
-                Mulai minggu ini dan seterusnya <span className="text-muted">({formatDayDate(thisWeek)})</span>
+                Mulai minggu ini dan seterusnya <span className="text-muted-foreground">({formatDayDate(thisWeek)})</span>
               </Choice>
               <Choice checked={form.applyMode === "date"} onSelect={() => set("applyMode", "date")}>
                 <span className="flex flex-wrap items-center gap-2">
@@ -346,7 +344,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
                   )}
                 </span>
               </Choice>
-              <p className="text-xs text-faint">Jadwal sebelum tanggal ini tidak berubah, jadi riwayat dan payroll tetap utuh.</p>
+              <p className="text-xs text-muted-foreground">Jadwal sebelum tanggal ini tidak berubah, jadi riwayat dan payroll tetap utuh.</p>
             </div>
           ) : (
             <label className="flex flex-wrap items-center gap-2 text-sm text-body">
@@ -359,11 +357,11 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             <Choice checked={!form.temporary} onSelect={() => set("temporary", false)}>
               Setiap minggu
-              <span className="block text-xs text-muted">Tanpa batas akhir</span>
+              <span className="block text-xs text-muted-foreground">Tanpa batas akhir</span>
             </Choice>
             <Choice checked={form.temporary} onSelect={() => set("temporary", true)}>
               Hanya sementara
-              <span className="mt-1 flex items-center gap-2 text-xs text-muted">
+              <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                 sampai
                 <DateInput
                   value={form.until}
@@ -391,7 +389,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
         </Step>
 
         {complete && start && end && !readOnly && (
-          <div className="rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-body">
+          <div className="rounded-lg border border-primary/30 bg-primary/[0.06] px-4 py-3 text-sm text-body">
             {describePlan({ hostName, day: form.day, start, end, from: startsOn, until })}
           </div>
         )}
@@ -403,8 +401,8 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
 function Step({ number, title, children }: { number: number; title: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-heading">
-        <span className="w-5 h-5 rounded-full bg-surface-2 text-[11px] text-body flex items-center justify-center">{number}</span>
+      <h3 className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <span className="flex size-5 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-brand tabular-nums">{number}</span>
         {title}
       </h3>
       {children}
@@ -421,11 +419,14 @@ function Choice({ checked, onSelect, children }: { checked: boolean; onSelect: (
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(event) => (event.key === " " || event.key === "Enter") && event.target === event.currentTarget && onSelect()}
-      className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 text-sm cursor-pointer transition-colors ${
-        checked ? "border-primary bg-primary/10 text-heading" : "border-stroke-strong text-body hover:bg-surface-2"
-      }`}
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        checked ? "border-primary bg-primary/[0.06] text-foreground" : "border-input text-body hover:bg-muted/60"
+      )}
     >
-      <span className={`mt-0.5 w-4 h-4 shrink-0 rounded-full border-2 ${checked ? "border-primary bg-accent shadow-[inset_0_0_0_2px_rgb(15_23_42)]" : "border-stroke-strong"}`} />
+      <span className={cn("mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2", checked ? "border-primary" : "border-input")} aria-hidden="true">
+        {checked && <span className="size-1.5 rounded-full bg-primary" />}
+      </span>
       <span className="flex-1">{children}</span>
     </div>
   );
@@ -435,7 +436,7 @@ function TimeInput({ label, value, onChange, error }: { label: string; value: st
   const listId = useId();
   return (
     <label className="space-y-1">
-      <span className="block text-xs text-muted">{label}</span>
+      <span className="block text-xs font-medium text-muted-foreground">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -447,9 +448,7 @@ function TimeInput({ label, value, onChange, error }: { label: string; value: st
         inputMode="numeric"
         placeholder="19:00"
         aria-invalid={error ? true : undefined}
-        className={`w-full px-3 py-2 rounded-lg bg-surface-2 border text-heading tabular-nums outline-none focus:ring-2 focus:ring-primary ${
-          error ? "border-red-400" : "border-stroke-strong"
-        }`}
+        className={cn(inputClass, "tabular-nums")}
       />
       <datalist id={listId}>
         {HALF_HOURS.map((time) => (
@@ -470,19 +469,19 @@ function DateInput({ value, min, onChange, label }: { value: string; min?: strin
       aria-label={label}
       onClick={(event) => event.stopPropagation()}
       onChange={(event) => event.target.value && onChange(event.target.value)}
-      className="px-2 py-1 rounded-md bg-surface-2 border border-stroke-strong text-sm text-heading [color-scheme:dark]"
+      className={cn(inputSmClass, "w-auto tabular-nums")}
     />
   );
 }
 
 function FieldError({ message }: { message?: string | null }) {
-  return message ? <p className="mt-1 text-xs text-danger">{message}</p> : null;
+  return message ? <p className="mt-1 text-xs text-destructive">{message}</p> : null;
 }
 
 function CloseButton({ onClick }: { onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="ml-auto px-4 py-2 rounded-lg text-sm text-body hover:bg-surface-2">
+    <Button type="button" variant="outline" onClick={onClick}>
       Tutup
-    </button>
+    </Button>
   );
 }

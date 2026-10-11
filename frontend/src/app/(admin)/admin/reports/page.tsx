@@ -1,15 +1,13 @@
 import ReportReview from "@/components/ReportReview";
+import PageHeader from "@/components/PageHeader";
 
 export default function AdminReportsPage() {
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Laporan Live</h1>
-        <p className="text-sm text-muted mt-1">
-          Laporan yang sesuai jadwal disetujui otomatis. Yang ada di sini perlu keputusan: setujui (bisa
-          dengan jam yang dikoreksi) atau tolak.
-        </p>
-      </div>
+    <div className="max-w-6xl space-y-6">
+      <PageHeader
+        title="Laporan live"
+        description="Laporan yang sesuai jadwal disetujui otomatis. Yang ada di sini perlu keputusan: setujui (bisa dengan jam yang dikoreksi) atau tolak."
+      />
       <ReportReview />
     </div>
   );

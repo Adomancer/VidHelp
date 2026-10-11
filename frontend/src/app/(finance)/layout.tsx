@@ -20,7 +20,13 @@ const links: SidebarGroup[] = [
 
 export default function FinanceLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarLayout panel="Panel Finance" roles={["finance", "admin"]} links={links}>
+    <SidebarLayout
+      panel="Panel Finance"
+      roles={["finance", "admin"]}
+      links={links}
+      homeHref="/finance/payroll"
+      accountLinks={[{ href: "/finance/security", label: "Keamanan akun", icon: "security" }]}
+    >
       {children}
     </SidebarLayout>
   );

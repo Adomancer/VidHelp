@@ -1,64 +1,116 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { ChevronsUpDown, LogOut } from "lucide-react";
+import { roleLabel } from "@/lib/labels";
+import { setThemeMode, useThemeMode, type ThemeMode } from "@/lib/theme";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "./AuthProvider";
+import NavIcon, { type NavIconName } from "./NavIcon";
+import { themeOptions } from "./ThemeToggle";
 import UserAvatar from "./UserAvatar";
 
-/** Avatar + name in the top header; opens a dropdown with the email and logout. */
-export default function UserMenu() {
-  const { user, logout } = useAuth();
-  const [open, setOpen] = useState(false);
-  const menu = useRef<HTMLDivElement>(null);
+export interface AccountLink {
+  href: string;
+  label: string;
+  icon: NavIconName;
+}
 
-  // Close when clicking outside the menu
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (menu.current && !menu.current.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [open]);
+/** The signed-in user at the bottom of the sidebar; opens account links, theme and logout. */
+export default function UserMenu({ links = [] }: { links?: AccountLink[] }) {
+  const { user, logout } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const mode = useThemeMode();
+  const roles = user.roles.map((role) => roleLabel(role.name)).join(", ");
 
   return (
-    <div className="relative" ref={menu}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-label="Menu akun"
-        className="flex items-center gap-2 rounded-full p-0.5 pr-2 hover:bg-surface-2"
-      >
-        <UserAvatar size="w-9 h-9" />
-        <span className="hidden sm:block max-w-40 truncate text-sm font-medium text-heading">{user.name}</span>
-        <svg className={`hidden sm:block w-4 h-4 text-muted transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton size="lg" tooltip={user.name} className="data-open:bg-sidebar-accent">
+              <UserAvatar size="size-8 text-xs" />
+              <span className="grid min-w-0 flex-1 text-left leading-tight">
+                <span className="truncate text-sm font-medium text-sidebar-accent-foreground">{user.name}</span>
+                <span className="truncate text-xs text-muted-foreground">{roles}</span>
+              </span>
+              <ChevronsUpDown className="ml-auto text-muted-foreground" aria-hidden="true" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
 
-      {open && (
-        <div className="absolute right-0 z-50 mt-2 w-64 rounded-[10px] border border-stroke bg-surface shadow-xl">
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-stroke">
-            <UserAvatar size="w-10 h-10" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-heading truncate">{user.name}</p>
-              <p className="text-xs text-muted truncate">{user.email}</p>
-            </div>
-          </div>
-          <div className="p-2">
-            <button
-              type="button"
-              onClick={logout}
-              className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-body hover:bg-surface-2 hover:text-heading"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+          <DropdownMenuContent side={isMobile ? "top" : "right"} align="end" sideOffset={8} className="w-64">
+            <DropdownMenuLabel className="flex items-center gap-3 py-2 font-normal">
+              <UserAvatar size="size-9 text-sm" />
+              <span className="grid min-w-0 leading-tight">
+                <span className="truncate text-sm font-medium text-foreground">{user.name}</span>
+                <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+              </span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            {links.length > 0 && (
+              <>
+                <DropdownMenuGroup>
+                  {links.map((link) => (
+                    <DropdownMenuItem key={link.href} asChild>
+                      <Link href={link.href} onClick={() => isMobile && setOpenMobile(false)}>
+                        <NavIcon name={link.icon} className="size-4 text-muted-foreground" />
+                        {link.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+              </>
+            )}
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                {(() => {
+                  const current = themeOptions.find((option) => option.value === mode) ?? themeOptions[0];
+                  return (
+                    <>
+                      <current.icon className="text-muted-foreground" aria-hidden="true" />
+                      Tema
+                      <span className="ml-auto text-xs text-muted-foreground">{current.label}</span>
+                    </>
+                  );
+                })()}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuRadioGroup value={mode} onValueChange={(value) => setThemeMode(value as ThemeMode)}>
+                  {themeOptions.map((option) => (
+                    <DropdownMenuRadioItem key={option.value} value={option.value}>
+                      <option.icon className="text-muted-foreground" aria-hidden="true" />
+                      {option.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem variant="destructive" onSelect={() => void logout()}>
+              <LogOut aria-hidden="true" />
               Keluar
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }

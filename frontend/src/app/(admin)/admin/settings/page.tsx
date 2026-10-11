@@ -2,13 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { RotateCcw } from "lucide-react";
 import { errorMessage, fieldErrors, settingsApi, type Setting, type SettingGroup, type SettingValue } from "@/lib/api";
-import { formatDate } from "@/lib/format";
-import { useApiData } from "@/lib/useApiData";
 import { TWO_FACTOR_SETUP_PATH } from "@/lib/auth";
+import { formatDate } from "@/lib/format";
+import { inputSmClass } from "@/lib/ui";
+import { useApiData } from "@/lib/useApiData";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
+import ErrorState from "@/components/ErrorState";
+import { FieldError } from "@/components/FieldMessage";
 import FormAlert from "@/components/FormAlert";
+import { CardsSkeleton } from "@/components/Loading";
+import PageHeader from "@/components/PageHeader";
+import { NativeSelect } from "@/components/SelectField";
+import { notify } from "@/components/Toast";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 
 const TWO_FACTOR_KEY = "two_factor.required_for_admins";
 
@@ -29,34 +40,52 @@ function showValue(setting: Setting, value: SettingValue): string {
   return setting.unit ? `${value} ${setting.unit}` : String(value);
 }
 
+const sectionId = (group: SettingGroup) => `pengaturan-${group.key}`;
+
 export default function AdminSettingsPage() {
   const { token } = useAuth();
   const settings = useApiData("admin-settings", () => settingsApi.all(token));
-  const [saved, setSaved] = useState<{ version: number; message: string } | null>(null);
+  const [version, setVersion] = useState(0);
+  const groups = settings.data?.groups;
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Pengaturan</h1>
-        <p className="text-sm text-muted mt-1">
-          Aturan bisnis yang diikuti seluruh aplikasi. Perubahan langsung berlaku dan tercatat di Log Audit.
-        </p>
+    <div className="space-y-6">
+      <PageHeader title="Pengaturan" description="Aturan bisnis yang diikuti seluruh aplikasi. Perubahan langsung berlaku dan tercatat di Log Audit." />
+
+      {settings.error && <ErrorState message={settings.error} onRetry={settings.reload} />}
+
+      <div className="grid items-start gap-6 lg:grid-cols-[12rem_minmax(0,1fr)] xl:grid-cols-[13rem_minmax(0,52rem)]">
+        <nav aria-label="Bagian pengaturan" className="hidden lg:sticky lg:top-20 lg:block">
+          <ul className="space-y-0.5 text-sm">
+            {groups?.map((group) => (
+              <li key={group.key}>
+                <a
+                  href={`#${sectionId(group)}`}
+                  className="block rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                >
+                  {group.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="min-w-0">
+          {!groups && !settings.error && <CardsSkeleton count={3} />}
+          {groups && (
+            <SettingsForm
+              // A fresh form after each save, filled from what the server stored
+              key={version}
+              groups={groups}
+              onSaved={(next, message) => {
+                settings.setData({ groups: next });
+                setVersion((current) => current + 1);
+                notify({ text: message });
+              }}
+            />
+          )}
+        </div>
       </div>
-
-      {settings.error && <FormAlert tone="error">{settings.error}</FormAlert>}
-      {saved && <FormAlert tone="success">{saved.message}</FormAlert>}
-
-      {settings.data && (
-        <SettingsForm
-          // A fresh form after each save, filled from what the server stored
-          key={saved?.version ?? 0}
-          groups={settings.data.groups}
-          onSaved={(groups, message) => {
-            settings.setData({ groups });
-            setSaved((current) => ({ version: (current?.version ?? 0) + 1, message }));
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -97,13 +126,14 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
   return (
     <div className="space-y-6 pb-4">
       {groups.map((group) => (
-        <Card key={group.key} title={group.label}>
-          <div className="divide-y divide-stroke -my-2">
+        <Card key={group.key} id={sectionId(group)} title={group.label} className="scroll-mt-20">
+          <div className="-my-2 divide-y divide-border">
             {group.settings.map((setting) => (
               <SettingRow
                 key={setting.key}
                 setting={setting}
                 value={draft[setting.key]}
+                changed={fromDraft(draft[setting.key]) !== setting.value}
                 error={errors[setting.key]}
                 onChange={(value) => setDraft({ ...draft, [setting.key]: value })}
               />
@@ -113,39 +143,34 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
       ))}
 
       {changed.length > 0 && (
-        <div className="sticky bottom-4 z-10 rounded-xl border border-primary/40 bg-surface backdrop-blur p-4 space-y-3 shadow-2xl">
+        <div className="sticky bottom-4 z-10 space-y-3 rounded-xl border border-primary/30 bg-popover/95 p-4 shadow-lg ring-1 ring-foreground/5 backdrop-blur-md animate-in fade-in-0 slide-in-from-bottom-2 duration-200">
           {error && <FormAlert tone="error">{error}</FormAlert>}
           {turningOn2fa && (
             <FormAlert tone="warning">
-              Admin dan finance yang belum memakai verifikasi dua langkah{user.two_factor_enabled ? "" : ", termasuk kamu,"} harus mengaturnya dulu sebelum bisa
-              melakukan hal lain.
+              Admin dan finance yang belum memakai verifikasi dua langkah{user.two_factor_enabled ? "" : ", termasuk kamu,"} harus mengaturnya dulu sebelum
+              bisa melakukan hal lain.
             </FormAlert>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-body">
-              {changed.length} perubahan belum disimpan
+              <span className="font-semibold text-foreground tabular-nums">{changed.length}</span> perubahan belum disimpan
             </p>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 disabled={saving}
                 onClick={() => {
                   setDraft(Object.fromEntries(all.map((setting) => [setting.key, toDraft(setting.value)])));
                   setErrors({});
                   setError(null);
                 }}
-                className="px-4 py-2 rounded-lg border border-stroke-strong text-sm text-body hover:bg-surface-2 disabled:opacity-50"
               >
                 Buang
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={save}
-                className="px-4 py-2 rounded-lg bg-primary text-sm font-medium text-white hover:bg-primary-hover disabled:opacity-60"
-              >
+              </Button>
+              <Button type="button" disabled={saving} onClick={save}>
                 {saving ? "Menyimpan…" : "Simpan perubahan"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -157,59 +182,51 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
 function SettingRow({
   setting,
   value,
+  changed,
   error,
   onChange,
 }: {
   setting: Setting;
   value: string | boolean;
+  changed: boolean;
   error?: string;
   onChange: (value: string | boolean) => void;
 }) {
   const isDefault = fromDraft(value) === setting.default;
-  const inputClass = `rounded-lg bg-canvas border px-3 py-2 text-sm text-heading outline-none focus:ring-2 focus:ring-primary ${
-    error ? "border-red-400" : "border-stroke-strong"
-  }`;
 
   return (
-    <div className="py-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0 sm:max-w-md">
-        <label htmlFor={setting.key} className="block text-sm font-medium text-heading">
+        <label htmlFor={setting.key} className="flex items-center gap-2 text-sm font-medium text-foreground">
           {setting.label}
+          {changed && <span className="size-1.5 rounded-full bg-primary" aria-label="Diubah, belum disimpan" />}
         </label>
-        <p className="text-xs text-muted mt-1">{setting.help}</p>
-        <p className="text-xs mt-1">
+        <p className="mt-1 text-xs text-muted-foreground">{setting.help}</p>
+        <p className="mt-1 text-xs">
           {setting.changed_at ? (
-            <span className="text-accent">
-              Diubah{setting.changed_by && <> oleh {setting.changed_by}</>} pada {formatDate(setting.changed_at)} · bawaan{" "}
-              {showValue(setting, setting.default)}
+            <span className="text-brand">
+              Diubah{setting.changed_by && <> oleh {setting.changed_by}</>} pada {formatDate(setting.changed_at)} · bawaan {showValue(setting, setting.default)}
             </span>
           ) : (
             <span className="text-faint">Nilai bawaan</span>
           )}
         </p>
-        {error && <p className="text-sm text-danger mt-1">{error}</p>}
+        <div className="mt-1">
+          <FieldError>{error}</FieldError>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex shrink-0 items-center gap-2">
         {setting.type === "bool" ? (
-          <button
-            id={setting.key}
-            type="button"
-            role="switch"
-            aria-checked={value === true}
-            onClick={() => onChange(value !== true)}
-            className={`relative w-11 h-6 rounded-full transition-colors ${value === true ? "bg-primary" : "bg-surface-3"}`}
-          >
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${value === true ? "translate-x-5" : ""}`} />
-          </button>
+          <Switch id={setting.key} checked={value === true} onCheckedChange={(checked) => onChange(checked)} />
         ) : setting.options ? (
-          <select id={setting.key} value={String(value)} onChange={(event) => onChange(event.target.value)} className={inputClass}>
+          <NativeSelect small id={setting.key} value={String(value)} onChange={(event) => onChange(event.target.value)} wrapperClassName="w-40">
             {setting.options.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         ) : (
           <input
             id={setting.key}
@@ -220,18 +237,22 @@ function SettingRow({
             value={String(value)}
             onChange={(event) => onChange(event.target.value)}
             aria-invalid={error ? true : undefined}
-            className={`w-24 text-right ${inputClass}`}
+            className={cn(inputSmClass, "w-24 text-right tabular-nums")}
           />
         )}
-        {setting.unit && setting.type !== "bool" && <span className="text-sm text-muted w-16">{setting.unit}</span>}
-        <button
+        {setting.unit && setting.type !== "bool" && <span className="w-16 text-sm text-muted-foreground">{setting.unit}</span>}
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={() => onChange(toDraft(setting.default))}
           disabled={isDefault}
-          className="text-xs text-accent hover:text-heading disabled:invisible"
+          title="Pakai nilai bawaan"
+          aria-label={`Pakai nilai bawaan untuk ${setting.label}`}
+          className={cn("text-muted-foreground", isDefault && "invisible")}
         >
-          Pakai bawaan
-        </button>
+          <RotateCcw />
+        </Button>
       </div>
     </div>
   );

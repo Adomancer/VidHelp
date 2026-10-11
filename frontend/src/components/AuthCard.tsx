@@ -1,11 +1,16 @@
-/** Card used by every page in the (auth) route group. */
-export default function AuthCard({ subtitle, children }: { subtitle?: string; children: React.ReactNode }) {
+/** The form column of every page in the (auth) route group: a title, a line under it, then the form. */
+export default function AuthCard({ title, subtitle, children }: { title?: string; subtitle?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="w-full max-w-md mx-4 p-8 space-y-6 bg-surface rounded-[10px] border border-stroke shadow-card">
-      <div className="text-center">
-        <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-lg font-bold text-white">V</span>
-        <h1 className="text-3xl font-bold text-heading">VidHelp</h1>
-        {subtitle && <p className="text-sm text-muted mt-2">{subtitle}</p>}
+    <div className="w-full max-w-sm space-y-7 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+      <div className="space-y-5">
+        {/* The laptop layout shows the logo in the brand panel */}
+        <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-xs lg:hidden">V</span>
+        {(title || subtitle) && (
+          <div className="space-y-1.5">
+            {title && <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>}
+            {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+          </div>
+        )}
       </div>
       {children}
     </div>

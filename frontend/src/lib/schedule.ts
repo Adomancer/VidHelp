@@ -23,6 +23,31 @@ export function weekStart(date: string = toDateInput()): string {
   return addDays(date, 1 - isoWeekday(new Date(`${date}T00:00`)));
 }
 
+/** The first day of the month `date` falls in: "2026-10-01". */
+export function monthStart(date: string = toDateInput()): string {
+  return `${date.slice(0, 7)}-01`;
+}
+
+/** The first day of the month `count` months later (or earlier). */
+export function addMonths(month: string, count: number): string {
+  const result = new Date(`${month}T00:00`);
+  result.setMonth(result.getMonth() + count, 1);
+  return toDateInput(result);
+}
+
+/** The weeks a month calendar shows: Monday on or before the 1st to Sunday on or after the last day (35 or 42 days). */
+export function monthGrid(month: string): { start: string; days: number } {
+  const start = weekStart(month);
+  const end = addDays(weekStart(addDays(addMonths(month, 1), -1)), 6);
+  const days = Math.round((Date.parse(`${end}T00:00`) - Date.parse(`${start}T00:00`)) / 86_400_000) + 1;
+  return { start, days };
+}
+
+/** "Oktober 2026" */
+export function formatMonth(month: string): string {
+  return new Date(`${month}T00:00`).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+}
+
 /** The later of two dates. */
 export function laterDate(a: string, b: string): string {
   return a > b ? a : b;

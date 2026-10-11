@@ -1,6 +1,8 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type InputHTMLAttributes } from "react";
+import { inputClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 interface RupiahInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "defaultValue" | "onChange" | "name"> {
   /** The form field; it carries the plain number ("15000"). */
@@ -41,7 +43,7 @@ export default function RupiahInput({ name, defaultValue, className = "", ...pro
 
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted">Rp</span>
+      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground" aria-hidden="true">Rp</span>
       <input
         ref={inputRef}
         type="text"
@@ -54,7 +56,7 @@ export default function RupiahInput({ name, defaultValue, className = "", ...pro
           // Drop leading zeros so "0" then "5" reads "5", not "05"
           setDigits(value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 12));
         }}
-        className={`pl-10 tabular-nums ${className}`}
+        className={cn(inputClass, className, "pl-10 tabular-nums")}
         {...props}
       />
       <input type="hidden" name={name} value={digits} />

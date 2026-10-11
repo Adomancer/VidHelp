@@ -395,8 +395,20 @@ export interface AdminDashboard {
   people: { active_hosts: number; operators: number; admins: number; warning_letters: number; points_period: { start: string } };
 }
 
+/** The operator overview: counts only. */
+export interface OperatorDashboard {
+  stats: {
+    total_hosts: number;
+    active_hosts: number;
+    today_schedules: number;
+    pending_backups: number;
+    reports_to_review: number;
+  };
+}
+
 export const dashboardApi = {
   admin: (token: string) => api<AdminDashboard>("/admin/dashboard", { token }),
+  operator: (token: string) => api<OperatorDashboard>("/operator/dashboard", { token }),
 };
 
 export interface AuditFilters {
@@ -714,8 +726,8 @@ export const scheduleApi = {
   lock: (token: string, id: string, isLocked: boolean) =>
     api<{ slot: ScheduleSlot }>(`/admin/schedules/${id}/lock`, { method: "PUT", body: JSON.stringify({ is_locked: isLocked }), token }),
 
-  /** covers: backups I do for others; absences: my sessions someone else covers (next 7 days). */
-  mine: (token: string) =>
+  /** covers: backups I do for others; absences: my sessions someone else covers (the next `days` days, 7 by default). */
+  mine: (token: string, days?: number) =>
     api<{
       slots: ScheduleSlot[];
       upcoming: ScheduleSlot[];
@@ -723,7 +735,7 @@ export const scheduleApi = {
       absences: SlotBackupMarker[];
       event_claims: MyEventClaim[];
       replacing_events: ReplacingEvent[];
-    }>("/host/schedules", { token }),
+    }>(days ? `/host/schedules?days=${days}` : "/host/schedules", { token }),
 
   myAvailability: (token: string) => api<{ availability: AvailabilityRange[] }>("/host/availability", { token }),
 

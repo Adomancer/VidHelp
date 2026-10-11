@@ -32,7 +32,7 @@ const links: SidebarGroup[] = [
 
 export default function OperatorLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarLayout panel="Panel Operator" roles={["operator", "admin"]} links={links}>
+    <SidebarLayout panel="Panel Operator" roles={["operator", "admin"]} links={links} homeHref="/operator/dashboard" search>
       {children}
     </SidebarLayout>
   );

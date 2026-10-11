@@ -1,18 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight, Plus, Ticket } from "lucide-react";
 import { errorMessage, eventApi, operatorApi, scheduleApi, type BrandHost, type EventBlock, type EventInput, type EventListItem } from "@/lib/api";
 import { groupByDay } from "@/lib/events";
 import { formatClock, formatDate, formatDay, formatDuration, toDateInput } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
+import { useMediaQuery } from "@/hooks/use-mobile";
+import { inputClass, inputSmClass } from "@/lib/ui";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
+import ConfirmDialog from "./ConfirmDialog";
+import Dialog from "./Dialog";
+import EmptyState from "./EmptyState";
+import ErrorState from "./ErrorState";
+import FormActions from "./FormActions";
 import FormAlert from "./FormAlert";
+import { CardsSkeleton } from "./Loading";
 import Modal from "./Modal";
-import SubmitButton from "./SubmitButton";
-
-type Notice = { tone: "success" | "error"; text: string } | null;
+import { NativeSelect } from "./SelectField";
+import StatusBadge from "./StatusBadge";
+import { notify } from "./Toast";
 
 /**
  * Admin/operator: create special events and manage who holds each block.
@@ -22,58 +34,84 @@ export default function EventManager() {
   const events = useApiData("events", () => eventApi.list(token));
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [error, setError] = useState<string | null>(null);
+  const wide = useMediaQuery("(min-width: 1024px)");
 
   const active = events.data?.events ?? [];
-  const eventId = selected ?? active.find((event) => event.status === "active")?.id ?? null;
+  const eventId = selected ?? (wide ? active.find((event) => event.status === "active")?.id : null) ?? null;
+
+  const detail = eventId && (
+    <EventDetail
+      key={eventId}
+      eventId={eventId}
+      onChanged={(text, tone = "success") => {
+        if (tone === "success") notify({ text });
+        else setError(text);
+        events.reload();
+      }}
+    />
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
-        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover">
+        <Button type="button" onClick={() => setCreating(true)}>
+          <Plus aria-hidden="true" />
           Event baru
-        </button>
+        </Button>
       </div>
 
       {creating && (
         <EventForm
           onDone={(message, id) => {
             setCreating(false);
-            setNotice({ tone: "success", text: message });
+            notify({ text: message });
             setSelected(id);
             events.reload();
           }}
           onCancel={() => setCreating(false)}
         />
       )}
-      {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
-      {events.error && <FormAlert tone="error">{events.error}</FormAlert>}
+      {error && <FormAlert tone="error">{error}</FormAlert>}
+      {events.error && <ErrorState message={events.error} onRetry={events.reload} />}
+      {!events.data && !events.error && <CardsSkeleton count={2} />}
 
       {events.data && active.length === 0 && (
         <Card>
-          <p className="text-sm text-muted">Belum ada event. Buat event untuk kampanye PD atau double date.</p>
+          <EmptyState
+            icon={Ticket}
+            title="Belum ada event"
+            description="Buat event untuk kampanye PD atau double date. Host dari brand-nya bisa langsung mengambil blok."
+            action={
+              <Button type="button" variant="outline" onClick={() => setCreating(true)}>
+                <Plus aria-hidden="true" />
+                Event baru
+              </Button>
+            }
+          />
         </Card>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[18rem_1fr]">
-        <ul className="space-y-2">
-          {active.map((event) => (
-            <li key={event.id}>
-              <EventListButton event={event} selected={event.id === eventId} onClick={() => setSelected(event.id)} />
-            </li>
-          ))}
-        </ul>
-        {eventId && (
-          <EventDetail
-            key={eventId}
-            eventId={eventId}
-            onChanged={(text, tone = "success") => {
-              setNotice({ tone, text });
-              events.reload();
-            }}
-          />
-        )}
-      </div>
+      {active.length > 0 && (
+        <div className="grid items-start gap-4 lg:grid-cols-[19rem_minmax(0,1fr)] xl:grid-cols-[21rem_minmax(0,1fr)]">
+          <ul className="space-y-2 lg:sticky lg:top-20">
+            {active.map((event) => (
+              <li key={event.id}>
+                <EventListButton event={event} selected={event.id === eventId} onClick={() => setSelected(event.id)} />
+              </li>
+            ))}
+          </ul>
+          {wide ? (
+            detail || <CardsSkeleton count={2} />
+          ) : (
+            eventId && (
+              <Dialog title="Detail event" placement="side" size="lg" onClose={() => setSelected(null)}>
+                {detail}
+              </Dialog>
+            )
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -83,16 +121,31 @@ function EventListButton({ event, selected, onClick }: { event: EventListItem; s
     <button
       type="button"
       onClick={onClick}
-      className={`w-full text-left rounded-lg px-3 py-2 border ${selected ? "bg-primary/20 border-primary/50" : "bg-surface border-stroke hover:bg-surface-2"}`}
+      aria-current={selected ? "true" : undefined}
+      className={cn(
+        "w-full space-y-1.5 rounded-xl border px-3.5 py-3 text-left shadow-xs transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 dark:shadow-none",
+        selected ? "border-primary/50 bg-primary/[0.06]" : "border-border bg-card hover:bg-muted/60"
+      )}
     >
-      <p className={`text-sm font-medium ${event.status === "cancelled" ? "text-faint line-through" : "text-heading"}`}>{event.name}</p>
-      <p className="text-xs text-muted">
+      <p className={cn("text-sm font-semibold", event.status === "cancelled" ? "text-faint line-through" : "text-foreground")}>{event.name}</p>
+      <p className="text-xs text-muted-foreground">
         {event.brand?.name} · {formatDate(event.start_date)}
         {event.end_date !== event.start_date ? ` – ${formatDate(event.end_date)}` : ""}
       </p>
-      <p className="text-xs text-faint">
-        {event.status === "cancelled" ? "dibatalkan" : `${event.claimed_blocks}/${event.total_blocks} blok terisi`}
-      </p>
+      {event.status === "cancelled" ? (
+        <StatusBadge tone="neutral" className="h-5 px-1.5 text-[11px]">
+          Dibatalkan
+        </StatusBadge>
+      ) : (
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${event.total_blocks > 0 ? (event.claimed_blocks / event.total_blocks) * 100 : 0}%` }} />
+          </div>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {event.claimed_blocks}/{event.total_blocks}
+          </span>
+        </div>
+      )}
     </button>
   );
 }
@@ -103,6 +156,7 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
   const brandId = detail.data?.event.brand_id ?? "";
   const hosts = useApiData(`event-hosts-${brandId}`, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
   const [openDay, setOpenDay] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   async function act(action: () => Promise<{ message: string }>) {
     try {
@@ -113,41 +167,37 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
     detail.reload();
   }
 
-  if (detail.error) return <FormAlert tone="error">{detail.error}</FormAlert>;
-  if (!detail.data) return <p className="text-muted">Memuat…</p>;
+  if (detail.error) return <ErrorState message={detail.error} onRetry={detail.reload} />;
+  if (!detail.data) return <CardsSkeleton count={2} />;
   const { event, blocks } = detail.data;
   const cancelled = event.status === "cancelled";
   const days = groupByDay(blocks);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-lg text-heading font-medium">{event.name}</p>
-            <p className="text-sm text-muted">
+          <div className="min-w-0">
+            <p className="text-lg font-semibold tracking-tight text-foreground">{event.name}</p>
+            <p className="text-sm text-muted-foreground">
               {event.brand?.name} · setiap hari {event.daily_start_time}–{event.daily_end_time} · blok {formatDuration(event.block_minutes / 60)} · maks{" "}
               {event.max_slots_per_host} per host
             </p>
-            <p className="text-xs text-muted mt-1">
+            <p className="mt-1.5 text-xs text-muted-foreground">
               {event.open_full_schedule ? "Menggantikan jadwal reguler di hari-hari ini." : "Berjalan bersama jadwal reguler; jam yang sudah terjadwal tidak bisa diambil."}
             </p>
           </div>
           {!cancelled && (
-            <button
-              type="button"
-              onClick={() => confirm(`Batalkan ${event.name}? Semua blok yang sudah diambil akan dilepas.`) && act(() => eventApi.cancel(token, event.id))}
-              className="px-3 py-1.5 rounded-lg border border-red-400/40 text-danger text-sm hover:bg-red-500/10"
-            >
+            <Button type="button" variant="outline" size="sm" onClick={() => setCancelling(true)} className="text-destructive hover:text-destructive">
               Batalkan event
-            </button>
+            </Button>
           )}
         </div>
         {!cancelled && <EventSettings key={`${event.max_slots_per_host}-${event.open_full_schedule}`} eventId={event.id} maxPerHost={event.max_slots_per_host} openFull={event.open_full_schedule} act={act} />}
       </Card>
 
       <Card title="Blok per hari" description="Klik hari untuk melihat setiap blok dan mengatur host-nya.">
-        <ul className="-my-2 divide-y divide-stroke">
+        <ul className="-mx-2 -my-1 divide-y divide-border">
           {days.map(([day, dayBlocks]) => (
             <li key={day}>
               <DaySummary day={day} blocks={dayBlocks} onOpen={() => setOpenDay(day)} />
@@ -169,6 +219,18 @@ function EventDetail({ eventId, onChanged }: { eventId: string; onChanged: (text
           onClose={() => setOpenDay(null)}
         />
       )}
+
+      {cancelling && (
+        <ConfirmDialog
+          title={`Batalkan ${event.name}?`}
+          confirmLabel="Batalkan event"
+          cancelLabel="Kembali"
+          onConfirm={() => act(() => eventApi.cancel(token, event.id))}
+          onClose={() => setCancelling(false)}
+        >
+          Semua blok yang sudah diambil akan dilepas, dan host mendapat pemberitahuan.
+        </ConfirmDialog>
+      )}
     </div>
   );
 }
@@ -178,8 +240,8 @@ type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
 /** Strip colors, one segment per block: who has it at a glance. */
 function blockColor(block: EventBlock): string {
   if (block.claim) return "bg-primary";
-  if (block.state === "unavailable") return "bg-amber-400/60";
-  if (block.state === "past") return "bg-stroke";
+  if (block.state === "unavailable") return "bg-warning/50";
+  if (block.state === "past") return "bg-border";
   return "bg-primary/15 ring-1 ring-inset ring-primary/40";
 }
 
@@ -190,10 +252,14 @@ function DaySummary({ day, blocks, onOpen }: { day: string; blocks: EventBlock[]
   const holders = [...new Set(blocks.flatMap((block) => (block.claim ? [block.claim.host_name] : [])))];
 
   return (
-    <button type="button" onClick={onOpen} className="group flex w-full items-center gap-4 rounded-lg px-1 py-3 text-left hover:bg-surface-2">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group flex w-full items-center gap-4 rounded-lg px-2 py-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60"
+    >
       <span className="w-28 shrink-0">
-        <span className="block text-sm font-medium text-heading">{formatDay(`${day}T00:00`)}</span>
-        <span className="block text-xs text-muted">
+        <span className="block text-sm font-semibold text-foreground">{formatDay(`${day}T00:00`)}</span>
+        <span className="block text-xs text-muted-foreground tabular-nums">
           {claimed}/{blocks.length} terisi
         </span>
       </span>
@@ -203,14 +269,14 @@ function DaySummary({ day, blocks, onOpen }: { day: string; blocks: EventBlock[]
             <span key={block.start_at} className={`h-2.5 flex-1 rounded-sm ${blockColor(block)}`} />
           ))}
         </span>
-        <span className="block truncate text-xs text-muted">
+        <span className="block truncate text-xs text-muted-foreground">
           {holders.length > 0
             ? `Diambil ${holders.slice(0, 3).join(", ")}${holders.length > 3 ? ` +${holders.length - 3} lainnya` : ""}`
             : "Belum ada yang mengambil"}
-          {open > 0 && <span className="text-accent"> · {open} masih kosong</span>}
+          {open > 0 && <span className="font-medium text-brand"> · {open} masih kosong</span>}
         </span>
       </span>
-      <span className="shrink-0 text-sm text-muted group-hover:text-heading">Detail ›</span>
+      <ChevronRight className="size-4 shrink-0 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden="true" />
     </button>
   );
 }
@@ -219,11 +285,11 @@ function BlockLegend() {
   const items: [string, string][] = [
     ["bg-primary", "Terisi"],
     ["bg-primary/15 ring-1 ring-inset ring-primary/40", "Kosong"],
-    ["bg-amber-400/60", "Ada jadwal reguler"],
-    ["bg-stroke", "Lewat, tidak diambil"],
+    ["bg-warning/50", "Ada jadwal reguler"],
+    ["bg-border", "Lewat, tidak diambil"],
   ];
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-stroke pt-3 text-xs text-muted">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
       {items.map(([color, label]) => (
         <span key={label} className="flex items-center gap-1.5">
           <span className={`h-2.5 w-4 rounded-sm ${color}`} /> {label}
@@ -267,77 +333,72 @@ function DayBlocksModal({
     <Modal title={formatDay(`${day}T00:00`)} description={`${eventName} · ${claimed}/${blocks.length} blok terisi`} onClose={onClose} wide>
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-xs uppercase tracking-wide text-faint">
-            <th className="w-32 pb-2 font-medium">Jam</th>
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+            <th className="w-28 pb-2 font-medium sm:w-32">Jam</th>
             <th className="pb-2 font-medium">Host / status</th>
-            <th className="pb-2 text-right font-medium">Aksi</th>
+            <th className="pb-2 text-right font-medium">
+              <span className="sr-only">Aksi</span>
+            </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-stroke">
+        <tbody className="divide-y divide-border">
           {blocks.map((block) => {
             const upcoming = new Date(block.end_at) > new Date();
             return (
               <tr key={block.start_at} className={block.state === "past" && !block.claim ? "opacity-60" : ""}>
-                <td className="py-2.5 whitespace-nowrap tabular-nums text-accent">
+                <td className="py-2.5 align-top font-medium whitespace-nowrap text-foreground tabular-nums">
                   {formatClock(block.start_at)}–{formatClock(block.end_at)}
                 </td>
                 <td className="py-2.5">
                   {block.claim ? (
-                    <span className="font-medium text-heading">{block.claim.host_name}</span>
+                    <span className="font-medium text-foreground">{block.claim.host_name}</span>
                   ) : block.state === "unavailable" ? (
                     <span className="text-faint">{block.reason}</span>
                   ) : (
-                    <span className="text-muted">{block.state === "past" ? "Tidak diambil" : "Kosong"}</span>
+                    <span className="text-muted-foreground">{block.state === "past" ? "Tidak diambil" : "Kosong"}</span>
                   )}
                   {assigning === block.start_at && (
                     <div className="mt-2 flex gap-2">
-                      <select
+                      <NativeSelect
+                        small
+                        wrapperClassName="flex-1"
                         value={assignHostId || hosts[0]?.host_id || ""}
                         onChange={(change) => setAssignHostId(change.target.value)}
                         aria-label="Host"
-                        className="flex-1 rounded-md border border-stroke-strong bg-surface px-2 py-1.5 text-sm text-heading"
                       >
                         {hosts.map((assignment) => (
                           <option key={assignment.host_id} value={assignment.host_id}>
                             {assignment.host.user.name}
                           </option>
                         ))}
-                      </select>
-                      <button
+                      </NativeSelect>
+                      <Button
                         type="button"
+                        size="sm"
                         onClick={() => {
                           const hostId = assignHostId || hosts[0]?.host_id;
                           if (hostId) run(() => eventApi.assign(token, eventId, block.start_at, hostId));
                         }}
-                        className="rounded-md bg-primary px-3 py-1.5 text-sm text-white hover:bg-primary-hover"
                       >
                         Berikan blok
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </td>
                 <td className="py-2.5 text-right whitespace-nowrap align-top">
                   {editable && upcoming ? (
-                    <span className="inline-flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAssigning(assigning === block.start_at ? null : block.start_at)}
-                        className="rounded-md border border-stroke-strong px-2.5 py-1 text-xs text-body hover:bg-surface-2"
-                      >
+                    <span className="inline-flex gap-1.5">
+                      <Button type="button" variant="outline" size="xs" onClick={() => setAssigning(assigning === block.start_at ? null : block.start_at)}>
                         {assigning === block.start_at ? "Tutup" : block.claim ? "Ganti host" : "Tunjuk host"}
-                      </button>
+                      </Button>
                       {block.claim && (
-                        <button
-                          type="button"
-                          onClick={() => run(() => eventApi.release(token, block.claim!.id))}
-                          className="rounded-md border border-red-400/40 px-2.5 py-1 text-xs text-danger hover:bg-red-500/10"
-                        >
+                        <Button type="button" variant="ghost" size="xs" onClick={() => run(() => eventApi.release(token, block.claim!.id))} className="text-destructive hover:text-destructive">
                           Lepas
-                        </button>
+                        </Button>
                       )}
                     </span>
                   ) : (
-                    <span className="text-faint">—</span>
+                    <span className="text-faint">–</span>
                   )}
                 </td>
               </tr>
@@ -365,22 +426,25 @@ function EventSettings({
   const [full, setFull] = useState(openFull);
 
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-stroke pt-3 text-sm">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-border pt-4 text-sm">
       <label className="flex items-center gap-2 text-body">
         Maks blok per host
-        <input type="number" min={1} max={100} value={max} onChange={(event) => setMax(event.target.value)} className="w-16 px-2 py-1 rounded-md bg-surface-2 border border-stroke-strong text-heading" />
+        <input type="number" min={1} max={100} value={max} onChange={(event) => setMax(event.target.value)} className={cn(inputSmClass, "w-16 tabular-nums")} />
       </label>
       <label className="flex items-center gap-2 text-body">
-        <input type="checkbox" checked={full} onChange={(event) => setFull(event.target.checked)} className="accent-primary" />
+        <Switch checked={full} onCheckedChange={setFull} />
         Gantikan jadwal reguler
       </label>
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="sm"
+        disabled={Number(max) === maxPerHost && full === openFull}
         onClick={() => act(() => eventApi.update(token, eventId, { max_slots_per_host: Number(max), open_full_schedule: full }))}
-        className="px-3 py-1 rounded-md border border-stroke-strong text-body hover:bg-surface-2"
+        className="ml-auto"
       >
-        Simpan
-      </button>
+        Simpan pengaturan
+      </Button>
     </div>
   );
 }
@@ -388,7 +452,7 @@ function EventSettings({
 function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
   const brands = useApiData("brands", () => operatorApi.brands(token));
-  const input = "w-full px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading";
+  const input = cn(inputClass, "tabular-nums");
 
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) => {
@@ -409,16 +473,16 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
   );
 
   const field = (label: string, name: string, child: React.ReactNode) => (
-    <label className="space-y-1">
-      <span className="block text-xs text-muted">{label}</span>
+    <label className="space-y-1.5">
+      <span className="block text-sm font-medium text-foreground">{label}</span>
       {child}
-      {errors[name] && <span className="block text-xs text-danger">{errors[name]}</span>}
+      {errors[name] && <span className="block text-sm text-destructive">{errors[name]}</span>}
     </label>
   );
 
   return (
     <Modal title="Event baru" description="Host dari brand ini mengambil blok, siapa cepat dia dapat." onClose={onCancel} wide>
-      <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2" noValidate>
+      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
             <FormAlert tone="error">{error}</FormAlert>
@@ -427,7 +491,7 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
         {field(
           "Brand",
           "brand_id",
-          <select name="brand_id" className={input}>
+          <NativeSelect name="brand_id">
             {brands.data?.brands
               .filter((brand) => brand.status === "active")
               .map((brand) => (
@@ -435,7 +499,7 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
                   {brand.name}
                 </option>
               ))}
-          </select>
+          </NativeSelect>
         )}
         {field("Nama", "name", <input name="name" placeholder="PD 10.10" maxLength={100} className={input} />)}
         {field("Hari pertama", "start_date", <input name="start_date" type="date" defaultValue={toDateInput()} min={toDateInput()} className={input} />)}
@@ -447,24 +511,17 @@ function EventForm({ onDone, onCancel }: { onDone: (message: string, id: string)
           "block_minutes",
           <div className="flex items-center gap-2">
             <input name="block_hours" type="number" min={0} max={12} defaultValue={2} aria-label="Jam per blok" className={input} />
-            <span className="text-sm text-muted">jam</span>
+            <span className="text-sm text-muted-foreground">jam</span>
             <input name="block_extra_minutes" type="number" min={0} max={59} step={15} defaultValue={0} aria-label="Menit per blok" className={input} />
-            <span className="text-sm text-muted">menit</span>
+            <span className="text-sm text-muted-foreground">menit</span>
           </div>
         )}
         {field("Maks blok per host", "max_slots_per_host", <input name="max_slots_per_host" type="number" min={1} max={100} defaultValue={3} className={input} />)}
-        <label className="flex items-center gap-2 text-sm text-body sm:col-span-2">
-          <input type="checkbox" name="open_full_schedule" className="accent-primary" />
-          Gantikan jadwal reguler brand di hari-hari ini (&quot;jadwal dibuka kosong&quot;)
+        <label className="flex items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm text-body sm:col-span-2">
+          <input type="checkbox" name="open_full_schedule" className="size-4 accent-primary" />
+          Gantikan jadwal reguler brand di hari-hari ini <span className="text-muted-foreground">(&quot;jadwal dibuka kosong&quot;)</span>
         </label>
-        <div className="sm:col-span-2 flex gap-3">
-          <div className="w-40">
-            <SubmitButton loading={loading}>Buat event</SubmitButton>
-          </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
-            Batal
-          </button>
-        </div>
+        <FormActions loading={loading} submitLabel="Buat event" onCancel={onCancel} />
       </form>
     </Modal>
   );

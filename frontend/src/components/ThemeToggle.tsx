@@ -1,54 +1,76 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { setThemeMode, useResolvedTheme, useThemeMode, type ThemeMode } from "@/lib/theme";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = "vidhelp-theme";
+export const themeOptions: { value: ThemeMode; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Terang", icon: Sun },
+  { value: "dark", label: "Gelap", icon: Moon },
+  { value: "system", label: "Sistem", icon: Monitor },
+];
 
-/**
- * Runs in <head> before the first paint so a saved dark theme doesn't flash light.
- * Light is the default; the choice is per device (localStorage).
- */
-export const themeInitScript = `try{if(localStorage.getItem("${STORAGE_KEY}")==="dark")document.documentElement.classList.add("dark")}catch(e){}`;
-
-function subscribe(onChange: () => void) {
-  const observer = new MutationObserver(onChange);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  return () => observer.disconnect();
-}
-
-const isDark = () => document.documentElement.classList.contains("dark");
-
-/** Sun/moon button that switches between light and dark mode. */
+/** Sun/moon button in the header; opens light, dark or follow-the-system. */
 export default function ThemeToggle() {
-  const dark = useSyncExternalStore(subscribe, isDark, () => false);
-
-  function toggle() {
-    const next = !dark;
-    document.documentElement.classList.toggle("dark", next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next ? "dark" : "light");
-    } catch {
-      // Storage blocked: the theme still switches for this visit
-    }
-  }
+  const mode = useThemeMode();
+  const resolved = useResolvedTheme();
 
   return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={dark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
-      title={dark ? "Mode terang" : "Mode gelap"}
-      className="w-9 h-9 rounded-full flex items-center justify-center text-body hover:bg-surface-2 hover:text-heading"
-    >
-      {dark ? (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-      ) : (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-        </svg>
-      )}
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Ganti tema" className="text-muted-foreground hover:text-foreground">
+          {resolved === "dark" ? <Moon /> : <Sun />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuLabel>Tema</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={mode} onValueChange={(value) => setThemeMode(value as ThemeMode)}>
+          {themeOptions.map((option) => (
+            <DropdownMenuRadioItem key={option.value} value={option.value}>
+              <option.icon className="text-muted-foreground" />
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** The same choice as a three-way segmented control, for menus and sheets. */
+export function ThemeSwitcher({ className }: { className?: string }) {
+  const mode = useThemeMode();
+
+  return (
+    <div role="radiogroup" aria-label="Tema" className={cn("grid grid-cols-3 gap-1 rounded-lg bg-muted p-1", className)}>
+      {themeOptions.map((option) => {
+        const selected = mode === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => setThemeMode(option.value)}
+            className={cn(
+              "flex h-9 items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              selected ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <option.icon className="size-3.5" aria-hidden="true" />
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

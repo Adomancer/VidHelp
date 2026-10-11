@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { ApiError, authApi } from "@/lib/api";
 import { consumeOAuthState, homePathFor, saveSession } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import FormAlert from "./FormAlert";
 import TwoFactorChallengeForm from "./TwoFactorChallengeForm";
 
 type Outcome =
@@ -72,7 +75,12 @@ export default function GoogleCallback() {
   }, [router, searchParams]);
 
   if (!outcome || outcome.kind === "signed-in") {
-    return <p className="text-center text-body">Sedang masuk…</p>;
+    return (
+      <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+        Sedang masuk…
+      </p>
+    );
   }
 
   if (outcome.kind === "two-factor") {
@@ -80,11 +88,11 @@ export default function GoogleCallback() {
   }
 
   return (
-    <div className="space-y-4 text-center">
-      <p className={outcome.kind === "pending" ? "text-warning" : "text-danger"}>{outcome.message}</p>
-      <Link href="/login" className="inline-block text-sm text-accent hover:text-heading">
-        Kembali ke halaman masuk
-      </Link>
+    <div className="space-y-4">
+      <FormAlert tone={outcome.kind === "pending" ? "warning" : "error"}>{outcome.message}</FormAlert>
+      <Button asChild variant="outline" className="w-full">
+        <Link href="/login">Kembali ke halaman masuk</Link>
+      </Button>
     </div>
   );
 }

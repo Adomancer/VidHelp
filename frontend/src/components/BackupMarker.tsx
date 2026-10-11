@@ -1,11 +1,12 @@
+import { CornerDownRight } from "lucide-react";
 import type { SlotBackupMarker } from "@/lib/api";
 
 /** One line under a slot saying what happens to it on that date because of a backup. */
 export default function BackupMarker({ marker, mine = false }: { marker: SlotBackupMarker; mine?: boolean }) {
   if (marker.status === "filled") {
     return (
-      <span className="block text-xs text-success">
-        {mine ? "Kamu libur · " : "↳ "}digantikan {marker.filler_name}
+      <span className="flex items-center gap-1 text-xs text-success">
+        {mine ? "Kamu libur · " : <CornerDownRight className="size-3 shrink-0" aria-hidden="true" />}digantikan {marker.filler_name}
       </span>
     );
   }

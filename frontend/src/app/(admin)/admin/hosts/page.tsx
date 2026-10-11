@@ -4,7 +4,8 @@ import { Suspense, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import HostDetailDialog from "@/components/HostDetailDialog";
 import HostTable from "@/components/HostTable";
-import Toast, { useToast } from "@/components/Toast";
+import PageHeader from "@/components/PageHeader";
+import { useToast } from "@/components/Toast";
 
 export default function AdminHostsPage() {
   // The open host is in the URL (?host=…), which isn't known while prerendering
@@ -20,18 +21,13 @@ function HostsPage() {
   const pathname = usePathname();
   const openId = useSearchParams().get("host");
   const [refreshKey, setRefreshKey] = useState(0);
-  const { toast, show, dismiss } = useToast();
+  const { show } = useToast();
 
   const open = (id: string | null) => router.replace(id ? `${pathname}?host=${id}` : pathname, { scroll: false });
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Host</h1>
-        <p className="text-sm text-muted mt-1">
-          Klik baris host untuk melihat data KTP dan bank, serta mengatur kontak, tanggal bergabung, level tarif, dan brand.
-        </p>
-      </div>
+      <PageHeader title="Host" description="Klik host untuk melihat data KTP dan bank, serta mengatur kontak, tanggal bergabung, level tarif, dan brand." />
       <HostTable onSelect={(host) => open(host.id)} refreshKey={refreshKey} />
 
       {openId && (
@@ -45,7 +41,6 @@ function HostsPage() {
           }}
         />
       )}
-      <Toast toast={toast} onDismiss={dismiss} />
     </div>
   );
 }

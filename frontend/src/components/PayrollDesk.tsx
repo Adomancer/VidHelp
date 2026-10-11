@@ -1,33 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { CalendarRange, ChevronRight, Download, HandCoins, Plus, Send, Wallet } from "lucide-react";
 import { errorMessage, payrollApi, type CashAdvance, type PeriodListItem, type PeriodStatus } from "@/lib/api";
 import { formatDate, formatDuration, formatRupiah } from "@/lib/format";
+import { inputClass, inputSmClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
+import ConfirmDialog from "./ConfirmDialog";
+import Dialog from "./Dialog";
 import DurationInput from "./DurationInput";
+import EmptyState from "./EmptyState";
+import ErrorState from "./ErrorState";
+import { FieldError } from "./FieldMessage";
+import FormActions from "./FormActions";
 import FormAlert from "./FormAlert";
+import { CardsSkeleton, RefreshBar, TableSkeleton } from "./Loading";
 import Modal from "./Modal";
+import RupiahInput from "./RupiahInput";
+import { NativeSelect } from "./SelectField";
+import StatusBadge, { type Tone } from "./StatusBadge";
 import SubmitButton from "./SubmitButton";
+import { notify } from "./Toast";
 import ToggleGroup from "./ToggleGroup";
 
-type Notice = { tone: "success" | "error"; text: string } | null;
-
-const statusStyles: Record<PeriodStatus, [string, string]> = {
-  in_progress: ["Berjalan", "bg-blue-500/15 text-info"],
-  waiting_payment: ["Siap ditagihkan", "bg-yellow-500/15 text-warning"],
-  requested: ["Menunggu brand", "bg-primary/15 text-accent"],
-  paid: ["Lunas", "bg-green-500/15 text-success"],
+const statusStyles: Record<PeriodStatus, [string, Tone]> = {
+  in_progress: ["Berjalan", "info"],
+  waiting_payment: ["Siap ditagihkan", "warning"],
+  requested: ["Menunggu brand", "brand"],
+  paid: ["Lunas", "success"],
 };
 
 export function PeriodBadge({ status }: { status: PeriodStatus }) {
-  const [label, style] = statusStyles[status];
-  return <span className={`px-2 py-0.5 rounded-md text-xs whitespace-nowrap ${style}`}>{label}</span>;
+  const [label, tone] = statusStyles[status];
+  return (
+    <StatusBadge tone={tone} dot>
+      {label}
+    </StatusBadge>
+  );
 }
+
+type Confirm = { title: string; body: string; label: string; destructive?: boolean; run: () => Promise<{ message: string }> } | null;
 
 /**
  * Admin payroll: payment periods per brand (lock, pay, slips) and kasbon.
@@ -36,8 +56,9 @@ export default function PayrollDesk() {
   const [tab, setTab] = useState<"periods" | "kasbon">("periods");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <ToggleGroup
+        label="Bagian penggajian"
         options={[
           ["periods", "Periode pembayaran"],
           ["kasbon", "Kasbon"],
@@ -45,7 +66,14 @@ export default function PayrollDesk() {
         value={tab}
         onChange={setTab}
       />
-      {tab === "periods" ? <Periods /> : <Kasbon />}
+      {tab === "periods" ? (
+        // The open period lives in the URL (?period=…), which isn't known while prerendering
+        <Suspense fallback={<TableSkeleton rows={5} columns={5} />}>
+          <Periods />
+        </Suspense>
+      ) : (
+        <Kasbon />
+      )}
     </div>
   );
 }
@@ -55,8 +83,15 @@ function Periods() {
   const brands = useApiData("payroll-brands", () => payrollApi.brands(token));
   const [brandId, setBrandId] = useState("");
   const periods = useApiData(`periods-${brandId}`, () => payrollApi.periods(token, brandId));
-  const [selected, setSelected] = useState<string | null>(null);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [error, setError] = useState<string | null>(null);
+  const list = periods.data?.periods;
+
+  // The open period is in the URL, so a refresh, a shared link or coming back from a slip keeps it open
+  const router = useRouter();
+  const pathname = usePathname();
+  const selected = useSearchParams().get("period");
+  const select = (id: string | null) => router.replace(id ? `${pathname}?period=${id}` : pathname, { scroll: false });
+  const current = list?.find((period) => period.id === selected);
 
   const withoutStart = brands.data?.brands.filter((brand) => brand.status === "active" && !brand.payroll_start_date) ?? [];
 
@@ -68,17 +103,16 @@ function Periods() {
           jam mereka masuk ke periode.
         </FormAlert>
       )}
-      {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
-      {periods.error && <FormAlert tone="error">{periods.error}</FormAlert>}
+      {error && <FormAlert tone="error">{error}</FormAlert>}
+      {periods.error && <ErrorState message={periods.error} onRetry={periods.reload} />}
 
-      <select
+      <NativeSelect
+        wrapperClassName="sm:w-64"
         value={brandId}
         onChange={(event) => {
           setBrandId(event.target.value);
-          setSelected(null);
         }}
         aria-label="Brand"
-        className="px-3 py-2 rounded-lg bg-surface border border-stroke text-heading"
       >
         <option value="">Semua brand</option>
         {brands.data?.brands.map((brand) => (
@@ -86,37 +120,84 @@ function Periods() {
             {brand.name}
           </option>
         ))}
-      </select>
+      </NativeSelect>
 
-      <div className={`bg-surface border border-stroke rounded-[10px] shadow-card overflow-x-auto ${periods.loading ? "opacity-60" : ""}`}>
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs uppercase tracking-wide text-muted bg-surface-2 border-b border-stroke">
-            <tr>
-              <th className="px-4 py-3 font-medium">Brand · periode</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Jam kerja</th>
-              <th className="px-4 py-3 font-medium">Ditagihkan</th>
-              <th className="px-4 py-3 font-medium text-right">Gaji host</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stroke">
-            {periods.data?.periods.map((period) => (
-              <PeriodRow key={period.id} period={period} selected={period.id === selected} onClick={() => setSelected(period.id === selected ? null : period.id)} />
-            ))}
-          </tbody>
-        </table>
-        {periods.data?.periods.length === 0 && <p className="px-4 py-8 text-center text-muted">Belum ada periode pembayaran.</p>}
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+        <RefreshBar active={periods.loading && Boolean(list)} />
+        {!list && !periods.error && <TableSkeleton rows={5} columns={5} />}
+        {list?.length === 0 && <EmptyState icon={CalendarRange} title="Belum ada periode pembayaran" description="Periode dibuat otomatis setelah brand punya tanggal mulai penggajian." />}
+
+        {list && list.length > 0 && (
+          <>
+            <table className="hidden w-full text-sm md:table">
+              <thead className="border-b border-border bg-muted/50 text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Brand · periode</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 text-right font-medium">Jam kerja</th>
+                  <th className="px-4 py-3 text-right font-medium">Ditagihkan</th>
+                  <th className="px-4 py-3 text-right font-medium">Gaji host</th>
+                  <th className="w-10 px-4 py-3">
+                    <span className="sr-only">Buka</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {list.map((period) => (
+                  <PeriodRow key={period.id} period={period} selected={period.id === selected} onClick={() => select(period.id)} />
+                ))}
+              </tbody>
+            </table>
+
+            <ul className="divide-y divide-border md:hidden">
+              {list.map((period) => (
+                <li key={period.id}>
+                  <button
+                    type="button"
+                    onClick={() => select(period.id)}
+                    className={cn("w-full space-y-2 p-4 text-left outline-none focus-visible:bg-muted/60", period.id === selected ? "bg-primary/[0.06]" : "active:bg-muted/60")}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground">{period.brand?.name}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
+                        </p>
+                      </div>
+                      <PeriodBadge status={period.status} />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground tabular-nums">
+                      <span>
+                        {formatDuration(period.achieved_hours)} / {period.target_hours} jam
+                      </span>
+                      <span className="text-sm font-semibold text-foreground">{formatRupiah(period.total_amount)}</span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </div>
 
       {selected && (
-        <PeriodDetail
-          key={selected}
-          periodId={selected}
-          onChanged={(text, tone = "success") => {
-            setNotice({ tone, text });
-            periods.reload();
-          }}
-        />
+        <Dialog
+          placement="side"
+          size="xl"
+          onClose={() => select(null)}
+          title={current ? `${current.brand?.name} · ${formatDate(current.period_start)} – ${formatDate(current.period_end)}` : "Periode pembayaran"}
+          description={current && <PeriodBadge status={current.status} />}
+        >
+          <PeriodDetail
+            key={selected}
+            periodId={selected}
+            onChanged={(text, tone = "success") => {
+              if (tone === "success") notify({ text });
+              else setError(text);
+              periods.reload();
+            }}
+          />
+        </Dialog>
       )}
     </div>
   );
@@ -124,21 +205,35 @@ function Periods() {
 
 function PeriodRow({ period, selected, onClick }: { period: PeriodListItem; selected: boolean; onClick: () => void }) {
   return (
-    <tr onClick={onClick} className={`cursor-pointer text-body ${selected ? "bg-primary/10" : "hover:bg-surface-2"}`}>
+    <tr
+      onClick={onClick}
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onClick();
+        }
+      }}
+      aria-haspopup="dialog"
+      className={cn("cursor-pointer text-body transition-colors outline-none focus-visible:bg-muted/60", selected ? "bg-primary/[0.06]" : "hover:bg-muted/40")}
+    >
       <td className="px-4 py-3">
-        <p className="text-heading">{period.brand?.name}</p>
-        <p className="text-xs text-muted">
+        <p className="font-medium text-foreground">{period.brand?.name}</p>
+        <p className="text-xs text-muted-foreground tabular-nums">
           {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
         </p>
       </td>
       <td className="px-4 py-3">
         <PeriodBadge status={period.status} />
       </td>
-      <td className="px-4 py-3 whitespace-nowrap">{formatDuration(period.worked_hours)}</td>
-      <td className="px-4 py-3 whitespace-nowrap">
-        {formatDuration(period.achieved_hours)} <span className="text-xs text-faint">/ {period.target_hours} jam</span>
+      <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">{formatDuration(period.worked_hours)}</td>
+      <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums">
+        {formatDuration(period.achieved_hours)} <span className="text-xs text-muted-foreground">/ {period.target_hours} jam</span>
       </td>
-      <td className="px-4 py-3 text-right whitespace-nowrap">{formatRupiah(period.total_amount)}</td>
+      <td className="px-4 py-3 text-right font-medium whitespace-nowrap text-foreground tabular-nums">{formatRupiah(period.total_amount)}</td>
+      <td className="px-4 py-3">
+        <ChevronRight className={cn("ml-auto size-4 text-faint", selected && "text-brand")} aria-hidden="true" />
+      </td>
     </tr>
   );
 }
@@ -146,6 +241,7 @@ function PeriodRow({ period, selected, onClick }: { period: PeriodListItem; sele
 function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (text: string, tone?: "success" | "error") => void }) {
   const { token } = useAuth();
   const detail = useApiData(`period-${periodId}`, () => payrollApi.period(token, periodId));
+  const [confirm, setConfirm] = useState<Confirm>(null);
   // The desk is shared by the admin and finance panels; slips open in the same panel
   const slipsPath = usePathname().startsWith("/finance") ? "/finance/payroll/slips" : "/admin/payroll/slips";
 
@@ -169,45 +265,59 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
     }
   }
 
-  if (detail.error) return <FormAlert tone="error">{detail.error}</FormAlert>;
-  if (!detail.data) return <p className="text-muted">Memuat…</p>;
+  if (detail.error) return <ErrorState message={detail.error} onRetry={detail.reload} />;
+  if (!detail.data) return <CardsSkeleton count={2} />;
   const { period, summary, pending_reports: pendingReports, requests, hosts, adjustments, slips } = detail.data;
   const locked = period.status === "requested" || period.status === "paid";
+  const hasActions = period.status === "waiting_payment" || locked;
 
   return (
     <div className="space-y-4">
       <Card>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-lg text-heading font-medium">
-              {period.brand?.name} · {formatDate(period.period_start)} – {formatDate(period.period_end)}
-            </p>
-            <PeriodBadge status={period.status} />
-          </div>
+        {/* What can be done with this period now, first */}
+        {hasActions && (
           <div className="flex flex-wrap gap-2">
             {period.status === "waiting_payment" && (
-              <button
+              <Button
                 type="button"
                 disabled={pendingReports > 0}
-                onClick={() => confirm("Kunci periode ini dan ajukan pembayaran? Jam dan tarif akan dibekukan.") && act(() => payrollApi.requestPayment(token, period.id))}
-                className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() =>
+                  setConfirm({
+                    title: "Ajukan pembayaran?",
+                    body: "Periode ini dikunci: jam dan tarif host dibekukan, dan laporan brand dibuat.",
+                    label: "Kunci dan ajukan",
+                    destructive: false,
+                    run: () => payrollApi.requestPayment(token, period.id),
+                  })
+                }
               >
+                <Send aria-hidden="true" />
                 Ajukan pembayaran
-              </button>
+              </Button>
             )}
             {locked && (
-              <button type="button" onClick={download} className="px-3 py-1.5 rounded-lg border border-stroke-strong text-body text-sm hover:bg-surface-2">
+              <Button type="button" variant="outline" onClick={download}>
+                <Download aria-hidden="true" />
                 Laporan brand (CSV)
-              </button>
+              </Button>
             )}
             {period.status === "requested" && (
-              <button
+              <Button
                 type="button"
-                onClick={() => confirm("Brand sudah membayar? Slip gaji akan dibuat dan kasbon dipotong.") && act(() => payrollApi.markPaid(token, period.id))}
-                className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm hover:bg-green-500"
+                variant="success"
+                onClick={() =>
+                  setConfirm({
+                    title: "Brand sudah membayar?",
+                    body: "Slip gaji dibuat untuk setiap host dan cicilan kasbon dipotong.",
+                    label: "Tandai lunas",
+                    destructive: false,
+                    run: () => payrollApi.markPaid(token, period.id),
+                  })
+                }
               >
+                <Wallet aria-hidden="true" />
                 Tandai lunas
-              </button>
+              </Button>
             )}
             {period.status === "requested" && (
               <InlineAction
@@ -215,101 +325,111 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                 placeholder="Kenapa? mis. jam host salah"
                 submitLabel="Batalkan pengajuan"
                 required
-                buttonClass="px-3 py-1.5 rounded-lg border border-red-500/40 text-danger text-sm hover:bg-red-500/10"
+                destructive
                 onSubmit={(reason) => act(() => payrollApi.cancelRequest(token, period.id, reason))}
               />
             )}
           </div>
-        </div>
+        )}
 
         {period.status !== "paid" && pendingReports > 0 && (
           <FormAlert tone="warning">
-            {pendingReports} laporan live di periode ini masih menunggu dicek. Pembayaran
-            bisa diajukan setelah operator menyetujui atau menolaknya.
+            {pendingReports} laporan live di periode ini masih menunggu dicek. Pembayaran bisa diajukan setelah operator menyetujui atau menolaknya.
           </FormAlert>
         )}
 
-        <dl className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+        <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border text-sm sm:grid-cols-3">
           <Stat label="Target" value={`${summary.target_hours} jam`} />
           <Stat label="Jam kerja (semua host)" value={formatDuration(summary.worked_hours)} />
           <Stat label="Bawaan periode lalu" value={formatDuration(summary.carried_in_hours)} />
           <Stat label="Ditagihkan ke brand" value={formatDuration(summary.achieved_hours)} />
           <Stat label="Dibawa ke periode berikutnya" value={formatDuration(summary.carried_out_hours)} />
-          <Stat label="Gaji host" value={formatRupiah(summary.total_amount)} />
+          <Stat label="Gaji host" value={formatRupiah(summary.total_amount)} strong />
         </dl>
-        {period.status === "in_progress" && <p className="text-xs text-muted">Gaji masih perkiraan dengan tarif hari ini sampai pembayaran diajukan.</p>}
+        {period.status === "in_progress" && <p className="text-xs text-muted-foreground">Gaji masih perkiraan dengan tarif hari ini sampai pembayaran diajukan.</p>}
         {period.status === "requested" && (
-          <p className="text-xs text-muted">
-            Membatalkan akan membuka kunci periode supaya jam bisa dikoreksi; ajukan lagi setelahnya. Jam yang disetujui saat periode terkunci tetap di periode berikutnya.
+          <p className="text-xs text-muted-foreground">
+            Membatalkan akan membuka kunci periode supaya jam bisa dikoreksi; ajukan lagi setelahnya. Jam yang disetujui saat periode terkunci tetap di periode
+            berikutnya.
           </p>
         )}
       </Card>
 
       {requests.some((request) => request.status === "cancelled") && (
         <Card title="Riwayat pengajuan">
-          <ul className="space-y-2 text-sm">
+          <ul className="divide-y divide-border text-sm">
             {requests.map((request) => (
-              <li key={request.id} className="rounded-lg bg-surface-2 px-3 py-2">
+              <li key={request.id} className="py-2.5 first:pt-0 last:pb-0">
                 <p className="text-body">
                   Diajukan {formatDate(request.requested_at)}
                   {request.requester ? ` oleh ${request.requester.name}` : ""}
                   {request.status === "cancelled" ? (
-                    <span className="text-danger">
+                    <span className="text-destructive">
                       {" "}
                       · dibatalkan {request.cancelled_at ? formatDate(request.cancelled_at) : ""}
                       {request.canceller ? ` oleh ${request.canceller.name}` : ""}
                     </span>
                   ) : (
-                    <span className="text-muted"> · {request.status === "paid" ? "lunas" : "aktif"}</span>
+                    <span className="text-muted-foreground"> · {request.status === "paid" ? "lunas" : "aktif"}</span>
                   )}
                 </p>
-                {request.cancel_reason && <p className="text-xs text-muted">{request.cancel_reason}</p>}
+                {request.cancel_reason && <p className="text-xs text-muted-foreground">{request.cancel_reason}</p>}
               </li>
             ))}
           </ul>
         </Card>
       )}
 
-      <Card title="Host">
-        {hosts.length === 0 && <p className="text-sm text-muted">Belum ada jam yang disetujui.</p>}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <tbody className="divide-y divide-stroke">
-              {hosts.map((host) => (
-                <tr key={host.host_id} className="text-body">
-                  <td className="py-2 text-heading">{host.name}</td>
-                  <td className="py-2">
-                    {host.session_count} sesi
-                  </td>
-                  <td className="py-2 whitespace-nowrap">{formatDuration(host.hours)}</td>
-                  <td className="py-2 whitespace-nowrap text-muted">× {formatRupiah(host.rate_per_hour)}</td>
-                  <td className="py-2 text-right whitespace-nowrap">
-                    {formatRupiah(host.amount)}
-                    {host.estimate && <span className="text-xs text-faint"> perkiraan</span>}
-                  </td>
+      <Card title="Host" bodyClassName="px-0 pb-2 md:px-0">
+        {hosts.length === 0 ? (
+          <p className="px-5 pb-3 text-sm text-muted-foreground md:px-6">Belum ada jam yang disetujui.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-y border-border bg-muted/50 text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-2.5 font-medium md:px-6">Host</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Sesi</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Waktu</th>
+                  <th className="hidden px-3 py-2.5 text-right font-medium sm:table-cell">Tarif</th>
+                  <th className="px-5 py-2.5 text-right font-medium md:px-6">Gaji</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {hosts.map((host) => (
+                  <tr key={host.host_id} className="text-body">
+                    <td className="px-5 py-2.5 font-medium text-foreground md:px-6">{host.name}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{host.session_count}</td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">{formatDuration(host.hours)}</td>
+                    <td className="hidden px-3 py-2.5 text-right whitespace-nowrap text-muted-foreground tabular-nums sm:table-cell">{formatRupiah(host.rate_per_hour)}</td>
+                    <td className="px-5 py-2.5 text-right whitespace-nowrap tabular-nums md:px-6">
+                      <span className="font-medium text-foreground">{formatRupiah(host.amount)}</span>
+                      {host.estimate && <span className="block text-[11px] text-muted-foreground">perkiraan</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <Card title="Penyesuaian" description="Tambah atau kurangi waktu host, mis. live terpotong karena gangguan.">
-        {adjustments.length === 0 && <p className="text-sm text-muted">Tidak ada.</p>}
+        {adjustments.length === 0 && <p className="text-sm text-muted-foreground">Tidak ada penyesuaian.</p>}
         <ul className="space-y-2">
           {adjustments.map((adjustment) => (
-            <li key={adjustment.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 text-sm">
-              <span className="text-heading">{adjustment.host.user.name}</span>
-              <span className={adjustment.hours_added < 0 ? "text-danger" : "text-success"}>
+            <li key={adjustment.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-sm">
+              <span className="font-medium text-foreground">{adjustment.host.user.name}</span>
+              <StatusBadge tone={adjustment.hours_added < 0 ? "danger" : "success"} className="tabular-nums">
                 {adjustment.hours_added < 0 ? "−" : "+"}
                 {formatDuration(Math.abs(adjustment.hours_added))}
                 {adjustment.sessions_added !== 0 && `, ${adjustment.sessions_added > 0 ? "+" : ""}${adjustment.sessions_added} sesi`}
-              </span>
-              <span className="flex-1 min-w-32 text-muted">{adjustment.notes}</span>
+              </StatusBadge>
+              <span className="min-w-32 flex-1 text-muted-foreground">{adjustment.notes}</span>
               {!locked && (
-                <button type="button" onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))} className="text-xs text-danger hover:text-danger">
+                <Button type="button" variant="ghost" size="xs" onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))} className="text-destructive hover:text-destructive">
                   Hapus
-                </button>
+                </Button>
               )}
             </li>
           ))}
@@ -318,24 +438,39 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
       </Card>
 
       {slips.length > 0 && (
-        <Card title="Slip gaji">
-          <ul className="space-y-2">
+        <Card title="Slip gaji" bodyClassName="px-0 pb-2 md:px-0">
+          <ul className="divide-y divide-border border-t border-border">
             {slips.map((slip) => (
-              <li key={slip.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-2 px-3 py-2 text-sm">
-                <span className="flex-1 text-heading">{slip.host?.user.name}</span>
-                <span className="text-muted">
-                  {formatRupiah(slip.gross_amount)}
-                  {slip.advance_deduction > 0 && ` − ${formatRupiah(slip.advance_deduction)} kasbon`}
-                </span>
-                {(slip.skipped_deductions?.length ?? 0) > 0 && <span className="text-xs text-warning">kasbon dilewati (gaji tidak cukup)</span>}
-                <span className="font-medium text-success">{formatRupiah(slip.net_amount)}</span>
-                <Link href={`${slipsPath}/${slip.id}`} className="text-xs text-accent hover:text-heading">
-                  Lihat
+              <li key={slip.id}>
+                <Link
+                  href={`${slipsPath}/${slip.id}`}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50 md:px-6"
+                >
+                  <span className="min-w-32 flex-1 font-medium text-foreground">{slip.host?.user.name}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {formatRupiah(slip.gross_amount)}
+                    {slip.advance_deduction > 0 && ` − ${formatRupiah(slip.advance_deduction)} kasbon`}
+                  </span>
+                  {(slip.skipped_deductions?.length ?? 0) > 0 && <StatusBadge tone="warning">kasbon dilewati</StatusBadge>}
+                  <span className="font-semibold text-foreground tabular-nums">{formatRupiah(slip.net_amount)}</span>
+                  <ChevronRight className="size-4 text-faint" aria-hidden="true" />
                 </Link>
               </li>
             ))}
           </ul>
         </Card>
+      )}
+
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.title}
+          confirmLabel={confirm.label}
+          destructive={confirm.destructive ?? true}
+          onConfirm={() => act(confirm.run)}
+          onClose={() => setConfirm(null)}
+        >
+          {confirm.body}
+        </ConfirmDialog>
       )}
     </div>
   );
@@ -350,7 +485,8 @@ function InlineAction({
   submitLabel,
   type = "text",
   required = false,
-  buttonClass,
+  destructive = false,
+  small = false,
   onSubmit,
 }: {
   label: string;
@@ -358,7 +494,8 @@ function InlineAction({
   submitLabel: string;
   type?: "text" | "number";
   required?: boolean;
-  buttonClass: string;
+  destructive?: boolean;
+  small?: boolean;
   onSubmit: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -367,9 +504,15 @@ function InlineAction({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass}>
+      <Button
+        type="button"
+        variant={small ? "ghost" : "outline"}
+        size={small ? "xs" : "default"}
+        onClick={() => setOpen(true)}
+        className={cn(destructive && "text-destructive hover:text-destructive")}
+      >
         {label}
-      </button>
+      </Button>
     );
   }
 
@@ -382,7 +525,7 @@ function InlineAction({
         setOpen(false);
         setValue("");
       }}
-      className="flex flex-wrap items-center gap-2"
+      className="flex w-full flex-wrap items-center gap-2 sm:w-auto"
     >
       <input
         autoFocus
@@ -394,23 +537,23 @@ function InlineAction({
         onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className={`px-3 py-1.5 rounded-lg bg-surface-2 border border-stroke-strong text-heading text-sm ${type === "number" ? "w-28" : "min-w-56"}`}
+        className={cn(inputSmClass, type === "number" ? "w-32" : "min-w-56 flex-1")}
       />
-      <button type="submit" disabled={missing} className="px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover disabled:opacity-50">
+      <Button type="submit" size="sm" variant={destructive ? "danger" : "default"} disabled={missing}>
         {submitLabel}
-      </button>
-      <button type="button" onClick={() => setOpen(false)} className="text-xs text-muted hover:text-heading">
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
         Kembali
-      </button>
+      </Button>
     </form>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div>
-      <dt className="text-xs text-muted">{label}</dt>
-      <dd className="text-heading">{value}</dd>
+    <div className="bg-card px-3.5 py-3">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={cn("mt-0.5 tabular-nums", strong ? "text-base font-semibold text-foreground" : "font-medium text-foreground")}>{value}</dd>
     </div>
   );
 }
@@ -420,7 +563,6 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
   const hosts = useApiData(`payroll-hosts-${brandId}`, () => payrollApi.hosts(token, brandId));
   const [direction, setDirection] = useState<1 | -1>(1);
   const [hours, setHours] = useState(1);
-  const input = "px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading";
 
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) =>
@@ -437,41 +579,52 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
   );
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2 border-t border-stroke pt-3" noValidate>
+    <form onSubmit={handleSubmit} className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2" noValidate>
       {error && (
         <div className="sm:col-span-2">
           <FormAlert tone="error">{error}</FormAlert>
         </div>
       )}
-      <label className="space-y-1">
-        <span className="block text-xs text-muted">Host</span>
-        <select name="host_id" className={`${input} w-full`}>
+      <div className="space-y-1.5">
+        <Label htmlFor={`adjust-host-${periodId}`}>Host</Label>
+        <NativeSelect id={`adjust-host-${periodId}`} name="host_id">
           {hosts.data?.hosts.map((host) => (
             <option key={host.host_id} value={host.host_id}>
               {host.name}
             </option>
           ))}
-        </select>
-      </label>
-      <label className="space-y-1">
-        <span className="block text-xs text-muted">Tambah atau kurangi</span>
-        <select value={direction} onChange={(event) => setDirection(Number(event.target.value) as 1 | -1)} className={`${input} w-full`}>
-          <option value={1}>Tambah waktu</option>
-          <option value={-1}>Kurangi waktu</option>
-        </select>
-      </label>
-      <DurationInput label="Waktu" hours={hours} onChange={setHours} error={errors.hours_added} compact />
-      <label className="space-y-1">
-        <span className="block text-xs text-muted">Sesi (opsional)</span>
-        <input name="sessions" type="number" min={0} max={50} defaultValue={0} className={`${input} w-24`} />
-      </label>
-      <label className="space-y-1 sm:col-span-2">
-        <span className="block text-xs text-muted">Alasan</span>
-        <input name="notes" maxLength={255} className={`${input} w-full`} />
-        {errors.notes && <span className="block text-xs text-danger">{errors.notes}</span>}
-      </label>
-      <div className="w-44">
-        <SubmitButton loading={loading}>Simpan penyesuaian</SubmitButton>
+        </NativeSelect>
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-sm font-medium text-foreground">Tambah atau kurangi</p>
+        <ToggleGroup
+          label="Tambah atau kurangi"
+          options={[
+            ["1", "Tambah waktu"],
+            ["-1", "Kurangi waktu"],
+          ] as const}
+          value={String(direction) as "1" | "-1"}
+          onChange={(value) => setDirection(Number(value) as 1 | -1)}
+          className="grid w-full grid-cols-2"
+        />
+      </div>
+      <DurationInput label="Waktu" hours={hours} onChange={setHours} error={errors.hours_added} />
+      <div className="space-y-1.5">
+        <Label htmlFor={`adjust-sessions-${periodId}`}>
+          Sesi <span className="font-normal text-muted-foreground">(opsional)</span>
+        </Label>
+        <input id={`adjust-sessions-${periodId}`} name="sessions" type="number" min={0} max={50} defaultValue={0} className={cn(inputClass, "w-28 tabular-nums")} />
+      </div>
+      <div className="space-y-1.5 sm:col-span-2">
+        <Label htmlFor={`adjust-notes-${periodId}`}>Alasan</Label>
+        <input id={`adjust-notes-${periodId}`} name="notes" maxLength={255} className={inputClass} />
+        <FieldError>{errors.notes}</FieldError>
+      </div>
+      <div className="flex justify-end sm:col-span-2">
+        <SubmitButton loading={loading} size="default" className="sm:w-auto">
+          <Plus aria-hidden="true" />
+          Simpan penyesuaian
+        </SubmitButton>
       </div>
     </form>
   );
@@ -480,24 +633,26 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
 const advanceTypes = { early_payment: "Gaji di muka", loan: "Pinjaman" } as const;
 
 function installmentColor(installment: CashAdvance["installments"][number]): string {
-  if (installment.status === "deducted") return "bg-green-500";
-  if (installment.status === "settled") return "bg-blue-400";
-  return installment.skip_count > 0 ? "bg-yellow-500" : "bg-surface-3";
+  if (installment.status === "deducted") return "bg-success";
+  if (installment.status === "settled") return "bg-info";
+  return installment.skip_count > 0 ? "bg-warning" : "bg-secondary";
 }
 
 function Kasbon() {
   const { token } = useAuth();
   const [status, setStatus] = useState<"open" | "paid" | "">("open");
   const advances = useApiData(`advances-${status}`, () => payrollApi.advances(token, status));
-  const [notice, setNotice] = useState<Notice>(null);
+  const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [removing, setRemoving] = useState<CashAdvance | null>(null);
+  const list = advances.data?.advances;
 
   async function act(action: () => Promise<{ message: string }>) {
-    setNotice(null);
+    setError(null);
     try {
-      setNotice({ tone: "success", text: (await action()).message });
+      notify({ text: (await action()).message });
     } catch (caught) {
-      setNotice({ tone: "error", text: errorMessage(caught) });
+      setError(errorMessage(caught));
     }
     advances.reload();
   }
@@ -505,19 +660,15 @@ function Kasbon() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <select
-          value={status}
-          onChange={(event) => setStatus(event.target.value as typeof status)}
-          aria-label="Status"
-          className="px-3 py-2 rounded-lg bg-surface border border-stroke text-heading"
-        >
+        <NativeSelect wrapperClassName="w-48" value={status} onChange={(event) => setStatus(event.target.value as typeof status)} aria-label="Status kasbon">
           <option value="open">Masih dicicil</option>
           <option value="paid">Sudah lunas</option>
           <option value="">Semua</option>
-        </select>
-        <button type="button" onClick={() => setCreating(true)} className="px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover">
+        </NativeSelect>
+        <Button type="button" onClick={() => setCreating(true)}>
+          <Plus aria-hidden="true" />
           Catat kasbon
-        </button>
+        </Button>
       </div>
 
       {creating && (
@@ -529,91 +680,110 @@ function Kasbon() {
           onCancel={() => setCreating(false)}
         />
       )}
-      {notice && <FormAlert tone={notice.tone}>{notice.text}</FormAlert>}
-      {advances.error && <FormAlert tone="error">{advances.error}</FormAlert>}
+      {error && <FormAlert tone="error">{error}</FormAlert>}
+      {advances.error && <ErrorState message={advances.error} onRetry={advances.reload} />}
+      {!list && !advances.error && <CardsSkeleton count={2} />}
 
-      {advances.data?.advances.length === 0 && (
-        <Card>
-          <p className="text-sm text-muted">Tidak ada kasbon.</p>
-        </Card>
+      {list?.length === 0 && (
+        <div className="rounded-xl border border-dashed border-input bg-card/50">
+          <EmptyState icon={HandCoins} title="Tidak ada kasbon" />
+        </div>
       )}
-      {advances.data?.advances.map((advance) => {
-        const paidCount = advance.installments.filter((installment) => installment.status !== "scheduled").length;
-        const skipped = advance.installments.find((installment) => installment.status === "scheduled" && installment.skip_count > 0);
+      <ul className={cn("grid gap-3 xl:grid-cols-2", advances.loading && list && "opacity-60")}>
+        {list?.map((advance) => {
+          const paidCount = advance.installments.filter((installment) => installment.status !== "scheduled").length;
+          const skipped = advance.installments.find((installment) => installment.status === "scheduled" && installment.skip_count > 0);
 
-        return (
-          <Card key={advance.id}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-heading font-medium">
-                  {advance.host.user.name} · {formatRupiah(advance.total_amount)}
-                </p>
-                <p className="text-xs text-muted">
-                  {advanceTypes[advance.type]} · {formatDate(advance.requested_at)}
-                  {advance.brand ? ` · ${advance.brand.name}` : ""}
-                  {advance.notes ? ` · ${advance.notes}` : ""}
-                </p>
+          return (
+            <li key={advance.id} className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-xs dark:shadow-none">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">
+                    {advance.host.user.name}
+                    <span className="font-semibold tabular-nums"> · {formatRupiah(advance.total_amount)}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {advanceTypes[advance.type]} · {formatDate(advance.requested_at)}
+                    {advance.brand ? ` · ${advance.brand.name}` : ""}
+                    {advance.notes ? ` · ${advance.notes}` : ""}
+                  </p>
+                </div>
+                {advance.status === "paid" ? (
+                  <StatusBadge tone="success">Lunas</StatusBadge>
+                ) : (
+                  <span className="text-right text-xs text-muted-foreground tabular-nums">
+                    {paidCount}/{advance.installment_count} cicilan
+                    <span className="block text-sm font-semibold text-foreground">sisa {formatRupiah(advance.remaining_amount)}</span>
+                  </span>
+                )}
               </div>
-              <span className="text-sm text-body">
-                {paidCount}/{advance.installment_count} cicilan · sisa {formatRupiah(advance.remaining_amount)}
-              </span>
-            </div>
-            <div className="flex gap-1">
-              {advance.installments.map((installment) => (
-                <span
-                  key={installment.id}
-                  title={`${installment.seq}: ${formatRupiah(installment.amount)}${installment.skip_count > 0 ? ` · dilewati ${installment.skip_count}×` : ""}`}
-                  className={`h-2 flex-1 rounded-full ${installmentColor(installment)}`}
-                />
-              ))}
-            </div>
-            {skipped && (
-              <p className="text-xs text-warning">
-                Cicilan {skipped.seq} ({formatRupiah(skipped.amount)}) dilewati di {skipped.skip_count} slip karena gaji tidak
-                cukup. Pertimbangkan menjadwal ulang jadi cicilan yang lebih kecil.
-              </p>
-            )}
-            {advance.settled_at && (
-              <p className="text-xs text-muted">
-                Dilunasi langsung pada {formatDate(advance.settled_at)}
-                {advance.settler ? ` (dicatat oleh ${advance.settler.name})` : ""}
-                {advance.settled_note ? ` · ${advance.settled_note}` : ""}
-              </p>
-            )}
-            <div className="flex flex-wrap items-center gap-3">
-              {advance.status !== "paid" && (
-                <>
-                  <InlineAction
-                    label="Dilunasi langsung"
-                    placeholder="Catatan (opsional), mis. tunai tgl 3 Okt"
-                    submitLabel="Tandai lunas"
-                    buttonClass="text-xs text-success hover:text-success"
-                    onSubmit={(note) => act(() => payrollApi.settleAdvance(token, advance.id, note || null))}
+              <div className="flex gap-1" aria-label={`${paidCount} dari ${advance.installment_count} cicilan terbayar`}>
+                {advance.installments.map((installment) => (
+                  <span
+                    key={installment.id}
+                    title={`${installment.seq}: ${formatRupiah(installment.amount)}${installment.skip_count > 0 ? ` · dilewati ${installment.skip_count}×` : ""}`}
+                    className={cn("h-2 flex-1 rounded-full", installmentColor(installment))}
                   />
-                  <InlineAction
-                    label="Jadwal ulang"
-                    placeholder="Jumlah cicilan"
-                    submitLabel="Bagi sisanya"
-                    type="number"
-                    required
-                    buttonClass="text-xs text-accent hover:text-heading"
-                    onSubmit={(count) => act(() => payrollApi.rescheduleAdvance(token, advance.id, Number(count)))}
-                  />
-                </>
+                ))}
+              </div>
+              {skipped && (
+                <FormAlert tone="warning">
+                  Cicilan {skipped.seq} ({formatRupiah(skipped.amount)}) dilewati di {skipped.skip_count} slip karena gaji tidak cukup. Pertimbangkan menjadwal ulang
+                  jadi cicilan yang lebih kecil.
+                </FormAlert>
               )}
-              {paidCount === 0 && (
-                <button
-                  type="button"
-                  onClick={() => confirm("Hapus kasbon ini?") && act(() => payrollApi.removeAdvance(token, advance.id))}
-                  className="text-xs text-danger hover:text-danger"
-                >
-                  Hapus (salah catat)
-                </button>
+              {advance.settled_at && (
+                <p className="text-xs text-muted-foreground">
+                  Dilunasi langsung pada {formatDate(advance.settled_at)}
+                  {advance.settler ? ` (dicatat oleh ${advance.settler.name})` : ""}
+                  {advance.settled_note ? ` · ${advance.settled_note}` : ""}
+                </p>
               )}
-            </div>
-          </Card>
-        );
-      })}
+              {(advance.status !== "paid" || paidCount === 0) && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                  {advance.status !== "paid" && (
+                    <>
+                      <InlineAction
+                        small
+                        label="Dilunasi langsung"
+                        placeholder="Catatan (opsional), mis. tunai tgl 3 Okt"
+                        submitLabel="Tandai lunas"
+                        onSubmit={(note) => act(() => payrollApi.settleAdvance(token, advance.id, note || null))}
+                      />
+                      <InlineAction
+                        small
+                        label="Jadwal ulang"
+                        placeholder="Jumlah cicilan"
+                        submitLabel="Bagi sisanya"
+                        type="number"
+                        required
+                        onSubmit={(count) => act(() => payrollApi.rescheduleAdvance(token, advance.id, Number(count)))}
+                      />
+                    </>
+                  )}
+                  {paidCount === 0 && (
+                    <Button type="button" variant="ghost" size="xs" onClick={() => setRemoving(advance)} className="ml-auto text-destructive hover:text-destructive">
+                      Hapus (salah catat)
+                    </Button>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {removing && (
+        <ConfirmDialog
+          title="Hapus kasbon ini?"
+          confirmLabel="Hapus kasbon"
+          cancelLabel="Kembali"
+          onConfirm={() => act(() => payrollApi.removeAdvance(token, removing.id))}
+          onClose={() => setRemoving(null)}
+        >
+          {advanceTypes[removing.type]} {removing.host.user.name} sebesar {formatRupiah(removing.total_amount)}. Belum ada cicilan yang dipotong.
+        </ConfirmDialog>
+      )}
     </div>
   );
 }
@@ -621,7 +791,6 @@ function Kasbon() {
 function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; onCancel: () => void }) {
   const { token } = useAuth();
   const hosts = useApiData("payroll-hosts-all", () => payrollApi.hosts(token));
-  const input = "w-full px-3 py-2 rounded-lg bg-surface-2 border border-stroke-strong text-heading";
 
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) =>
@@ -637,51 +806,46 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
 
   return (
     <Modal title="Catat kasbon" description="Dicicil sama rata dari slip gaji host berikutnya (brand apa pun)." onClose={onCancel}>
-      <form onSubmit={handleSubmit} className="grid gap-3 sm:grid-cols-2" noValidate>
+      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (
           <div className="sm:col-span-2">
             <FormAlert tone="error">{error}</FormAlert>
           </div>
         )}
-        <label className="space-y-1">
-          <span className="block text-xs text-muted">Host</span>
-          <select name="host_id" className={input}>
+        <div className="space-y-1.5">
+          <Label htmlFor="advance-host">Host</Label>
+          <NativeSelect id="advance-host" name="host_id">
             {hosts.data?.hosts.map((host) => (
               <option key={host.host_id} value={host.host_id}>
                 {host.name}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="block text-xs text-muted">Jenis</span>
-          <select name="type" className={input}>
+          </NativeSelect>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="advance-type">Jenis</Label>
+          <NativeSelect id="advance-type" name="type">
             <option value="loan">Pinjaman</option>
             <option value="early_payment">Gaji di muka</option>
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="block text-xs text-muted">Jumlah (Rp)</span>
-          <input name="total_amount" type="number" min={1000} step={1000} className={input} />
-          {errors.total_amount && <span className="block text-xs text-danger">{errors.total_amount}</span>}
-        </label>
-        <label className="space-y-1">
-          <span className="block text-xs text-muted">Jumlah cicilan</span>
-          <input name="installment_count" type="number" min={1} max={24} defaultValue={1} className={input} />
-          {errors.installment_count && <span className="block text-xs text-danger">{errors.installment_count}</span>}
-        </label>
-        <label className="space-y-1 sm:col-span-2">
-          <span className="block text-xs text-muted">Catatan</span>
-          <input name="notes" maxLength={255} className={input} />
-        </label>
-        <div className="sm:col-span-2 flex gap-3">
-          <div className="w-40">
-            <SubmitButton loading={loading}>Catat</SubmitButton>
-          </div>
-          <button type="button" onClick={onCancel} className="px-4 py-3 rounded-xl text-body hover:bg-surface-2">
-            Batal
-          </button>
+          </NativeSelect>
         </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="advance-amount">Jumlah</Label>
+          <RupiahInput id="advance-amount" name="total_amount" placeholder="0" aria-invalid={errors.total_amount ? true : undefined} />
+          <FieldError>{errors.total_amount}</FieldError>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="advance-installments">Jumlah cicilan</Label>
+          <input id="advance-installments" name="installment_count" type="number" min={1} max={24} defaultValue={1} className={cn(inputClass, "tabular-nums")} />
+          <FieldError>{errors.installment_count}</FieldError>
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <Label htmlFor="advance-notes">
+            Catatan <span className="font-normal text-muted-foreground">(opsional)</span>
+          </Label>
+          <input id="advance-notes" name="notes" maxLength={255} className={inputClass} />
+        </div>
+        <FormActions loading={loading} submitLabel="Catat kasbon" onCancel={onCancel} />
       </form>
     </Modal>
   );

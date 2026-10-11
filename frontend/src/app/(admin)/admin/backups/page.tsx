@@ -1,13 +1,14 @@
 import BackupDesk from "@/components/BackupDesk";
+import PageHeader from "@/components/PageHeader";
 import BackupTimingNote from "@/components/BackupTimingNote";
 
 export default function AdminBackupsPage() {
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold text-heading">Backup</h1>
-        <BackupTimingNote />
-      </div>
+    <div className="max-w-6xl space-y-6">
+      <PageHeader
+        title="Backup"
+        description={<BackupTimingNote />}
+      />
       <BackupDesk />
     </div>
   );
