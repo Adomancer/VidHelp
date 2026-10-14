@@ -17,9 +17,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * caller explicitly makeVisible()s the raw fields (admin only).
  */
 #[Table('host_sensitive_data')]
-#[Fillable(['host_id', 'ktp_number', 'ktp_image_path', 'bank_name', 'bank_account', 'account_holder_name'])]
+#[Fillable(['host_id', 'ktp_number', 'bank_name', 'bank_account', 'account_holder_name'])]
 #[Hidden(['ktp_number', 'bank_account', 'ktp_image_path'])]
-#[Appends(['ktp_number_masked', 'bank_account_masked', 'has_ktp_image'])]
+#[Appends(['ktp_number_masked', 'bank_account_masked'])]
 class HostSensitiveData extends Model
 {
     use Auditable, HasUuids;
@@ -45,11 +45,6 @@ class HostSensitiveData extends Model
     protected function bankAccountMasked(): Attribute
     {
         return Attribute::get(fn () => self::mask($this->bank_account));
-    }
-
-    protected function hasKtpImage(): Attribute
-    {
-        return Attribute::get(fn () => $this->ktp_image_path !== null);
     }
 
     /** "3201234567890001" → "************0001" */

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Crown, Eye } from "lucide-react";
-import { adminHostsApi, errorMessage, operatorApi, type AdminHostDetail, type RateCategory } from "@/lib/api";
+import { Crown } from "lucide-react";
+import { adminHostsApi, operatorApi, type AdminHostDetail, type RateCategory } from "@/lib/api";
 import { formatDate, formatRupiah, formatTenure } from "@/lib/format";
 import { statusLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
@@ -210,18 +210,7 @@ function RateSelect({ host, rates, error }: { host: AdminHostDetail; rates: Rate
 }
 
 function SensitiveData({ host }: { host: AdminHostDetail }) {
-  const { token } = useAuth();
-  const [ktpUrl, setKtpUrl] = useState<string | null>(null);
-  const [ktpError, setKtpError] = useState<string | null>(null);
   const data = host.sensitive_data;
-
-  async function showKtp() {
-    try {
-      setKtpUrl(await adminHostsApi.ktpImageUrl(token, host.id));
-    } catch (caught) {
-      setKtpError(errorMessage(caught));
-    }
-  }
 
   const rows: [string, string | null | undefined][] = [
     ["Nomor KTP", data?.ktp_number],
@@ -231,30 +220,13 @@ function SensitiveData({ host }: { host: AdminHostDetail }) {
   ];
 
   return (
-    <div className="space-y-3">
-      <dl className="grid gap-3 sm:grid-cols-2">
+    <dl className="grid gap-3 sm:grid-cols-2">
         {rows.map(([label, value]) => (
           <div key={label} className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
             <dt className="text-xs text-muted-foreground">{label}</dt>
             <dd className="mt-0.5 text-sm text-foreground tabular-nums">{value || <span className="text-faint">belum diisi</span>}</dd>
           </div>
         ))}
-      </dl>
-
-      {ktpError && <FormAlert tone="error">{ktpError}</FormAlert>}
-      {data?.has_ktp_image ? (
-        ktpUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- private blob URL
-          <img src={ktpUrl} alt="Foto KTP" className="max-h-80 rounded-lg border border-border" />
-        ) : (
-          <Button type="button" variant="outline" onClick={showKtp}>
-            <Eye aria-hidden="true" />
-            Lihat foto KTP
-          </Button>
-        )
-      ) : (
-        <p className="text-sm text-faint">Belum ada foto KTP.</p>
-      )}
-    </div>
+    </dl>
   );
 }

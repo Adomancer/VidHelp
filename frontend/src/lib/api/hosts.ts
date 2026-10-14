@@ -1,7 +1,7 @@
 /** Hosts, brands and rate levels: a host's own profile, the operator's host list, and admin edits. */
 
 import { toDateInput } from "../format";
-import { api, apiFileUrl, downloadFile, type Message, type Paginated, post, put, del, query } from "./client";
+import { api, downloadFile, type Message, type Paginated, post, put, del, query } from "./client";
 import type { AuthUser } from "./auth";
 
 export type HostStatus = "active" | "inactive" | "archived" | "banned";
@@ -52,7 +52,6 @@ export interface SensitiveDataMasked {
   account_holder_name: string | null;
   ktp_number_masked: string | null;
   bank_account_masked: string | null;
-  has_ktp_image: boolean;
 }
 
 export interface HostProfile {
@@ -71,9 +70,43 @@ export interface HostProfile {
 /** A host profile with its account. */
 export type HostWithUser = HostProfile & { user: AuthUser };
 
+/** One field of a personal data change: its new value (KTP/bank masked for the host) and, for admins, the saved one. */
+export interface ProfileChangeField {
+  field: "name" | "phone" | "guardian_phone" | "ktp_number" | "bank_name" | "bank_account" | "account_holder_name";
+  label: string;
+  value: string | null;
+  current?: string | null;
+}
+
+export type ProfileChangeStatus = "pending" | "approved" | "rejected" | "cancelled";
+
+/** The host's latest change request: waiting for an admin, or how it was decided. */
+export interface MyProfileChange {
+  id: string;
+  status: ProfileChangeStatus;
+  fields: ProfileChangeField[];
+  created_at: string;
+  reviewed_at: string | null;
+  review_note: string | null;
+}
+
 export interface MyProfile {
   user: AuthUser;
   host_profile: (HostProfile & { sensitive_data: SensitiveDataMasked | null; assignments: Assignment[] }) | null;
+  /** Personal data changes wait for an admin's approval. */
+  profile_change?: MyProfileChange | null;
+}
+
+/** For admins: a host's change with the saved values next to the new ones (full numbers). */
+export interface ProfileChangeRequest {
+  id: string;
+  status: ProfileChangeStatus;
+  host: { id: string; name: string; email: string; avatar_url: string | null };
+  fields: ProfileChangeField[];
+  created_at: string;
+  reviewed_at: string | null;
+  reviewer: string | null;
+  review_note: string | null;
 }
 
 export interface HostListItem extends HostProfile {
@@ -103,11 +136,8 @@ export const hostApi = {
   updateSensitive: (token: string, data: { ktp_number?: string; bank_name?: string; bank_account?: string; account_holder_name?: string }) =>
     put<MyProfile & Message>("/host/profile/sensitive", token, data),
 
-  uploadKtpImage: (token: string, image: File) => {
-    const body = new FormData();
-    body.append("ktp_image", image);
-    return post<MyProfile & Message>("/host/profile/ktp-image", token, body);
-  },
+  /** Take back my change request while it waits. */
+  cancelChange: (token: string, id: string) => post<MyProfile & Message>(`/host/profile/changes/${id}/cancel`, token),
 
   /** Brands I'm actively assigned to, then the ones I cover a backup or an event block for soon, with their product knowledge. */
   brands: (token: string) => api<{ brands: MyBrand[] }>("/host/brands", { token }),
@@ -164,5 +194,9 @@ export const adminHostsApi = {
   /** rate_category_id: an id pins the level by hand, null returns it to automatic. */
   updateHost: (token: string, id: string, data: AdminHostInput) => put<{ host: AdminHostDetail }>(`/admin/hosts/${id}`, token, data),
 
-  ktpImageUrl: (token: string, id: string) => apiFileUrl(`/admin/hosts/${id}/ktp-image`, token),
+  /** Hosts' personal data changes: waiting (oldest first) or decided (latest 50). */
+  profileChanges: (token: string, status: "pending" | "decided" = "pending") =>
+    api<{ requests: ProfileChangeRequest[]; pending_count: number }>(`/admin/profile-changes${query({ status })}`, { token }),
+  approveChange: (token: string, id: string) => post(`/admin/profile-changes/${id}/approve`, token),
+  rejectChange: (token: string, id: string, note: string) => post(`/admin/profile-changes/${id}/reject`, token, { note }),
 };

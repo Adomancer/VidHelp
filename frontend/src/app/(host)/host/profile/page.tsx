@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, CircleCheck, Crown, LogOut, Upload } from "lucide-react";
-import { errorMessage, hostApi, type MyProfile } from "@/lib/api";
+import { Camera, Clock, Crown, LogOut, XCircle } from "lucide-react";
+import { errorMessage, hostApi, type MyProfile, type MyProfileChange } from "@/lib/api";
 import { formatDate, formatTenure } from "@/lib/format";
 import { roleLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
+import { useNow } from "@/lib/useNow";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
@@ -73,6 +74,7 @@ export default function HostProfilePage() {
         <div className="min-w-0 space-y-6 [&>section]:scroll-mt-20">
           <HeaderCard host={host} onUpdated={applyUpdate} />
           {!profile.data && !profile.error && <CardsSkeleton count={2} />}
+          {host && profile.data?.profile_change && <ChangeStatus change={profile.data.profile_change} onUpdated={applyUpdate} />}
           {profile.data && <PersonalForm data={profile.data} onUpdated={applyUpdate} />}
           {host && <BrandsCard host={host} />}
           {host && <IdentityForm host={host} onUpdated={applyUpdate} />}
@@ -165,14 +167,16 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
           guardian_phone: formValue(form, "guardian_phone") || null,
         }),
       }),
-    (updated) => {
+    (updated, form) => {
+      // For hosts nothing changed yet: show the saved data again (what was sent is in the request card)
+      if (host) form.reset();
       notify({ text: updated.message });
       onUpdated(updated);
     }
   );
 
   return (
-    <Card id="data-pribadi" title="Data pribadi">
+    <Card id="data-pribadi" title="Data pribadi" description={host ? "Perubahan dikirim ke admin dan berlaku setelah disetujui." : undefined}>
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
@@ -186,10 +190,81 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
 
         <div className="flex justify-end">
           <SubmitButton loading={loading} size="default" className="sm:w-auto">
-            Simpan
+            {host ? "Kirim untuk disetujui" : "Simpan"}
           </SubmitButton>
         </div>
       </form>
+    </Card>
+  );
+}
+
+const sameDay = (iso: string) => new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+
+/**
+ * Where my latest personal data change stands: waiting for an admin (with what I asked for),
+ * rejected (with why), or approved lately.
+ */
+function ChangeStatus({ change, onUpdated }: { change: MyProfileChange; onUpdated: (profile: MyProfile) => void }) {
+  const { token } = useAuth();
+  const [cancelling, setCancelling] = useState(false);
+  const now = useNow(60 * 60_000);
+  const recent = change.reviewed_at && now.getTime() - new Date(change.reviewed_at).getTime() < 7 * 86_400_000;
+
+  async function cancel() {
+    setCancelling(true);
+    try {
+      const updated = await hostApi.cancelChange(token, change.id);
+      notify({ text: updated.message });
+      onUpdated(updated);
+    } catch (caught) {
+      notify({ text: errorMessage(caught), tone: "error" });
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  if (change.status === "rejected") {
+    return (
+      <FormAlert tone="error">
+        <span className="font-medium">Perubahan data ditolak admin</span>
+        {change.reviewed_at && ` (${sameDay(change.reviewed_at)})`}: {change.review_note}. Perbaiki lalu kirim lagi.
+      </FormAlert>
+    );
+  }
+
+  if (change.status === "approved") {
+    return recent ? (
+      <FormAlert tone="success">Perubahan data disetujui admin{change.reviewed_at && ` pada ${sameDay(change.reviewed_at)}`}.</FormAlert>
+    ) : null;
+  }
+
+  return (
+    <Card>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning">
+            <Clock className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-medium text-foreground">Menunggu persetujuan admin</p>
+            <p className="text-sm text-muted-foreground">
+              Dikirim {sameDay(change.created_at)}. Data di bawah belum berubah sampai disetujui. Perubahan lain yang kamu kirim ikut masuk ke permintaan ini.
+            </p>
+          </div>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={cancel} disabled={cancelling}>
+          <XCircle aria-hidden="true" />
+          {cancelling ? "Membatalkan…" : "Batalkan permintaan"}
+        </Button>
+      </div>
+      <dl className="grid gap-x-6 gap-y-2 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm sm:grid-cols-2">
+        {change.fields.map((field) => (
+          <div key={field.field} className="min-w-0">
+            <dt className="text-xs text-muted-foreground">{field.label}</dt>
+            <dd className="truncate font-medium text-foreground">{field.value ?? <span className="font-normal text-muted-foreground">dikosongkan</span>}</dd>
+          </div>
+        ))}
+      </dl>
     </Card>
   );
 }
@@ -224,8 +299,6 @@ function BrandsCard({ host }: { host: HostProfileData }) {
  */
 function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (profile: MyProfile) => void }) {
   const { token } = useAuth();
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
   const current = host.sensitive_data;
 
   const { loading, errors, error, handleSubmit } = useApiForm(
@@ -241,22 +314,12 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
     }
   );
 
-  async function uploadKtp(file: File | undefined) {
-    if (!file) return;
-    setUploading(true);
-    setUploadError(null);
-    try {
-      onUpdated(await hostApi.uploadKtpImage(token, file));
-      notify({ text: "Foto KTP tersimpan" });
-    } catch (caught) {
-      setUploadError(errorMessage(caught));
-    } finally {
-      setUploading(false);
-    }
-  }
-
   return (
-    <Card id="identitas" title="KTP & rekening bank" description="Dibutuhkan untuk penggajian. Disimpan terenkripsi; hanya admin yang bisa melihat nomor lengkapnya.">
+    <Card
+      id="identitas"
+      title="KTP & rekening bank"
+      description="Dibutuhkan untuk penggajian. Disimpan terenkripsi; hanya admin yang bisa melihat nomor lengkapnya. Perubahan berlaku setelah disetujui admin."
+    >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
@@ -287,32 +350,10 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
 
         <div className="flex justify-end">
           <SubmitButton loading={loading} size="default" className="sm:w-auto">
-            Simpan
+            Kirim untuk disetujui
           </SubmitButton>
         </div>
       </form>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">Foto KTP</p>
-          {current?.has_ktp_image ? (
-            <p className="flex items-center gap-1 text-xs text-success">
-              <CircleCheck className="size-3.5" aria-hidden="true" />
-              Sudah diunggah
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">Belum diunggah</p>
-          )}
-        </div>
-        <Button asChild variant="outline" className={cn("cursor-pointer", uploading && "pointer-events-none opacity-60")}>
-          <label>
-            <Upload aria-hidden="true" />
-            {uploading ? "Mengunggah…" : current?.has_ktp_image ? "Ganti foto" : "Unggah foto"}
-            <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => uploadKtp(event.target.files?.[0])} />
-          </label>
-        </Button>
-      </div>
-      {uploadError && <FormAlert tone="error">{uploadError}</FormAlert>}
     </Card>
   );
 }

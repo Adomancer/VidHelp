@@ -6,8 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\HostProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class HostController extends Controller
 {
@@ -41,17 +39,6 @@ class HostController extends Controller
         $host->save();
 
         return response()->json(['host' => $this->load($host), 'message' => 'Host diperbarui']);
-    }
-
-    /**
-     * Stream the KTP photo from private storage.
-     */
-    public function ktpImage(HostProfile $host): StreamedResponse
-    {
-        $path = $host->sensitiveData?->ktp_image_path;
-        abort_unless($path && Storage::disk('local')->exists($path), 404, 'Belum ada foto KTP.');
-
-        return Storage::disk('local')->response($path);
     }
 
     private function load(HostProfile $host): HostProfile

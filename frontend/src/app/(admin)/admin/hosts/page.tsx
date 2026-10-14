@@ -5,6 +5,7 @@ import { useInvalidate } from "@/lib/useApiData";
 import HostDetailDialog from "@/components/HostDetailDialog";
 import HostTable from "@/components/HostTable";
 import PageHeader from "@/components/PageHeader";
+import ProfileChangesPanel from "@/components/ProfileChangesPanel";
 import { useToast } from "@/components/Toast";
 
 export default function AdminHostsPage() {
@@ -18,6 +19,7 @@ export default function AdminHostsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Host" description="Klik host untuk melihat data KTP dan bank, serta mengatur kontak, tanggal bergabung, level tarif, dan brand." />
+      <ProfileChangesPanel />
       <HostTable onSelect={(host) => open(host.id)} />
 
       {openId && (

@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Host;
 
 use App\Http\Controllers\Controller;
 use App\Models\HostProfile;
+use App\Models\ProfileChangeRequest;
 use App\Models\User;
+use App\Services\ProfileChangeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -13,6 +15,10 @@ use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
+    private const SENT = 'Perubahan dikirim. Datamu berubah setelah disetujui admin.';
+
+    public function __construct(private ProfileChangeService $changes) {}
+
     /**
      * Get my account plus host profile (null for users without one, e.g. admins).
      * KTP and bank numbers are only returned masked.
@@ -23,7 +29,8 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update my name and, for hosts, contact numbers.
+     * My name and, for hosts, contact numbers. For hosts it becomes a request an admin approves;
+     * other users (e.g. staff) change their name straight away.
      */
     public function update(Request $request): JsonResponse
     {
@@ -36,8 +43,13 @@ class ProfileController extends Controller
             'guardian_phone' => [$profile ? 'sometimes' : 'prohibited', 'nullable', 'digits_between:8,15'],
         ]);
 
+        if ($profile) {
+            $this->changes->submit($profile, Arr::only($validated, ['name', 'phone', 'guardian_phone']));
+
+            return response()->json([...$this->payload($user->fresh()), 'message' => self::SENT]);
+        }
+
         $user->update(Arr::only($validated, ['name']));
-        $profile?->update(Arr::only($validated, ['phone', 'guardian_phone']));
 
         return response()->json([...$this->payload($user->fresh()), 'message' => 'Profil berhasil diperbarui']);
     }
@@ -57,7 +69,8 @@ class ProfileController extends Controller
     }
 
     /**
-     * Save my KTP number and bank details. Stored encrypted; only admins see the full values.
+     * Ask to save my KTP number and bank details (an admin approves). Stored encrypted;
+     * only admins see the full values.
      */
     public function updateSensitive(Request $request): JsonResponse
     {
@@ -70,38 +83,48 @@ class ProfileController extends Controller
             'account_holder_name' => 'sometimes|nullable|string|max:255',
         ]);
 
-        $profile->sensitiveData()->updateOrCreate([], $validated);
+        $this->changes->submit($profile, $validated);
 
-        return response()->json([...$this->payload($request->user()->fresh()), 'message' => 'Data disimpan']);
+        return response()->json([...$this->payload($request->user()->fresh()), 'message' => self::SENT]);
     }
 
     /**
-     * Upload a photo of my KTP to private storage (admins can view it).
+     * Take back my pending change request.
      */
-    public function uploadKtpImage(Request $request): JsonResponse
+    public function cancelChange(Request $request, ProfileChangeRequest $change): JsonResponse
     {
-        $profile = $this->requireHostProfile($request);
-        $request->validate(['ktp_image' => 'required|image|max:4096']);
+        abort_unless($change->host_id === $this->requireHostProfile($request)->id, 403, 'Ini bukan permintaanmu.');
 
-        $sensitive = $profile->sensitiveData()->firstOrNew();
-        if ($sensitive->ktp_image_path) {
-            Storage::disk('local')->delete($sensitive->ktp_image_path);
-        }
-        $sensitive->ktp_image_path = $request->file('ktp_image')->store('ktp', 'local');
-        $sensitive->save();
+        $this->changes->cancel($change);
 
-        return response()->json([...$this->payload($request->user()->fresh()), 'message' => 'Foto KTP diunggah']);
+        return response()->json([...$this->payload($request->user()->fresh()), 'message' => 'Permintaan perubahan dibatalkan']);
     }
 
+    /**
+     * My profile, plus (for hosts) the change waiting for an admin and the last decision.
+     */
     private function payload(User $user): array
     {
+        $profile = $user->hostProfile;
+        $latest = $profile
+            ? ProfileChangeRequest::where('host_id', $profile->id)->where('status', '!=', 'cancelled')->latest()->first()
+            : null;
+
         return [
             'user' => $user->load('roles'),
-            'host_profile' => $user->hostProfile?->load([
+            'host_profile' => $profile?->load([
                 'rateCategory',
                 'sensitiveData',
                 'assignments' => fn ($q) => $q->where('status', 'active')->with('brand:id,name,is_obs'),
             ]),
+            'profile_change' => $latest ? [
+                'id' => $latest->id,
+                'status' => $latest->status,
+                'fields' => $latest->lines(),
+                'created_at' => $latest->created_at,
+                'reviewed_at' => $latest->reviewed_at,
+                'review_note' => $latest->review_note,
+            ] : null,
         ];
     }
 
