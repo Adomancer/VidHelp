@@ -106,6 +106,8 @@ export const pointsApi = {
     api<{ month: string; scale: { min: number; max: number }; hosts: RatingRow[] }>(`/admin/ratings${query({ month })}`, { token }),
   rate: (token: string, data: { host_id: string; month_year: string; rating: number; note: string | null }) =>
     put<{ rating: HostRating } & Message>("/admin/ratings", token, data),
+  /** The current points period (balances, history, SP letters, violation types) as Excel. */
+  exportPoints: (token: string) => downloadFile("/operator/points/export", token, `poin-sp-${new Date().toISOString().slice(0, 10)}.xlsx`),
   /** Ratings of the month, plus that month's point history and SP letters, as Excel. */
   exportRatings: (token: string, month: string) => downloadFile(`/admin/ratings/export${query({ month })}`, token, `ratings-${month}.xlsx`),
   /** A host's full point and SP history across all periods, newest first. */

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CalendarRange, ChevronRight, Download, HandCoins, Lock, Plus, Send, Wallet } from "lucide-react";
+import { CalendarRange, ChevronRight, Download, FileSpreadsheet, HandCoins, Lock, Plus, Send, Wallet } from "lucide-react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { errorMessage, payrollApi, type CashAdvance, type HostPayRow, type PeriodListItem, type PeriodStatus } from "@/lib/api";
 import { hasAnyRole } from "@/lib/auth";
@@ -24,6 +24,7 @@ import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
 import { FieldError } from "./FieldMessage";
 import FormActions from "./FormActions";
+import FinanceReportDialog from "./FinanceReportDialog";
 import FormAlert from "./FormAlert";
 import { CardsSkeleton, RefreshBar, TableSkeleton } from "./Loading";
 import Modal from "./Modal";
@@ -51,6 +52,7 @@ function useCanManageFinance(): boolean {
 export default function PayrollDesk() {
   const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(["periods", "kasbon"] as const).withDefault("periods"));
   const canManage = useCanManageFinance();
+  const [reporting, setReporting] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -59,16 +61,23 @@ export default function PayrollDesk() {
           Mode lihat saja. Menutup periode, mengajukan pembayaran, menandai lunas, penyesuaian jam, dan kasbon hanya bisa dilakukan oleh akun Finance.
         </FormAlert>
       )}
-      <ToggleGroup
-        label="Bagian penggajian"
-        options={[
-          ["periods", "Periode pembayaran"],
-          ["kasbon", "Kasbon"],
-        ] as const}
-        value={tab}
-        onChange={(next) => void setTab(next)}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ToggleGroup
+          label="Bagian penggajian"
+          options={[
+            ["periods", "Periode pembayaran"],
+            ["kasbon", "Kasbon"],
+          ] as const}
+          value={tab}
+          onChange={(next) => void setTab(next)}
+        />
+        <Button type="button" variant="outline" onClick={() => setReporting(true)}>
+          <FileSpreadsheet aria-hidden="true" />
+          Unduh laporan
+        </Button>
+      </div>
       {tab === "periods" ? <Periods /> : <Kasbon />}
+      {reporting && <FinanceReportDialog onClose={() => setReporting(false)} />}
     </div>
   );
 }
@@ -301,12 +310,10 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
   }
 
   async function download() {
-    const tab = window.open("", "_blank");
+    if (!detail.data) return;
     try {
-      const url = await payrollApi.exportUrl(token, periodId);
-      if (tab) tab.location.href = url;
+      await payrollApi.exportPeriod(token, detail.data.period);
     } catch (caught) {
-      tab?.close();
       onChanged(errorMessage(caught), "error");
     }
   }
@@ -364,7 +371,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
             {locked && (
               <Button type="button" variant="outline" onClick={download}>
                 <Download aria-hidden="true" />
-                Laporan brand (CSV)
+                Laporan brand (Excel)
               </Button>
             )}
             {canManage && period.status === "requested" && (

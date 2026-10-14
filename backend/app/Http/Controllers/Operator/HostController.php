@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
+use App\Models\Brand;
 use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
 use App\Models\User;
-use App\Services\SpreadsheetExport;
+use App\Services\Excel\Column;
+use App\Services\Excel\ExcelReport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,28 +24,87 @@ class HostController extends Controller
         return response()->json($this->filtered($request)->paginate(20));
     }
 
-    /**
-     * The same list (same filters, every page) as an Excel file. No KTP/bank data.
-     */
-    public function export(Request $request, SpreadsheetExport $export): BinaryFileResponse
-    {
-        $rows = $this->filtered($request)->get()->map(fn (HostProfile $host) => [
-            $host->user->name,
-            $host->user->email,
-            $host->phone,
-            $host->guardian_phone,
-            match ($host->status) { 'active' => 'Aktif', 'inactive' => 'Nonaktif', 'archived' => 'Diarsipkan', 'banned' => 'Diblokir', default => $host->status },
-            $host->rateCategory?->name,
-            $host->join_date?->toDateString(),
-            $host->assignments
-                ->where('status', 'active')
-                ->map(fn (HostBrandAssignment $assignment) => $assignment->brand->name.($assignment->is_leader ? ' (leader)' : ''))
-                ->join(', '),
-        ]);
+    private const STATUS = ['active' => 'Aktif', 'inactive' => 'Nonaktif', 'archived' => 'Diarsipkan', 'banned' => 'Diblokir'];
 
-        return $export->download('hosts-'.today()->toDateString().'.xlsx', [
-            'Host' => [['Nama', 'Email', 'No. HP', 'No. HP wali', 'Status', 'Level tarif', 'Tanggal bergabung', 'Brand'], $rows],
-        ]);
+    private const STATUS_TONES = ['Aktif' => 'green', 'Nonaktif' => 'amber', 'Diarsipkan' => 'gray', 'Diblokir' => 'red'];
+
+    /**
+     * The same list (same filters, every page) as an Excel report: a summary (status, brands,
+     * rate levels) and the full host list. No KTP/bank data.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $hosts = $this->filtered($request)->with('rateCategory')->get();
+        $brand = $request->brand_id ? Brand::find($request->brand_id) : null;
+        $filters = collect([
+            $brand ? "Brand {$brand->name}" : 'Semua brand',
+            ...array_map(fn ($term) => "cari \"{$term}\"", array_filter((array) $request->input('search', []), 'strlen')),
+            $request->input('host_ids') ? count($request->input('host_ids')).' host dipilih' : null,
+        ])->filter()->implode(' · ');
+
+        $report = new ExcelReport('Laporan Data Host', $filters, $request->user()?->name);
+        $activeOn = fn (HostProfile $host) => $host->assignments->where('status', 'active');
+
+        $report->sheet('Ringkasan', 'Ringkasan host')
+            ->pairs('Jumlah host', [
+                ['Total host', $hosts->count(), 'number'],
+                ...collect(self::STATUS)->map(fn ($label, $status) => [$label, $hosts->where('status', $status)->count(), 'number'])->values()->all(),
+                ['Rata-rata masa kerja (bulan)', round($hosts->avg(fn (HostProfile $host) => $host->tenureMonths()) ?? 0, 1), 'decimal'],
+            ])
+            ->table(
+                [Column::text('Brand', 30), Column::number('Host aktif', 14), Column::text('Leader', 24)],
+                $hosts->flatMap($activeOn)->groupBy('brand_id')
+                    ->map(fn ($assignments) => [
+                        $assignments->first()->brand->name,
+                        $assignments->count(),
+                        $hosts->firstWhere('id', $assignments->firstWhere('is_leader', true)?->host_id)?->user->name,
+                    ])
+                    ->sortBy(0)->values(),
+                heading: 'Host per brand',
+                totals: true,
+            )
+            ->table(
+                [Column::text('Level tarif', 30), Column::rupiah('Tarif per jam', 18, summed: false), Column::number('Jumlah host', 14)],
+                $hosts->groupBy(fn (HostProfile $host) => $host->rateCategory?->name ?? 'Belum ada level')
+                    ->map(fn ($group, $name) => [$name, $group->first()->rateCategory?->rate_per_hour, $group->count()])
+                    ->sortBy(1)->values(),
+                heading: 'Host per level tarif',
+                totals: true,
+            );
+
+        $report->sheet('Daftar Host', 'Semua host sesuai filter')->table(
+            [
+                Column::number('No', 6, summed: false),
+                Column::text('Nama', 24),
+                Column::text('Email', 28),
+                Column::text('No. HP', 16),
+                Column::text('No. HP wali', 16),
+                Column::status('Status', self::STATUS_TONES, 13),
+                Column::text('Level tarif', 16),
+                Column::rupiah('Tarif per jam', 16, summed: false),
+                Column::date('Tanggal bergabung', 15),
+                Column::number('Masa kerja (bulan)', 12, summed: false),
+                Column::text('Brand aktif', 30, wrap: true),
+                Column::text('Leader di', 20, wrap: true),
+            ],
+            $hosts->values()->map(fn (HostProfile $host, int $i) => [
+                $i + 1,
+                $host->user->name,
+                $host->user->email,
+                $host->phone,
+                $host->guardian_phone,
+                self::STATUS[$host->status] ?? $host->status,
+                $host->rateCategory?->name.($host->rate_category_overridden ? ' (manual)' : ''),
+                $host->rateCategory?->rate_per_hour,
+                $host->join_date,
+                $host->tenureMonths(),
+                $activeOn($host)->map(fn (HostBrandAssignment $assignment) => $assignment->brand->name)->sort()->implode(', '),
+                $activeOn($host)->where('is_leader', true)->map(fn (HostBrandAssignment $assignment) => $assignment->brand->name)->implode(', '),
+            ]),
+            totals: false,
+        );
+
+        return $report->download('hosts-'.today()->toDateString().'.xlsx');
     }
 
     /**

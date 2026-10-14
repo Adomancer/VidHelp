@@ -258,11 +258,28 @@ class PointsTest extends TestCase
                 ->assertDownload('ratings-2026-10.xlsx')
         );
 
-        $this->assertSame(['Rating', 'Riwayat poin', 'Riwayat SP'], array_keys($sheets));
-        $rating = collect($sheets['Rating'])->firstWhere(0, $name);
-        $this->assertEquals([$name, 1, 4.8, 4.2, 'Good', $this->admin->name], $rating);
-        $this->assertEquals([$name, 'Telat', -5, 'Late 20 minutes'], array_slice($sheets['Riwayat poin'][1], 1, 4));
-        $this->assertSame([$name, 'SP1', 'Repeated no-show', $this->admin->name, 'Tidak'], array_slice($sheets['Riwayat SP'][1], 1));
+        $this->assertSame(['Ringkasan', 'Rating', 'Riwayat Poin', 'Surat Peringatan'], array_keys($sheets));
+        $this->assertSame(1, $this->xlsxValue($sheets['Ringkasan'], 'Sudah dinilai'));
+
+        $rating = collect($this->xlsxTable($sheets['Rating'], 'No'))->firstWhere(1, $name);
+        $this->assertEquals([$name, 1, 4.8, 4.2, 'Sudah dinilai', 'Good', $this->admin->name], array_slice($rating, 1));
+        $this->assertEquals([$name, 'Telat', -5, 'Late 20 minutes'], array_slice($this->xlsxTable($sheets['Riwayat Poin'], 'Tanggal')[1], 1, 4));
+        $this->assertSame([$name, 'SP1', 'Repeated no-show', $this->admin->name, 'Berlaku'], array_slice($this->xlsxTable($sheets['Surat Peringatan'], 'Terbit')[1], 1));
+    }
+
+    public function test_points_period_exports_balances_history_and_violation_types(): void
+    {
+        $this->violation(['reason' => 'Late 20 minutes'])->assertCreated();
+        $name = $this->host->user->name;
+
+        $sheets = $this->xlsxSheets($this->actingAs($this->admin)->get('/api/operator/points/export')->assertOk());
+
+        $this->assertSame(['Ringkasan', 'Saldo Poin', 'Riwayat Poin', 'Surat Peringatan', 'Jenis Pelanggaran'], array_keys($sheets));
+        $this->assertSame(1, $this->xlsxValue($sheets['Ringkasan'], 'Catatan poin'));
+        $balance = collect($this->xlsxTable($sheets['Saldo Poin'], 'No'))->firstWhere(1, $name);
+        $this->assertSame([95, 'Aman', 1, 5], array_slice($balance, 3));
+        $this->assertSame('Late 20 minutes', $this->xlsxTable($sheets['Riwayat Poin'], 'Tanggal')[1][4]);
+        $this->assertContains('Telat', array_column($this->xlsxTable($sheets['Jenis Pelanggaran'], 'Jenis'), 0));
     }
 
     public function test_admin_sees_a_hosts_full_point_and_sp_history(): void

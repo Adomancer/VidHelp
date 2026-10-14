@@ -17,9 +17,10 @@ import { notify } from "./Toast";
 
 /**
  * Admin list of violation types: points deducted, rating impact, on/off.
- * Types marked "automatic" are also applied by the system.
+ * Types marked "automatic" are also applied by the system. `plain`: without its card,
+ * inside a dialog that has its own title.
  */
-export default function ViolationTypesEditor() {
+export default function ViolationTypesEditor({ plain = false }: { plain?: boolean }) {
   const { token } = useAuth();
   const types = useApiData("all-violation-types", () => pointsApi.allViolationTypes(token));
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +35,8 @@ export default function ViolationTypesEditor() {
     types.reload();
   }
 
-  return (
-    <Card title="Jenis pelanggaran" description="Poin dipotong dari saldo 3 bulanan; dampak rating menurunkan saran rating bulanan." bodyClassName="px-0 md:px-0">
+  const content = (
+    <>
       {error && (
         <div className="px-5 md:px-6">
           <FormAlert tone="error">{error}</FormAlert>
@@ -55,6 +56,14 @@ export default function ViolationTypesEditor() {
         ))}
         {types.data && <TypeRow key={`new-${types.data.violation_types.length}`} onSave={save} />}
       </div>
+    </>
+  );
+
+  if (plain) return <div className="-mx-5 -mt-5 sm:-mx-6">{content}</div>;
+
+  return (
+    <Card title="Jenis pelanggaran" description="Poin dipotong dari saldo 3 bulanan; dampak rating menurunkan saran rating bulanan." bodyClassName="px-0 md:px-0">
+      {content}
     </Card>
   );
 }
