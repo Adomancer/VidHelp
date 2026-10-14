@@ -56,7 +56,7 @@ export default function PayrollDesk() {
     <div className="space-y-5">
       {!canManage && (
         <FormAlert tone="info">
-          Mode lihat saja. Mengajukan pembayaran, menandai lunas, penyesuaian jam, dan kasbon hanya bisa dilakukan oleh akun Finance.
+          Mode lihat saja. Menutup periode, mengajukan pembayaran, menandai lunas, penyesuaian jam, dan kasbon hanya bisa dilakukan oleh akun Finance.
         </FormAlert>
       )}
       <ToggleGroup

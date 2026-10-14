@@ -218,7 +218,7 @@ flowchart TD
   B --> B2{"Carried-in + worked hours<br/>reach the target?"}
   B2 -->|No| B3{"Brand stopped live?"}
   B3 -->|No| B
-  B3 -->|Yes| B4["Admin/finance closes<br/>the period early"]
+  B3 -->|Yes| B4["Finance closes<br/>the period early"]
   B4 --> C
   B2 -->|Yes| C["Period ends on its last session's day;<br/>next period starts the day after;<br/>brand leader (PIC) and finance notified"]
   C --> D{"Reports waiting for review,<br/>sick letters still due, or the<br/>previous period not requested?"}

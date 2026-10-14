@@ -124,7 +124,7 @@ class PayrollController extends Controller
     }
 
     /**
-     * Close a running period before its target (e.g. the brand stopped going live) so it can be billed.
+     * Finance only: close a running period before its target (e.g. the brand stopped going live) so it can be billed.
      */
     public function close(Request $request, PaymentPeriod $period): JsonResponse
     {

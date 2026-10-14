@@ -126,7 +126,7 @@ class PayrollTest extends TestCase
     {
         $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
         $period = $this->period('2026-10-01');
-        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/close")->assertOk();
+        $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/close")->assertOk();
 
         return $period->fresh();
     }
@@ -231,11 +231,13 @@ class PayrollTest extends TestCase
     {
         $this->workSession($this->host, '2026-10-02', 2);
         $period = $this->period('2026-10-01');
-        $this->travelTo(CarbonImmutable::parse('2026-10-08 00:10'));
-        $this->artisan('payroll:roll-periods')->assertSuccessful();
 
         $this->actingAs($this->admin)->getJson("/api/finance/payroll/periods/{$period->id}")->assertOk();
         $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/adjustments", ['hours' => 1])->assertForbidden();
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/close")->assertForbidden();
+        $this->assertSame('in_progress', $period->fresh()->status);
+
+        $period = $this->endFirstPeriod(); // by finance
         $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertForbidden();
         $this->assertSame('waiting_payment', $period->fresh()->status);
 

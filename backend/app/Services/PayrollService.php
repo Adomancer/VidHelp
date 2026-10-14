@@ -26,8 +26,8 @@ use Illuminate\Validation\ValidationException;
  * salary slips and kasbon deductions.
  *
  * A brand's period runs until its target hours are reached (about a month for 720 hours), or
- * until admin/finance closes it early; the next one starts the day after. The brand's leader
- * host (its PIC) then requests payment; finance follows it up and marks it paid.
+ * until finance closes it early; the next one starts the day after. The brand's leader
+ * host (its PIC) then requests payment; finance follows it up and marks it paid. Admins only look.
  *
  * A period pays at most the brand's target: hours carried in from the last period first, then
  * this period's hours. Hours over the target stay unpaid and carry to the next period, cut
@@ -185,7 +185,7 @@ class PayrollService
         $body = "{$this->dates($period)}: {$this->hours($summary['achieved_hours'])} jam bisa ditagihkan. Ajukan pembayaran ke brand.";
 
         $this->notifier->toUsers($this->notifier->brandLeaders($period->brand_id), 'period_ready', $title, $body, '/host/pay', dm: true);
-        $this->notifier->toUsers($this->notifier->finance(), 'period_ready', $title, $body, '/finance/payroll');
+        $this->notifier->toUsers($this->notifier->finance(), 'period_ready', $title, $body, '/admin/payroll');
     }
 
     /**
@@ -410,7 +410,7 @@ class PayrollService
 
     /**
      * Lock the period, snapshot host pay at today's rates, and ask the brand to pay.
-     * Done by the brand's leader host once the target is reached (admin/finance can too).
+     * Done by the brand's leader host once the target is reached (finance can on their behalf).
      */
     public function requestPayment(PaymentPeriod $period, User $by): PaymentRequest
     {
@@ -419,7 +419,7 @@ class PayrollService
 
             if ($period->status === 'in_progress') {
                 $summary = $this->breakdown($period)['summary'];
-                $this->fail("Target {$period->target_hours} jam belum tercapai (baru {$this->hours($summary['carried_in_hours'] + $summary['worked_hours'])} jam). Admin atau finance bisa menutup periode lebih awal kalau brand berhenti live.");
+                $this->fail("Target {$period->target_hours} jam belum tercapai (baru {$this->hours($summary['carried_in_hours'] + $summary['worked_hours'])} jam). Finance bisa menutup periode lebih awal kalau brand berhenti live.");
             }
             if ($period->isLocked()) {
                 $this->fail('Pembayaran untuk periode ini sudah diajukan.');
@@ -492,7 +492,7 @@ class PayrollService
             'payment_requested',
             "Pembayaran {$period->brand->name} diajukan",
             "{$by->name} mengajukan {$this->hours($period->achieved_hours)} jam untuk {$this->dates($period)}. Tandai lunas setelah brand membayar.",
-            '/finance/payroll',
+            '/admin/payroll',
         );
 
         // The hours carried over may already fill the next period

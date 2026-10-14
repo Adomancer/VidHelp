@@ -163,12 +163,6 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         // Payroll: periods per brand, salary slips
         Route::get('/payroll/periods', [PayrollController::class, 'periods']);
         Route::get('/payroll/periods/{period}', [PayrollController::class, 'show']);
-        Route::post('/payroll/periods/{period}/adjustments', [PayrollController::class, 'storeAdjustment']);
-        Route::delete('/payroll/adjustments/{adjustment}', [PayrollController::class, 'destroyAdjustment']);
-        Route::post('/payroll/periods/{period}/close', [PayrollController::class, 'close']);
-        Route::post('/payroll/periods/{period}/request', [PayrollController::class, 'requestPayment']);
-        Route::post('/payroll/periods/{period}/cancel-request', [PayrollController::class, 'cancelRequest']);
-        Route::post('/payroll/periods/{period}/paid', [PayrollController::class, 'markPaid']);
         Route::get('/payroll/periods/{period}/export', [PayrollController::class, 'export']);
         Route::get('/payroll/slips/{slip}', [PayrollController::class, 'slip']);
 
@@ -177,9 +171,10 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::get('/cash-advances/limit/{host}', [CashAdvanceController::class, 'limit']);
 
         Route::middleware('role:finance')->group(function () {
-            // Adjustments, payment requests, marking paid
+            // Adjustments, closing a period early, payment requests (on the PIC's behalf), marking paid
             Route::post('/payroll/periods/{period}/adjustments', [PayrollController::class, 'storeAdjustment']);
             Route::delete('/payroll/adjustments/{adjustment}', [PayrollController::class, 'destroyAdjustment']);
+            Route::post('/payroll/periods/{period}/close', [PayrollController::class, 'close']);
             Route::post('/payroll/periods/{period}/request', [PayrollController::class, 'requestPayment']);
             Route::post('/payroll/periods/{period}/cancel-request', [PayrollController::class, 'cancelRequest']);
             Route::post('/payroll/periods/{period}/paid', [PayrollController::class, 'markPaid']);

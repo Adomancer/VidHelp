@@ -22,7 +22,7 @@ export interface PaymentPeriod {
   id: string;
   brand_id: string;
   period_start: string;
-  /** Null while it runs: it ends when the target is reached or admin/finance closes it early */
+  /** Null while it runs: it ends when the target is reached or finance closes it early */
   period_end: string | null;
   status: PeriodStatus;
   closed_at: string | null;

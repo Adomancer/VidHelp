@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * One payment period of a brand: it runs (no end date yet) until the brand's target hours are reached
- * or admin/finance closes it early, and the next one starts the day after it ends.
+ * or finance closes it early, and the next one starts the day after it ends.
  * in_progress → (target reached or closed) waiting_payment → (the brand's leader requests payment, locked)
  * requested → paid. Cancelling the request unlocks it again (requested → waiting_payment).
  */
