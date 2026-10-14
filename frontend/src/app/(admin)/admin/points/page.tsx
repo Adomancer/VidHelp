@@ -1,6 +1,6 @@
 import PointsDesk from "@/components/PointsDesk";
 import PageHeader from "@/components/PageHeader";
-import ViolationTypesEditor from "@/components/ViolationTypesEditor";
+import { PointsExportButton, ViolationTypesButton } from "@/components/PointsActions";
 
 export default function AdminPointsPage() {
   return (
@@ -8,9 +8,14 @@ export default function AdminPointsPage() {
       <PageHeader
         title="Poin & SP"
         description="Catat pelanggaran, batalkan catatan yang salah, serta terbitkan atau batalkan surat peringatan secara manual."
+        actions={
+          <>
+            <ViolationTypesButton />
+            <PointsExportButton />
+          </>
+        }
       />
       <PointsDesk isAdmin />
-      <ViolationTypesEditor />
     </div>
   );
 }

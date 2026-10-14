@@ -180,12 +180,9 @@ function BrandPeriods({ periods, onChanged }: { periods: BrandPeriod[]; onChange
   const [error, setError] = useState<string | null>(null);
 
   async function download(period: BrandPeriod) {
-    const tab = window.open("", "_blank");
     try {
-      const url = await payApi.exportUrl(token, period.id);
-      if (tab) tab.location.href = url;
+      await payApi.exportPeriod(token, period);
     } catch (caught) {
-      tab?.close();
       setError(errorMessage(caught));
     }
   }
@@ -252,7 +249,7 @@ function BrandPeriods({ periods, onChanged }: { periods: BrandPeriod[]; onChange
                   </p>
                   <Button type="button" variant="outline" size="xs" onClick={() => download(period)}>
                     <Download aria-hidden="true" />
-                    Laporan brand
+                    Laporan brand (Excel)
                   </Button>
                 </div>
               )}

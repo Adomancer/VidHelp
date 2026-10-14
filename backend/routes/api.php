@@ -164,6 +164,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::get('/payroll/periods', [PayrollController::class, 'periods']);
         Route::get('/payroll/periods/{period}', [PayrollController::class, 'show']);
         Route::get('/payroll/periods/{period}/export', [PayrollController::class, 'export']);
+        Route::get('/payroll/report', [PayrollController::class, 'report']);
         Route::get('/payroll/slips/{slip}', [PayrollController::class, 'slip']);
 
         // Kasbon (cash advances)
@@ -236,6 +237,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
         // Points: record violations and brand complaints
         Route::get('/points', [PointController::class, 'index']);
+        Route::get('/points/export', [PointController::class, 'export']);
         Route::get('/points/hosts/{host}', [PointController::class, 'show']);
         Route::get('/violation-types', [PointController::class, 'violationTypes']);
         Route::post('/points/violations', [PointController::class, 'storeViolation']);

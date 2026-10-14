@@ -179,11 +179,21 @@ class BrandAssignmentTest extends TestCase
                 ->assertDownload('hosts-'.today()->toDateString().'.xlsx')
         );
 
-        $this->assertSame(['Nama', 'Email', 'No. HP', 'No. HP wali', 'Status', 'Level tarif', 'Tanggal bergabung', 'Brand'], $sheets['Host'][0]);
-        $this->assertCount(2, $sheets['Host']);
-        $this->assertSame($assigned->user->email, $sheets['Host'][1][1]);
-        $this->assertSame('08123456789', $sheets['Host'][1][2]);
-        $this->assertSame('Wardah (leader)', $sheets['Host'][1][7]);
+        $this->assertSame(['Ringkasan', 'Daftar Host'], array_keys($sheets));
+        $this->assertSame(1, $this->xlsxValue($sheets['Ringkasan'], 'Total host'));
+
+        $hosts = $this->xlsxTable($sheets['Daftar Host'], 'No');
+        $this->assertSame(
+            ['No', 'Nama', 'Email', 'No. HP', 'No. HP wali', 'Status', 'Level tarif', 'Tarif per jam', 'Tanggal bergabung', 'Masa kerja (bulan)', 'Brand aktif', 'Leader di'],
+            $hosts[0],
+        );
+        $this->assertCount(2, $hosts);
+        $this->assertSame($assigned->user->email, $hosts[1][2]);
+        $this->assertSame('08123456789', $hosts[1][3]);
+        $this->assertSame('Aktif', $hosts[1][5]);
+        // The banned assignment (Emina) isn't an active brand
+        $this->assertSame('Wardah', $hosts[1][10]);
+        $this->assertSame('Wardah', $hosts[1][11]);
     }
 
     public function test_host_export_writes_formula_like_names_as_plain_text(): void
@@ -194,11 +204,11 @@ class BrandAssignmentTest extends TestCase
         $response = $this->actingAs($this->operator)->get('/api/operator/hosts/export')->assertOk();
         $zip = new \ZipArchive;
         $zip->open($response->baseResponse->getFile()->getPathname());
-        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $listXml = $zip->getFromName('xl/worksheets/sheet2.xml'); // "Daftar Host" (no total row, so no formulas)
         $zip->close();
 
-        $this->assertStringNotContainsString('<f>', $sheetXml);
-        $this->assertSame('=HYPERLINK("http://evil.test","Click")', $this->xlsxSheets($response)['Host'][1][0]);
+        $this->assertStringNotContainsString('<f>', $listXml);
+        $this->assertSame('=HYPERLINK("http://evil.test","Click")', $this->xlsxTable($this->xlsxSheets($response)['Daftar Host'], 'No')[1][1]);
     }
 
     public function test_host_cannot_use_operator_routes(): void

@@ -11,10 +11,11 @@ use App\Models\PaymentItem;
 use App\Models\PaymentPeriod;
 use App\Models\SalarySlip;
 use App\Models\WorkSession;
+use App\Services\PayrollReport;
 use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PayController extends Controller
 {
@@ -114,16 +115,11 @@ class PayController extends Controller
     }
 
     /** The brand report (CSV) for a period I lead. */
-    public function export(Request $request, PaymentPeriod $period): Response
+    public function export(Request $request, PaymentPeriod $period, PayrollReport $report): BinaryFileResponse
     {
         $this->ensureLeader($request, $period);
 
-        $name = str($period->brand->name)->slug().'-'.$period->period_start->toDateString().'.csv';
-
-        return response($this->payroll->exportCsv($period->load('brand')), 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$name}\"",
-        ]);
+        return $report->period($period, $request->user());
     }
 
     /**

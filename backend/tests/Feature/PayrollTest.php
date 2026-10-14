@@ -272,7 +272,9 @@ class PayrollTest extends TestCase
         $this->assertSame($this->host->user_id, $period->paymentRequest()->firstOrFail()->requested_by);
         $this->assertDatabaseHas(AppNotification::class, ['user_id' => $finance->id, 'type' => 'payment_requested']);
 
-        $this->actingAs($this->host->user)->get("/api/host/pay/periods/{$period->id}/export")->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $this->actingAs($this->host->user)->get("/api/host/pay/periods/{$period->id}/export")
+            ->assertOk()
+            ->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }
 
     public function test_finance_closes_a_period_early_when_the_brand_stops(): void
@@ -668,18 +670,62 @@ class PayrollTest extends TestCase
         $this->assertSame(0, CashAdvance::count());
     }
 
-    public function test_brand_report_csv_lists_sessions_and_totals(): void
+    public function test_brand_report_lists_hours_and_sessions_but_no_pay(): void
     {
         $this->workSession($this->host, '2026-10-02', 2);
         $period = $this->period('2026-10-01');
 
-        $csv = $this->actingAs($this->admin)->get("/api/finance/payroll/periods/{$period->id}/export")
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8')
-            ->getContent();
+        $sheets = $this->xlsxSheets(
+            $this->actingAs($this->admin)->get("/api/finance/payroll/periods/{$period->id}/export")
+                ->assertOk()
+                ->assertDownload('brand-a-2026-10-01.xlsx')
+        );
 
-        $this->assertStringContainsString($this->host->user->name, $csv);
-        $this->assertStringContainsString('Jam yang ditagihkan (target 10)', $csv);
+        $this->assertSame(['Ringkasan', 'Sesi Live', 'Penyesuaian'], array_keys($sheets));
+        $this->assertEquals(10, $this->xlsxValue($sheets['Ringkasan'], 'Target jam'));
+        $this->assertEquals(2, $this->xlsxValue($sheets['Ringkasan'], 'Jam yang ditagihkan'));
+        $this->assertEquals([$this->host->user->name, 1, 0, 2, 2, 0], $this->xlsxTable($sheets['Ringkasan'], 'Host')[1]);
+
+        $sessions = $this->xlsxTable($sheets['Sesi Live'], 'Tanggal');
+        $this->assertSame($this->host->user->name, $sessions[1][2]);
+        $this->assertEquals(2, $sessions[1][5]);
+
+        // For the brand: no rates or pay anywhere
+        $headers = collect($sheets)->flatten()->filter(fn ($cell) => is_string($cell))->implode('|');
+        $this->assertStringNotContainsString('Gaji', $headers);
+        $this->assertStringNotContainsString('Tarif', $headers);
+    }
+
+    public function test_finance_report_covers_a_day_week_month_year_or_everything(): void
+    {
+        $this->workSession($this->host, '2026-10-02', 2); // 40.000
+        $period = $this->endFirstPeriod();
+        $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
+        $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/paid")->assertOk();
+        $name = $this->host->user->name;
+
+        $report = fn (string $query) => $this->xlsxSheets($this->actingAs($this->admin)->get("/api/finance/payroll/report?{$query}")->assertOk());
+
+        $month = $report('range=month&date=2026-10-20');
+        $this->assertSame(['Ringkasan', 'Rekap Host', 'Sesi Live', 'Periode', 'Slip Gaji', 'Kasbon', 'Cicilan Kasbon'], array_keys($month));
+        $this->assertSame(1, $this->xlsxValue($month['Ringkasan'], 'Sesi live'));
+        $this->assertEquals(40000, $this->xlsxValue($month['Ringkasan'], 'Gaji kotor'));
+        $this->assertEquals([$name, 'Brand A', 1, 2, 1, 40000, 0, 40000, 0, 0], $this->xlsxTable($month['Rekap Host'], 'Host')[1]);
+        $this->assertSame('Lunas', $this->xlsxTable($month['Periode'], 'Brand')[1][3]);
+
+        // The session was on Fri 2 Oct; Sat 3 Oct had none
+        $this->assertCount(2, $this->xlsxTable($report('range=day&date=2026-10-02')['Sesi Live'], 'Tanggal'));
+        $this->assertSame('Tidak ada sesi live di rentang ini.', $this->xlsxTable($report('range=day&date=2026-10-03')['Sesi Live'], 'Tanggal')[1][0]);
+        $this->assertSame(1, $this->xlsxValue($report('range=week&date=2026-09-30')['Ringkasan'], 'Sesi live'));
+        $this->assertSame(1, $this->xlsxValue($report('range=year&date=2026-01-01')['Ringkasan'], 'Sesi live'));
+        $this->assertSame(1, $this->xlsxValue($report('range=all')['Ringkasan'], 'Sesi live'));
+        $this->assertSame(0, $this->xlsxValue($report('range=custom&from=2026-10-03&to=2026-10-04')['Ringkasan'], 'Sesi live'));
+
+        $other = Brand::create(['name' => 'Brand B', 'target_hours_per_period' => 10, 'payment_cycle_days' => 7, 'payroll_start_date' => '2026-10-01']);
+        $this->assertSame(0, $this->xlsxValue($report("range=all&brand_id={$other->id}")['Ringkasan'], 'Sesi live'));
+
+        $this->actingAs($this->finance)->getJson('/api/finance/payroll/report?range=custom&from=2026-10-05&to=2026-10-01')->assertJsonValidationErrors('to');
+        $this->actingAs($this->finance)->getJson('/api/finance/payroll/report?range=decade')->assertJsonValidationErrors('range');
     }
 
     public function test_host_sees_estimate_slips_and_only_their_own_slip(): void

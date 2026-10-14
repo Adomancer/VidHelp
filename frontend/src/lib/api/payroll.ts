@@ -1,9 +1,27 @@
 /** Payroll: payment periods, salary slips and kasbon (finance), and a host's own pay. */
 
-import { api, apiFileUrl, post, del, query } from "./client";
+import { toDateInput } from "../format";
+import { api, downloadFile, post, del, query } from "./client";
 import type { Brand, HostWithUser } from "./hosts";
 
 export type PeriodStatus = "in_progress" | "waiting_payment" | "requested" | "paid";
+
+/** day, week (Mon–Sun), month or year around `date`; `from`–`to`; or everything */
+export type FinanceReportRange = "day" | "week" | "month" | "year" | "all" | "custom";
+
+export interface FinanceReportFilters {
+  range: FinanceReportRange;
+  date?: string;
+  from?: string;
+  to?: string;
+  brand_id?: string;
+}
+
+/** "Kopi Nusantara", "2026-10-01" → "kopi-nusantara-2026-10-01.xlsx" (the server names it the same) */
+function periodFileName(brandName: string, periodStart: string): string {
+  const slug = brandName.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `${slug}-${periodStart.slice(0, 10)}.xlsx`;
+}
 
 export interface PeriodSummary {
   /** Every approved hour this period, backups paid by another host included */
@@ -200,7 +218,12 @@ export const payrollApi = {
   requestPayment: (token: string, periodId: string) => post(`/finance/payroll/periods/${periodId}/request`, token),
   cancelRequest: (token: string, periodId: string, reason: string) => post(`/finance/payroll/periods/${periodId}/cancel-request`, token, { reason }),
   markPaid: (token: string, periodId: string, reference: string | null) => post(`/finance/payroll/periods/${periodId}/paid`, token, { reference }),
-  exportUrl: (token: string, periodId: string) => apiFileUrl(`/finance/payroll/periods/${periodId}/export`, token),
+  /** The brand report of a period (hours per host, sessions, adjustments; no pay) as Excel. */
+  exportPeriod: (token: string, period: { id: string; period_start: string; brand?: { name: string } }) =>
+    downloadFile(`/finance/payroll/periods/${period.id}/export`, token, periodFileName(period.brand?.name ?? "periode", period.period_start)),
+  /** Sessions, pay per host, periods, slips and kasbon for a range, as one Excel file. */
+  report: (token: string, filters: FinanceReportFilters) =>
+    downloadFile(`/finance/payroll/report${query(filters)}`, token, `laporan-keuangan-${filters.range}-${filters.date ?? filters.from ?? toDateInput()}.xlsx`),
   slip: (token: string, id: string) => api<{ slip: SlipDetail }>(`/finance/payroll/slips/${id}`, { token }),
   advances: (token: string, status: "open" | "paid" | "" = "") => api<{ advances: CashAdvance[] }>(`/finance/cash-advances${query({ status })}`, { token }),
   advanceLimit: (token: string, hostId: string) => api<{ limit: AdvanceLimit }>(`/finance/cash-advances/limit/${hostId}`, { token }),
@@ -277,5 +300,7 @@ export const payApi = {
   slip: (token: string, id: string) => api<{ slip: SlipDetail }>(`/host/pay/slips/${id}`, { token }),
   /** As the brand's leader: request payment once the target is reached. */
   requestPayment: (token: string, periodId: string) => post(`/host/pay/periods/${periodId}/request`, token),
-  exportUrl: (token: string, periodId: string) => apiFileUrl(`/host/pay/periods/${periodId}/export`, token),
+  /** As the brand's leader: the brand report of a period as Excel. */
+  exportPeriod: (token: string, period: { id: string; period_start: string; brand: { name: string } }) =>
+    downloadFile(`/host/pay/periods/${period.id}/export`, token, periodFileName(period.brand.name, period.period_start)),
 };

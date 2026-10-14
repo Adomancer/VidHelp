@@ -8,11 +8,13 @@ use App\Models\HostProfile;
 use App\Models\HourAdjustment;
 use App\Models\PaymentPeriod;
 use App\Models\SalarySlip;
+use App\Services\PayrollReport;
 use App\Services\PayrollService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PayrollController extends Controller
 {
@@ -170,14 +172,43 @@ class PayrollController extends Controller
     /**
      * The brand report as a CSV download.
      */
-    public function export(PaymentPeriod $period): Response
+    /**
+     * The brand report for one period as Excel (hours per host and every session; no pay).
+     */
+    public function export(Request $request, PaymentPeriod $period, PayrollReport $report): BinaryFileResponse
     {
-        $name = str($period->brand->name)->slug().'-'.$period->period_start->toDateString().'.csv';
+        return $report->period($period, $request->user());
+    }
 
-        return response($this->payroll->exportCsv($period->load('brand')), 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$name}\"",
+    /**
+     * The finance report as Excel for a day, week (Mon–Sun), month or year around `date`
+     * (default today), a custom `from`–`to`, or everything; optionally one brand.
+     */
+    public function report(Request $request, PayrollReport $report): BinaryFileResponse
+    {
+        $validated = $request->validate([
+            'range' => 'required|in:day,week,month,year,all,custom',
+            'date' => 'nullable|date_format:Y-m-d',
+            'from' => 'required_if:range,custom|nullable|date_format:Y-m-d',
+            'to' => 'required_if:range,custom|nullable|date_format:Y-m-d|after_or_equal:from',
+            'brand_id' => 'nullable|exists:brands,id',
         ]);
+
+        $date = CarbonImmutable::parse($validated['date'] ?? today())->locale('id');
+        [$from, $to, $label] = match ($validated['range']) {
+            'day' => [$date, $date, 'Harian · '.$date->translatedFormat('l, j F Y')],
+            'week' => [$date->startOfWeek(), $date->endOfWeek(), 'Mingguan · '.$date->startOfWeek()->translatedFormat('j M').' – '.$date->endOfWeek()->translatedFormat('j M Y')],
+            'month' => [$date->startOfMonth(), $date->endOfMonth(), 'Bulanan · '.$date->translatedFormat('F Y')],
+            'year' => [$date->startOfYear(), $date->endOfYear(), 'Tahunan · '.$date->year],
+            'all' => [null, null, 'Semua waktu'],
+            'custom' => [
+                $from = CarbonImmutable::parse($validated['from'])->locale('id'),
+                $to = CarbonImmutable::parse($validated['to'])->locale('id'),
+                'Rentang · '.$from->translatedFormat('j M Y').' – '.$to->translatedFormat('j M Y'),
+            ],
+        };
+
+        return $report->range($from, $to, isset($validated['brand_id']) ? Brand::find($validated['brand_id']) : null, $request->user(), $label);
     }
 
     public function slip(SalarySlip $slip): JsonResponse

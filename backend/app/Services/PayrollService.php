@@ -869,52 +869,6 @@ class PayrollService
             ->count();
     }
 
-    /**
-     * The brand report for a period as CSV: every session, then adjustments and totals.
-     */
-    public function exportCsv(PaymentPeriod $period): string
-    {
-        $out = fopen('php://temp', 'r+');
-        $summary = $this->breakdown($period)['summary'];
-
-        fputcsv($out, ['Brand', $period->brand->name]);
-        fputcsv($out, ['Periode', $period->period_start->toDateString(), $period->period_end?->toDateString() ?? 'berjalan']);
-        fputcsv($out, []);
-        fputcsv($out, ['Tanggal', 'Host', 'Mulai', 'Selesai', 'Jam', 'Jenis']);
-
-        WorkSession::where('payment_period_id', $period->id)->with('host.user')->orderBy('start_at')->get()
-            ->each(fn (WorkSession $session) => fputcsv($out, [
-                $session->session_date->toDateString(),
-                $session->host->user->name,
-                $session->start_at->format('Y-m-d H:i'),
-                $session->end_at->format('Y-m-d H:i'),
-                $session->duration_hours,
-                $session->session_type,
-            ]));
-
-        $adjustments = $period->adjustments()->with('host.user')->get();
-        if ($adjustments->isNotEmpty()) {
-            fputcsv($out, []);
-            fputcsv($out, ['Penyesuaian']);
-            fputcsv($out, ['Host', 'Sesi', 'Jam', 'Catatan']);
-            $adjustments->each(fn (HourAdjustment $adjustment) => fputcsv($out, [
-                $adjustment->host->user->name, $adjustment->sessions_added, $adjustment->hours_added, $adjustment->notes,
-            ]));
-        }
-
-        fputcsv($out, []);
-        fputcsv($out, ['Jam kerja', $summary['worked_hours']]);
-        fputcsv($out, ['Bawaan dari periode lalu', $summary['carried_in_hours']]);
-        fputcsv($out, ["Jam yang ditagihkan (target {$summary['target_hours']})", $summary['achieved_hours']]);
-        fputcsv($out, ['Dibawa ke periode berikutnya', $summary['carried_out_hours']]);
-
-        rewind($out);
-        $csv = stream_get_contents($out);
-        fclose($out);
-
-        return $csv;
-    }
-
     private function rupiah(float $amount): string
     {
         return 'Rp '.number_format($amount, 0, ',', '.');
