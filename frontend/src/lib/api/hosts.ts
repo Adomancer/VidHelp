@@ -109,11 +109,18 @@ export const hostApi = {
     return post<MyProfile & Message>("/host/profile/ktp-image", token, body);
   },
 
-  /** Brands I'm actively assigned to, with their product knowledge. */
+  /** Brands I'm actively assigned to, then the ones I cover a backup or an event block for soon, with their product knowledge. */
   brands: (token: string) => api<{ brands: MyBrand[] }>("/host/brands", { token }),
+
+  /** One brand's product knowledge (one I'm assigned to, or cover a backup or event block for). */
+  brand: (token: string, id: string) => api<{ brand: Omit<MyBrand, "via"> }>(`/host/brands/${id}`, { token }),
 };
 
-export type MyBrand = Pick<Brand, "id" | "name" | "is_obs"> & { product_knowledge: string | null };
+export type MyBrand = Pick<Brand, "id" | "name" | "is_obs"> & {
+  product_knowledge: string | null;
+  /** Why I see it: assigned to it, or going live for it as a backup or in an event block */
+  via: "assigned" | "backup" | "event";
+};
 
 export interface HostFilters {
   search?: string[];

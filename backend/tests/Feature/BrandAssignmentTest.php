@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\HostProfile;
+use App\Models\ScheduleSlot;
 use App\Models\User;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
@@ -235,6 +237,42 @@ class BrandAssignmentTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'brands')
             ->assertJsonPath('brands.0.name', 'Wardah')
-            ->assertJsonPath('brands.0.product_knowledge', 'Lip cream 12 shades');
+            ->assertJsonPath('brands.0.product_knowledge', 'Lip cream 12 shades')
+            ->assertJsonPath('brands.0.via', 'assigned');
+
+        // Opened from a session
+        $this->actingAs($host->user)->getJson("/api/host/brands/{$assigned->id}")
+            ->assertOk()
+            ->assertJsonPath('brand.product_knowledge', 'Lip cream 12 shades');
+        $this->actingAs($host->user)->getJson("/api/host/brands/{$banned->id}")->assertForbidden();
+    }
+
+    public function test_backup_cover_sees_the_other_brands_knowledge_until_a_day_after(): void
+    {
+        $this->travelTo(now()->setTime(9, 0));
+        $cover = $this->host();
+        $other = $this->brand(['name' => 'Skintific', 'product_knowledge' => 'Serum 5X Ceramide']);
+        $requester = $this->host();
+        $slot = ScheduleSlot::create([
+            'assignment_id' => $requester->assignments()->create(['brand_id' => $other->id, 'status' => 'active'])->id,
+            'day_of_week' => now()->dayOfWeekIso, 'start_time' => '19:00', 'end_time' => '21:00', 'effective_from' => today()->subMonth(),
+        ]);
+        BackupRequest::create([
+            'slot_id' => $slot->id, 'brand_id' => $other->id, 'requesting_host_id' => $requester->id,
+            'backup_date' => today(), 'start_at' => today()->setTime(19, 0), 'end_at' => today()->setTime(21, 0),
+            'reason_type' => 'permit', 'status' => 'filled', 'filled_by_host_id' => $cover->id, 'auto_fill_at' => today()->setTime(18, 30),
+        ]);
+
+        $this->actingAs($cover->user)->getJson("/api/host/brands/{$other->id}")
+            ->assertOk()
+            ->assertJsonPath('brand.product_knowledge', 'Serum 5X Ceramide');
+        $this->actingAs($cover->user)->getJson('/api/host/brands')
+            ->assertJsonPath('brands.0.name', 'Skintific')
+            ->assertJsonPath('brands.0.via', 'backup');
+
+        // Not someone else's cover, and not long after it ended
+        $this->actingAs($this->host()->user)->getJson("/api/host/brands/{$other->id}")->assertForbidden();
+        $this->travelTo(today()->addDays(2));
+        $this->actingAs($cover->user)->getJson("/api/host/brands/{$other->id}")->assertForbidden();
     }
 }

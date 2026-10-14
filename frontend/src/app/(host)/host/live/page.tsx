@@ -12,6 +12,7 @@ import { formValue, useApiForm } from "@/lib/useApiForm";
 import { timeUntil, useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import { KnowledgeButton } from "@/components/BrandKnowledge";
 import Card from "@/components/Card";
 import DurationInput from "@/components/DurationInput";
 import EmptyState from "@/components/EmptyState";
@@ -199,6 +200,8 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
           {session.role === "event" && <p className="mt-1.5 text-xs font-medium text-brand">Event: {session.event_name}</p>}
           {session.role === "off" && <p className="mt-1.5 text-xs text-muted-foreground">Kamu libur, digantikan {session.covered_by}</p>}
         </div>
+        {session.role !== "off" && <KnowledgeButton brand={session.brand} compact className="shrink-0 sm:hidden" />}
+        {session.role !== "off" && <KnowledgeButton brand={session.brand} className="hidden shrink-0 sm:inline-flex" />}
       </div>
 
       {session.role !== "off" && <Progress attendance={attendance} />}

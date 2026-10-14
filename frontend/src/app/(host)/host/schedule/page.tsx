@@ -23,6 +23,7 @@ import { timeUntil, useNow } from "@/lib/useNow";
 import { useMediaQuery } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import { KnowledgeButton } from "@/components/BrandKnowledge";
 import Card from "@/components/Card";
 import Dialog from "@/components/Dialog";
 import EmptyState from "@/components/EmptyState";
@@ -59,6 +60,7 @@ interface Entry {
   from: string;
   to: string;
   brand: string;
+  brandId: string;
   /** What's special about it, e.g. "Digantikan Ayu" or "Backup untuk Rizky". */
   note?: string;
   /** My slot is waiting for a cover. */
@@ -118,7 +120,7 @@ function buildDays(
   const slotEntry = (slot: ScheduleSlot, date: string, part: { key: string; date: string; start: number; end: number; carried?: boolean }): Entry => {
     const event = replacedBy(slot, date);
     const marker = markerFor(slot, date);
-    const base = { ...part, from: slot.start_time, to: slot.end_time, brand: slot.assignment.brand.name };
+    const base = { ...part, from: slot.start_time, to: slot.end_time, brand: slot.assignment.brand.name, brandId: slot.assignment.brand.id };
     if (event) return { ...base, kind: "replaced", note: `Diganti event ${event}` };
     if (marker?.status === "filled") return { ...base, kind: "off", note: `Digantikan ${marker.filler_name ?? "host lain"}` };
     if (marker) return { ...base, kind: "own", note: marker.status === "open" ? "Mencari backup" : "Backup diajukan", needsCover: marker.status };
@@ -156,6 +158,7 @@ function buildDays(
         from: formatClock(cover.start_at),
         to: formatClock(cover.end_at),
         brand: cover.brand.name,
+        brandId: cover.brand.id,
         note: `Backup untuk ${cover.requester_name}`,
       }));
 
@@ -170,6 +173,7 @@ function buildDays(
         from: formatClock(claim.start_at),
         to: formatClock(claim.end_at),
         brand: claim.brand.name,
+        brandId: claim.brand.id,
         note: `Event ${claim.event_name}`,
       }));
 
@@ -453,6 +457,7 @@ function DayDetail({ day }: { day: Day }) {
                 <span className="truncate">{entry.note}</span>
               </StatusBadge>
             )}
+            {live(entry) && !day.past && <KnowledgeButton brand={{ id: entry.brandId, name: entry.brand }} compact className="shrink-0" />}
           </li>
         ))}
       </ul>

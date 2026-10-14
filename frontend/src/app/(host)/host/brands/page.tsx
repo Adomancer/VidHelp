@@ -1,9 +1,10 @@
 "use client";
 
-import { BookOpen, Tag } from "lucide-react";
+import { Tag } from "lucide-react";
 import { hostApi } from "@/lib/api";
 import { useApiData } from "@/lib/useApiData";
 import { useAuth } from "@/components/AuthProvider";
+import { KnowledgeText } from "@/components/BrandKnowledge";
 import Card from "@/components/Card";
 import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
@@ -11,24 +12,9 @@ import { CardsSkeleton } from "@/components/Loading";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 
-/** Shows text with its http(s) links clickable, keeping line breaks. */
-function Linkified({ text }: { text: string }) {
-  return (
-    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words text-body">
-      {text.split(/(https?:\/\/\S+)/g).map((part, index) =>
-        index % 2 === 1 ? (
-          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="font-medium text-brand underline underline-offset-2 hover:no-underline">
-            {part}
-          </a>
-        ) : (
-          part
-        )
-      )}
-    </p>
-  );
-}
+const viaBadge = { backup: "Backup", event: "Event" } as const;
 
-/** Product knowledge of the brands I'm assigned to. */
+/** Product knowledge of the brands I'm assigned to, and of the ones I go live for soon as a backup or in an event. */
 export default function HostBrandsPage() {
   const { token } = useAuth();
   const brands = useApiData("my-brands", () => hostApi.brands(token));
@@ -57,16 +43,16 @@ export default function HostBrandsPage() {
                 {brand.name}
               </span>
             }
-            action={brand.is_obs ? <StatusBadge tone="info">OBS</StatusBadge> : undefined}
+            action={
+              brand.is_obs || brand.via !== "assigned" ? (
+                <span className="flex gap-1.5">
+                  {brand.via !== "assigned" && <StatusBadge tone="success">{viaBadge[brand.via]}</StatusBadge>}
+                  {brand.is_obs && <StatusBadge tone="info">OBS</StatusBadge>}
+                </span>
+              ) : undefined
+            }
           >
-            {brand.product_knowledge ? (
-              <Linkified text={brand.product_knowledge} />
-            ) : (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                <BookOpen className="size-4 shrink-0" aria-hidden="true" />
-                Belum ada product knowledge. Tanyakan ke operator kamu.
-              </p>
-            )}
+            <KnowledgeText text={brand.product_knowledge} />
           </Card>
         ))}
       </div>

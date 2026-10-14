@@ -255,6 +255,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
         // Product knowledge of the brands I'm assigned to
         Route::get('/brands', [HostBrandController::class, 'index']);
+        Route::get('/brands/{brand}', [HostBrandController::class, 'show']);
 
         // Backups: request cover for my slot (open or to named hosts), apply to cover others
         Route::get('/backups', [HostBackupController::class, 'index']);
