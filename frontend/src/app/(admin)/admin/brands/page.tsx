@@ -36,7 +36,7 @@ function brandColumns(onEdit: (brand: BrandSummary) => void): ColumnDef<BrandSum
       cell: ({ row }) => `${row.original.target_hours_per_period} jam`,
       meta: { cellClassName: "tabular-nums" },
     },
-    { accessorKey: "payment_cycle_days", header: "Siklus pembayaran", cell: ({ row }) => <Cycle brand={row.original} /> },
+    { accessorKey: "payroll_start_date", header: "Penggajian", cell: ({ row }) => <PayrollStart brand={row.original} /> },
     { accessorKey: "active_hosts_count", header: "Host", meta: { align: "right" } },
     { id: "leader", accessorFn: (brand) => brand.leader?.name ?? "", header: "Leader", cell: ({ row }) => <Leader brand={row.original} /> },
     { accessorKey: "status", header: "Status", cell: ({ row }) => <BrandStatus brand={row.original} /> },
@@ -116,8 +116,8 @@ export default function AdminBrandsPage() {
                     <dd className="font-medium text-foreground tabular-nums">{brand.target_hours_per_period} jam</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Siklus</dt>
-                    <dd className="font-medium text-foreground tabular-nums">{brand.payment_cycle_days} hari</dd>
+                    <dt className="text-muted-foreground">Penggajian</dt>
+                    <dd className="font-medium text-foreground tabular-nums">{brand.payroll_start_date ? formatDate(brand.payroll_start_date) : "Belum"}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Host</dt>
@@ -163,14 +163,11 @@ function BrandName({ brand }: { brand: BrandSummary }) {
   );
 }
 
-function Cycle({ brand }: { brand: BrandSummary }) {
-  return (
-    <>
-      <span className="tabular-nums">{brand.payment_cycle_days} hari</span>
-      <span className="block text-xs text-muted-foreground">
-        {brand.payroll_start_date ? `mulai ${formatDate(brand.payroll_start_date)}` : "penggajian belum dimulai"}
-      </span>
-    </>
+function PayrollStart({ brand }: { brand: BrandSummary }) {
+  return brand.payroll_start_date ? (
+    <span className="tabular-nums">mulai {formatDate(brand.payroll_start_date)}</span>
+  ) : (
+    <span className="text-xs text-muted-foreground">belum dimulai</span>
   );
 }
 
@@ -201,7 +198,6 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
         is_obs: data.get("is_obs") === "on",
         product_knowledge: formValue(data, "product_knowledge") || null,
         target_hours_per_period: Number(formValue(data, "target_hours_per_period")),
-        payment_cycle_days: Number(formValue(data, "payment_cycle_days")),
         payroll_start_date: formValue(data, "payroll_start_date") || null,
         status: (formValue(data, "status") || "active") as BrandInput["status"],
       };
@@ -227,15 +223,7 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           defaultValue={brand?.target_hours_per_period}
           required
           error={errors.target_hours_per_period}
-        />
-        <TextField
-          label="Siklus pembayaran (hari)"
-          name="payment_cycle_days"
-          type="number"
-          min={1}
-          defaultValue={brand?.payment_cycle_days ?? 14}
-          required
-          error={errors.payment_cycle_days}
+          hint="Periode selesai saat jam ini tercapai (mis. 720 jam ≈ sebulan); lalu leader brand mengajukan pembayaran."
         />
         <div className="space-y-1.5">
           <Label htmlFor="payroll_start_date">Mulai penggajian</Label>

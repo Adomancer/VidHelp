@@ -33,7 +33,7 @@ class AccountTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-10-05 10:00')); // Monday
         $this->seed([RoleSeeder::class, HostRateCategorySeeder::class]);
         $this->admin = User::where('email', 'admin@vidhelp.com')->firstOrFail();
-        $this->brand = Brand::create(['name' => 'Brand A', 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
+        $this->brand = Brand::create(['name' => 'Brand A', 'target_hours_per_period' => 100]);
     }
 
     private function host(): HostProfile

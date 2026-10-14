@@ -45,8 +45,8 @@ class EventTest extends TestCase
         $this->operator = User::factory()->create();
         $this->operator->assignRole('operator');
 
-        $this->brandA = Brand::create(['name' => 'Brand A', 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
-        $this->brandB = Brand::create(['name' => 'Brand B', 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
+        $this->brandA = Brand::create(['name' => 'Brand A', 'target_hours_per_period' => 100]);
+        $this->brandB = Brand::create(['name' => 'Brand B', 'target_hours_per_period' => 100]);
         $this->regular = $this->host($this->brandA);
         $this->other = $this->host($this->brandA);
 

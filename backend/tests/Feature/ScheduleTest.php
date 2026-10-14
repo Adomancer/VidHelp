@@ -32,7 +32,7 @@ class ScheduleTest extends TestCase
 
     private function brand(): Brand
     {
-        return Brand::create(['name' => 'Brand '.uniqid(), 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
+        return Brand::create(['name' => 'Brand '.uniqid(), 'target_hours_per_period' => 100]);
     }
 
     /** A host on a brand. Pass an existing assignment's host to put the same host on another brand. */
@@ -58,6 +58,17 @@ class ScheduleTest extends TestCase
             'start_time' => $start,
             'end_time' => $end,
             ...$extra,
+        ]);
+    }
+
+    /** One slot per day, e.g. every day. */
+    private function addSlotOnDays(HostBrandAssignment $assignment, array $days, string $start, string $end)
+    {
+        return $this->actingAs($this->operator)->postJson('/api/operator/schedules', [
+            'assignment_id' => $assignment->id,
+            'days_of_week' => $days,
+            'start_time' => $start,
+            'end_time' => $end,
         ]);
     }
 
@@ -287,6 +298,49 @@ class ScheduleTest extends TestCase
 
         $this->actingAs($this->operator)->getJson('/api/operator/schedules/conflicts?'.http_build_query($query + ['ignore_id' => $clashId]))
             ->assertJsonCount(0, 'conflicts');
+    }
+
+    public function test_every_day_adds_one_slot_per_day(): void
+    {
+        $assignment = $this->assignment($this->brand());
+
+        $this->addSlotOnDays($assignment, [7, 1, 2, 3, 4, 5, 6], '19:00', '21:00')
+            ->assertCreated()
+            ->assertJsonCount(7, 'slots')
+            ->assertJsonPath('slots.0.day_of_week', 1)
+            ->assertJsonPath('slots.6.day_of_week', 7)
+            ->assertJsonPath('message', '7 slot ditambahkan');
+
+        $this->assertEquals(range(1, 7), ScheduleSlot::where('assignment_id', $assignment->id)->orderBy('day_of_week')->pluck('day_of_week')->all());
+    }
+
+    public function test_several_days_add_nothing_when_one_day_clashes(): void
+    {
+        $brand = $this->brand();
+        $this->addSlot($this->assignment($brand), 3, '20:00', '22:00')->assertCreated();
+        $assignment = $this->assignment($brand);
+
+        $this->addSlotOnDays($assignment, [1, 2, 3, 4, 5, 6, 7], '19:00', '21:00')
+            ->assertJsonValidationErrors('start_time');
+
+        $this->assertSame(0, ScheduleSlot::where('assignment_id', $assignment->id)->count());
+    }
+
+    public function test_conflict_check_covers_every_chosen_day(): void
+    {
+        $brand = $this->brand();
+        $this->addSlot($this->assignment($brand), 5, '20:00', '22:00')->assertCreated();
+
+        $query = [
+            'assignment_id' => $this->assignment($brand)->id, 'days_of_week' => [1, 3, 5], 'start_time' => '19:00', 'end_time' => '21:00',
+            'effective_from' => today()->toDateString(),
+        ];
+
+        $this->actingAs($this->operator)->getJson('/api/operator/schedules/conflicts?'.http_build_query($query))
+            ->assertOk()
+            ->assertJsonCount(1, 'conflicts')
+            ->assertJsonPath('conflicts.0.day_of_week', 5)
+            ->assertJsonPath('conflicts.0.same_host', false);
     }
 
     public function test_history_follows_an_edit_from_a_later_date(): void

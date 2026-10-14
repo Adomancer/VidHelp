@@ -66,7 +66,7 @@ class BackupTest extends TestCase
 
     private function brand(string $name): Brand
     {
-        return Brand::create(['name' => $name, 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
+        return Brand::create(['name' => $name, 'target_hours_per_period' => 100]);
     }
 
     private function host(): HostProfile

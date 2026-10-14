@@ -134,10 +134,20 @@ export function describeWeekly(day: number, start: string, end: string): string 
   return `setiap ${dayLong(day)}, ${describeTimes(day, start, end)}`;
 }
 
+/** "setiap hari, 19:00–23:00", "setiap Senin, Rabu dan Jumat, 22:00–02:00 (selesai esok hari)"; one day as describeWeekly. */
+export function describeDays(days: number[], start: string, end: string): string {
+  if (days.length === 1) return describeWeekly(days[0], start, end);
+
+  const names = [...days].sort((a, b) => a - b).map(dayLong);
+  const which = days.length === 7 ? "setiap hari" : `setiap ${names.slice(0, -1).join(", ")} dan ${names.at(-1)}`;
+  const times = toMinutes(end) > toMinutes(start) ? `${start}–${end}` : `${start}–${end} (selesai esok hari)`;
+  return `${which}, ${times}`;
+}
+
 /** "Andi akan live setiap Senin, 19:00–23:00, mulai 6 Oktober 2026, tanpa batas akhir." */
-export function describePlan(plan: { hostName: string; day: number; start: string; end: string; from: string; until: string | null }): string {
+export function describePlan(plan: { hostName: string; days: number[]; start: string; end: string; from: string; until: string | null }): string {
   const period = plan.until ? `sampai ${formatLongDate(plan.until)}` : "tanpa batas akhir";
-  return `${plan.hostName} akan live ${describeWeekly(plan.day, plan.start, plan.end)}, mulai ${formatLongDate(plan.from)}, ${period}.`;
+  return `${plan.hostName} akan live ${describeDays(plan.days, plan.start, plan.end)}, mulai ${formatLongDate(plan.from)}, ${period}.`;
 }
 
 /** "Setiap minggu sejak 6 Okt 2026" or "Sementara: 6 Okt – 31 Okt 2026" */

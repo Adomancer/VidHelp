@@ -18,11 +18,14 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Demo data to click through the app: five hosts (host1@vidhelp.com … host5@vidhelp.com,
  * password "password"), two brands with weekly schedules, about seven weeks of live
- * sessions and pay periods (paid, requested, in progress), a kasbon, and backups to decide.
+ * sessions, a late check-in (points deducted), pay periods that close on the brand's target hours
+ * (paid; Glow Skincare's latest requested by its leader Ayu; Kopi Nusantara's latest usually still
+ * waiting for its leader Rizky to request; one running each), a kasbon, and backups to decide.
  *
  * Run: php artisan db:seed --class=DemoSeeder (after the normal seeders). Never in production.
  *
@@ -62,6 +65,9 @@ class DemoSeeder extends Seeder
     /** @var array<string, Brand> */
     private array $brands = [];
 
+    /** @var array<string, User> brand name => its leader's user (the PIC who requests payment) */
+    private array $leaders = [];
+
     /** @var array<int, list<ScheduleSlot>> host number => their slots */
     private array $slots = [];
 
@@ -85,7 +91,7 @@ class DemoSeeder extends Seeder
         // Never post demo notifications to the real Discord server
         config(['services.discord.bot_token' => null]);
 
-        // Periods are 14 days, starting on the Monday about six weeks ago
+        // Payroll starts on the Monday about six weeks ago; a period ends when its target hours are reached
         $today = CarbonImmutable::today();
         $start = $today->subWeeks(6)->startOfWeek();
 
@@ -107,6 +113,7 @@ class DemoSeeder extends Seeder
         });
 
         $this->command->info('Demo data added. Sign in as host1@vidhelp.com … host5@vidhelp.com with password "password".');
+        $this->command->info('Brand leaders (PIC): host1 (Glow Skincare), host4 (Kopi Nusantara, a period waiting for its request).');
     }
 
     /** Accounts are created as of the first period; join dates count back from the real today. */
@@ -147,13 +154,13 @@ class DemoSeeder extends Seeder
 
     private function createBrandsAndSchedule(CarbonImmutable $start): void
     {
-        $targets = ['Glow Skincare' => 30, 'Kopi Nusantara' => 36];
+        // About two weeks of their schedule each (12 and 20 hours a week)
+        $targets = ['Glow Skincare' => 24, 'Kopi Nusantara' => 40];
 
         foreach (self::SCHEDULE as $brandName => $rows) {
             $brand = Brand::create([
                 'name' => $brandName,
                 'target_hours_per_period' => $targets[$brandName],
-                'payment_cycle_days' => 14,
                 'payroll_start_date' => $start->toDateString(),
                 'status' => 'active',
             ]);
@@ -166,6 +173,9 @@ class DemoSeeder extends Seeder
                     'is_leader' => $leader,
                     'status' => 'active',
                 ]);
+                if ($leader) {
+                    $this->leaders[$brandName] = $this->hosts[$number]->user;
+                }
 
                 foreach ($days as $day) {
                     $this->slots[$number][] = ScheduleSlot::create([
@@ -187,12 +197,8 @@ class DemoSeeder extends Seeder
      */
     private function playPastSessions(AttendanceService $attendance, PayrollService $payroll, CarbonImmutable $start, CarbonImmutable $today): void
     {
-        // Pay events, by days after the start: the first two periods paid, the third requested
-        $events = [
-            14 => 'roll', 15 => 'kasbon', 16 => 'request:0', 18 => 'paid:0',
-            28 => 'roll', 30 => 'request:14', 32 => 'paid:14',
-            42 => 'roll', 44 => 'request:28',
-        ];
+        // Dimas borrows on day 15
+        $kasbonDay = 15;
 
         $lastAyu = $this->lastOccurrence(1, $today);
         $lastDimas = $this->lastOccurrence(2, $today);
@@ -214,7 +220,12 @@ class DemoSeeder extends Seeder
                     continue;
                 }
 
-                $record = $this->at($sessionStart->subMinutes(mt_rand(1, 8)), fn () => $attendance->checkIn($this->hosts[$number], $slot->id, $day->toDateString(), null));
+                // Nadia checks in 14 minutes late once: the "Telat" points are deducted; her hours still pass
+                // (within the tolerance), so the periods close on the same days as without it
+                $late = $number === 5 && $offset === 30;
+                $checkInAt = $late ? $sessionStart->addMinutes(14) : $sessionStart->subMinutes(mt_rand(1, 8));
+
+                $record = $this->at($checkInAt, fn () => $attendance->checkIn($this->hosts[$number], $slot->id, $day->toDateString(), null));
                 $this->at($sessionEnd->addMinutes(mt_rand(0, 3)), fn () => $attendance->checkOut($record));
 
                 // Ayu's latest session: checked out but no report yet (overdue)
@@ -238,31 +249,43 @@ class DemoSeeder extends Seeder
                 ]));
             }
 
-            if ($event = $events[$offset] ?? null) {
-                $this->at($day->setTime(10, 0), fn () => $this->payEvent($payroll, $event, $start));
-            }
+            $this->at($day->setTime(10, 0), function () use ($payroll, $offset, $kasbonDay, $today) {
+                if ($offset === $kasbonDay) {
+                    // Dimas borrows Rp 300.000 (his limit: 4 h a week × 52/12 × Rp 25.000 ≈ Rp 433.000), paid back in 3 installments
+                    $payroll->recordAdvance($this->hosts[2], [
+                        'type' => 'loan',
+                        'total_amount' => 300000,
+                        'installment_count' => 3,
+                        'notes' => 'Biaya kos (demo)',
+                    ], $this->admin);
+                }
+                $this->settlePeriods($payroll, $today);
+            });
         }
     }
 
-    private function payEvent(PayrollService $payroll, string $event, CarbonImmutable $start): void
+    /**
+     * The brand's PIC requests payment the day after a period reaches its target (unless a report
+     * still needs review); the brand pays two days later, except for requests from the last week.
+     * Kopi Nusantara's PIC hasn't requested a period that closed in the last week yet, so it waits.
+     */
+    private function settlePeriods(PayrollService $payroll, CarbonImmutable $today): void
     {
-        [$action, $periodOffset] = array_pad(explode(':', $event), 2, null);
-        $periods = fn () => PaymentPeriod::whereIn('brand_id', collect($this->brands)->pluck('id'))
-            ->whereDate('period_start', $start->addDays((int) $periodOffset)->toDateString())
-            ->get();
+        foreach ($this->brands as $name => $brand) {
+            $brand->paymentPeriods()->where('status', 'waiting_payment')->whereDate('period_end', '<', today())->orderBy('period_start')->get()
+                ->reject(fn (PaymentPeriod $period) => $name === 'Kopi Nusantara' && $period->period_end->gte($today->subWeek()))
+                ->each(function (PaymentPeriod $period) use ($payroll, $name) {
+                    try {
+                        $payroll->requestPayment($period, $this->leaders[$name]);
+                    } catch (ValidationException) {
+                        // Waits, as in the app, e.g. for a flagged report
+                    }
+                });
 
-        match ($action) {
-            'roll' => $payroll->rollPeriods(),
-            // Dimas borrows Rp 300.000 (his limit: 4 h a week × 52/12 × Rp 25.000 ≈ Rp 433.000), paid back in 3 installments
-            'kasbon' => $payroll->recordAdvance($this->hosts[2], [
-                'type' => 'loan',
-                'total_amount' => 300000,
-                'installment_count' => 3,
-                'notes' => 'Biaya kos (demo)',
-            ], $this->admin),
-            'request' => $periods()->each(fn (PaymentPeriod $period) => $payroll->requestPayment($period, $this->admin)),
-            'paid' => $periods()->each(fn (PaymentPeriod $period) => $payroll->markPaid($period)),
-        };
+            $brand->paymentPeriods()->where('status', 'requested')->get()
+                ->filter(fn (PaymentPeriod $period) => $period->locked_at->lte(now()->subDays(2)) && $period->locked_at->lt($today->subWeek()))
+                ->each(fn (PaymentPeriod $period) => $payroll->markPaid($period));
+        }
     }
 
     /**

@@ -51,9 +51,7 @@ class BrandController extends Controller
     {
         $brand = Brand::create($this->validated($request));
 
-        if ($brand->payroll_start_date) {
-            $payroll->periodFor($brand, today());
-        }
+        $payroll->openPeriod($brand);
 
         return response()->json(['brand' => $brand, 'message' => 'Brand dibuat'], 201);
     }
@@ -62,13 +60,12 @@ class BrandController extends Controller
     {
         $validated = $this->validated($request, $brand);
 
-        // Periods are laid out from the start date and cycle; changing either would shift every period
-        $moves = fn (string $key) => array_key_exists($key, $validated) && (string) $validated[$key] !== (string) ($key === 'payroll_start_date'
-            ? $brand->payroll_start_date?->toDateString()
-            : $brand->{$key});
-        if (($moves('payroll_start_date') || $moves('payment_cycle_days')) && $brand->paymentPeriods()->exists()) {
+        // The first period starts on this date; moving it would shift every period after
+        $moves = array_key_exists('payroll_start_date', $validated)
+            && (string) $validated['payroll_start_date'] !== (string) $brand->payroll_start_date?->toDateString();
+        if ($moves && $brand->paymentPeriods()->exists()) {
             throw ValidationException::withMessages([
-                'payroll_start_date' => ['Brand ini sudah punya periode pembayaran, jadi tanggal mulai penggajian dan siklusnya tidak bisa diubah lagi.'],
+                'payroll_start_date' => ['Brand ini sudah punya periode pembayaran, jadi tanggal mulai penggajian tidak bisa diubah lagi.'],
             ]);
         }
 
@@ -76,7 +73,10 @@ class BrandController extends Controller
 
         if ($brand->payroll_start_date) {
             $payroll->assignUnassigned($brand);
-            $payroll->periodFor($brand, today());
+            // A new target applies to the running period too, and may already be reached
+            $open = $payroll->openPeriod($brand);
+            $open->update(['target_hours' => $brand->target_hours_per_period]);
+            $payroll->closeIfTargetReached($open);
         }
 
         return response()->json(['brand' => $brand, 'message' => 'Brand diperbarui']);
@@ -91,7 +91,6 @@ class BrandController extends Controller
             'is_obs' => 'sometimes|boolean',
             'product_knowledge' => 'sometimes|nullable|string|max:20000',
             'target_hours_per_period' => "$required|integer|min:1|max:10000",
-            'payment_cycle_days' => "$required|integer|min:1|max:365",
             'payroll_start_date' => 'sometimes|nullable|date_format:Y-m-d',
             'status' => 'sometimes|in:active,inactive',
         ]);

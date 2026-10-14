@@ -7,6 +7,7 @@ import { DAYS, isoWeekday, nextDay, previousDay, toDateInput } from "@/lib/forma
 import {
   addDays,
   dayLong,
+  describeDays,
   describePlan,
   describeWeekly,
   durationMinutes,
@@ -58,9 +59,12 @@ function firstOn(day: number, from: string): string {
   return addDays(from, (day - isoWeekday(new Date(`${from}T00:00`)) + 7) % 7);
 }
 
+const EVERY_DAY = DAYS.map((option) => option.value);
+
 /**
  * Add or edit a weekly slot, top to bottom: who, which day and hours, for how long,
- * which type. Clashes are checked while filling in; save stays off until they're fixed.
+ * which type. A new slot can go on several days at once (e.g. every day): one slot per day.
+ * Clashes are checked while filling in; save stays off until they're fixed.
  */
 export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, onSaved }: SlotDialogProps) {
   const { token } = useAuth();
@@ -72,7 +76,9 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
 
   const initial = {
     assignmentId: slot?.assignment_id ?? (hosts.length === 1 ? hosts[0].id : ""),
+    /** The day the host's timeline shows; one of `days`. */
     day: slot?.day_of_week ?? day ?? isoWeekday(),
+    days: [slot?.day_of_week ?? day ?? isoWeekday()] as number[],
     start: slot?.start_time ?? "",
     end: slot?.end_time ?? "",
     slotType: slot?.slot_type ?? "regular",
@@ -85,6 +91,20 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
   const [form, setForm] = useState(initial);
   const set = <K extends keyof typeof initial>(key: K, value: (typeof initial)[K]) =>
     !readOnly && setForm((current) => ({ ...current, [key]: value }));
+
+  /** Adding: days toggle on and off (at least one stays). Editing: one day, as before. */
+  function toggleDay(value: number) {
+    if (readOnly) return;
+    setForm((current) => {
+      if (slot) return { ...current, day: value, days: [value] };
+      if (!current.days.includes(value)) return { ...current, day: value, days: [...current.days, value].sort((a, b) => a - b) };
+      if (current.days.length === 1) return current;
+      const days = current.days.filter((other) => other !== value);
+      return { ...current, days, day: current.day === value ? days[0] : current.day };
+    });
+  }
+  const everyDay = form.days.length === EVERY_DAY.length;
+  const toggleEveryDay = () => !readOnly && setForm((current) => ({ ...current, days: everyDay ? [current.day] : EVERY_DAY }));
 
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -110,7 +130,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
   const checkParams = complete
     ? {
         assignment_id: form.assignmentId,
-        day_of_week: form.day,
+        ...(slot ? { day_of_week: form.day } : { days_of_week: form.days }),
         start_time: start!,
         end_time: end!,
         effective_from: startsOn,
@@ -187,20 +207,23 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
 
     const input = {
       assignment_id: form.assignmentId,
-      day_of_week: form.day,
       start_time: start,
       end_time: end,
       slot_type: form.slotType,
       effective_to: until,
     };
-    const weekly = describeWeekly(form.day, start, end);
+    const weekly = describeDays(form.days, start, end);
 
     try {
       if (!slot) {
-        const { slot: created } = await scheduleApi.create(token, { ...input, effective_from: form.from });
-        onSaved({ text: `Slot disimpan, berlaku ${weekly}`, undo: () => scheduleApi.undo(token, created.id) });
+        const { slots } = await scheduleApi.create(token, { ...input, days_of_week: form.days, effective_from: form.from });
+        onSaved({
+          text: `${slots.length > 1 ? `${slots.length} slot` : "Slot"} disimpan, berlaku ${weekly}`,
+          undo: () => Promise.all(slots.map((created) => scheduleApi.undo(token, created.id))),
+        });
       } else {
-        const result = await scheduleApi.update(token, slot.id, asksWhen ? { ...input, apply_from: startsOn } : { ...input, effective_from: form.from });
+        const changes = { ...input, day_of_week: form.day };
+        const result = await scheduleApi.update(token, slot.id, asksWhen ? { ...changes, apply_from: startsOn } : { ...changes, effective_from: form.from });
         onSaved({
           text: asksWhen ? `Perubahan disimpan, berlaku mulai ${formatLongDate(startsOn)}` : `Slot disimpan, berlaku ${weekly}`,
           // A continued slot is taken back as a whole; an in-place edit gets its old values back
@@ -273,6 +296,25 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
                 Jadwal {hostName} di semua brand, {formatDayDate(date)}
                 {hostSlots.loading && " · memuat…"}
               </p>
+              {form.days.length > 1 && (
+                <div className="flex flex-wrap gap-1" role="radiogroup" aria-label="Lihat hari">
+                  {form.days.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={form.day === value}
+                      onClick={() => setForm((current) => ({ ...current, day: value }))}
+                      className={cn(
+                        "rounded-md px-2 py-0.5 text-xs font-medium transition-colors",
+                        form.day === value ? "bg-primary/10 text-brand" : "text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {DAYS[value - 1].short}
+                    </button>
+                  ))}
+                </div>
+              )}
               <HostDayTimeline
                 busy={busy}
                 available={available}
@@ -285,22 +327,36 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
         </Step>
 
         <Step number={2} title="Hari dan jam">
-          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Hari">
-            {DAYS.map((option) => (
-              <Chip
-                key={option.value}
-                role="radio"
-                aria-checked={form.day === option.value}
-                aria-pressed={undefined}
-                selected={form.day === option.value}
-                onClick={() => set("day", option.value)}
-                className="min-w-12 justify-center"
-              >
-                {option.short}
+          {slot ? (
+            <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Hari">
+              {DAYS.map((option) => (
+                <Chip
+                  key={option.value}
+                  role="radio"
+                  aria-checked={form.day === option.value}
+                  aria-pressed={undefined}
+                  selected={form.day === option.value}
+                  onClick={() => toggleDay(option.value)}
+                  className="min-w-12 justify-center"
+                >
+                  {option.short}
+                </Chip>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Hari">
+              <Chip selected={everyDay} onClick={toggleEveryDay}>
+                Setiap hari
               </Chip>
-            ))}
-          </div>
-          <FieldError message={errors.day_of_week} />
+              {DAYS.map((option) => (
+                <Chip key={option.value} selected={form.days.includes(option.value)} onClick={() => toggleDay(option.value)} className="min-w-12 justify-center">
+                  {option.short}
+                </Chip>
+              ))}
+            </div>
+          )}
+          {!slot && <p className="mt-1.5 text-xs text-muted-foreground">Pilih satu hari atau lebih; tiap hari jadi slot sendiri dengan jam yang sama.</p>}
+          <FieldError message={errors.day_of_week ?? errors.days_of_week} />
 
           <div className="mt-3 grid grid-cols-2 gap-3 max-w-sm">
             <TimeInput label="Mulai" value={form.start} onChange={(value) => set("start", value)} error={problems.start ?? errors.start_time} />
@@ -310,7 +366,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
             <p className={cn("mt-2 flex items-center gap-1.5 text-sm", toMinutes(end) < toMinutes(start) ? "text-info" : "text-muted-foreground")}>
               {toMinutes(end) < toMinutes(start) && <Moon className="size-3.5 shrink-0" aria-hidden="true" />}
               {toMinutes(end) < toMinutes(start)
-                ? `Berakhir esok hari (${dayLong(nextDay(form.day))}) pukul ${end} · ${formatMinutes(hint)}`
+                ? `Berakhir esok hari${form.days.length === 1 ? ` (${dayLong(nextDay(form.day))})` : ""} pukul ${end} · ${formatMinutes(hint)}`
                 : `Durasi ${formatMinutes(hint)}`}
             </p>
           )}
@@ -391,7 +447,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
 
         {complete && start && end && !readOnly && (
           <div className="rounded-lg border border-primary/30 bg-primary/[0.06] px-4 py-3 text-sm text-body">
-            {describePlan({ hostName, day: form.day, start, end, from: startsOn, until })}
+            {describePlan({ hostName, days: form.days, start, end, from: startsOn, until })}
           </div>
         )}
       </fieldset>

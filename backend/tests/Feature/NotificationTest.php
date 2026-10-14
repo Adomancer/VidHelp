@@ -43,7 +43,7 @@ class NotificationTest extends TestCase
         $this->seed([RoleSeeder::class, HostRateCategorySeeder::class, ViolationTypeSeeder::class]);
         $this->admin = User::where('email', 'admin@vidhelp.com')->firstOrFail();
 
-        $this->brand = Brand::create(['name' => 'Brand A', 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
+        $this->brand = Brand::create(['name' => 'Brand A', 'target_hours_per_period' => 100]);
         $this->requester = $this->host();
         $this->other = $this->host();
         $this->slot = ScheduleSlot::create([

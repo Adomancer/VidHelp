@@ -124,7 +124,8 @@ export interface BrandProgress {
   id: string;
   name: string;
   /** Null when the brand has no payroll start date yet. */
-  period: { id: string; start: string; end: string; status: PeriodStatus; days_left: number } | null;
+  /** The running period; it closes when the target is reached. */
+  period: { id: string; start: string; status: PeriodStatus; hours_left: number } | null;
   worked_hours?: number;
   carried_in_hours?: number;
   achieved_hours?: number;

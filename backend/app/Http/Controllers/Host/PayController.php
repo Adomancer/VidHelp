@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Host;
 
 use App\Http\Controllers\Controller;
+use App\Models\Brand;
 use App\Models\CashAdvance;
 use App\Models\HostProfile;
 use App\Models\HourAdjustment;
@@ -13,6 +14,7 @@ use App\Models\WorkSession;
 use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class PayController extends Controller
 {
@@ -22,6 +24,7 @@ class PayController extends Controller
 
     /**
      * Pay so far in open periods (estimate at today's rate), my salary slips and my kasbon.
+     * A brand's leader also gets that brand's periods, to request payment (`brand_periods`).
      */
     public function index(Request $request): JsonResponse
     {
@@ -47,7 +50,7 @@ class PayController extends Controller
                     'period_id' => $period->id,
                     'brand' => $period->brand->only('id', 'name'),
                     'period_start' => $period->period_start->toDateString(),
-                    'period_end' => $period->period_end->toDateString(),
+                    'period_end' => $period->period_end?->toDateString(),
                     'status' => $period->status,
                     'session_count' => $row['session_count'],
                     'carried_in_hours' => $row['carried_in_hours'],
@@ -64,6 +67,7 @@ class PayController extends Controller
 
         return response()->json([
             'current' => $current,
+            'brand_periods' => $this->brandPeriods($host),
             'slips' => SalarySlip::where('host_id', $host->id)
                 ->with('period.brand:id,name')
                 ->latest('generated_at')
@@ -73,7 +77,7 @@ class PayController extends Controller
                     'id' => $slip->id,
                     'brand' => $slip->period->brand->only('id', 'name'),
                     'period_start' => $slip->period->period_start->toDateString(),
-                    'period_end' => $slip->period->period_end->toDateString(),
+                    'period_end' => $slip->period->period_end?->toDateString(),
                     'gross_amount' => $slip->gross_amount,
                     'advance_deduction' => $slip->advance_deduction,
                     'net_amount' => $slip->net_amount,
@@ -95,6 +99,82 @@ class PayController extends Controller
         abort_unless($slip->host_id === $this->host($request)->id, 403, 'Ini bukan slip gajimu.');
 
         return response()->json(['slip' => $this->payroll->slipDetail($slip)]);
+    }
+
+    /**
+     * As the brand's leader: request payment for a period that reached its target.
+     */
+    public function requestPayment(Request $request, PaymentPeriod $period): JsonResponse
+    {
+        $this->ensureLeader($request, $period);
+
+        $this->payroll->requestPayment($period, $request->user());
+
+        return response()->json(['message' => 'Pembayaran diajukan. Unduh laporannya dan kirim ke brand.']);
+    }
+
+    /** The brand report (CSV) for a period I lead. */
+    public function export(Request $request, PaymentPeriod $period): Response
+    {
+        $this->ensureLeader($request, $period);
+
+        $name = str($period->brand->name)->slug().'-'.$period->period_start->toDateString().'.csv';
+
+        return response($this->payroll->exportCsv($period->load('brand')), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$name}\"",
+        ]);
+    }
+
+    /**
+     * The latest periods of every brand I lead: progress to the target and where payment stands.
+     *
+     * @return list<array>
+     */
+    private function brandPeriods(HostProfile $host): array
+    {
+        $brandIds = $host->assignments()->where('is_leader', true)->where('status', 'active')->pluck('brand_id');
+
+        return Brand::whereIn('id', $brandIds)->whereNotNull('payroll_start_date')->orderBy('name')->get()
+            ->flatMap(function (Brand $brand) {
+                $this->payroll->openPeriod($brand);
+
+                return $brand->paymentPeriods()->with('paymentRequest.requester:id,name')->orderByDesc('period_start')->limit(4)->get()
+                    ->map(function (PaymentPeriod $period) use ($brand) {
+                        $summary = $this->payroll->breakdown($period)['summary'];
+                        $open = ! $period->isLocked();
+
+                        return [
+                            'id' => $period->id,
+                            'brand' => $brand->only('id', 'name'),
+                            'period_start' => $period->period_start->toDateString(),
+                            'period_end' => $period->period_end?->toDateString(),
+                            'status' => $period->status,
+                            'target_hours' => $period->target_hours,
+                            // Toward the target: carried in + worked (may pass it; the rest carries on)
+                            'progress_hours' => round($summary['carried_in_hours'] + $summary['worked_hours'], 2),
+                            'achieved_hours' => $summary['achieved_hours'],
+                            'closed_early' => $period->closed_by !== null,
+                            'pending_reports' => $open && $period->status === 'waiting_payment' ? $this->payroll->pendingReports($period) : 0,
+                            'pending_letters' => $open && $period->status === 'waiting_payment' ? $this->payroll->pendingCoverLetters($period) : 0,
+                            'request' => $period->paymentRequest ? [
+                                ...$period->paymentRequest->only('requested_at', 'paid_at'),
+                                'requester' => $period->paymentRequest->requester?->name,
+                            ] : null,
+                        ];
+                    });
+            })
+            ->values()
+            ->all();
+    }
+
+    private function ensureLeader(Request $request, PaymentPeriod $period): void
+    {
+        abort_unless(
+            $this->host($request)->assignments()->where('brand_id', $period->brand_id)->where('is_leader', true)->where('status', 'active')->exists(),
+            403,
+            'Hanya PIC (leader) brand ini yang bisa mengajukan pembayaran.'
+        );
     }
 
     private function host(Request $request): HostProfile

@@ -77,7 +77,7 @@ class PayrollController extends Controller
         ['hosts' => $hosts, 'summary' => $summary] = $this->payroll->breakdown($period);
 
         return response()->json([
-            'period' => $period->load(['brand:id,name', 'paymentRequest.requester:id,name']),
+            'period' => $period->load(['brand:id,name', 'paymentRequest.requester:id,name', 'closer:id,name']),
             'summary' => $summary,
             'pending_reports' => $period->isLocked() ? 0 : $this->payroll->pendingReports($period),
             'pending_letters' => $period->isLocked() ? 0 : $this->payroll->pendingCoverLetters($period),
@@ -123,6 +123,19 @@ class PayrollController extends Controller
         return response()->json(['message' => 'Penyesuaian dihapus']);
     }
 
+    /**
+     * Close a running period before its target (e.g. the brand stopped going live) so it can be billed.
+     */
+    public function close(Request $request, PaymentPeriod $period): JsonResponse
+    {
+        $this->payroll->closeEarly($period, $request->user());
+
+        return response()->json(['message' => 'Periode ditutup; PIC brand bisa mengajukan pembayaran.']);
+    }
+
+    /**
+     * Request on the PIC's behalf (normally the brand's leader host does it).
+     */
     public function requestPayment(Request $request, PaymentPeriod $period): JsonResponse
     {
         $this->payroll->requestPayment($period, $request->user());

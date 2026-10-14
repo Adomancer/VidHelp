@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\BackupRequest;
+use App\Models\HostBrandAssignment;
 use App\Models\ScheduleSlot;
 use App\Models\SpecialEvent;
 use Illuminate\Http\JsonResponse;
@@ -71,15 +72,30 @@ class ScheduleController extends Controller
         return response()->json(['slots' => $slots, 'backups' => $backups, 'replacing_events' => $events]);
     }
 
+    /**
+     * Add a weekly slot, or with `days_of_week` (e.g. every day) one slot per day, all or none.
+     * `slot` is the first one, `slots` all of them.
+     */
     public function store(Request $request): JsonResponse
     {
-        $slot = new ScheduleSlot(['slot_type' => 'regular', 'status' => 'active', 'effective_from' => today()]);
-        $slot->fill($this->validated($request, $slot));
+        $attributes = $this->validated($request, new ScheduleSlot);
+        $days = $this->days($request) ?? [$attributes['day_of_week']];
 
-        $this->ensureNoConflicts($slot);
-        $slot->save();
+        $slots = DB::transaction(fn () => collect($days)->map(function (int $day) use ($attributes) {
+            $slot = new ScheduleSlot(['slot_type' => 'regular', 'status' => 'active', 'effective_from' => today()]);
+            $slot->fill([...$attributes, 'day_of_week' => $day]);
 
-        return response()->json(['slot' => $this->load($slot), 'message' => 'Slot ditambahkan'], 201);
+            $this->ensureNoConflicts($slot);
+            $slot->save();
+
+            return $this->load($slot);
+        }));
+
+        return response()->json([
+            'slot' => $slots->first(),
+            'slots' => $slots,
+            'message' => $slots->count() > 1 ? "{$slots->count()} slot ditambahkan" : 'Slot ditambahkan',
+        ], 201);
     }
 
     /**
@@ -90,7 +106,7 @@ class ScheduleController extends Controller
     {
         $validated = $request->validate([
             'assignment_id' => 'required|uuid|exists:host_brand_assignments,id',
-            'day_of_week' => 'required|integer|between:1,7',
+            'day_of_week' => 'required_without:days_of_week|integer|between:1,7',
             'start_time' => 'required|date_format:H:i',
             'end_time' => 'required|date_format:H:i|different:start_time',
             'effective_from' => 'required|date',
@@ -98,13 +114,19 @@ class ScheduleController extends Controller
             'ignore_id' => 'nullable|uuid',
         ]);
 
-        $slot = new ScheduleSlot(Arr::except($validated, 'ignore_id'));
+        $days = $this->days($request) ?? [$validated['day_of_week']];
 
-        $conflicts = $slot->conflicts($validated['ignore_id'] ?? null)->map(fn (ScheduleSlot $other) => [
+        $conflicts = collect($days)
+            ->flatMap(fn (int $day) => (new ScheduleSlot([...Arr::except($validated, 'ignore_id'), 'day_of_week' => $day]))->conflicts($validated['ignore_id'] ?? null))
+            ->unique('id')
+            ->values();
+        $hostId = $conflicts->isEmpty() ? null : HostBrandAssignment::find($validated['assignment_id'])->host_id;
+
+        $conflicts = $conflicts->map(fn (ScheduleSlot $other) => [
             'id' => $other->id,
             'host_name' => $other->assignment->host->user->name,
             'brand_name' => $other->assignment->brand->name,
-            'same_host' => $other->assignment->host_id === $slot->assignment->host_id,
+            'same_host' => $other->assignment->host_id === $hostId,
             'day_of_week' => $other->day_of_week,
             'start_time' => $other->start_time,
             'end_time' => $other->end_time,
@@ -262,7 +284,7 @@ class ScheduleController extends Controller
                 $required,
                 Rule::exists('host_brand_assignments', 'id')->where('status', 'active'),
             ],
-            'day_of_week' => "$required|integer|between:1,7",
+            'day_of_week' => ($required === 'required' ? 'required_without:days_of_week' : $required).'|integer|between:1,7',
             'start_time' => "$required|date_format:H:i",
             'end_time' => "$required|date_format:H:i",
             'slot_type' => 'sometimes|in:regular,pd',
@@ -286,6 +308,17 @@ class ScheduleController extends Controller
         }
 
         return $validated;
+    }
+
+    /** Several days for a new slot (1 = Monday ... 7 = Sunday), sorted; null when only `day_of_week` was sent. */
+    private function days(Request $request): ?array
+    {
+        $validated = $request->validate([
+            'days_of_week' => 'sometimes|array|min:1|max:7',
+            'days_of_week.*' => 'integer|between:1,7|distinct',
+        ]);
+
+        return isset($validated['days_of_week']) ? collect($validated['days_of_week'])->map(fn ($day) => (int) $day)->sort()->values()->all() : null;
     }
 
     private function ensureNoConflicts(ScheduleSlot $slot): void

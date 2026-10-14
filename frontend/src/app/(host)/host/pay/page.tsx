@@ -1,18 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ChevronRight, FileText, HandCoins, Wallet } from "lucide-react";
-import { payApi } from "@/lib/api";
-import { formatDate, formatDuration, formatRupiah, formatShortDate } from "@/lib/format";
+import { ChevronRight, Crown, Download, FileText, HandCoins, Send, Wallet } from "lucide-react";
+import { errorMessage, payApi, type BrandPeriod } from "@/lib/api";
+import { formatDate, formatDuration, formatPeriodDates, formatRupiah, formatShortDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
 import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import FormAlert from "@/components/FormAlert";
 import { CardsSkeleton } from "@/components/Loading";
 import PageHeader from "@/components/PageHeader";
 import StatCard from "@/components/StatCard";
+import PeriodBadge from "@/components/PeriodBadge";
 import StatusBadge from "@/components/StatusBadge";
+import { notify } from "@/components/Toast";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
 const advanceTypes = { early_payment: "Gaji di muka", loan: "Pinjaman" } as const;
@@ -48,6 +54,8 @@ export default function HostPayPage() {
             <StatCard icon={HandCoins} label="Sisa kasbon" value={formatRupiah(owed)} note={owed > 0 ? `${openKasbon.length} kasbon berjalan` : "Tidak ada kasbon"} />
           </div>
 
+          {data.brand_periods.length > 0 && <BrandPeriods periods={data.brand_periods} onChanged={pay.reload} />}
+
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="min-w-0 space-y-6">
               <Card title="Periode berjalan">
@@ -60,7 +68,7 @@ export default function HostPayPage() {
                         <div className="min-w-0">
                           <p className="font-medium text-foreground">{period.brand.name}</p>
                           <p className="text-xs text-muted-foreground tabular-nums">
-                            {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.session_count} sesi
+                            {formatPeriodDates(period.period_start, period.period_end)} · {period.session_count} sesi
                           </p>
                           {period.carried_in_hours > 0 && (
                             <p className="text-xs text-muted-foreground">+{formatDuration(period.carried_in_hours)} bawaan dari periode lalu, dibayar duluan</p>
@@ -103,7 +111,7 @@ export default function HostPayPage() {
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium text-foreground">{slip.brand.name}</span>
                             <span className="block text-xs text-muted-foreground tabular-nums">
-                              {formatDate(slip.period_start)} – {formatDate(slip.period_end)}
+                              {formatPeriodDates(slip.period_start, slip.period_end)}
                               {slip.advance_deduction > 0 && ` · kasbon −${formatRupiah(slip.advance_deduction)}`}
                             </span>
                           </span>
@@ -159,5 +167,120 @@ export default function HostPayPage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * As the brand's leader (PIC): each period's progress to the target, and the request for
+ * payment once it is reached. Finance follows it up and marks it paid.
+ */
+function BrandPeriods({ periods, onChanged }: { periods: BrandPeriod[]; onChanged: () => void }) {
+  const { token } = useAuth();
+  const [asking, setAsking] = useState<BrandPeriod | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function download(period: BrandPeriod) {
+    const tab = window.open("", "_blank");
+    try {
+      const url = await payApi.exportUrl(token, period.id);
+      if (tab) tab.location.href = url;
+    } catch (caught) {
+      tab?.close();
+      setError(errorMessage(caught));
+    }
+  }
+
+  return (
+    <Card title="Pembayaran brand" description="Kamu PIC (leader) brand ini: ajukan pembayaran ke brand setiap kali target jam tercapai.">
+      {error && <FormAlert tone="error">{error}</FormAlert>}
+      <ul className="divide-y divide-border">
+        {periods.map((period) => {
+          const percent = period.target_hours > 0 ? Math.min(100, (period.progress_hours / period.target_hours) * 100) : 0;
+          const blocked = period.pending_reports + period.pending_letters > 0;
+
+          return (
+            <li key={period.id} className="space-y-2 py-3.5 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 font-medium text-foreground">
+                    <Crown className="size-3.5 text-warning" aria-hidden="true" />
+                    {period.brand.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground tabular-nums">{formatPeriodDates(period.period_start, period.period_end)}</p>
+                </div>
+                <PeriodBadge status={period.status} />
+              </div>
+
+              {period.status === "in_progress" && (
+                <>
+                  <Progress value={percent} aria-label={`Jam ${period.brand.name}`} className="h-1.5" />
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    {formatDuration(period.progress_hours)} / {period.target_hours} jam · kurang {formatDuration(Math.max(0, period.target_hours - period.progress_hours))}
+                  </p>
+                </>
+              )}
+
+              {period.status === "waiting_payment" && (
+                <>
+                  <p className="text-sm text-body">
+                    {period.closed_early ? "Periode ditutup lebih awal oleh agensi" : "Target tercapai"}: {formatDuration(period.achieved_hours)} bisa ditagihkan ke brand.
+                  </p>
+                  {blocked && (
+                    <p className="text-xs text-warning">
+                      {[
+                        period.pending_reports > 0 && `${period.pending_reports} laporan live masih menunggu dicek operator`,
+                        period.pending_letters > 0 && `${period.pending_letters} backup sakit masih menunggu surat dokter`,
+                      ]
+                        .filter(Boolean)
+                        .join("; ")}
+                      . Pembayaran bisa diajukan setelah itu.
+                    </p>
+                  )}
+                  <Button type="button" size="sm" disabled={blocked} onClick={() => setAsking(period)}>
+                    <Send aria-hidden="true" />
+                    Ajukan pembayaran
+                  </Button>
+                </>
+              )}
+
+              {(period.status === "requested" || period.status === "paid") && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <p className="text-xs text-muted-foreground">
+                    {formatDuration(period.achieved_hours)} ditagihkan
+                    {period.request && ` · diajukan ${formatDate(period.request.requested_at)}${period.request.requester ? ` oleh ${period.request.requester}` : ""}`}
+                    {period.request?.paid_at && ` · lunas ${formatDate(period.request.paid_at)}`}
+                  </p>
+                  <Button type="button" variant="outline" size="xs" onClick={() => download(period)}>
+                    <Download aria-hidden="true" />
+                    Laporan brand
+                  </Button>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {asking && (
+        <ConfirmDialog
+          title={`Ajukan pembayaran ${asking.brand.name}?`}
+          confirmLabel="Ajukan"
+          destructive={false}
+          onConfirm={async () => {
+            setError(null);
+            try {
+              notify({ text: (await payApi.requestPayment(token, asking.id)).message });
+            } catch (caught) {
+              setError(errorMessage(caught));
+            }
+            onChanged();
+          }}
+          onClose={() => setAsking(null)}
+        >
+          {formatDuration(asking.achieved_hours)} untuk {formatPeriodDates(asking.period_start, asking.period_end)}. Jam dan gaji host dikunci, lalu unduh laporannya dan kirim ke brand.
+          Finance menandai lunas setelah brand membayar.
+        </ConfirmDialog>
+      )}
+    </Card>
   );
 }

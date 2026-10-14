@@ -39,7 +39,7 @@ class BrandAssignmentTest extends TestCase
 
     private function brand(array $attributes = []): Brand
     {
-        return Brand::create($attributes + ['name' => 'Brand '.uniqid(), 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
+        return Brand::create($attributes + ['name' => 'Brand '.uniqid(), 'target_hours_per_period' => 100]);
     }
 
     public function test_admin_creates_and_updates_brands(): void
@@ -48,7 +48,6 @@ class BrandAssignmentTest extends TestCase
             'name' => 'Skintific',
             'is_obs' => true,
             'target_hours_per_period' => 120,
-            'payment_cycle_days' => 14,
         ])->assertCreated()->json('brand.id');
 
         $this->actingAs($this->admin)->putJson("/api/admin/brands/{$id}", ['status' => 'inactive'])
@@ -56,7 +55,7 @@ class BrandAssignmentTest extends TestCase
             ->assertJsonPath('brand.status', 'inactive');
 
         $this->actingAs($this->admin)->postJson('/api/admin/brands', [
-            'name' => 'Skintific', 'target_hours_per_period' => 1, 'payment_cycle_days' => 1,
+            'name' => 'Skintific', 'target_hours_per_period' => 1,
         ])->assertJsonValidationErrors('name');
     }
 
@@ -69,7 +68,7 @@ class BrandAssignmentTest extends TestCase
             ->assertJsonPath('brands.0.name', 'Wardah');
 
         $this->actingAs($this->operator)->postJson('/api/admin/brands', [
-            'name' => 'X', 'target_hours_per_period' => 1, 'payment_cycle_days' => 1,
+            'name' => 'X', 'target_hours_per_period' => 1,
         ])->assertForbidden();
     }
 
@@ -214,7 +213,6 @@ class BrandAssignmentTest extends TestCase
             'name' => 'Skintific',
             'product_knowledge' => "Serum 5X Ceramide\nHarga Rp 129.000",
             'target_hours_per_period' => 120,
-            'payment_cycle_days' => 14,
         ])->assertCreated()
             ->assertJsonPath('brand.product_knowledge', "Serum 5X Ceramide\nHarga Rp 129.000")
             ->json('brand.id');

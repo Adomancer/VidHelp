@@ -165,6 +165,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::get('/payroll/periods/{period}', [PayrollController::class, 'show']);
         Route::post('/payroll/periods/{period}/adjustments', [PayrollController::class, 'storeAdjustment']);
         Route::delete('/payroll/adjustments/{adjustment}', [PayrollController::class, 'destroyAdjustment']);
+        Route::post('/payroll/periods/{period}/close', [PayrollController::class, 'close']);
         Route::post('/payroll/periods/{period}/request', [PayrollController::class, 'requestPayment']);
         Route::post('/payroll/periods/{period}/cancel-request', [PayrollController::class, 'cancelRequest']);
         Route::post('/payroll/periods/{period}/paid', [PayrollController::class, 'markPaid']);
@@ -287,5 +288,8 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         // My pay: open periods, salary slips, kasbon
         Route::get('/pay', [PayController::class, 'index']);
         Route::get('/pay/slips/{slip}', [PayController::class, 'slip']);
+        // As a brand's leader (PIC): its periods, request payment once the target is reached, the brand report
+        Route::post('/pay/periods/{period}/request', [PayController::class, 'requestPayment']);
+        Route::get('/pay/periods/{period}/export', [PayController::class, 'export']);
     });
 });
