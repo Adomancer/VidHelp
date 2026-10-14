@@ -70,14 +70,17 @@ class ProfileChangeService
         $request->save();
 
         if (! $pending) {
+            // Only which data changes, never the values (KTP, bank account)
             $what = collect($request->lines())->pluck('label')->implode(', ');
-            $this->notifier->toUsers(
-                $this->notifier->admins(),
-                'profile_change_requested',
-                "Perubahan data: {$host->user->name}",
-                "{$what}. Setujui atau tolak di halaman Host.",
-                '/admin/hosts?changes=pending',
-            );
+            $notice = Notice::make('profile_change_requested', "Perubahan data: {$host->user->name}")
+                ->body("{$what}. Setujui atau tolak di halaman Host.")
+                ->field('Host', $host->user->name)
+                ->field('Data yang diubah', $what, inline: false)
+                ->about($host->user)
+                ->link('/admin/hosts?changes=pending', 'Tinjau perubahan');
+
+            $this->notifier->toUsers($this->notifier->admins(), $notice, dm: true);
+            $this->notifier->toChannel('admin', $notice);
         }
 
         return $request;
@@ -105,7 +108,11 @@ class ProfileChangeService
             $request->update(['status' => 'approved', 'reviewed_by' => $by->id, 'reviewed_at' => now()]);
         });
 
-        $this->notifier->toUsers($host->user, 'profile_change_approved', 'Perubahan data disetujui', 'Data pribadimu sudah diperbarui.', '/host/profile', dm: true);
+        $this->notifier->toUsers($host->user, Notice::make('profile_change_approved', 'Perubahan data disetujui')
+            ->body('Data pribadimu sudah diperbarui.')
+            ->field('Data yang diubah', collect($request->lines())->pluck('label')->implode(', '), inline: false)
+            ->field('Disetujui oleh', $by->name)
+            ->link('/host/profile', 'Lihat profil'), dm: true);
     }
 
     public function reject(ProfileChangeRequest $request, User $by, string $note): void
@@ -113,7 +120,12 @@ class ProfileChangeService
         $this->ensurePending($request);
         $request->update(['status' => 'rejected', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
 
-        $this->notifier->toUsers($request->host->user, 'profile_change_rejected', 'Perubahan data ditolak', $note, '/host/profile', dm: true);
+        $this->notifier->toUsers($request->host->user, Notice::make('profile_change_rejected', 'Perubahan data ditolak')
+            ->body($note)
+            ->field('Data yang diubah', collect($request->lines())->pluck('label')->implode(', '), inline: false)
+            ->field('Ditolak oleh', $by->name)
+            ->field('Catatan', $note, inline: false)
+            ->link('/host/profile', 'Perbaiki data'), dm: true);
     }
 
     /** The host takes their request back. */

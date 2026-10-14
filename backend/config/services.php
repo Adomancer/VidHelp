@@ -44,6 +44,10 @@ return [
             'backups' => env('DISCORD_CHANNEL_BACKUPS'),
             'admin' => env('DISCORD_CHANNEL_ADMIN'),
         ],
+        // Roles pinged with a channel's posts (optional)
+        'roles' => [
+            'admin' => env('DISCORD_ROLE_ADMIN'),
+        ],
     ],
 
     'slack' => [

@@ -44,6 +44,19 @@ return [
         'late_after_minutes' => (int) env('ATTENDANCE_LATE_AFTER_MINUTES', 10),
     ],
 
+    // Reminders sent by `notifications:send-reminders` (in-app and Discord DM). 0 turns one off.
+    'notifications' => [
+        // Hosts hear this many minutes before a session they haven't checked in for
+        // (and again when it has started without a check-in)
+        'live_reminder_minutes' => (int) env('NOTIFY_LIVE_REMINDER_MINUTES', 30),
+
+        // Hosts hear this many hours before a live report or sick letter is due
+        'deadline_reminder_hours' => (int) env('NOTIFY_DEADLINE_REMINDER_HOURS', 3),
+
+        // Staff hear this many minutes before the best backup applicant is picked automatically
+        'decision_reminder_minutes' => (int) env('NOTIFY_DECISION_REMINDER_MINUTES', 60),
+    ],
+
     // Numbers the host types into the live report. Placeholder until the agency's
     // report template arrives: add/rename keys here (and in the frontend field list).
     'report_metrics' => [

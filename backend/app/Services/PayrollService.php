@@ -182,10 +182,16 @@ class PayrollService
         $title = $by
             ? "Periode {$period->brand->name} ditutup lebih awal"
             : "Target {$period->target_hours} jam {$period->brand->name} tercapai";
-        $body = "{$this->dates($period)}: {$this->hours($summary['achieved_hours'])} jam bisa ditagihkan. Ajukan pembayaran ke brand.";
+        $notice = Notice::make('period_ready', $title)
+            ->body("{$this->dates($period)}: {$this->hours($summary['achieved_hours'])} jam bisa ditagihkan. Ajukan pembayaran ke brand.")
+            ->brand($period->brand->name)
+            ->field('Periode', $this->dates($period))
+            ->field('Jam ditagihkan', "{$this->hours($summary['achieved_hours'])} / {$this->hours($period->target_hours)} jam")
+            ->field('Pindah ke periode berikutnya', $summary['carried_out_hours'] > 0 ? "{$this->hours($summary['carried_out_hours'])} jam" : null)
+            ->field('Ditutup oleh', $by?->name ?? 'Otomatis (target tercapai)');
 
-        $this->notifier->toUsers($this->notifier->brandLeaders($period->brand_id), 'period_ready', $title, $body, '/host/pay', dm: true);
-        $this->notifier->toUsers($this->notifier->finance(), 'period_ready', $title, $body, '/admin/payroll');
+        $this->notifier->toUsers($this->notifier->brandLeaders($period->brand_id), (clone $notice)->link('/host/pay', 'Ajukan pembayaran'), dm: true);
+        $this->notifier->toUsers($this->notifier->admins(), $notice->link('/admin/payroll', 'Buka payroll'), dm: true);
     }
 
     /**
@@ -488,11 +494,15 @@ class PayrollService
 
         $period->refresh()->loadMissing('brand');
         $this->notifier->toUsers(
-            $this->notifier->finance()->reject(fn (User $user) => $user->is($by)),
-            'payment_requested',
-            "Pembayaran {$period->brand->name} diajukan",
-            "{$by->name} mengajukan {$this->hours($period->achieved_hours)} jam untuk {$this->dates($period)}. Tandai lunas setelah brand membayar.",
-            '/admin/payroll',
+            $this->notifier->admins()->reject(fn (User $user) => $user->is($by)),
+            Notice::make('payment_requested', "Pembayaran {$period->brand->name} diajukan")
+                ->body("{$by->name} mengajukan {$this->hours($period->achieved_hours)} jam untuk {$this->dates($period)}. Tandai lunas setelah brand membayar.")
+                ->brand($period->brand->name)
+                ->field('Periode', $this->dates($period))
+                ->field('Jam ditagihkan', "{$this->hours($period->achieved_hours)} jam")
+                ->field('Diajukan oleh', $by->name)
+                ->link('/admin/payroll', 'Tandai lunas'),
+            dm: true,
         );
 
         // The hours carried over may already fill the next period
@@ -629,14 +639,15 @@ class PayrollService
                     'net_amount' => $slip->gross_amount - $deducted,
                 ]);
 
-                $this->notifier->toUsers(
-                    $item->host->user,
-                    'slip_ready',
-                    "Slip gaji siap: {$period->brand->name}",
-                    'Gaji bersih '.$this->rupiah($slip->net_amount)." untuk {$this->dates($period)}.",
-                    "/host/pay/slips/{$slip->id}",
-                    dm: true,
-                );
+                $this->notifier->toUsers($item->host->user, Notice::make('slip_ready', "Slip gaji siap: {$period->brand->name}")
+                    ->body('Gaji bersih '.$this->rupiah($slip->net_amount)." untuk {$this->dates($period)}.")
+                    ->brand($period->brand->name)
+                    ->field('Periode', $this->dates($period))
+                    ->field('Jam dibayar', "{$this->hours($item->hours)} jam")
+                    ->field('Gaji kotor', $this->rupiah($slip->gross_amount))
+                    ->field('Potongan kasbon', $deducted > 0 ? $this->rupiah($deducted) : null)
+                    ->field('Gaji bersih', $this->rupiah($slip->net_amount))
+                    ->link("/host/pay/slips/{$slip->id}", 'Lihat slip'), dm: true);
 
                 return $slip;
             });

@@ -325,7 +325,15 @@ class AttendanceService
 
         $report->update(['status' => 'rejected', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
 
-        $this->notifier->toUsers($report->host->user, 'report_rejected', 'Laporan live kamu ditolak', "{$report->brand->name}, {$report->attendance->scheduled_start_at->translatedFormat('D j M H:i')}: {$note}", '/host/live', dm: true);
+        $attendance = $report->attendance;
+        $this->notifier->toUsers($report->host->user, Notice::make('report_rejected', 'Laporan live kamu ditolak')
+            ->body("{$report->brand->name}, {$attendance->scheduled_start_at->translatedFormat('D j M H:i')}: {$note}")
+            ->brand($report->brand->name)
+            ->field('Sesi', Notice::window($attendance->scheduled_start_at, $attendance->scheduled_end_at), inline: false)
+            ->field('Durasi dilaporkan', $this->hoursLabel($report->duration_hours))
+            ->field('Ditolak oleh', $by->name)
+            ->field('Catatan', $note, inline: false)
+            ->link('/host/live', 'Buka laporan'), dm: true);
 
         return $report;
     }
@@ -367,10 +375,28 @@ class AttendanceService
         $reasons = array_map(fn (string $reason) => $labels[$reason] ?? $reason, $report->flag_reasons ?? []);
 
         $attendance->loadMissing(['host.user', 'brand']);
-        $title = "Laporan perlu dicek: {$attendance->host->user->name}";
-        $body = "{$attendance->brand->name}, {$attendance->scheduled_start_at->translatedFormat('D j M H:i')}: ".implode(', ', $reasons).'.';
+        $host = $attendance->host->user;
 
-        $this->notifier->toUsers($this->notifier->staff(), 'report_flagged', $title, $body, '/operator/reports');
-        $this->notifier->toChannel('admin', 'report_flagged', $title, $body, '/operator/reports');
+        $notice = Notice::make('report_flagged', "Laporan perlu dicek: {$host->name}")
+            ->body("{$attendance->brand->name}, {$attendance->scheduled_start_at->translatedFormat('D j M H:i')}: ".implode(', ', $reasons).'.')
+            ->brand($attendance->brand->name)
+            ->field('Host', $host->name)
+            ->field('Durasi dilaporkan', $this->hoursLabel($report->duration_hours))
+            ->field('Sesi', Notice::window($attendance->scheduled_start_at, $attendance->scheduled_end_at), inline: false)
+            ->field('Check-in', $attendance->check_in_at->format('H:i'))
+            ->field('Check-out', $attendance->check_out_at?->format('H:i') ?? 'Tidak check-out')
+            ->field('Alasan', implode("
+", array_map(fn (string $reason) => "• {$reason}", $reasons)), inline: false)
+            ->about($host)
+            ->link('/operator/reports', 'Cek laporan');
+
+        $this->notifier->toUsers($this->notifier->staff(), $notice, dm: true);
+        $this->notifier->toChannel('admin', $notice);
+    }
+
+    /** "2,5 jam" */
+    private function hoursLabel(float|string $hours): string
+    {
+        return rtrim(rtrim(number_format((float) $hours, 2, ',', '.'), '0'), ',').' jam';
     }
 }

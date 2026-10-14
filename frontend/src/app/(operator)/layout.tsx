@@ -32,7 +32,14 @@ const links: SidebarGroup[] = [
 
 export default function OperatorLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarLayout panel="Panel Operator" roles={["operator", "admin", "finance"]} links={links} homeHref="/operator/dashboard" search>
+    <SidebarLayout
+      panel="Panel Operator"
+      roles={["operator", "admin", "finance"]}
+      links={links}
+      homeHref="/operator/dashboard"
+      accountLinks={[{ href: "/operator/account", label: "Akun", icon: "profile" }]}
+      search
+    >
       {children}
     </SidebarLayout>
   );

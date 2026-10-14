@@ -352,10 +352,16 @@ class BackupService
         $host->loadMissing('user');
         $window = "{$request->brand->name} · {$this->window($request)}";
 
-        $this->notifier->toUsers($host->user, 'backup_not_picked', "Kamu tidak terpilih menggantikan di {$request->brand->name}", "{$window}, untuk {$request->requester->user->name}.", '/host/backups', dm: true);
+        $this->notifier->toUsers($host->user, $this->notice($request, 'backup_not_picked', "Kamu tidak terpilih menggantikan di {$request->brand->name}")
+            ->body("{$window}, untuk {$request->requester->user->name}.")
+            ->field('Untuk', $request->requester->user->name)
+            ->link('/host/backups', 'Cari backup lain'), dm: true);
 
         if ($reopened) {
-            $this->notifier->toUsers($request->requester->user, 'backup_reopened', 'Permintaan backup kamu dibuka lagi', "{$window}: pendaftar tidak disetujui. Host lain masih bisa mendaftar.", '/host/backups', dm: true);
+            $this->notifier->toUsers($request->requester->user, $this->notice($request, 'backup_reopened', 'Permintaan backup kamu dibuka lagi')
+                ->body("{$window}: pendaftar tidak disetujui. Host lain masih bisa mendaftar.")
+                ->field('Pendaftar yang ditolak', $host->user->name)
+                ->link('/host/backups', 'Lihat permintaan'), dm: true);
         }
     }
 
@@ -483,7 +489,10 @@ class BackupService
 
         // Removed by an admin (not dropped): tell the host they are off it
         if ($previousCover && $applicationStatus !== 'cancelled') {
-            $this->notifier->toUsers($previousCover->user, 'backup_unassigned', "Kamu tidak lagi menggantikan di {$request->brand->name}", $this->window($request), '/host/backups', dm: true);
+            $this->notifier->toUsers($previousCover->user, $this->notice($request, 'backup_unassigned', "Kamu tidak lagi menggantikan di {$request->brand->name}")
+                ->body("{$this->window($request)}: admin mencabut penugasanmu. Kamu libur di sesi ini.")
+                ->field('Untuk', $request->requester->user->name)
+                ->link('/host/schedule', 'Lihat jadwal'), dm: true);
         }
 
         $this->announceOpen($request->fresh(), reopened: true);
@@ -510,14 +519,25 @@ class BackupService
 
         $request->loadMissing(['brand', 'requester.user']);
         $window = "{$request->brand->name} · {$this->window($request)}";
-        $title = "Backup dibatalkan: {$request->brand->name}";
+        $notice = $this->notice($request, 'backup_cancelled', "Backup dibatalkan: {$request->brand->name}")
+            ->field('Untuk', $request->requester->user->name)
+            ->field('Pengganti', $cover?->name);
 
         if ($cover) {
-            $this->notifier->toUsers($cover, 'backup_cancelled', $title, "{$window}: {$request->requester->user->name} tidak lagi butuh pengganti. Kamu libur di sesi ini.", '/host/schedule', dm: true);
+            $this->notifier->toUsers($cover, (clone $notice)
+                ->body("{$window}: {$request->requester->user->name} tidak lagi butuh pengganti. Kamu libur di sesi ini.")
+                ->link('/host/schedule', 'Lihat jadwal'), dm: true);
         }
         if ($waiting->isNotEmpty()) {
-            $this->notifier->toUsers($waiting, 'backup_cancelled', $title, "{$window}: permintaan dibatalkan, jadi pendaftaranmu ditutup.", '/host/backups');
+            $this->notifier->toUsers($waiting, (clone $notice)
+                ->body("{$window}: permintaan dibatalkan, jadi pendaftaranmu ditutup.")
+                ->link('/host/backups', 'Cari backup lain'));
         }
+
+        $this->notifier->toChannel('backups', $notice
+            ->body("{$window}: {$request->requester->user->name} tidak lagi butuh pengganti.")
+            ->link('/host/backups')
+            ->mention($cover));
     }
 
     /**
@@ -559,56 +579,105 @@ class BackupService
 
     /**
      * The request is (again) looking for a cover: every other host may apply, or only
-     * the nominees of a direct request.
+     * the nominees of a direct request (pinged in #backup-needs too).
      */
     public function announceOpen(BackupRequest $request, bool $reopened = false): void
     {
         $request->loadMissing(['brand', 'requester.user']);
+        $requester = $request->requester->user;
 
         if ($request->request_type === 'direct') {
             $request->loadMissing('nominees.host.user');
-            $title = "{$request->requester->user->name} meminta kamu menggantikan di {$request->brand->name}";
-            $body = "{$this->window($request)}. Daftar di tab Backup kalau kamu bisa.";
             $nominees = $request->nominees->map(fn ($nominee) => $nominee->host->user);
+            $notice = $this->notice($request, 'backup_asked', "{$requester->name} meminta kamu menggantikan di {$request->brand->name}")
+                ->body("{$this->window($request)}. Daftar di tab Backup kalau kamu bisa.")
+                ->field('Untuk', $requester->name)
+                ->field('Yang diminta', $nominees->pluck('name')->join(', '))
+                ->field('Dipilih otomatis', Notice::time($request->auto_fill_at), inline: false)
+                ->about($requester)
+                ->link('/host/backups', 'Daftar di VidHelp');
 
-            $this->notifier->toUsers($nominees, 'backup_asked', $title, $body, '/host/backups', dm: true);
+            $this->notifier->toUsers($nominees, $notice, dm: true);
+            $this->notifier->toChannel('backups', $notice
+                ->as('backup_asked', ($reopened ? 'Masih butuh pengganti: ' : 'Minta digantikan: ')."{$requester->name} di {$request->brand->name}")
+                ->body("{$this->window($request)}. Hanya host yang diminta yang bisa mendaftar.")
+                ->mention($nominees));
 
             return;
         }
 
-        $title = ($reopened ? 'Butuh backup lagi: ' : 'Butuh backup: ').$request->brand->name;
-        $body = "{$this->window($request)} · untuk {$request->requester->user->name}. Daftar di tab Backup.";
+        $notice = $this->notice($request, 'backup_opened', ($reopened ? 'Butuh backup lagi: ' : 'Butuh backup: ').$request->brand->name)
+            ->body("{$this->window($request)} · untuk {$requester->name}. Daftar di tab Backup.")
+            ->field('Untuk', $requester->name)
+            ->field('Dipilih otomatis', Notice::time($request->auto_fill_at), inline: false)
+            ->about($requester)
+            ->link('/host/backups', 'Daftar di VidHelp');
 
-        $this->notifier->toUsers($this->notifier->hosts(exceptHostId: $request->requesting_host_id), 'backup_opened', $title, $body, '/host/backups');
-        $this->notifier->toChannel('backups', 'backup_opened', $title, $body, '/host/backups');
+        $this->notifier->toUsers($this->notifier->hosts(exceptHostId: $request->requesting_host_id), $notice);
+        $this->notifier->toChannel('backups', $notice);
     }
 
     /** Someone applied: the admins decide (or the best applicant is auto-picked before the slot). */
     private function announceApplied(BackupRequest $request, HostProfile $applicant): void
     {
         $request->loadMissing(['brand', 'requester.user']);
-        $applicant->loadMissing('user');
-        $title = "{$applicant->user->name} ingin menggantikan {$request->requester->user->name}";
-        $body = "{$request->brand->name} · {$this->window($request)}. Setujui atau tolak sebelum {$request->auto_fill_at->translatedFormat('D j M H:i')}, atau pendaftar terbaik dipilih otomatis.";
+        $applicant->loadMissing(['user', 'latestRating']);
+        $rating = $applicant->latestRating?->rating;
 
-        $this->notifier->toUsers($this->notifier->staff(), 'backup_applied', $title, $body, '/operator/backups');
-        $this->notifier->toChannel('admin', 'backup_applied', $title, $body, '/operator/backups');
+        $notice = $this->notice($request, 'backup_applied', "{$applicant->user->name} ingin menggantikan {$request->requester->user->name}")
+            ->body("{$request->brand->name} · {$this->window($request)}. Setujui atau tolak sebelum {$request->auto_fill_at->translatedFormat('D j M H:i')}, atau pendaftar terbaik dipilih otomatis.")
+            ->field('Pendaftar', $applicant->user->name)
+            ->field('Menggantikan', $request->requester->user->name)
+            ->field('Brand', $this->isSameBrand($applicant, $request) ? 'Brand sendiri' : 'Lintas brand (pakai kuota)')
+            ->field('Poin', $this->points->balance($applicant)->current_points)
+            ->field('Rating terakhir', $rating !== null ? "{$rating}/".config('vidhelp.rating.max') : 'Belum ada')
+            ->field('Putuskan sebelum', Notice::time($request->auto_fill_at), inline: false)
+            ->about($applicant->user)
+            ->link('/operator/backups', 'Tinjau pendaftar');
+
+        $this->notifier->toUsers($this->notifier->staff(), $notice, dm: true);
+        $this->notifier->toChannel('admin', $notice);
     }
 
     private function announceFilled(BackupRequest $request, HostProfile $cover): void
     {
         $request->loadMissing(['brand', 'requester.user']);
         $cover->loadMissing('user');
+        $requester = $request->requester->user;
         $window = "{$request->brand->name} · {$this->window($request)}";
+        $pickedBy = $request->auto_filled ? 'Otomatis (tidak ada keputusan sebelum batas waktu)' : 'Admin';
 
-        $this->notifier->toUsers($cover->user, 'backup_picked', "Kamu menggantikan di {$request->brand->name}", "{$window}, untuk {$request->requester->user->name}.", '/host/schedule', dm: true);
-        $this->notifier->toUsers($request->requester->user, 'backup_covered', 'Backup kamu sudah ada penggantinya', "{$cover->user->name} menggantikan {$window}.", '/host/backups', dm: true);
+        $this->notifier->toUsers($cover->user, $this->notice($request, 'backup_picked', "Kamu menggantikan di {$request->brand->name}")
+            ->body("{$window}, untuk {$requester->name}.")
+            ->field('Untuk', $requester->name)
+            ->field('Dipilih oleh', $pickedBy)
+            ->about($requester)
+            ->link('/host/schedule', 'Lihat jadwal'), dm: true);
+
+        $this->notifier->toUsers($requester, $this->notice($request, 'backup_covered', 'Backup kamu sudah ada penggantinya')
+            ->body("{$cover->user->name} menggantikan {$window}.")
+            ->field('Pengganti', $cover->user->name)
+            ->field('Dipilih oleh', $pickedBy)
+            ->about($cover->user)
+            ->link('/host/backups', 'Lihat backup'), dm: true);
+
+        $this->notifier->toChannel('backups', $this->notice($request, 'backup_filled', "Backup terisi: {$request->brand->name}")
+            ->body("{$cover->user->name} menggantikan {$requester->name}.")
+            ->field('Pengganti', $cover->user->name)
+            ->field('Untuk', $requester->name)
+            ->about($cover->user)
+            ->mention([$cover->user, $requester])
+            ->link('/host/backups'));
 
         if ($request->auto_filled) {
-            $title = "Otomatis memilih {$cover->user->name}";
-            $body = "Menggantikan {$request->requester->user->name} pada {$window}; tidak ada keputusan sebelum batas waktu.";
-            $this->notifier->toUsers($this->notifier->admins(), 'backup_auto_picked', $title, $body, '/operator/backups');
-            $this->notifier->toChannel('admin', 'backup_auto_picked', $title, $body, '/operator/backups');
+            $notice = $this->notice($request, 'backup_auto_picked', "Otomatis memilih {$cover->user->name}")
+                ->body("Menggantikan {$requester->name} pada {$window}; tidak ada keputusan sebelum batas waktu.")
+                ->field('Pengganti', $cover->user->name)
+                ->field('Untuk', $requester->name)
+                ->about($cover->user)
+                ->link('/operator/backups', 'Lihat backup');
+            $this->notifier->toUsers($this->notifier->admins(), $notice, dm: true);
+            $this->notifier->toChannel('admin', $notice);
         }
     }
 
@@ -622,19 +691,36 @@ class BackupService
         }
 
         $request->loadMissing(['brand', 'requester.user']);
-        $body = "{$request->brand->name} · {$this->window($request)}, untuk {$request->requester->user->name}. Kamu tetap di daftar tunggu kalau penggantinya batal.";
 
-        $this->notifier->toUsers($others, 'backup_not_picked', "Kamu tidak terpilih menggantikan di {$request->brand->name}", $body, '/host/backups');
+        $this->notifier->toUsers($others, $this->notice($request, 'backup_not_picked', "Kamu tidak terpilih menggantikan di {$request->brand->name}")
+            ->body("{$request->brand->name} · {$this->window($request)}, untuk {$request->requester->user->name}. Kamu tetap di daftar tunggu kalau penggantinya batal.")
+            ->link('/host/backups'));
     }
 
     private function announceNoCover(BackupRequest $request): void
     {
         $request->loadMissing(['brand', 'requester.user']);
-        $title = "Tidak ada yang bisa menggantikan {$request->requester->user->name}";
-        $body = "{$request->brand->name} · {$this->window($request)} segera dimulai dan belum ada host yang memenuhi syarat mendaftar. Tunjuk pengganti secara manual.";
+        $applicants = $request->applications()->where('status', 'applied')->count();
 
-        $this->notifier->toUsers($this->notifier->staff(), 'backup_no_cover', $title, $body, '/operator/backups');
-        $this->notifier->toChannel('admin', 'backup_no_cover', $title, $body, '/operator/backups');
+        $notice = $this->notice($request, 'backup_no_cover', "Tidak ada yang bisa menggantikan {$request->requester->user->name}")
+            ->body("{$request->brand->name} · {$this->window($request)} segera dimulai dan belum ada host yang memenuhi syarat mendaftar. Tunjuk pengganti secara manual.")
+            ->field('Untuk', $request->requester->user->name)
+            ->field('Pendaftar', $applicants ? "{$applicants} (tidak ada yang memenuhi syarat)" : 'Belum ada')
+            ->about($request->requester->user)
+            ->link('/operator/backups', 'Tunjuk pengganti');
+
+        $this->notifier->toUsers($this->notifier->staff(), $notice, dm: true);
+        $this->notifier->toChannel('admin', $notice);
+    }
+
+    /** A notice about a request, with its brand and time filled in. */
+    private function notice(BackupRequest $request, string $type, string $title): Notice
+    {
+        $request->loadMissing(['brand', 'requester.user']);
+
+        return Notice::make($type, $title)
+            ->brand($request->brand->name)
+            ->field('Waktu', Notice::window($request->start_at, $request->end_at), inline: false);
     }
 
     /** "Tue 6 Oct 14:00–16:00" */

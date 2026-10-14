@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  Bell,
   CalendarDays,
   ClipboardCheck,
   FileText,
@@ -37,6 +38,7 @@ const icons = {
   payroll: Wallet,
   audit: ClipboardCheck,
   settings: Settings,
+  notifications: Bell,
   security: ShieldCheck,
   profile: UserRound,
   more: LayoutGrid,

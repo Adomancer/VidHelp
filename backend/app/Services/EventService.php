@@ -26,11 +26,18 @@ class EventService
 
         $event = SpecialEvent::create([...$attributes, 'status' => 'active', 'created_by' => $by->id])->load('brand');
 
-        $title = "Event baru: {$event->name} ({$event->brand->name})";
         $days = $event->start_date->translatedFormat('j M').($event->end_date->equalTo($event->start_date) ? '' : ' – '.$event->end_date->translatedFormat('j M'));
-        $body = "{$days}, {$event->daily_start_time}–{$event->daily_end_time}. Ambil blokmu di menu Event (maks {$event->max_slots_per_host}).";
-        $this->notifier->toUsers($this->notifier->hosts($event->brand_id), 'event_opened', $title, $body, '/host/events');
-        $this->notifier->toChannel('backups', 'event_opened', $title, $body, '/host/events');
+        $hosts = $this->notifier->hosts($event->brand_id);
+        $notice = Notice::make('event_opened', "Event baru: {$event->name} ({$event->brand->name})")
+            ->body("{$days}, {$event->daily_start_time}–{$event->daily_end_time}. Ambil blokmu di menu Event (maks {$event->max_slots_per_host}).")
+            ->brand($event->brand->name)
+            ->field('Tanggal', $event->start_date->translatedFormat('l, j F Y').($event->end_date->equalTo($event->start_date) ? '' : ' – '.$event->end_date->translatedFormat('l, j F Y')), inline: false)
+            ->field('Jam harian', "{$event->daily_start_time}–{$event->daily_end_time}")
+            ->field('Panjang blok', "{$event->block_minutes} menit")
+            ->field('Maks per host', "{$event->max_slots_per_host} blok")
+            ->link('/host/events', 'Ambil blok');
+        $this->notifier->toUsers($hosts, $notice);
+        $this->notifier->toChannel('backups', $notice->mention($hosts));
 
         return $event;
     }

@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Table('notifications')]
 #[Fillable([
-    'user_id', 'type', 'title', 'body', 'link', 'payload', 'channel', 'target',
+    'user_id', 'type', 'dedupe_key', 'title', 'body', 'link', 'payload', 'channel', 'target',
     'status', 'attempts', 'error', 'sent_at', 'read_at',
 ])]
 class AppNotification extends Model

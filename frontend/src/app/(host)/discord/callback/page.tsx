@@ -2,16 +2,16 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { discordApi, errorMessage } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import Card from "@/components/Card";
-import { DISCORD_STATE_KEY } from "@/components/DiscordConnect";
+import { DISCORD_RETURN_KEY, DISCORD_STATE_KEY } from "@/components/DiscordConnect";
 import FormAlert from "@/components/FormAlert";
 import { Button } from "@/components/ui/button";
 
-/** Discord redirects here after "Connect Discord"; finish linking, then back to the profile. */
+/** Discord redirects here after "Connect Discord"; finish linking, then back to the page that started it. */
 export default function DiscordCallbackPage() {
   return (
     <div className="mx-auto max-w-lg pt-10">
@@ -21,6 +21,12 @@ export default function DiscordCallbackPage() {
       </Suspense>
     </div>
   );
+}
+
+/** Where "Connect Discord" was pressed (a path in this app), or the host profile. */
+function returnPath(): string {
+  const path = typeof window === "undefined" ? null : sessionStorage.getItem(DISCORD_RETURN_KEY);
+  return path?.startsWith("/") && !path.startsWith("//") ? path : "/host/profile";
 }
 
 async function finish(token: string, params: URLSearchParams): Promise<string | null> {
@@ -41,9 +47,9 @@ async function finish(token: string, params: URLSearchParams): Promise<string | 
 
 function FinishLink() {
   const { token } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [back] = useState(returnPath);
   const started = useRef(false); // a Discord code can only be used once (StrictMode runs effects twice)
 
   useEffect(() => {
@@ -51,10 +57,14 @@ function FinishLink() {
     started.current = true;
 
     finish(token, new URLSearchParams(searchParams.toString())).then((problem) => {
+      sessionStorage.removeItem(DISCORD_RETURN_KEY);
       if (problem) setError(problem);
-      else router.replace("/host/profile");
+      // A full page load, not router.replace: the tab may still be in the background after
+      // Discord (e.g. it opened the Discord app), and a page transition there is refused
+      // ("Document hidden"). The Discord card also loads its new status this way.
+      else window.location.replace(back);
     });
-  }, [router, searchParams, token]);
+  }, [back, searchParams, token]);
 
   if (!error) return <Connecting />;
 
@@ -62,7 +72,7 @@ function FinishLink() {
     <Card>
       <FormAlert tone="error">{error}</FormAlert>
       <Button asChild variant="outline">
-        <Link href="/host/profile">Kembali ke profil saya</Link>
+        <Link href={back}>Kembali</Link>
       </Button>
     </Card>
   );

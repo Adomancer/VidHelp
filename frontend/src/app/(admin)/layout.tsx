@@ -46,6 +46,7 @@ const links: SidebarGroup[] = [
     items: [
       { href: "/admin/audit", label: "Log Audit", icon: "audit" },
       { href: "/admin/settings", label: "Pengaturan", icon: "settings" },
+      { href: "/admin/notifications", label: "Notifikasi", icon: "notifications" },
       { href: "/admin/security", label: "Keamanan", icon: "security" },
     ],
   },

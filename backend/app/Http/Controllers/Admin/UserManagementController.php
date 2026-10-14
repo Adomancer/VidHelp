@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\AccountService;
+use App\Services\Notice;
 use App\Services\Notifier;
 use App\Services\TwoFactorService;
 use Illuminate\Http\JsonResponse;
@@ -145,7 +146,10 @@ class UserManagementController extends Controller
 
         if ($firstApproval) {
             AuditLog::record('approve', $user);
-            $notifier->toUsers($user, 'account_approved', 'Akunmu sudah disetujui', 'Selamat datang di VidHelp! Kamu sudah bisa masuk.', '/host/live', dm: true);
+            $notifier->toUsers($user, Notice::make('account_approved', 'Akunmu sudah disetujui')
+                ->body('Selamat datang di VidHelp! Kamu sudah bisa masuk.')
+                ->field('Disetujui oleh', $request->user()->name)
+                ->link('/host/live', 'Mulai'), dm: true);
         }
 
         return response()->json(['message' => 'Pengguna diaktifkan']);

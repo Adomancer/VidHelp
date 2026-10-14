@@ -24,6 +24,7 @@ class SettingsService
         'backups' => 'Backup',
         'attendance' => 'Absensi dan laporan live',
         'points' => 'Poin dan surat peringatan',
+        'notifications' => 'Pengingat',
         'security' => 'Keamanan',
     ];
 
@@ -100,6 +101,21 @@ class SettingsService
             'group' => 'points', 'type' => 'int', 'min' => 0, 'max' => 1000, 'unit' => 'poin',
             'label' => 'SP3 di angka atau di bawah',
             'help' => 'Harus lebih kecil dari SP2.',
+        ],
+        'notifications.live_reminder_minutes' => [
+            'group' => 'notifications', 'type' => 'int', 'min' => 0, 'max' => 240, 'unit' => 'menit',
+            'label' => 'Ingatkan host sebelum live',
+            'help' => 'Host yang belum check-in diingatkan sebelum sesi, dan sekali lagi saat sesi sudah mulai. 0 berarti tidak mengingatkan.',
+        ],
+        'notifications.deadline_reminder_hours' => [
+            'group' => 'notifications', 'type' => 'int', 'min' => 0, 'max' => 48, 'unit' => 'jam',
+            'label' => 'Ingatkan sebelum batas laporan live dan surat sakit',
+            'help' => 'Host yang belum mengirim laporan atau surat sakit diingatkan sebelum batasnya. 0 berarti tidak mengingatkan.',
+        ],
+        'notifications.decision_reminder_minutes' => [
+            'group' => 'notifications', 'type' => 'int', 'min' => 0, 'max' => 720, 'unit' => 'menit',
+            'label' => 'Ingatkan staff sebelum pendaftar backup dipilih otomatis',
+            'help' => 'Kalau pendaftar belum diputuskan, staff diingatkan selama ini sebelum yang terbaik dipilih otomatis. 0 berarti tidak mengingatkan.',
         ],
         'two_factor.required_for_admins' => [
             'group' => 'security', 'type' => 'bool',

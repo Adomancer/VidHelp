@@ -2,13 +2,18 @@
 
 use App\Models\AuditLog;
 use App\Models\HostProfile;
+use App\Models\User;
 use App\Services\BackupService;
+use App\Services\DiscordPreview;
 use App\Services\Notifier;
 use App\Services\PayrollService;
 use App\Services\PointService;
+use App\Services\ReminderService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Sleep;
+use Illuminate\Validation\ValidationException;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -48,6 +53,48 @@ Artisan::command('notifications:retry-discord', function (Notifier $notifier) {
 })->purpose('Resend Discord messages that failed or were never sent');
 
 Schedule::command('notifications:retry-discord')->everyFiveMinutes();
+
+Artisan::command('notifications:send-reminders', function (ReminderService $reminders) {
+    $sent = $reminders->send();
+    $this->info("Sent {$sent} reminder(s).");
+})->purpose('Remind hosts of sessions, live reports and sick letters, and staff of backup decisions, before they are due');
+
+Schedule::command('notifications:send-reminders')->everyFiveMinutes();
+
+Artisan::command('discord:preview {to=backups : backups, admin, or the email of a user who linked Discord} {--only=* : Only these types, e.g. --only=backup_opened}', function (DiscordPreview $preview) {
+    $to = $this->argument('to');
+    $target = in_array($to, ['backups', 'admin'], true) ? $to : User::where('email', $to)->with('discordLink')->first();
+    if (! $target) {
+        $this->error("Tidak ada pengguna dengan email {$to}.");
+
+        return 1;
+    }
+
+    try {
+        $channelId = $preview->channelFor($target);
+    } catch (ValidationException $e) {
+        $this->error(collect($e->errors())->flatten()->first());
+
+        return 1;
+    }
+
+    $types = $this->option('only') ?: $preview->types();
+    foreach ($types as $i => $type) {
+        try {
+            $preview->send($channelId, $type);
+            $this->line("<info>✓</info> {$type}");
+        } catch (Throwable $e) {
+            $this->line("<error>✗</error> {$type}: {$e->getMessage()}");
+        }
+
+        // Discord allows about 5 messages per 5 seconds in a channel
+        if ($i < count($types) - 1) {
+            Sleep::for(1100)->milliseconds();
+        }
+    }
+
+    return 0;
+})->purpose('Send an example of every notification type to a Discord channel or DM, to see how they look');
 
 // Delete audit rows older than vidhelp.audit.keep_days
 Schedule::command('model:prune', ['--model' => [AuditLog::class]])->dailyAt('01:00');

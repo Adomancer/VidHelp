@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\HostController as AdminHostController;
+use App\Http\Controllers\Admin\NotificationDeliveryController;
 use App\Http\Controllers\Admin\PointAdminController;
 use App\Http\Controllers\Admin\ProfileChangeController;
 use App\Http\Controllers\Admin\RateCategoryController;
@@ -91,6 +92,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
     Route::post('/discord/link', [DiscordController::class, 'link']);
     Route::delete('/discord/link', [DiscordController::class, 'unlink']);
     Route::post('/discord/test', [DiscordController::class, 'test']);
+    Route::put('/discord/preferences', [DiscordController::class, 'preferences']);
 
     // Rule numbers shown in help texts
     Route::get('/settings', [SettingsController::class, 'index']);
@@ -116,6 +118,13 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
         // Audit trail
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
+
+        // Discord: setup check, every message with its status, resend, test posts
+        Route::get('/notifications/discord', [NotificationDeliveryController::class, 'status']);
+        Route::get('/notifications/deliveries', [NotificationDeliveryController::class, 'index']);
+        Route::post('/notifications/deliveries/{notification}/resend', [NotificationDeliveryController::class, 'resend']);
+        Route::post('/notifications/test-channel', [NotificationDeliveryController::class, 'testChannel']);
+        Route::post('/notifications/preview', [NotificationDeliveryController::class, 'preview']);
 
         // Business rules (overrides of config/vidhelp.php)
         Route::get('/settings', [AdminSettingsController::class, 'index']);

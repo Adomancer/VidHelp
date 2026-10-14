@@ -208,25 +208,39 @@ class PointService
     {
         $what = $log->violationType?->name ?? 'Potongan poin';
 
-        $this->notifier->toUsers(
-            $host->user,
-            'points_deducted',
-            "{$log->points_change} poin: {$what}",
-            trim(($log->reason ? "{$log->reason} " : '')."Poinmu sekarang {$balance->current_points}."),
-            '/host/rating',
-            dm: true,
-        );
+        // The next SP level still above the host's points, e.g. "SP2 di 50 poin"
+        $next = collect(config('vidhelp.points.sp_thresholds'))->filter(fn ($at) => $at < $balance->current_points)->sortDesc();
+
+        $this->notifier->toUsers($host->user, Notice::make('points_deducted', "{$log->points_change} poin: {$what}")
+            ->body(trim(($log->reason ? "{$log->reason} " : '')."Poinmu sekarang {$balance->current_points}."))
+            ->field('Pelanggaran', $what)
+            ->field('Perubahan', "{$log->points_change} poin")
+            ->field('Poin sekarang', $balance->current_points)
+            ->field('Alasan', $log->reason, inline: false)
+            ->field('SP berikutnya', $next->isNotEmpty() ? "SP{$next->keys()->first()} di {$next->first()} poin" : null)
+            ->link('/host/rating', 'Lihat poin'), dm: true);
     }
 
     private function announceWarning(HostProfile $host, WarningLetter $letter): void
     {
         $host->loadMissing('user');
 
-        $this->notifier->toUsers($host->user, 'sp_issued', "Kamu mendapat SP{$letter->level}", $letter->reason, '/host/rating', dm: true);
+        $points = $this->balance($host)->current_points;
+        $notice = Notice::make('sp_issued', "Kamu mendapat SP{$letter->level}")
+            ->body($letter->reason)
+            ->field('Level', "SP{$letter->level}")
+            ->field('Poin sekarang', $points)
+            ->field('Alasan', $letter->reason, inline: false);
 
-        $title = "SP{$letter->level} untuk {$host->user->name}";
-        $this->notifier->toUsers($this->notifier->admins(), 'sp_issued', $title, $letter->reason, '/admin/points');
-        $this->notifier->toChannel('admin', 'sp_issued', $title, $letter->reason, '/admin/points');
+        $this->notifier->toUsers($host->user, (clone $notice)->link('/host/rating', 'Lihat poin dan SP'), dm: true);
+
+        $staffNotice = $notice->as('sp_issued', "SP{$letter->level} untuk {$host->user->name}")
+            ->category('admin')
+            ->field('Host', $host->user->name)
+            ->about($host->user)
+            ->link('/admin/points', 'Lihat poin host');
+        $this->notifier->toUsers($this->notifier->admins(), $staffNotice, dm: true);
+        $this->notifier->toChannel('admin', $staffNotice);
     }
 
     public function voidWarning(WarningLetter $letter, User $by): void
