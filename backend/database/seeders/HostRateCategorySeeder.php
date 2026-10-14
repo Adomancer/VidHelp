@@ -8,18 +8,17 @@ use Illuminate\Database\Seeder;
 class HostRateCategorySeeder extends Seeder
 {
     /**
-     * Default rate levels. Rates are placeholders; set the real ones on /admin/rates.
+     * Default rate levels, as set by the agency (Oct 2026). Admins can change them on /admin/rates.
      */
     public function run(): void
     {
         $levels = [
-            ['name' => 'Magang', 'min_tenure_months' => 0],
-            ['name' => 'Baru', 'min_tenure_months' => 3],
-            ['name' => 'Di atas 1 tahun', 'min_tenure_months' => 12],
+            ['name' => 'Di bawah 1 tahun', 'min_tenure_months' => 0, 'rate_per_hour' => 25000],
+            ['name' => 'Di atas 1 tahun', 'min_tenure_months' => 12, 'rate_per_hour' => 37500],
         ];
 
         foreach ($levels as $level) {
-            HostRateCategory::firstOrCreate(['name' => $level['name']], $level + ['rate_per_hour' => 0]);
+            HostRateCategory::firstOrCreate(['name' => $level['name']], $level);
         }
     }
 }

@@ -98,11 +98,6 @@ class DemoSeeder extends Seeder
         mt_srand(2026);
 
         DB::transaction(function () use ($attendance, $payroll, $backups, $start, $today) {
-            // Rates are seeded as Rp 0 placeholders; demo pay (and the kasbon limit) needs real-looking ones
-            foreach (['Magang' => 20000, 'Baru' => 25000, 'Di atas 1 tahun' => 30000] as $name => $rate) {
-                HostRateCategory::where('name', $name)->where('rate_per_hour', 0)->update(['rate_per_hour' => $rate]);
-            }
-
             $this->at($start->subDay()->setTime(9, 0), function () use ($start, $today) {
                 $this->createHosts($today);
                 $this->createBrandsAndSchedule($start);

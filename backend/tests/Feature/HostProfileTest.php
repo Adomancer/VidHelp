@@ -49,7 +49,7 @@ class HostProfileTest extends TestCase
         return HostRateCategory::where('name', $name)->firstOrFail();
     }
 
-    public function test_approving_a_host_creates_their_profile_as_magang(): void
+    public function test_approving_a_host_creates_their_profile_on_the_lowest_level(): void
     {
         $user = User::factory()->pending()->create();
         $user->assignRole('host');
@@ -59,7 +59,7 @@ class HostProfileTest extends TestCase
         $profile = $user->fresh()->hostProfile;
         $this->assertNotNull($profile);
         $this->assertTrue($profile->join_date->isToday());
-        $this->assertSame('Magang', $profile->rateCategory->name);
+        $this->assertSame('Di bawah 1 tahun', $profile->rateCategory->name);
     }
 
     public function test_approving_an_operator_does_not_create_a_host_profile(): void
@@ -80,14 +80,14 @@ class HostProfileTest extends TestCase
         $auto->update(['join_date' => today()->subMonths(13)]);
         $pinned->update([
             'join_date' => today()->subMonths(13),
-            'rate_category_id' => $this->category('Magang')->id,
+            'rate_category_id' => $this->category('Di bawah 1 tahun')->id,
             'rate_category_overridden' => true,
         ]);
 
         $this->artisan('hosts:sync-rate-categories')->assertSuccessful();
 
         $this->assertSame('Di atas 1 tahun', $auto->fresh()->rateCategory->name);
-        $this->assertSame('Magang', $pinned->fresh()->rateCategory->name);
+        $this->assertSame('Di bawah 1 tahun', $pinned->fresh()->rateCategory->name);
     }
 
     public function test_admin_can_pin_and_unpin_a_rate_level(): void
@@ -95,14 +95,14 @@ class HostProfileTest extends TestCase
         $profile = $this->activeHost()->hostProfile;
 
         $this->actingAs($this->admin)->putJson("/api/admin/hosts/{$profile->id}", [
-            'rate_category_id' => $this->category('Baru')->id,
+            'rate_category_id' => $this->category('Di atas 1 tahun')->id,
         ])->assertOk()->assertJsonPath('host.rate_category_overridden', true);
 
         $this->actingAs($this->admin)->putJson("/api/admin/hosts/{$profile->id}", [
             'rate_category_id' => null,
         ])->assertOk()->assertJsonPath('host.rate_category_overridden', false);
 
-        $this->assertSame('Magang', $profile->fresh()->rateCategory->name); // back to tenure-based
+        $this->assertSame('Di bawah 1 tahun', $profile->fresh()->rateCategory->name); // back to tenure-based
     }
 
     public function test_changing_join_date_recalculates_level(): void
@@ -110,10 +110,10 @@ class HostProfileTest extends TestCase
         $profile = $this->activeHost()->hostProfile;
 
         $this->actingAs($this->admin)->putJson("/api/admin/hosts/{$profile->id}", [
-            'join_date' => today()->subMonths(4)->toDateString(),
+            'join_date' => today()->subMonths(13)->toDateString(),
         ])->assertOk();
 
-        $this->assertSame('Baru', $profile->fresh()->rateCategory->name);
+        $this->assertSame('Di atas 1 tahun', $profile->fresh()->rateCategory->name);
     }
 
     public function test_host_updates_contact_numbers_but_not_join_date(): void
@@ -216,9 +216,9 @@ class HostProfileTest extends TestCase
     {
         $this->activeHost();
 
-        $this->actingAs($this->admin)->deleteJson("/api/admin/rate-categories/{$this->category('Magang')->id}")
+        $this->actingAs($this->admin)->deleteJson("/api/admin/rate-categories/{$this->category('Di bawah 1 tahun')->id}")
             ->assertUnprocessable();
-        $this->actingAs($this->admin)->deleteJson("/api/admin/rate-categories/{$this->category('Baru')->id}")
+        $this->actingAs($this->admin)->deleteJson("/api/admin/rate-categories/{$this->category('Di atas 1 tahun')->id}")
             ->assertOk();
     }
 

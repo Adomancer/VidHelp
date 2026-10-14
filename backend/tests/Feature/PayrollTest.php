@@ -37,7 +37,7 @@ class PayrollTest extends TestCase
 
     private Brand $brand;
 
-    /** Rate Rp 20.000/h (Magang) */
+    /** Rate Rp 20.000/h (Di bawah 1 tahun) */
     private HostProfile $host;
 
     /** The host's Sunday 19:00-22:00 slot: 3 h a week × 52/12 × Rp 20.000 = Rp 260.000 a month (the kasbon limit) */
@@ -49,8 +49,8 @@ class PayrollTest extends TestCase
 
         $this->travelTo(CarbonImmutable::parse('2026-10-05 10:00')); // Monday
         $this->seed([RoleSeeder::class, HostRateCategorySeeder::class]);
-        HostRateCategory::where('name', 'Magang')->update(['rate_per_hour' => 20000]);
-        HostRateCategory::where('name', 'Baru')->update(['rate_per_hour' => 25000]);
+        HostRateCategory::where('name', 'Di bawah 1 tahun')->update(['rate_per_hour' => 20000]);
+        HostRateCategory::where('name', 'Di atas 1 tahun')->update(['rate_per_hour' => 25000]);
         $this->admin = User::where('email', 'admin@vidhelp.com')->firstOrFail();
         $this->finance = User::factory()->create();
         $this->finance->assignRole('finance');
@@ -310,7 +310,7 @@ class PayrollTest extends TestCase
     public function test_request_locks_pay_at_todays_rate_and_splits_hours_over_the_target(): void
     {
         $other = $this->newHost();
-        $other->update(['rate_category_id' => HostRateCategory::where('name', 'Baru')->value('id'), 'rate_category_overridden' => true]);
+        $other->update(['rate_category_id' => HostRateCategory::where('name', 'Di atas 1 tahun')->value('id'), 'rate_category_overridden' => true]);
         $this->workSession($this->host, '2026-10-02', 7);
         $this->workSession($other, '2026-10-03', 5); // 12 of 10: closes
         $period = $this->period('2026-10-01');
@@ -318,7 +318,7 @@ class PayrollTest extends TestCase
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
 
         // A later rate change does not touch the locked period
-        HostRateCategory::where('name', 'Magang')->update(['rate_per_hour' => 99999]);
+        HostRateCategory::where('name', 'Di bawah 1 tahun')->update(['rate_per_hour' => 99999]);
 
         $hosts = collect($this->actingAs($this->finance)->getJson("/api/finance/payroll/periods/{$period->id}")
             ->assertJsonPath('period.status', 'requested')
