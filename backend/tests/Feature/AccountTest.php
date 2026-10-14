@@ -192,7 +192,7 @@ class AccountTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/admin/users/{$user->id}/activate")->assertJsonValidationErrors('status');
     }
 
-    public function test_finance_runs_payroll_but_nothing_else(): void
+    public function test_finance_has_every_admin_right_and_runs_payroll(): void
     {
         $finance = User::factory()->create();
         $finance->assignRole('finance');
@@ -202,11 +202,28 @@ class AccountTest extends TestCase
         $this->actingAs($finance)->getJson('/api/finance/hosts')->assertOk();
         $this->actingAs($finance)->getJson('/api/finance/brands')->assertOk()->assertJsonPath('brands.0.name', 'Brand A');
 
-        $this->actingAs($finance)->getJson('/api/admin/users')->assertForbidden();
-        $this->actingAs($finance)->getJson('/api/operator/schedules')->assertForbidden();
+        // Everything an admin sees and changes
+        $this->actingAs($finance)->getJson('/api/admin/users')->assertOk();
+        $this->actingAs($finance)->getJson('/api/admin/settings')->assertOk();
+        $this->actingAs($finance)->getJson('/api/operator/schedules')->assertOk();
+        $this->actingAs($finance)->postJson('/api/admin/brands', [
+            'name' => 'Brand F', 'target_hours_per_period' => 50, 'payment_cycle_days' => 14,
+        ])->assertCreated();
+
+        // Kasbon validation is reached (not 403): finance may change finance
+        $this->actingAs($finance)->postJson('/api/finance/cash-advances', [])->assertUnprocessable();
 
         $host = $this->host();
         $this->actingAs($host->user)->getJson('/api/finance/payroll/periods')->assertForbidden();
+    }
+
+    public function test_admin_sees_payroll_and_kasbon_but_cannot_change_them(): void
+    {
         $this->actingAs($this->admin)->getJson('/api/finance/payroll/periods')->assertOk();
+        $this->actingAs($this->admin)->getJson('/api/finance/cash-advances')->assertOk();
+        $this->actingAs($this->admin)->getJson('/api/finance/hosts')->assertOk();
+
+        // Payroll actions on a real period are checked in PayrollTest
+        $this->actingAs($this->admin)->postJson('/api/finance/cash-advances', [])->assertForbidden();
     }
 }

@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import type { ColumnDef } from "@tanstack/react-table";
 import { CalendarRange, ChevronRight, Download, HandCoins, Lock, Plus, Send, Wallet } from "lucide-react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { errorMessage, payrollApi, type CashAdvance, type HostPayRow, type PeriodListItem, type PeriodStatus } from "@/lib/api";
+import { hasAnyRole } from "@/lib/auth";
 import { formatDate, formatDuration, formatPeriodDates, formatRupiah } from "@/lib/format";
 import { inputClass, inputSmClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
@@ -37,6 +37,12 @@ import ToggleGroup from "./ToggleGroup";
 
 type Confirm = { title: string; body: string; label: string; destructive?: boolean; run: () => Promise<{ message: string }> } | null;
 
+/** Only finance changes payroll and kasbon; admins see everything but can't change it. */
+function useCanManageFinance(): boolean {
+  const { user } = useAuth();
+  return hasAnyRole(user, ["finance"]);
+}
+
 /**
  * Admin payroll: payment periods per brand (lock, pay, slips) and kasbon.
  * The tab, brand filter, open period and kasbon filter live in the URL, so a refresh,
@@ -44,9 +50,15 @@ type Confirm = { title: string; body: string; label: string; destructive?: boole
  */
 export default function PayrollDesk() {
   const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(["periods", "kasbon"] as const).withDefault("periods"));
+  const canManage = useCanManageFinance();
 
   return (
     <div className="space-y-5">
+      {!canManage && (
+        <FormAlert tone="info">
+          Mode lihat saja. Mengajukan pembayaran, menandai lunas, penyesuaian jam, dan kasbon hanya bisa dilakukan oleh akun Finance.
+        </FormAlert>
+      )}
       <ToggleGroup
         label="Bagian penggajian"
         options={[
@@ -273,11 +285,11 @@ const hostPayColumns: ColumnDef<HostPayRow>[] = [
 function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (text: string, tone?: "success" | "error") => void }) {
   const { token } = useAuth();
   const detail = useApiData(`payroll-period-${periodId}`, () => payrollApi.period(token, periodId));
+  const canManage = useCanManageFinance();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [paying, setPaying] = useState(false);
   const [reference, setReference] = useState("");
-  // The desk is shared by the admin and finance panels; slips open in the same panel
-  const slipsPath = usePathname().startsWith("/finance") ? "/finance/payroll/slips" : "/admin/payroll/slips";
+  const slipsPath = "/admin/payroll/slips";
 
   async function act(action: () => Promise<{ message: string }>) {
     try {
@@ -303,73 +315,76 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
   if (!detail.data) return <CardsSkeleton count={2} />;
   const { period, summary, pending_reports: pendingReports, pending_letters: pendingLetters, requests, hosts, adjustments, slips } = detail.data;
   const locked = period.status === "requested" || period.status === "paid";
+  const hasActions = (canManage && (period.status === "in_progress" || period.status === "waiting_payment" || period.status === "requested")) || locked;
   const paymentReference = period.payment_request?.payment_reference;
 
   return (
     <div className="space-y-4">
       <Card>
         {/* What can be done with this period now, first */}
-        <div className="flex flex-wrap gap-2">
-          {period.status === "in_progress" && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                setConfirm({
-                  title: "Tutup periode sebelum target?",
-                  body: `Baru ${formatDuration(summary.carried_in_hours + summary.worked_hours)} dari ${summary.target_hours} jam. Pakai ini kalau brand berhenti live: periode berakhir hari ini, PIC brand bisa mengajukan pembayaran untuk jam yang ada, dan periode baru dimulai besok.`,
-                  label: "Tutup periode",
-                  destructive: false,
-                  run: () => payrollApi.closePeriod(token, period.id),
-                })
-              }
-            >
-              <Lock aria-hidden="true" />
-              Tutup periode
-            </Button>
-          )}
-          {period.status === "waiting_payment" && (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={pendingReports > 0 || pendingLetters > 0}
-              onClick={() =>
-                setConfirm({
-                  title: "Ajukan atas nama PIC?",
-                  body: "Biasanya leader brand yang mengajukan dari aplikasinya. Periode ini dikunci: jam dan tarif host dibekukan, dan laporan brand dibuat.",
-                  label: "Kunci dan ajukan",
-                  destructive: false,
-                  run: () => payrollApi.requestPayment(token, period.id),
-                })
-              }
-            >
-              <Send aria-hidden="true" />
-              Ajukan atas nama PIC
-            </Button>
-          )}
-          {locked && (
-            <Button type="button" variant="outline" onClick={download}>
-              <Download aria-hidden="true" />
-              Laporan brand (CSV)
-            </Button>
-          )}
-          {period.status === "requested" && (
-            <Button type="button" variant="success" onClick={() => setPaying(true)}>
-              <Wallet aria-hidden="true" />
-              Tandai lunas
-            </Button>
-          )}
-          {period.status === "requested" && (
-            <InlineAction
-              label="Batalkan pengajuan"
-              placeholder="Kenapa? mis. jam host salah"
-              submitLabel="Batalkan pengajuan"
-              required
-              destructive
-              onSubmit={(reason) => act(() => payrollApi.cancelRequest(token, period.id, reason))}
-            />
-          )}
-        </div>
+        {hasActions && (
+          <div className="flex flex-wrap gap-2">
+            {canManage && period.status === "in_progress" && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setConfirm({
+                    title: "Tutup periode sebelum target?",
+                    body: `Baru ${formatDuration(summary.carried_in_hours + summary.worked_hours)} dari ${summary.target_hours} jam. Pakai ini kalau brand berhenti live: periode berakhir hari ini, PIC brand bisa mengajukan pembayaran untuk jam yang ada, dan periode baru dimulai besok.`,
+                    label: "Tutup periode",
+                    destructive: false,
+                    run: () => payrollApi.closePeriod(token, period.id),
+                  })
+                }
+              >
+                <Lock aria-hidden="true" />
+                Tutup periode
+              </Button>
+            )}
+            {canManage && period.status === "waiting_payment" && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={pendingReports > 0 || pendingLetters > 0}
+                onClick={() =>
+                  setConfirm({
+                    title: "Ajukan atas nama PIC?",
+                    body: "Biasanya leader brand yang mengajukan dari aplikasinya. Periode ini dikunci: jam dan tarif host dibekukan, dan laporan brand dibuat.",
+                    label: "Kunci dan ajukan",
+                    destructive: false,
+                    run: () => payrollApi.requestPayment(token, period.id),
+                  })
+                }
+              >
+                <Send aria-hidden="true" />
+                Ajukan atas nama PIC
+              </Button>
+            )}
+            {locked && (
+              <Button type="button" variant="outline" onClick={download}>
+                <Download aria-hidden="true" />
+                Laporan brand (CSV)
+              </Button>
+            )}
+            {canManage && period.status === "requested" && (
+              <Button type="button" variant="success" onClick={() => setPaying(true)}>
+                <Wallet aria-hidden="true" />
+                Tandai lunas
+              </Button>
+            )}
+            {canManage && period.status === "requested" && (
+              <InlineAction
+                label="Batalkan pengajuan"
+                placeholder="Kenapa? mis. jam host salah"
+                submitLabel="Batalkan pengajuan"
+                required
+                destructive
+                onSubmit={(reason) => act(() => payrollApi.cancelRequest(token, period.id, reason))}
+              />
+            )}
+          </div>
+        )}
 
         {period.status === "in_progress" && (
           <FormAlert tone="info">
@@ -469,7 +484,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                 {adjustment.sessions_added !== 0 && `, ${adjustment.sessions_added > 0 ? "+" : ""}${adjustment.sessions_added} sesi`}
               </StatusBadge>
               <span className="min-w-32 flex-1 text-muted-foreground">{adjustment.notes}</span>
-              {!locked && (
+              {canManage && !locked && (
                 <Button type="button" variant="ghost" size="xs" onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))} className="text-destructive hover:text-destructive">
                   Hapus
                 </Button>
@@ -477,7 +492,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
             </li>
           ))}
         </ul>
-        {!locked && <AdjustmentForm periodId={period.id} brandId={period.brand_id} onDone={(message) => act(async () => ({ message }))} />}
+        {canManage && !locked && <AdjustmentForm periodId={period.id} brandId={period.brand_id} onDone={(message) => act(async () => ({ message }))} />}
       </Card>
 
       {slips.length > 0 && (
@@ -718,6 +733,7 @@ function Kasbon() {
   const status = statusParam === "all" ? "" : statusParam;
   const setStatus = (next: typeof status) => void setStatusParam(next || "all");
   const advances = useApiData(`payroll-advances-${status}`, () => payrollApi.advances(token, status));
+  const canManage = useCanManageFinance();
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<CashAdvance | null>(null);
@@ -741,10 +757,12 @@ function Kasbon() {
           <option value="paid">Sudah lunas</option>
           <option value="">Semua</option>
         </NativeSelect>
-        <Button type="button" onClick={() => setCreating(true)}>
-          <Plus aria-hidden="true" />
-          Catat kasbon
-        </Button>
+        {canManage && (
+          <Button type="button" onClick={() => setCreating(true)}>
+            <Plus aria-hidden="true" />
+            Catat kasbon
+          </Button>
+        )}
       </div>
 
       {creating && (
@@ -815,7 +833,7 @@ function Kasbon() {
                   {advance.settled_note ? ` · ${advance.settled_note}` : ""}
                 </p>
               )}
-              {(advance.status !== "paid" || paidCount === 0) && (
+              {canManage && (advance.status !== "paid" || paidCount === 0) && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
                   {advance.status !== "paid" && (
                     <>

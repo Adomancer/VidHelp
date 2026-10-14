@@ -338,7 +338,7 @@ class ScheduleController extends Controller
     private function ensureCanChange(Request $request, ScheduleSlot $slot): void
     {
         abort_if(
-            $slot->is_locked && ! $request->user()->hasRole('admin'),
+            $slot->is_locked && ! $request->user()->hasAnyRole(['admin', 'finance']),
             403,
             'Slot ini dikunci. Hanya admin yang bisa mengubahnya.'
         );

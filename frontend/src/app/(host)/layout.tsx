@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function HostLayout({ children }: { children: React.ReactNode }) {
   return (
-    <RequireAuth roles={["host", "operator", "admin"]}>
+    <RequireAuth roles={["host", "operator", "admin", "finance"]}>
       <HostShell>{children}</HostShell>
     </RequireAuth>
   );

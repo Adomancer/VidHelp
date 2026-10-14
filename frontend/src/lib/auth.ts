@@ -49,12 +49,14 @@ export function hasAnyRole(user: AuthUser, roles: RoleName[]): boolean {
 
 export const TWO_FACTOR_SETUP_PATH = "/two-factor/setup";
 
-/** Landing page for a user, based on their highest role (admins without required 2FA set it up first). */
+/**
+ * Landing page for a user, based on their highest role (admins without required 2FA set it up first).
+ * Finance works in the admin panel: it has every admin right, plus changing payroll and kasbon.
+ */
 export function homePathFor(user: AuthUser): string {
   if (user.two_factor_setup_required) return TWO_FACTOR_SETUP_PATH;
-  if (hasAnyRole(user, ["admin"])) return "/admin/dashboard";
+  if (hasAnyRole(user, ["admin", "finance"])) return "/admin/dashboard";
   if (hasAnyRole(user, ["operator"])) return "/operator/dashboard";
-  if (hasAnyRole(user, ["finance"])) return "/finance/payroll";
   return "/host/live";
 }
 

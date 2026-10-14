@@ -55,7 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <SidebarLayout
       panel="Panel Admin"
-      roles={["admin"]}
+      roles={["admin", "finance"]}
       links={links}
       homeHref="/admin/dashboard"
       accountLinks={[{ href: "/admin/security", label: "Keamanan akun", icon: "security" }]}
