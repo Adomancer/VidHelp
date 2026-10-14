@@ -9,6 +9,16 @@ interface FetchOptions extends RequestInit {
   token?: string;
 }
 
+let changeListener: (() => void) | null = null;
+
+/**
+ * Be told after every request that changed something on the server (any successful
+ * non-GET), e.g. so cached lists on other pages load again next time they're opened.
+ */
+export function onDataChanged(listener: (() => void) | null) {
+  changeListener = listener;
+}
+
 /**
  * Send a request to the Laravel backend with auth token injection.
  * FormData bodies (file uploads) are sent as multipart; everything else as JSON.
@@ -41,6 +51,9 @@ async function request(endpoint: string, options: FetchOptions = {}): Promise<Re
     const error = await response.json().catch(() => ({}));
     throw new ApiError(response.status, error.message || "Permintaan ke server gagal", error);
   }
+
+  const method = (rest.method ?? "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") changeListener?.();
 
   return response;
 }

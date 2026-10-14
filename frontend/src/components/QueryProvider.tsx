@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { ApiError } from "@/lib/api";
+import { ApiError, onDataChanged } from "@/lib/api";
 
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        // Cached data shows straight away, and a fresh copy still loads on every mount and when the
-        // tab regains focus, so a page never sits on data from before a change made elsewhere
-        staleTime: 0,
-        refetchOnWindowFocus: true,
+        // A page loads its data once: going back to it, or back to the browser tab, shows the cached
+        // copy without asking the server again. Data counts as fresh for 10 minutes; after that the
+        // next visit loads it again (for changes made by other people meanwhile)
+        staleTime: 10 * 60_000,
+        // Pages not visited for half an hour are dropped from memory and load fresh next time
+        gcTime: 30 * 60_000,
+        refetchOnWindowFocus: false,
         // Only retry when the server couldn't be reached; its own errors (401, 422, 500…) won't change
         retry: (failureCount, error) => !(error instanceof ApiError) && failureCount < 2,
       },
@@ -23,6 +26,14 @@ function makeQueryClient() {
 /** The shared cache behind `useApiData`. One lives in the root layout. */
 export default function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(makeQueryClient);
+
+  // After any change (save, delete, approve…) other pages may show something else now: mark the
+  // whole cache stale without loading anything yet, so each page loads again once, when next opened.
+  // The page that made the change reloads its own data as before.
+  useEffect(() => {
+    onDataChanged(() => void queryClient.invalidateQueries({ refetchType: "none" }));
+    return () => onDataChanged(null);
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>
