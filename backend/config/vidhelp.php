@@ -40,7 +40,8 @@ return [
         // Reported hours may be this much under the scheduled length and still auto-approve
         'duration_tolerance_minutes' => (int) env('ATTENDANCE_DURATION_TOLERANCE_MINUTES', 15),
 
-        // TODO: late check-in rule, not decided by the agency yet
+        // Checking in more than this many minutes after the start counts as late (the "Telat" violation)
+        'late_after_minutes' => (int) env('ATTENDANCE_LATE_AFTER_MINUTES', 10),
     ],
 
     // Numbers the host types into the live report. Placeholder until the agency's

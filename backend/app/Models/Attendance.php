@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'host_id', 'slot_id', 'backup_request_id', 'event_claim_id', 'brand_id', 'session_date',
     'scheduled_start_at', 'scheduled_end_at', 'check_in_at', 'check_out_at', 'report_due_at',
 ])]
+#[Appends(['late_minutes'])]
 class Attendance extends Model
 {
     use Auditable, HasUuids;
@@ -66,6 +69,16 @@ class Attendance extends Model
     public function scheduledHours(): float
     {
         return round($this->scheduled_start_at->diffInMinutes($this->scheduled_end_at) / 60, 2);
+    }
+
+    /** Minutes the check-in came after the start, when that counts as late (0 = on time). */
+    protected function lateMinutes(): Attribute
+    {
+        return Attribute::get(function () {
+            $minutes = (int) floor($this->scheduled_start_at->diffInMinutes($this->check_in_at, false));
+
+            return $minutes > config('vidhelp.attendance.late_after_minutes') ? $minutes : 0;
+        });
     }
 
     /** Hours between check-in and check-out, or null if not checked out. */

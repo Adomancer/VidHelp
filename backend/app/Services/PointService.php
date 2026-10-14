@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Attendance;
 use App\Models\BackupApplication;
 use App\Models\BackupRequest;
 use App\Models\HostProfile;
@@ -259,6 +260,27 @@ class PointService
         }
 
         $application->update(['penalty_applied' => true]);
+    }
+
+    /**
+     * The host checked in late.
+     */
+    public function penalizeLateCheckIn(Attendance $attendance): void
+    {
+        $type = ViolationType::forCode(ViolationType::LATE_CHECK_IN);
+        if (! $type || $attendance->late_minutes === 0) {
+            return;
+        }
+
+        $attendance->loadMissing(['host', 'brand']);
+        $this->deduct(
+            $attendance->host,
+            $type,
+            'late_check_in',
+            "Check-in {$attendance->late_minutes} menit setelah live {$attendance->brand->name} mulai ({$attendance->scheduled_start_at->translatedFormat('d M H:i')}).",
+            null,
+            extra: ['occurred_on' => $attendance->session_date->toDateString()],
+        );
     }
 
     /**

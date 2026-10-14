@@ -262,6 +262,4 @@ This is **Next.js 16**, which differs from older versions. Check `frontend/node_
 5. Smaller: partial-session backups, stored PDF salary slips, a price per hour per brand (invoice in rupiah), a penalty for releasing an event block late.
 
 **Waiting on the agency's decision**
-- Late check-in rule (after how many minutes, how many points).
 - Live report template (real fields instead of GMV, orders, viewers).
-- Backup paid by the requesting host: whether the agency still pays the requester for that slot (now: the cover's hours are billed to the brand, but paid to nobody on payroll).

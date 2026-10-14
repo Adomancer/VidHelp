@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
  */
 class AttendanceService
 {
-    public function __construct(private EventCalendar $events, private PayrollService $payroll, private Notifier $notifier)
+    public function __construct(private EventCalendar $events, private PayrollService $payroll, private PointService $points, private Notifier $notifier)
     {
     }
 
@@ -138,6 +138,7 @@ class AttendanceService
 
     /**
      * Check in for my own slot occurrence, a backup I'm covering, or an event block I claimed.
+     * More than the late limit after the start deducts the "Telat" violation.
      */
     public function checkIn(HostProfile $host, ?string $slotId, ?string $date, ?string $backupRequestId, ?string $eventClaimId = null): Attendance
     {
@@ -198,7 +199,7 @@ class AttendanceService
             throw ValidationException::withMessages(['session' => ['Kamu sudah check-in untuk sesi ini.']]);
         }
 
-        return Attendance::create([
+        $attendance = Attendance::create([
             'host_id' => $host->id,
             'slot_id' => $slotId,
             'backup_request_id' => $backupRequestId,
@@ -210,6 +211,10 @@ class AttendanceService
             'check_in_at' => now(),
             'report_due_at' => now()->addHours(config('vidhelp.attendance.report_due_hours')),
         ]);
+
+        $this->points->penalizeLateCheckIn($attendance);
+
+        return $attendance;
     }
 
     public function checkOut(Attendance $attendance): Attendance

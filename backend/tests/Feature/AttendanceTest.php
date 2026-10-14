@@ -8,12 +8,16 @@ use App\Models\Brand;
 use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
 use App\Models\LiveReport;
+use App\Models\PointBalance;
+use App\Models\PointLog;
 use App\Models\ScheduleSlot;
 use App\Models\User;
+use App\Models\ViolationType;
 use App\Models\WorkSession;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
+use Database\Seeders\ViolationTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -102,6 +106,44 @@ class AttendanceTest extends TestCase
         $this->travelTo(CarbonImmutable::parse(self::TUESDAY.' 13:05'));
         $this->checkIn()->assertCreated()->assertJsonPath('attendance.report_due_at', fn ($due) => str_starts_with($due, '2026-10-07'));
         $this->checkIn()->assertJsonValidationErrors('session'); // twice
+    }
+
+    public function test_check_in_up_to_ten_minutes_after_the_start_is_on_time(): void
+    {
+        $this->seed(ViolationTypeSeeder::class);
+
+        $this->travelTo(CarbonImmutable::parse(self::TUESDAY.' 14:10'));
+        $this->checkIn()->assertCreated()->assertJsonPath('attendance.late_minutes', 0);
+
+        $this->assertSame(0, PointLog::count());
+    }
+
+    public function test_late_check_in_deducts_the_telat_violation(): void
+    {
+        $this->seed(ViolationTypeSeeder::class);
+
+        $this->travelTo(CarbonImmutable::parse(self::TUESDAY.' 14:11'));
+        $this->checkIn()
+            ->assertCreated()
+            ->assertJsonPath('attendance.late_minutes', 11)
+            ->assertJsonPath('message', fn ($message) => str_contains($message, 'telat 11 menit'));
+
+        $log = PointLog::sole();
+        $this->assertSame('late_check_in', $log->source);
+        $this->assertSame(-5, $log->points_change);
+        $this->assertSame(self::TUESDAY, $log->occurred_on->toDateString());
+        $this->assertSame(95, PointBalance::where('host_id', $this->host->id)->value('current_points'));
+    }
+
+    public function test_late_check_in_is_not_penalized_when_the_admin_turned_telat_off(): void
+    {
+        $this->seed(ViolationTypeSeeder::class);
+        ViolationType::where('code', ViolationType::LATE_CHECK_IN)->update(['is_active' => false]);
+
+        $this->travelTo(CarbonImmutable::parse(self::TUESDAY.' 14:30'));
+        $this->checkIn()->assertCreated()->assertJsonPath('attendance.late_minutes', 30);
+
+        $this->assertSame(0, PointLog::count());
     }
 
     public function test_cannot_check_in_after_the_session_ended(): void

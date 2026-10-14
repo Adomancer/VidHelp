@@ -126,6 +126,7 @@ function ReportCard({ report, act }: { report: ReviewReport; act: (action: () =>
             <span className="font-normal text-muted-foreground">· {report.brand.name}</span>
             {attendance.backup_request_id && <StatusBadge tone="info">Backup</StatusBadge>}
             {attendance.event_claim_id && <StatusBadge tone="warning">Event</StatusBadge>}
+            {attendance.late_minutes > 0 && <StatusBadge tone="danger">Telat {attendance.late_minutes} mnt</StatusBadge>}
           </p>
           <p className="text-sm text-body tabular-nums">{formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}</p>
         </div>

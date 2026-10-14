@@ -14,7 +14,7 @@ class ViolationTypeSeeder extends Seeder
     public function run(): void
     {
         $types = [
-            ['name' => 'Telat', 'code' => null, 'default_points' => 5, 'rating_impact' => 0.2],
+            ['name' => 'Telat', 'code' => ViolationType::LATE_CHECK_IN, 'default_points' => 5, 'rating_impact' => 0.2],
             ['name' => 'Main HP saat live', 'code' => null, 'default_points' => 10, 'rating_impact' => 0.5],
             ['name' => 'Ketiduran', 'code' => null, 'default_points' => 10, 'rating_impact' => 0.5],
             ['name' => 'Batal backup', 'code' => ViolationType::BACKUP_CANCEL, 'default_points' => 10, 'rating_impact' => 0.5],

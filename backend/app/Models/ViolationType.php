@@ -22,6 +22,8 @@ class ViolationType extends Model
 
     public const BRAND_COMPLAINT = 'brand_complaint';
 
+    public const LATE_CHECK_IN = 'late_check_in';
+
     protected function casts(): array
     {
         return [

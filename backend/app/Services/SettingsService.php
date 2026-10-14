@@ -61,6 +61,11 @@ class SettingsService
             'label' => 'Check-in dibuka sebelum sesi',
             'help' => 'Seberapa awal tombol check-in bisa dipakai.',
         ],
+        'attendance.late_after_minutes' => [
+            'group' => 'attendance', 'type' => 'int', 'min' => 0, 'max' => 120, 'unit' => 'menit',
+            'label' => 'Batas telat check-in',
+            'help' => 'Check-in lebih dari ini setelah sesi dimulai dihitung telat dan otomatis memotong poin Telat.',
+        ],
         'attendance.report_due_hours' => [
             'group' => 'attendance', 'type' => 'int', 'min' => 1, 'max' => 168, 'unit' => 'jam',
             'label' => 'Batas laporan live setelah check-in',

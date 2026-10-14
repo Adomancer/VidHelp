@@ -57,7 +57,11 @@ class LiveController extends Controller
             $validated['event_claim_id'] ?? null,
         );
 
-        return response()->json(['attendance' => $attendance, 'message' => 'Berhasil check-in. Selamat live!'], 201);
+        $message = $attendance->late_minutes > 0
+            ? "Berhasil check-in, tapi telat {$attendance->late_minutes} menit; poin Telat dipotong. Selamat live!"
+            : 'Berhasil check-in. Selamat live!';
+
+        return response()->json(['attendance' => $attendance, 'message' => $message], 201);
     }
 
     public function checkOut(Request $request, Attendance $attendance): JsonResponse

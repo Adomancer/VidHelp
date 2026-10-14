@@ -15,7 +15,7 @@ export interface ViolationType {
 
 export interface PointLog {
   id: string;
-  source: "internal" | "brand_complaint" | "backup_cancel" | "late_attachment";
+  source: "internal" | "brand_complaint" | "backup_cancel" | "late_attachment" | "late_check_in";
   points_change: number;
   reason: string | null;
   occurred_on: string;

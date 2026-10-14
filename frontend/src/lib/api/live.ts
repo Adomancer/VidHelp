@@ -31,6 +31,8 @@ export interface Attendance {
   check_in_at: string;
   check_out_at: string | null;
   report_due_at: string;
+  /** Minutes the check-in came after the start when that counts as late; 0 = on time. */
+  late_minutes: number;
   report?: LiveReport | null;
   brand?: { id: string; name: string };
   host?: HostWithUser;

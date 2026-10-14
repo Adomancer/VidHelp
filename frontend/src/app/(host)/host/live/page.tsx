@@ -227,7 +227,10 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
           <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted/60 px-4 py-3 text-sm">
             <div>
               <dt className="text-xs text-muted-foreground">Check-in</dt>
-              <dd className="font-medium text-foreground tabular-nums">{formatClock(attendance.check_in_at)}</dd>
+              <dd className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-foreground tabular-nums">
+                {formatClock(attendance.check_in_at)}
+                {attendance.late_minutes > 0 && <StatusBadge tone="danger">Telat {attendance.late_minutes} mnt</StatusBadge>}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Check-out</dt>

@@ -34,6 +34,7 @@ export const sourceLabels: Record<PointLog["source"], string> = {
   brand_complaint: "Komplain brand",
   backup_cancel: "Membatalkan backup (otomatis)",
   late_attachment: "Surat sakit terlambat (otomatis)",
+  late_check_in: "Telat check-in (otomatis)",
 };
 
 /**

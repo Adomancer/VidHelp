@@ -157,7 +157,10 @@ flowchart TD
 flowchart TD
   A(["Session in My Schedule"]) --> B["Check-in opens<br/>60 min before start"]
   B --> C["Host checks in"]
-  C --> D["Live"]
+  C --> C2{"More than 10 min<br/>after the start?"}
+  C2 -->|Yes| C3["Late: Telat points<br/>deducted automatically"]
+  C3 --> D
+  C2 -->|No| D["Live"]
   D --> E["Host checks out"]
   E --> F["Live report within 24 h:<br/>hours, GMV, orders, viewers"]
   F --> G{"Fits? sent on time, checked out,<br/>hours within 15 min of the slot,<br/>not more than attended"}
@@ -195,7 +198,7 @@ flowchart TD
 flowchart TD
   A["Each host starts the period with 100 points<br/>reset every 3 months"] --> B["Point history"]
   C["Operator records a violation<br/>or a brand complaint"] --> D["Points deducted<br/>by violation type"]
-  E["Automatic: dropped backup,<br/>late or missing sick letter"] --> D
+  E["Automatic: late check-in, dropped backup,<br/>late or missing sick letter"] --> D
   D --> F["Host told privately:<br/>bell + Discord DM"]
   F --> G{"At or below 75 / 50 / 25?"}
   G -->|Yes| H["SP1 / SP2 / SP3 issued<br/>automatically; host and admins told"]
