@@ -80,6 +80,22 @@ class Notifier
         return User::role(['admin', 'finance'])->where('status', 'active')->with('discordLink')->get();
     }
 
+    /** Active admins and finance staff (they follow payroll). */
+    public function finance(): Collection
+    {
+        return User::role(['admin', 'finance'])->where('status', 'active')->with('discordLink')->get();
+    }
+
+    /** Active users of the brand's leader hosts (the brand's PIC, who requests payment). */
+    public function brandLeaders(string $brandId): Collection
+    {
+        return User::query()
+            ->where('status', 'active')
+            ->whereHas('hostProfile.assignments', fn ($q) => $q->where('brand_id', $brandId)->where('is_leader', true)->where('status', 'active'))
+            ->with('discordLink')
+            ->get();
+    }
+
     /** Active admins, finance and operators. */
     public function staff(): Collection
     {

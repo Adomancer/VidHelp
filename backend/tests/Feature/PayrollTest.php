@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AppNotification;
 use App\Models\Attendance;
 use App\Models\BackupRequest;
 use App\Models\Brand;
@@ -54,9 +55,9 @@ class PayrollTest extends TestCase
         $this->finance = User::factory()->create();
         $this->finance->assignRole('finance');
 
-        // Weekly cycle from Thu 1 Oct: 1-7, 8-14, ... Target 10 hours per period
+        // Periods from Thu 1 Oct, each running until 10 hours are reached
         $this->brand = Brand::create([
-            'name' => 'Brand A', 'target_hours_per_period' => 10, 'payment_cycle_days' => 7, 'payroll_start_date' => '2026-10-01',
+            'name' => 'Brand A', 'target_hours_per_period' => 10, 'payroll_start_date' => '2026-10-01',
         ]);
         $this->host = $this->newHost();
         $this->slot = ScheduleSlot::create([
@@ -120,13 +121,20 @@ class PayrollTest extends TestCase
         ]);
     }
 
-    /** Move past the first period (1-7 Oct) so it is waiting for payment. */
+    /** On 8 Oct finance closes the first period before its target, so it waits for payment. */
     private function endFirstPeriod(): PaymentPeriod
     {
         $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
-        $this->artisan('payroll:roll-periods');
+        $period = $this->period('2026-10-01');
+        $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/close")->assertOk();
 
-        return $this->period('2026-10-01');
+        return $period->fresh();
+    }
+
+    /** The host as the brand's leader (its PIC). */
+    private function makeLeader(HostProfile $host): void
+    {
+        $host->assignments()->where('brand_id', $this->brand->id)->update(['is_leader' => true]);
     }
 
     private function recordAdvance(int $amount, int $installments): string
@@ -141,19 +149,34 @@ class PayrollTest extends TestCase
         return PaymentPeriod::where('brand_id', $this->brand->id)->whereDate('period_start', $start)->firstOrFail();
     }
 
-    public function test_sessions_land_in_back_to_back_periods(): void
+    public function test_period_runs_until_the_target_then_the_next_starts(): void
     {
-        $first = $this->workSession($this->host, '2026-10-03', 2);
-        $second = $this->workSession($this->host, '2026-10-09', 3);
+        $this->makeLeader($this->host);
+        $this->workSession($this->host, '2026-10-02', 4);
+        $this->workSession($this->host, '2026-10-03', 4);
+        $first = $this->period('2026-10-01');
+        $this->assertSame('in_progress', $first->status);
+        $this->assertNull($first->period_end);
 
-        $this->assertSame($this->period('2026-10-01')->id, $first->payment_period_id);
-        $this->assertSame('2026-10-14', $this->period('2026-10-08')->period_end->toDateString());
-        $this->assertSame($this->period('2026-10-08')->id, $second->payment_period_id);
+        // 11 of 10 hours: the period closes on the day of its last session
+        $this->workSession($this->host, '2026-10-04', 3);
+        $first->refresh();
+        $this->assertSame('waiting_payment', $first->status);
+        $this->assertSame('2026-10-04', $first->period_end->toDateString());
+        $this->assertNull($first->closed_by);
+        $this->assertDatabaseHas(AppNotification::class, ['user_id' => $this->host->user_id, 'type' => 'period_ready']);
+
+        $next = $this->period('2026-10-05');
+        $this->assertSame('in_progress', $next->status);
+        $this->assertSame($next->id, $this->workSession($this->host, '2026-10-06', 2)->payment_period_id);
+
+        // A report from inside the closed period approved late still belongs to it
+        $this->assertSame($first->id, $this->workSession($this->host, '2026-10-03', 1)->payment_period_id);
     }
 
     public function test_setting_a_payroll_start_date_picks_up_earlier_sessions(): void
     {
-        $brandB = Brand::create(['name' => 'Brand B', 'target_hours_per_period' => 10, 'payment_cycle_days' => 14]);
+        $brandB = Brand::create(['name' => 'Brand B', 'target_hours_per_period' => 10]);
         $session = $this->workSession($this->host, '2026-10-02', 2, $brandB);
         $this->assertNull($session->payment_period_id);
 
@@ -167,8 +190,6 @@ class PayrollTest extends TestCase
         $this->workSession($this->host, '2026-10-02', 2);
 
         $this->actingAs($this->admin)->putJson("/api/admin/brands/{$this->brand->id}", ['payroll_start_date' => '2026-10-02'])
-            ->assertJsonValidationErrors('payroll_start_date');
-        $this->actingAs($this->admin)->putJson("/api/admin/brands/{$this->brand->id}", ['payment_cycle_days' => 14])
             ->assertJsonValidationErrors('payroll_start_date');
         $this->actingAs($this->admin)->putJson("/api/admin/brands/{$this->brand->id}", ['target_hours_per_period' => 12])->assertOk();
     }
@@ -223,18 +244,63 @@ class PayrollTest extends TestCase
         $this->actingAs($this->admin)->postJson("/api/finance/payroll/periods/{$period->id}/cancel-request", ['reason' => 'x'])->assertForbidden();
     }
 
-    public function test_payment_can_only_be_requested_after_the_period_ends(): void
+    public function test_leader_requests_payment_only_once_the_target_is_reached(): void
     {
-        $this->workSession($this->host, '2026-10-02', 2);
+        $this->makeLeader($this->host);
+        $finance = User::factory()->create();
+        $finance->assignRole('finance');
+        $this->workSession($this->host, '2026-10-02', 6);
         $period = $this->period('2026-10-01');
 
-        $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertJsonValidationErrors('period');
+        $this->actingAs($this->host->user)->postJson("/api/host/pay/periods/{$period->id}/request")
+            ->assertJsonValidationErrors('period')
+            ->assertJsonPath('errors.period.0', fn ($message) => str_contains($message, 'Target 10 jam belum tercapai (baru 6 jam)'));
 
-        $this->travelTo(CarbonImmutable::parse('2026-10-08 00:10'));
-        $this->artisan('payroll:roll-periods')->assertSuccessful();
-        $this->assertSame('waiting_payment', $period->fresh()->status);
+        $this->workSession($this->host, '2026-10-03', 4);
+        $this->actingAs($this->host->user)->getJson('/api/host/pay')
+            ->assertJsonPath('brand_periods.0.id', $this->period('2026-10-04')->id) // the new running one first
+            ->assertJsonPath('brand_periods.1.status', 'waiting_payment')
+            ->assertJsonPath('brand_periods.1.progress_hours', 10);
 
+        // Only the brand's leader may request
+        $this->actingAs($this->newHost()->user)->postJson("/api/host/pay/periods/{$period->id}/request")->assertForbidden();
+
+        $this->actingAs($this->host->user)->postJson("/api/host/pay/periods/{$period->id}/request")->assertOk();
+        $this->assertSame('requested', $period->fresh()->status);
+        $this->assertSame($this->host->user_id, $period->paymentRequest()->firstOrFail()->requested_by);
+        $this->assertDatabaseHas(AppNotification::class, ['user_id' => $finance->id, 'type' => 'payment_requested']);
+
+        $this->actingAs($this->host->user)->get("/api/host/pay/periods/{$period->id}/export")->assertOk()->assertHeader('content-type', 'text/csv; charset=UTF-8');
+    }
+
+    public function test_finance_closes_a_period_early_when_the_brand_stops(): void
+    {
+        $period = app(PayrollService::class)->openPeriod($this->brand);
+        $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/close")->assertJsonValidationErrors('period'); // no hours yet
+
+        $this->workSession($this->host, '2026-10-02', 2);
+        $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/close")->assertOk();
+
+        $period->refresh();
+        $this->assertSame('waiting_payment', $period->status);
+        $this->assertSame('2026-10-05', $period->period_end->toDateString()); // today
+        $this->assertSame($this->finance->id, $period->closed_by);
+        $this->assertSame('in_progress', $this->period('2026-10-06')->status);
+
+        $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/close")->assertJsonValidationErrors('period');
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
+        $this->actingAs($this->finance)->getJson("/api/finance/payroll/periods/{$period->id}")->assertJsonPath('summary.achieved_hours', 2);
+    }
+
+    public function test_lowering_the_target_closes_a_period_that_already_reached_it(): void
+    {
+        $this->workSession($this->host, '2026-10-02', 6);
+
+        $this->actingAs($this->admin)->putJson("/api/admin/brands/{$this->brand->id}", ['target_hours_per_period' => 5])->assertOk();
+
+        $period = $this->period('2026-10-01');
+        $this->assertSame('waiting_payment', $period->status);
+        $this->assertSame(5, $period->target_hours);
     }
 
     public function test_request_locks_pay_at_todays_rate_and_splits_hours_over_the_target(): void
@@ -242,11 +308,9 @@ class PayrollTest extends TestCase
         $other = $this->newHost();
         $other->update(['rate_category_id' => HostRateCategory::where('name', 'Baru')->value('id'), 'rate_category_overridden' => true]);
         $this->workSession($this->host, '2026-10-02', 7);
-        $this->workSession($other, '2026-10-03', 5);
+        $this->workSession($other, '2026-10-03', 5); // 12 of 10: closes
         $period = $this->period('2026-10-01');
 
-        $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
-        $this->artisan('payroll:roll-periods');
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
 
         // A later rate change does not touch the locked period
@@ -265,13 +329,13 @@ class PayrollTest extends TestCase
         $this->assertSame([7, 5.83, 1.17], [$hosts[$this->host->id]['worked_hours'], $hosts[$this->host->id]['hours'], $hosts[$this->host->id]['carried_out_hours']]);
         $this->assertSame([5, 4.17, 0.83], [$hosts[$other->id]['worked_hours'], $hosts[$other->id]['hours'], $hosts[$other->id]['carried_out_hours']]);
 
-        $this->assertSame(2.0, $this->period('2026-10-08')->carried_in_hours);
+        $this->assertSame(2.0, $this->period('2026-10-04')->carried_in_hours);
     }
 
     public function test_carried_hours_are_paid_first_in_the_next_period(): void
     {
-        $this->workSession($this->host, '2026-10-02', 12); // target 10
-        $first = $this->endFirstPeriod();
+        $this->workSession($this->host, '2026-10-02', 12); // target 10: closes on 2 Oct
+        $first = $this->period('2026-10-01');
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$first->id}/request")->assertOk();
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$first->id}/paid")->assertOk();
 
@@ -284,7 +348,7 @@ class PayrollTest extends TestCase
 
         // The 2 carried hours count first: only 8 more fit, the 9th carries again
         $this->workSession($this->host, '2026-10-09', 9);
-        $second = $this->period('2026-10-08');
+        $second = $this->period('2026-10-03');
         $this->actingAs($this->finance)->getJson("/api/finance/payroll/periods/{$second->id}")
             ->assertJsonPath('hosts.0.carried_in_hours', 2)
             ->assertJsonPath('hosts.0.worked_hours', 9)
@@ -301,31 +365,33 @@ class PayrollTest extends TestCase
     public function test_carried_hours_alone_can_fill_the_next_period(): void
     {
         $other = $this->newHost();
-        $this->workSession($this->host, '2026-10-02', 16);
-        $this->workSession($other, '2026-10-03', 4); // 20 hours: half paid, half carried (host 8, other 2)
-        $first = $this->endFirstPeriod();
+        $this->workSession($this->host, '2026-10-02', 16); // closes on 2 Oct
+        $this->workSession($other, '2026-10-02', 4); // 20 hours: half paid, half carried (host 8, other 2)
+        $first = $this->period('2026-10-01');
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$first->id}/request")->assertOk();
 
-        // The 10 carried hours fill the next target, so the other host's new hours all carry again
-        $this->workSession($other, '2026-10-09', 3);
-        $hosts = collect($this->actingAs($this->finance)->getJson('/api/finance/payroll/periods/'.$this->period('2026-10-08')->id)
+        // The 10 carried hours fill the next target on their own, so it closes right away
+        $second = $this->period('2026-10-03');
+        $this->assertSame('waiting_payment', $second->status);
+        $hosts = collect($this->actingAs($this->finance)->getJson("/api/finance/payroll/periods/{$second->id}")
             ->assertJsonPath('summary.carried_in_hours', 10)
             ->assertJsonPath('summary.achieved_hours', 10)
-            ->assertJsonPath('summary.carried_out_hours', 3)
+            ->assertJsonPath('summary.carried_out_hours', 0)
             ->json('hosts'))->keyBy('host_id');
 
         $this->assertSame([8, 8, 0], [$hosts[$this->host->id]['carried_in_hours'], $hosts[$this->host->id]['hours'], $hosts[$this->host->id]['carried_out_hours']]);
-        $this->assertSame([2, 2, 3], [$hosts[$other->id]['carried_in_hours'], $hosts[$other->id]['hours'], $hosts[$other->id]['carried_out_hours']]);
+        $this->assertSame([2, 2, 0], [$hosts[$other->id]['carried_in_hours'], $hosts[$other->id]['hours'], $hosts[$other->id]['carried_out_hours']]);
+
+        // New hours go to the period after
+        $this->assertNotSame($second->id, $this->workSession($other, '2026-10-09', 3)->payment_period_id);
     }
 
     public function test_previous_period_with_hours_must_be_requested_first(): void
     {
-        $this->workSession($this->host, '2026-10-02', 2);
-        $this->workSession($this->host, '2026-10-09', 2);
-        $this->travelTo(CarbonImmutable::parse('2026-10-15 09:00'));
-        $this->artisan('payroll:roll-periods');
+        $this->workSession($this->host, '2026-10-02', 10);
+        $this->workSession($this->host, '2026-10-03', 10);
         $first = $this->period('2026-10-01');
-        $second = $this->period('2026-10-08');
+        $second = $this->period('2026-10-03');
 
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$second->id}/request")->assertJsonValidationErrors('period');
 
@@ -350,8 +416,7 @@ class PayrollTest extends TestCase
         $this->assertSame(0, $hosts[$cover->id]['hours']);
         $this->assertSame([['payer' => $this->host->user->name, 'hours' => 2]], $hosts[$cover->id]['host_paid']);
 
-        $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
-        $this->artisan('payroll:roll-periods');
+        $this->endFirstPeriod();
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/paid")->assertOk();
 
@@ -395,9 +460,7 @@ class PayrollTest extends TestCase
     public function test_locked_period_takes_no_changes_and_late_sessions_move_on(): void
     {
         $this->workSession($this->host, '2026-10-02', 2);
-        $period = $this->period('2026-10-01');
-        $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
-        $this->artisan('payroll:roll-periods');
+        $period = $this->endFirstPeriod();
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
 
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/adjustments", [
@@ -406,7 +469,7 @@ class PayrollTest extends TestCase
 
         // A report for 6 Oct approved only now goes to the next period
         $late = $this->workSession($this->host, '2026-10-06', 1);
-        $this->assertSame($this->period('2026-10-08')->id, $late->payment_period_id);
+        $this->assertSame($this->period('2026-10-09')->id, $late->payment_period_id);
     }
 
     public function test_paid_period_creates_slips_and_deducts_kasbon(): void
@@ -416,9 +479,7 @@ class PayrollTest extends TestCase
         ])->assertCreated()->assertJsonPath('advance.installments.0.amount', 15000)->assertJsonPath('advance.installments.1.amount', 15001);
 
         $this->workSession($this->host, '2026-10-02', 2); // 40.000
-        $period = $this->period('2026-10-01');
-        $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
-        $this->artisan('payroll:roll-periods');
+        $period = $this->endFirstPeriod();
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/paid", ['reference' => 'TRF 0042'])->assertOk();
 
@@ -475,9 +536,9 @@ class PayrollTest extends TestCase
     public function test_cancelling_a_request_unlocks_the_period_and_keeps_history(): void
     {
         $this->workSession($this->host, '2026-10-02', 12); // 2 hours over the target carry out
-        $period = $this->endFirstPeriod();
+        $period = $this->period('2026-10-01');
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request")->assertOk();
-        $this->assertSame(2.0, $this->period('2026-10-08')->carried_in_hours);
+        $this->assertSame(2.0, $this->period('2026-10-03')->carried_in_hours);
 
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/cancel-request")->assertJsonValidationErrors('reason');
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/cancel-request", ['reason' => 'Wrong hours for one host'])
@@ -485,7 +546,7 @@ class PayrollTest extends TestCase
 
         $this->assertSame('waiting_payment', $period->fresh()->status);
         $this->assertSame(0, $period->items()->count());
-        $this->assertSame(0.0, $this->period('2026-10-08')->carried_in_hours);
+        $this->assertSame(0.0, $this->period('2026-10-03')->carried_in_hours);
 
         // Open again: adjust, then request a second time
         $this->travel(10)->minutes();
@@ -504,14 +565,12 @@ class PayrollTest extends TestCase
 
     public function test_paid_period_or_one_whose_next_is_locked_cannot_be_cancelled(): void
     {
-        $this->workSession($this->host, '2026-10-02', 2);
-        $this->workSession($this->host, '2026-10-09', 2);
-        $first = $this->endFirstPeriod();
+        $this->workSession($this->host, '2026-10-02', 10);
+        $this->workSession($this->host, '2026-10-03', 10);
+        $first = $this->period('2026-10-01');
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$first->id}/request")->assertOk();
 
-        $this->travelTo(CarbonImmutable::parse('2026-10-15 09:00'));
-        $this->artisan('payroll:roll-periods');
-        $second = $this->period('2026-10-08');
+        $second = $this->period('2026-10-03');
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$second->id}/request")->assertOk();
 
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$first->id}/cancel-request", ['reason' => 'Mistake'])
@@ -628,9 +687,7 @@ class PayrollTest extends TestCase
             ->assertJsonPath('current.0.hours', 2)
             ->assertJsonPath('current.0.estimate', 40000);
 
-        $period = $this->period('2026-10-01');
-        $this->travelTo(CarbonImmutable::parse('2026-10-08 09:00'));
-        $this->artisan('payroll:roll-periods');
+        $period = $this->endFirstPeriod();
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/request");
         $this->actingAs($this->finance)->postJson("/api/finance/payroll/periods/{$period->id}/paid");
         $slip = SalarySlip::firstOrFail();

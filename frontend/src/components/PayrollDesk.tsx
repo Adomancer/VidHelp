@@ -3,11 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CalendarRange, ChevronRight, Download, HandCoins, Plus, Send, Wallet } from "lucide-react";
+import { CalendarRange, ChevronRight, Download, HandCoins, Lock, Plus, Send, Wallet } from "lucide-react";
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs";
 import { errorMessage, payrollApi, type CashAdvance, type HostPayRow, type PeriodListItem, type PeriodStatus } from "@/lib/api";
 import { hasAnyRole } from "@/lib/auth";
-import { formatDate, formatDuration, formatRupiah } from "@/lib/format";
+import { formatDate, formatDuration, formatPeriodDates, formatRupiah } from "@/lib/format";
 import { inputClass, inputSmClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
@@ -27,28 +27,13 @@ import FormActions from "./FormActions";
 import FormAlert from "./FormAlert";
 import { CardsSkeleton, RefreshBar, TableSkeleton } from "./Loading";
 import Modal from "./Modal";
+import PeriodBadge from "./PeriodBadge";
 import RupiahInput from "./RupiahInput";
 import { NativeSelect } from "./SelectField";
-import StatusBadge, { type Tone } from "./StatusBadge";
+import StatusBadge from "./StatusBadge";
 import SubmitButton from "./SubmitButton";
 import { notify } from "./Toast";
 import ToggleGroup from "./ToggleGroup";
-
-const statusStyles: Record<PeriodStatus, [string, Tone]> = {
-  in_progress: ["Berjalan", "info"],
-  waiting_payment: ["Siap ditagihkan", "warning"],
-  requested: ["Menunggu brand", "brand"],
-  paid: ["Lunas", "success"],
-};
-
-export function PeriodBadge({ status }: { status: PeriodStatus }) {
-  const [label, tone] = statusStyles[status];
-  return (
-    <StatusBadge tone={tone} dot>
-      {label}
-    </StatusBadge>
-  );
-}
 
 type Confirm = { title: string; body: string; label: string; destructive?: boolean; run: () => Promise<{ message: string }> } | null;
 
@@ -150,7 +135,7 @@ function Periods() {
                   <div className="min-w-0">
                     <p className="font-medium text-foreground">{period.brand?.name}</p>
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
+                      {formatPeriodDates(period.period_start, period.period_end)} · {period.hosts} host
                     </p>
                   </div>
                   <PeriodBadge status={period.status} />
@@ -172,7 +157,7 @@ function Periods() {
           placement="side"
           size="xl"
           onClose={() => select(null)}
-          title={current ? `${current.brand?.name} · ${formatDate(current.period_start)} – ${formatDate(current.period_end)}` : "Periode pembayaran"}
+          title={current ? `${current.brand?.name} · ${formatPeriodDates(current.period_start, current.period_end)}` : "Periode pembayaran"}
           description={current && <PeriodBadge status={current.status} />}
         >
           <PeriodDetail
@@ -202,7 +187,7 @@ const periodColumns: ColumnDef<PeriodListItem>[] = [
       <>
         <p className="font-medium text-foreground">{period.brand?.name}</p>
         <p className="text-xs text-muted-foreground tabular-nums">
-          {formatDate(period.period_start)} – {formatDate(period.period_end)} · {period.hosts} host
+          {formatPeriodDates(period.period_start, period.period_end)} · {period.hosts} host
         </p>
       </>
     ),
@@ -330,7 +315,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
   if (!detail.data) return <CardsSkeleton count={2} />;
   const { period, summary, pending_reports: pendingReports, pending_letters: pendingLetters, requests, hosts, adjustments, slips } = detail.data;
   const locked = period.status === "requested" || period.status === "paid";
-  const hasActions = (canManage && period.status === "waiting_payment") || locked;
+  const hasActions = (canManage && (period.status === "in_progress" || period.status === "waiting_payment" || period.status === "requested")) || locked;
   const paymentReference = period.payment_request?.payment_reference;
 
   return (
@@ -339,14 +324,33 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
         {/* What can be done with this period now, first */}
         {hasActions && (
           <div className="flex flex-wrap gap-2">
+            {canManage && period.status === "in_progress" && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  setConfirm({
+                    title: "Tutup periode sebelum target?",
+                    body: `Baru ${formatDuration(summary.carried_in_hours + summary.worked_hours)} dari ${summary.target_hours} jam. Pakai ini kalau brand berhenti live: periode berakhir hari ini, PIC brand bisa mengajukan pembayaran untuk jam yang ada, dan periode baru dimulai besok.`,
+                    label: "Tutup periode",
+                    destructive: false,
+                    run: () => payrollApi.closePeriod(token, period.id),
+                  })
+                }
+              >
+                <Lock aria-hidden="true" />
+                Tutup periode
+              </Button>
+            )}
             {canManage && period.status === "waiting_payment" && (
               <Button
                 type="button"
+                variant="outline"
                 disabled={pendingReports > 0 || pendingLetters > 0}
                 onClick={() =>
                   setConfirm({
-                    title: "Ajukan pembayaran?",
-                    body: "Periode ini dikunci: jam dan tarif host dibekukan, dan laporan brand dibuat.",
+                    title: "Ajukan atas nama PIC?",
+                    body: "Biasanya leader brand yang mengajukan dari aplikasinya. Periode ini dikunci: jam dan tarif host dibekukan, dan laporan brand dibuat.",
                     label: "Kunci dan ajukan",
                     destructive: false,
                     run: () => payrollApi.requestPayment(token, period.id),
@@ -354,7 +358,7 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                 }
               >
                 <Send aria-hidden="true" />
-                Ajukan pembayaran
+                Ajukan atas nama PIC
               </Button>
             )}
             {locked && (
@@ -380,6 +384,19 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
               />
             )}
           </div>
+        )}
+
+        {period.status === "in_progress" && (
+          <FormAlert tone="info">
+            Berjalan sampai target {summary.target_hours} jam tercapai: kurang{" "}
+            {formatDuration(Math.max(0, summary.target_hours - summary.carried_in_hours - summary.worked_hours))}. Setelah itu leader brand (PIC) mengajukan
+            pembayaran.
+          </FormAlert>
+        )}
+        {period.status === "waiting_payment" && (
+          <FormAlert tone="warning">
+            {period.closer ? `Ditutup lebih awal oleh ${period.closer.name}.` : "Target tercapai."} Menunggu leader brand (PIC) mengajukan pembayaran.
+          </FormAlert>
         )}
 
         {period.status !== "paid" && pendingReports > 0 && (

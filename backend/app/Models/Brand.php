@@ -8,7 +8,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'is_obs', 'product_knowledge','target_hours_per_period', 'payment_cycle_days', 'payroll_start_date', 'status'])]
+/**
+ * A client brand. Its pay periods start on `payroll_start_date`, and each one runs until
+ * `target_hours_per_period` hours are reached; the brand's leader host then requests payment.
+ */
+#[Fillable(['name', 'is_obs', 'product_knowledge', 'target_hours_per_period', 'payroll_start_date', 'status'])]
 class Brand extends Model
 {
     use Auditable, HasUuids;
@@ -18,7 +22,6 @@ class Brand extends Model
         return [
             'is_obs' => 'boolean',
             'target_hours_per_period' => 'integer',
-            'payment_cycle_days' => 'integer',
             'payroll_start_date' => 'date:Y-m-d',
         ];
     }

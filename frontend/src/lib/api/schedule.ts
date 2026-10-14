@@ -37,6 +37,9 @@ export interface SlotInput {
   effective_to: string | null;
 }
 
+/** A new slot on one or more days (e.g. every day): one weekly slot per day. */
+export type NewSlotInput = Omit<SlotInput, "day_of_week"> & { days_of_week: number[] };
+
 export interface AvailabilityRange {
   day_of_week: DayOfWeek;
   available_from: string;
@@ -78,7 +81,8 @@ export const scheduleApi = {
 
   brandHosts: (token: string, brandId: string) => api<{ assignments: BrandHost[] }>(`/operator/brands/${brandId}/hosts`, { token }),
 
-  create: (token: string, data: SlotInput) => post<{ slot: ScheduleSlot }>("/operator/schedules", token, data),
+  /** One slot per day in `days_of_week`, all or none; `slot` is the first. */
+  create: (token: string, data: SlotInput | NewSlotInput) => post<{ slot: ScheduleSlot; slots: ScheduleSlot[] }>("/operator/schedules", token, data),
 
   /**
    * With `apply_from` after the slot started, the slot ends the day before and the
@@ -90,7 +94,8 @@ export const scheduleApi = {
   /** Ends the slot from today (or `from`) on; deletes it if it hasn't started by then. */
   remove: (token: string, id: string, from?: string) => del(`/operator/schedules/${id}${query({ from })}`, token),
 
-  conflicts: (token: string, params: Omit<SlotInput, "slot_type"> & { ignore_id?: string }) =>
+  /** Clashes on any of the days (`days_of_week` for a new slot on several days). */
+  conflicts: (token: string, params: Omit<SlotInput, "slot_type" | "day_of_week"> & ({ day_of_week: number } | { days_of_week: number[] }) & { ignore_id?: string }) =>
     api<{ conflicts: SlotConflict[] }>(`/operator/schedules/conflicts${query(params)}`, { token }),
 
   history: (token: string, id: string) => api<{ history: SlotHistoryEntry[] }>(`/operator/schedules/${id}/history`, { token }),

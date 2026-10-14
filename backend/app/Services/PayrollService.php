@@ -25,6 +25,10 @@ use Illuminate\Validation\ValidationException;
  * Payment periods per brand, host pay, brand invoices (target cap + carry-over),
  * salary slips and kasbon deductions.
  *
+ * A brand's period runs until its target hours are reached (about a month for 720 hours), or
+ * until admin/finance closes it early; the next one starts the day after. The brand's leader
+ * host (its PIC) then requests payment; finance follows it up and marks it paid.
+ *
  * A period pays at most the brand's target: hours carried in from the last period first, then
  * this period's hours. Hours over the target stay unpaid and carry to the next period, cut
  * from every host by the same share. What the brand is billed and what hosts are paid always
@@ -39,44 +43,55 @@ class PayrollService
     public function __construct(private Notifier $notifier) {}
 
     /**
-     * The brand's period containing `$date`, created on first use. Null before the brand's payroll start date.
+     * The brand's period a session on `$date` belongs to: the closed one whose dates cover it,
+     * or else the running one. Null before the brand's payroll start date.
      */
     public function periodFor(Brand $brand, CarbonInterface|string $date): ?PaymentPeriod
+    {
+        $open = $this->openPeriod($brand);
+        $day = CarbonImmutable::parse($date)->toDateString();
+        if (! $open || $day < $brand->payroll_start_date->toDateString()) {
+            return null;
+        }
+
+        return PaymentPeriod::where('brand_id', $brand->id)
+            ->whereDate('period_start', '<=', $day)
+            ->whereDate('period_end', '>=', $day)
+            ->first() ?? $open;
+    }
+
+    /**
+     * The brand's running period, started on first use: from the payroll start date, or the day
+     * after the last period ended. Null without a payroll start date.
+     */
+    public function openPeriod(Brand $brand): ?PaymentPeriod
     {
         if (! $brand->payroll_start_date) {
             return null;
         }
 
-        $anchor = CarbonImmutable::parse($brand->payroll_start_date->toDateString());
-        $day = CarbonImmutable::parse($date)->startOfDay();
-        if ($day->lt($anchor)) {
-            return null;
-        }
-
-        $cycle = max(1, $brand->payment_cycle_days);
-        $start = $anchor->addDays(intdiv((int) floor($anchor->diffInDays($day)), $cycle) * $cycle);
-        $end = $start->addDays($cycle - 1);
-
-        $period = PaymentPeriod::where('brand_id', $brand->id)->whereDate('period_start', $start)->first();
-        if ($period) {
-            return $period;
+        $open = PaymentPeriod::where('brand_id', $brand->id)->whereNull('period_end')->first();
+        if ($open) {
+            return $open;
         }
 
         // Hours the brand couldn't absorb last period count toward this one
-        $previous = PaymentPeriod::where('brand_id', $brand->id)->whereDate('period_end', $start->subDay())->first();
+        $previous = PaymentPeriod::where('brand_id', $brand->id)->orderByDesc('period_end')->first();
 
         return PaymentPeriod::create([
             'brand_id' => $brand->id,
-            'period_start' => $start->toDateString(),
-            'period_end' => $end->toDateString(),
+            'period_start' => $previous
+                ? CarbonImmutable::parse($previous->period_end->toDateString())->addDay()->toDateString()
+                : $brand->payroll_start_date->toDateString(),
             'target_hours' => $brand->target_hours_per_period,
             'carried_in_hours' => $previous?->isLocked() ? $previous->carried_out_hours : 0,
-            'status' => $end->lt(today()) ? 'waiting_payment' : 'in_progress',
+            'status' => 'in_progress',
         ]);
     }
 
     /**
-     * Put an approved work session in its period, or the next open one if that period is already locked.
+     * Put an approved work session in its period, or the next open one if that period is already
+     * locked; the period closes if that reaches the target.
      */
     public function assign(WorkSession $session): void
     {
@@ -84,21 +99,93 @@ class PayrollService
         $period = $this->periodFor($brand, $session->session_date);
 
         while ($period?->isLocked()) {
-            $period = $this->periodFor($brand, CarbonImmutable::parse($period->period_end->toDateString())->addDay());
+            $period = $this->nextPeriod($period) ?? $this->openPeriod($brand);
         }
 
         if ($period) {
             $session->update(['payment_period_id' => $period->id]);
+            $this->closeIfTargetReached($period);
         }
     }
 
-    /** Sessions approved before the brand had a payroll start date. */
+    /** Sessions approved before the brand had a payroll start date, oldest first so periods fill in order. */
     public function assignUnassigned(Brand $brand): int
     {
-        $sessions = WorkSession::where('brand_id', $brand->id)->whereNull('payment_period_id')->with('brand')->get();
+        $sessions = WorkSession::where('brand_id', $brand->id)
+            ->whereNull('payment_period_id')
+            ->with('brand')
+            ->orderBy('session_date')
+            ->orderBy('start_at')
+            ->get();
         $sessions->each(fn (WorkSession $session) => $this->assign($session));
 
         return $sessions->count();
+    }
+
+    /**
+     * Close the running period once carried-in plus worked hours reach its target. It ends on the
+     * day of its last session; the next period starts the day after. The brand's leader is told to
+     * request payment.
+     */
+    public function closeIfTargetReached(PaymentPeriod $period): bool
+    {
+        if ($period->status !== 'in_progress') {
+            return false;
+        }
+
+        $summary = $this->breakdown($period)['summary'];
+        if ($summary['carried_in_hours'] + $summary['worked_hours'] < $period->target_hours) {
+            return false;
+        }
+
+        $lastSession = $period->workSessions()->max('session_date');
+        $this->close($period, $lastSession ? CarbonImmutable::parse($lastSession) : CarbonImmutable::today(), null);
+
+        return true;
+    }
+
+    /**
+     * Close a running period before its target, e.g. the brand stopped going live: it ends today
+     * and its hours can be billed as they are.
+     */
+    public function closeEarly(PaymentPeriod $period, User $by): PaymentPeriod
+    {
+        return DB::transaction(function () use ($period, $by) {
+            $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
+
+            if ($period->status !== 'in_progress') {
+                $this->fail('Periode ini sudah ditutup.');
+            }
+            if (! $this->hasHours($period)) {
+                $this->fail('Belum ada jam di periode ini.');
+            }
+
+            $lastSession = $period->workSessions()->max('session_date');
+            $this->close($period, max(CarbonImmutable::today(), CarbonImmutable::parse($lastSession ?? today())), $by);
+
+            return $period;
+        });
+    }
+
+    private function close(PaymentPeriod $period, CarbonImmutable $end, ?User $by): void
+    {
+        $period->update([
+            'period_end' => max($end, CarbonImmutable::parse($period->period_start->toDateString()))->toDateString(),
+            'status' => 'waiting_payment',
+            'closed_at' => now(),
+            'closed_by' => $by?->id,
+        ]);
+        $this->openPeriod($period->brand);
+
+        $period->loadMissing('brand');
+        $summary = $this->breakdown($period)['summary'];
+        $title = $by
+            ? "Periode {$period->brand->name} ditutup lebih awal"
+            : "Target {$period->target_hours} jam {$period->brand->name} tercapai";
+        $body = "{$this->dates($period)}: {$this->hours($summary['achieved_hours'])} jam bisa ditagihkan. Ajukan pembayaran ke brand.";
+
+        $this->notifier->toUsers($this->notifier->brandLeaders($period->brand_id), 'period_ready', $title, $body, '/host/pay', dm: true);
+        $this->notifier->toUsers($this->notifier->finance(), 'period_ready', $title, $body, '/finance/payroll');
     }
 
     /**
@@ -323,14 +410,16 @@ class PayrollService
 
     /**
      * Lock the period, snapshot host pay at today's rates, and ask the brand to pay.
+     * Done by the brand's leader host once the target is reached (admin/finance can too).
      */
     public function requestPayment(PaymentPeriod $period, User $by): PaymentRequest
     {
-        return DB::transaction(function () use ($period, $by) {
+        $request = DB::transaction(function () use ($period, $by) {
             $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
 
             if ($period->status === 'in_progress') {
-                $this->fail('Pembayaran baru bisa diajukan setelah periode berakhir.');
+                $summary = $this->breakdown($period)['summary'];
+                $this->fail("Target {$period->target_hours} jam belum tercapai (baru {$this->hours($summary['carried_in_hours'] + $summary['worked_hours'])} jam). Admin atau finance bisa menutup periode lebih awal kalau brand berhenti live.");
             }
             if ($period->isLocked()) {
                 $this->fail('Pembayaran untuk periode ini sudah diajukan.');
@@ -356,7 +445,7 @@ class PayrollService
 
             ['hosts' => $hosts, 'summary' => $summary] = $this->breakdown($period);
 
-            $next = $this->periodFor($period->brand, CarbonImmutable::parse($period->period_end->toDateString())->addDay());
+            $next = $this->nextPeriod($period) ?? $this->openPeriod($period->brand);
             if ($summary['carried_out_hours'] > 0 && $next?->isLocked()) {
                 $this->fail("Periode berikutnya ({$this->dates($next)}) sudah diajukan, jadi {$summary['carried_out_hours']} jam yang melewati target tidak bisa dibawa ke sana. Batalkan pengajuan periode itu dulu.");
             }
@@ -396,6 +485,22 @@ class PayrollService
                 'exported_report_url' => "/api/finance/payroll/periods/{$period->id}/export",
             ]);
         });
+
+        $period->refresh()->loadMissing('brand');
+        $this->notifier->toUsers(
+            $this->notifier->finance()->reject(fn (User $user) => $user->is($by)),
+            'payment_requested',
+            "Pembayaran {$period->brand->name} diajukan",
+            "{$by->name} mengajukan {$this->hours($period->achieved_hours)} jam untuk {$this->dates($period)}. Tandai lunas setelah brand membayar.",
+            '/finance/payroll',
+        );
+
+        // The hours carried over may already fill the next period
+        if ($next = $this->nextPeriod($period)) {
+            $this->closeIfTargetReached($next);
+        }
+
+        return $request;
     }
 
     /**
@@ -447,12 +552,16 @@ class PayrollService
             ->whereIn('status', ['submitted', 'flagged'])
             ->whereHas('attendance', fn ($q) => $q
                 ->whereDate('session_date', '>=', $period->period_start)
-                ->whereDate('session_date', '<=', $period->period_end))
+                ->whereDate('session_date', '<=', $period->period_end ?? today()))
             ->count();
     }
 
     public function nextPeriod(PaymentPeriod $period): ?PaymentPeriod
     {
+        if (! $period->period_end) {
+            return null;
+        }
+
         return PaymentPeriod::where('brand_id', $period->brand_id)
             ->whereDate('period_start', CarbonImmutable::parse($period->period_end->toDateString())->addDay())
             ->first();
@@ -471,10 +580,18 @@ class PayrollService
         return $period->carried_in_hours > 0 || $period->workSessions()->exists() || $period->adjustments()->exists();
     }
 
-    /** "1 Okt – 7 Okt 2026" */
+    /** "1 Okt – 7 Okt 2026", or "sejak 1 Okt 2026" while running */
     private function dates(PaymentPeriod $period): string
     {
-        return $period->period_start->translatedFormat('j M').' – '.$period->period_end->translatedFormat('j M Y');
+        return $period->period_end
+            ? $period->period_start->translatedFormat('j M').' – '.$period->period_end->translatedFormat('j M Y')
+            : 'sejak '.$period->period_start->translatedFormat('j M Y');
+    }
+
+    /** "12,5" */
+    private function hours(float $hours): string
+    {
+        return rtrim(rtrim(number_format($hours, 2, ',', '.'), '0'), ',');
     }
 
     /**
@@ -740,19 +857,16 @@ class PayrollService
     }
 
     /**
-     * Ended periods wait for payment; every brand with a payroll start date gets its current period.
+     * Every active brand with a payroll start date has a running period, closed if it already
+     * reached its target (e.g. after the target was lowered). Runs nightly as a safety net.
+     *
+     * @return int how many periods closed
      */
     public function rollPeriods(): int
     {
-        // One by one rather than a bulk update, so each change lands in the audit log
-        $ended = PaymentPeriod::where('status', 'in_progress')->whereDate('period_end', '<', today())->get();
-        $ended->each(fn (PaymentPeriod $period) => $period->update(['status' => 'waiting_payment']));
-        $closed = $ended->count();
-
-        Brand::whereNotNull('payroll_start_date')->where('status', 'active')->get()
-            ->each(fn (Brand $brand) => $this->periodFor($brand, today()));
-
-        return $closed;
+        return Brand::whereNotNull('payroll_start_date')->where('status', 'active')->get()
+            ->filter(fn (Brand $brand) => $this->closeIfTargetReached($this->openPeriod($brand)))
+            ->count();
     }
 
     /**
@@ -764,7 +878,7 @@ class PayrollService
         $summary = $this->breakdown($period)['summary'];
 
         fputcsv($out, ['Brand', $period->brand->name]);
-        fputcsv($out, ['Periode', $period->period_start->toDateString(), $period->period_end->toDateString()]);
+        fputcsv($out, ['Periode', $period->period_start->toDateString(), $period->period_end?->toDateString() ?? 'berjalan']);
         fputcsv($out, []);
         fputcsv($out, ['Tanggal', 'Host', 'Mulai', 'Selesai', 'Jam', 'Jenis']);
 

@@ -22,8 +22,12 @@ export interface PaymentPeriod {
   id: string;
   brand_id: string;
   period_start: string;
-  period_end: string;
+  /** Null while it runs: it ends when the target is reached or admin/finance closes it early */
+  period_end: string | null;
   status: PeriodStatus;
+  closed_at: string | null;
+  /** Set when closed early by hand; null when the target closed it */
+  closer?: { id: string; name: string } | null;
   locked_at: string | null;
   brand?: { id: string; name: string };
   /** The live request; cancelled ones only appear in the period's request history */
@@ -190,6 +194,9 @@ export const payrollApi = {
   addAdjustment: (token: string, periodId: string, data: { host_id: string; sessions_added: number; hours_added: number; notes: string }) =>
     post(`/finance/payroll/periods/${periodId}/adjustments`, token, data),
   removeAdjustment: (token: string, id: string) => del(`/finance/payroll/adjustments/${id}`, token),
+  /** Close a running period before its target (e.g. the brand stopped going live). */
+  closePeriod: (token: string, periodId: string) => post(`/finance/payroll/periods/${periodId}/close`, token),
+  /** On the PIC's behalf; normally the brand's leader host requests. */
   requestPayment: (token: string, periodId: string) => post(`/finance/payroll/periods/${periodId}/request`, token),
   cancelRequest: (token: string, periodId: string, reason: string) => post(`/finance/payroll/periods/${periodId}/cancel-request`, token, { reason }),
   markPaid: (token: string, periodId: string, reference: string | null) => post(`/finance/payroll/periods/${periodId}/paid`, token, { reference }),
@@ -210,7 +217,7 @@ export interface MyPay {
     period_id: string;
     brand: { id: string; name: string };
     period_start: string;
-    period_end: string;
+    period_end: string | null;
     status: PeriodStatus;
     session_count: number;
     carried_in_hours: number;
@@ -232,6 +239,8 @@ export interface MyPay {
     net_amount: number;
     generated_at: string;
   }[];
+  /** Periods of the brands I lead (as PIC), newest first; empty if I lead none. */
+  brand_periods: BrandPeriod[];
   advances: {
     id: string;
     type: CashAdvance["type"];
@@ -244,7 +253,29 @@ export interface MyPay {
   }[];
 }
 
+/** A period of a brand I lead: progress to its target and where payment stands. */
+export interface BrandPeriod {
+  id: string;
+  brand: { id: string; name: string };
+  period_start: string;
+  period_end: string | null;
+  status: PeriodStatus;
+  target_hours: number;
+  /** Carried in + worked; may pass the target (the rest carries to the next period) */
+  progress_hours: number;
+  /** Billable to the brand: capped at the target */
+  achieved_hours: number;
+  closed_early: boolean;
+  /** Block the request until 0 */
+  pending_reports: number;
+  pending_letters: number;
+  request: { requested_at: string; paid_at: string | null; requester: string | null } | null;
+}
+
 export const payApi = {
   mine: (token: string) => api<MyPay>("/host/pay", { token }),
   slip: (token: string, id: string) => api<{ slip: SlipDetail }>(`/host/pay/slips/${id}`, { token }),
+  /** As the brand's leader: request payment once the target is reached. */
+  requestPayment: (token: string, periodId: string) => post(`/host/pay/periods/${periodId}/request`, token),
+  exportUrl: (token: string, periodId: string) => apiFileUrl(`/host/pay/periods/${periodId}/export`, token),
 };

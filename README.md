@@ -105,7 +105,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 | `HostCalendar` | When a host or brand is busy (slots, covers, events), used to prevent clashes |
 | `PointService` | Points per 3-month period, violations, penalties, automatic SP1–SP3 |
 | `RatingService` | Monthly 1–5 host ratings and the suggested value |
-| `PayrollService` | Pay periods per brand, host pay, payment requests (blocked while reports await review; can be cancelled to reopen a period), salary slips, kasbon (installments, direct payback, rescheduling), CSV export |
+| `PayrollService` | Pay periods per brand (each runs until the brand's target hours, then the brand's leader requests payment), host pay, payment requests (blocked while reports await review; can be cancelled to reopen a period), salary slips, kasbon (installments, direct payback, rescheduling), CSV export |
 | `Notifier` / `DiscordClient` | Bell notifications, Discord channel posts and DMs, retries |
 | `TwoFactorService` / `Totp` | Two-factor sign-in for admin and finance, recovery codes |
 | `SettingsService` | Admin-editable rules layered over `config/vidhelp.php` |
@@ -119,7 +119,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 | `backups:auto-process` | every minute | approves the best applicant for requests about to start that nobody decided on |
 | `points:apply-penalties` | every 10 min | deducts points for late or missing sick letters |
 | `notifications:retry-discord` | every 5 min | resends failed Discord messages |
-| `payroll:roll-periods` | 00:05 | closes ended pay periods, opens new ones |
+| `payroll:roll-periods` | 00:05 | opens each brand's running pay period; closes it if its target is already reached (periods also close the moment a session reaches the target) |
 | `hosts:sync-rate-categories` | 00:10 | moves hosts up a rate level by tenure |
 | `model:prune` (audit log) | 01:00 | deletes audit rows older than the retention setting |
 

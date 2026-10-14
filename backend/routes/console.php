@@ -37,8 +37,8 @@ Schedule::command('points:apply-penalties')->everyTenMinutes();
 
 Artisan::command('payroll:roll-periods', function (PayrollService $payroll) {
     $closed = $payroll->rollPeriods();
-    $this->info("{$closed} ended period(s) now wait for payment.");
-})->purpose('Move ended payment periods to waiting_payment and open current periods');
+    $this->info("{$closed} period(s) reached their target and wait for payment.");
+})->purpose('Open each brand\'s running pay period and close it if its target is reached');
 
 Schedule::command('payroll:roll-periods')->dailyAt('00:05');
 

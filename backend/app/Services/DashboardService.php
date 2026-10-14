@@ -109,7 +109,7 @@ class DashboardService
     }
 
     /**
-     * Each active brand's current payment period: hours against target, reported GMV, estimated host pay.
+     * Each active brand's running payment period: hours against target, reported GMV, estimated host pay.
      *
      * @return list<array>
      */
@@ -119,7 +119,7 @@ class DashboardService
 
         return Brand::where('status', 'active')->orderBy('name')->get()
             ->map(function (Brand $brand) use ($gmvTracked) {
-                $period = $this->payroll->periodFor($brand, today());
+                $period = $this->payroll->openPeriod($brand);
                 if (! $period) {
                     return ['id' => $brand->id, 'name' => $brand->name, 'period' => null];
                 }
@@ -132,9 +132,9 @@ class DashboardService
                     'period' => [
                         'id' => $period->id,
                         'start' => $period->period_start->toDateString(),
-                        'end' => $period->period_end->toDateString(),
                         'status' => $period->status,
-                        'days_left' => (int) today()->diffInDays($period->period_end, false) + 1,
+                        // Hours still to go before the target closes it
+                        'hours_left' => max(0, round($period->target_hours - $summary['carried_in_hours'] - $summary['worked_hours'], 2)),
                     ],
                     ...$summary,
                     'gmv' => $gmvTracked ? $this->gmv($brand, $period) : null,
@@ -151,7 +151,7 @@ class DashboardService
             ->where('status', 'approved')
             ->whereHas('attendance', fn ($q) => $q->whereBetween('session_date', [
                 $period->period_start->toDateString(),
-                $period->period_end->toDateString(),
+                ($period->period_end ?? today())->toDateString(),
             ]))
             ->get(['metrics'])
             ->sum(fn (LiveReport $report) => (float) ($report->metrics['gmv'] ?? 0));

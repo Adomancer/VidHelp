@@ -10,6 +10,11 @@ export function formatDate(value: string): string {
   return new Date(value).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** "1 Okt 2026 – 28 Okt 2026", or "1 Okt 2026 – sekarang" while a pay period still runs. */
+export function formatPeriodDates(start: string, end: string | null): string {
+  return `${formatDate(start)} – ${end ? formatDate(end) : "sekarang"}`;
+}
+
 /** 13 → "1 yr 1 mo" */
 export function formatTenure(joinDate: string): string {
   const joined = new Date(joinDate);

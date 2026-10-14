@@ -23,9 +23,9 @@ export interface Brand {
   is_obs: boolean;
   /** What hosts assigned to the brand need to know (products, prices, talking points) */
   product_knowledge?: string | null;
+  /** A pay period runs until this many hours are reached; the brand's leader then requests payment */
   target_hours_per_period: number;
-  payment_cycle_days: number;
-  /** First day of the first payment period; later periods follow back to back */
+  /** First day of the first payment period; each next one starts the day after the last one ended */
   payroll_start_date?: string | null;
   status: "active" | "inactive";
 }

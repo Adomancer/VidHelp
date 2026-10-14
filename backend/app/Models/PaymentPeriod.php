@@ -11,13 +11,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * One payment cycle of a brand.
- * in_progress → (period ends) waiting_payment → (admin requests payment, locked) requested → paid.
- * Cancelling the request unlocks it again (requested → waiting_payment).
+ * One payment period of a brand: it runs (no end date yet) until the brand's target hours are reached
+ * or admin/finance closes it early, and the next one starts the day after it ends.
+ * in_progress → (target reached or closed) waiting_payment → (the brand's leader requests payment, locked)
+ * requested → paid. Cancelling the request unlocks it again (requested → waiting_payment).
  */
 #[Fillable([
     'brand_id', 'period_start', 'period_end', 'target_hours', 'worked_hours', 'host_paid_hours', 'achieved_hours',
-    'carried_in_hours', 'carried_out_hours', 'status', 'locked_at',
+    'carried_in_hours', 'carried_out_hours', 'status', 'closed_at', 'closed_by', 'locked_at',
 ])]
 class PaymentPeriod extends Model
 {
@@ -34,6 +35,7 @@ class PaymentPeriod extends Model
             'achieved_hours' => 'float',
             'carried_in_hours' => 'float',
             'carried_out_hours' => 'float',
+            'closed_at' => 'datetime',
             'locked_at' => 'datetime',
         ];
     }
@@ -46,6 +48,12 @@ class PaymentPeriod extends Model
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
+    }
+
+    /** Who closed it before the target was reached; null when the target closed it. */
+    public function closer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by');
     }
 
     public function workSessions(): HasMany

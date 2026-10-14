@@ -29,7 +29,6 @@ class AuditLogTest extends TestCase
         $brand = $this->actingAs($this->admin)->postJson('/api/admin/brands', [
             'name' => 'Glow Skincare',
             'target_hours_per_period' => 100,
-            'payment_cycle_days' => 14,
         ])->assertCreated()->json('brand.id');
 
         $this->actingAs($this->admin)->putJson("/api/admin/brands/{$brand}", ['target_hours_per_period' => 120])->assertOk();
@@ -96,7 +95,7 @@ class AuditLogTest extends TestCase
 
     public function test_admin_can_filter_the_log_and_others_cannot_see_it(): void
     {
-        Brand::create(['name' => 'Glow', 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
+        Brand::create(['name' => 'Glow', 'target_hours_per_period' => 100]);
         AuditLog::record('login', $this->admin, actor: $this->admin);
 
         $this->actingAs($this->admin)->getJson('/api/admin/audit-logs?action=login')

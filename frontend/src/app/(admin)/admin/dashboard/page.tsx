@@ -522,7 +522,7 @@ function BrandRow({ brand }: { brand: BrandProgress }) {
   const achieved = brand.achieved_hours ?? 0;
   const target = brand.target_hours ?? 0;
   const percent = target > 0 ? Math.min(100, (achieved / target) * 100) : 0;
-  const daysLeft = brand.period.days_left;
+  const hoursLeft = brand.period.hours_left;
   const carriedIn = brand.carried_in_hours ?? 0;
   const carriedOut = brand.carried_out_hours ?? 0;
 
@@ -539,8 +539,8 @@ function BrandRow({ brand }: { brand: BrandProgress }) {
         <span className="tabular-nums">
           {formatDuration(achieved)} / {formatDuration(target)} · {Math.round(percent)}%
         </span>
-        <span className="shrink-0" title={`${formatShortDate(brand.period.start)} – ${formatShortDate(brand.period.end)}`}>
-          {daysLeft > 0 ? `sisa ${daysLeft} hari` : "selesai"}
+        <span className="shrink-0" title={`Sejak ${formatShortDate(brand.period.start)}`}>
+          {hoursLeft > 0 ? `kurang ${formatDuration(hoursLeft)}` : "target tercapai"}
         </span>
       </div>
       {(brand.gmv != null || carriedIn > 0 || carriedOut > 0) && (

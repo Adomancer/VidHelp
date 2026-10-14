@@ -43,7 +43,7 @@ class AttendanceTest extends TestCase
         $this->admin = User::where('email', 'admin@vidhelp.com')->firstOrFail();
 
         $this->host = $this->newHost();
-        $brand = Brand::create(['name' => 'Brand A', 'target_hours_per_period' => 100, 'payment_cycle_days' => 14]);
+        $brand = Brand::create(['name' => 'Brand A', 'target_hours_per_period' => 100]);
         $assignment = HostBrandAssignment::create(['host_id' => $this->host->id, 'brand_id' => $brand->id, 'status' => 'active']);
         $this->slot = ScheduleSlot::create([
             'assignment_id' => $assignment->id, 'day_of_week' => 2,

@@ -14,6 +14,7 @@ flowchart TD
     H5["Request or cover<br/>a backup"]
     H6["Claim event blocks"]
     H7["Score, SP,<br/>salary slips"]
+    H8["Leader (brand PIC):<br/>request payment<br/>when target is reached"]
   end
   subgraph ADMIN["Admin"]
     A1["Approve sign-ups,<br/>create accounts"]
@@ -29,14 +30,14 @@ flowchart TD
     O6["Record violations"]
   end
   subgraph FIN["Finance"]
-    F1["Request payment<br/>per pay period"]
+    F1["Track pay periods,<br/>close one early"]
     F2["Mark paid →<br/>salary slips"]
     F3["Kasbon"]
   end
   subgraph AUTO["Automatic"]
     S1["Auto-approve<br/>reports"]
     S2["Auto-pick cover<br/>30 min before"]
-    S3["Close pay periods<br/>nightly"]
+    S3["Close a pay period<br/>when its target is reached"]
     S4["Point penalties,<br/>automatic SP"]
   end
   H1 --> A1 --> O1
@@ -96,8 +97,8 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-  A["Admin creates a brand:<br/>target hours, pay cycle, payroll start,<br/>product knowledge"] --> B["Operator assigns hosts,<br/>picks one leader"]
-  B --> C["Operator adds a weekly slot:<br/>host, day, time, from date<br/>sees each host's free times"]
+  A["Admin creates a brand:<br/>target hours per period, payroll start,<br/>product knowledge"] --> B["Operator assigns hosts,<br/>picks one leader"]
+  B --> C["Operator adds a weekly slot:<br/>host, one or more days (or every day),<br/>time, from date; sees each host's free times"]
   C --> D{"Clash? the brand already live then,<br/>or the host busy elsewhere"}
   D -->|Yes| C
   D -->|No| E["Slot saved<br/>can be undone within 10 min"]
@@ -213,12 +214,17 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A["Pay period per brand:<br/>from payroll start, every N days"] --> B["Approved hours collect;<br/>finance can add hour adjustments"]
-  B --> C["Period ends; nightly job sets<br/>Waiting for payment"]
+  A["Pay period per brand:<br/>starts on payroll start,<br/>runs until the target hours (e.g. 720)"] --> B["Approved hours collect;<br/>finance can add hour adjustments"]
+  B --> B2{"Carried-in + worked hours<br/>reach the target?"}
+  B2 -->|No| B3{"Brand stopped live?"}
+  B3 -->|No| B
+  B3 -->|Yes| B4["Admin/finance closes<br/>the period early"]
+  B4 --> C
+  B2 -->|Yes| C["Period ends on its last session's day;<br/>next period starts the day after;<br/>brand leader (PIC) and finance notified"]
   C --> D{"Reports waiting for review,<br/>sick letters still due, or the<br/>previous period not requested?"}
   D -->|Yes| E["Request blocked<br/>until resolved"]
   E --> D
-  D -->|No| F["Finance or admin requests payment:<br/>pay frozen at current rates;<br/>carried-in hours paid first, then this period's,<br/>up to the target (billed = paid);<br/>extra hours carry to next period,<br/>cut from every host by the same share"]
+  D -->|No| F["Brand leader (PIC) requests payment<br/>(finance can on their behalf):<br/>pay frozen at current rates;<br/>carried-in hours paid first, then this period's,<br/>up to the target (billed = paid);<br/>extra hours carry to next period,<br/>cut from every host by the same share"]
   F --> G{"Mistake found?"}
   G -->|Yes| H["Cancel the request with a reason:<br/>period reopens, carry-over undone"]
   H --> C

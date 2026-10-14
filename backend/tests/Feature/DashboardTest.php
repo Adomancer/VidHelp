@@ -40,7 +40,7 @@ class DashboardTest extends TestCase
 
         // Weekly periods from Thu 1 Oct: today is in 1-7 Oct
         $this->brand = Brand::create([
-            'name' => 'Glow', 'target_hours_per_period' => 10, 'payment_cycle_days' => 7, 'payroll_start_date' => '2026-10-01',
+            'name' => 'Glow', 'target_hours_per_period' => 10, 'payroll_start_date' => '2026-10-01',
         ]);
     }
 
@@ -113,7 +113,7 @@ class DashboardTest extends TestCase
 
         $brand = $response->json('brands.0');
         $this->assertSame('2026-10-01', $brand['period']['start']);
-        $this->assertSame(2, $brand['period']['days_left']); // 6 and 7 Oct
+        $this->assertEquals(8, $brand['period']['hours_left']); // 2 of 10 worked
         $this->assertEquals(2, $brand['worked_hours']);
         $this->assertEquals(10, $brand['target_hours']);
         $this->assertEquals(1500000, $brand['gmv']);
