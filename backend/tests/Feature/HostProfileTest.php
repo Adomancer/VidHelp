@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\HostProfile;
 use App\Models\HostRateCategory;
+use App\Models\ProfileChangeRequest;
+use App\Models\AppNotification;
 use App\Models\User;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
@@ -116,19 +118,99 @@ class HostProfileTest extends TestCase
         $this->assertSame('Baru', $profile->fresh()->rateCategory->name);
     }
 
-    public function test_host_updates_contact_numbers_but_not_join_date(): void
+    /** Approve the host's pending change as admin. */
+    private function approve(User $host): void
+    {
+        $id = $this->actingAs($this->admin)->getJson('/api/admin/profile-changes')->assertOk()->json('requests.0.id');
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$id}/approve")->assertOk();
+    }
+
+    public function test_host_personal_data_only_changes_once_an_admin_approves(): void
     {
         $host = $this->activeHost();
+        $oldName = $host->name;
 
         $this->actingAs($host)->putJson('/api/host/profile', [
             'name' => 'New Name',
             'phone' => '081234567890',
             'guardian_phone' => '6281200001111',
             'join_date' => '2020-01-01',
-        ])->assertOk()->assertJsonPath('host_profile.phone', '081234567890');
+        ])->assertOk()
+            ->assertJsonPath('host_profile.phone', null)
+            ->assertJsonPath('profile_change.status', 'pending')
+            ->assertJsonPath('profile_change.fields.0.label', 'Nama lengkap')
+            ->assertJsonPath('profile_change.fields.0.value', 'New Name');
+
+        $this->assertSame($oldName, $host->fresh()->name);
+        $this->assertNull($host->hostProfile->fresh()->phone);
+        $this->assertDatabaseHas(AppNotification::class, ['user_id' => $this->admin->id, 'type' => 'profile_change_requested']);
+
+        // Admin sees what is saved next to what was asked for
+        $this->actingAs($this->admin)->getJson('/api/admin/profile-changes')
+            ->assertOk()
+            ->assertJsonPath('pending_count', 1)
+            ->assertJsonPath('requests.0.fields.0.current', $oldName)
+            ->assertJsonPath('requests.0.fields.0.value', 'New Name');
+
+        $this->approve($host);
 
         $this->assertSame('New Name', $host->fresh()->name);
+        $this->assertSame('081234567890', $host->hostProfile->fresh()->phone);
         $this->assertTrue($host->hostProfile->fresh()->join_date->isToday());
+        $this->assertDatabaseHas(AppNotification::class, ['user_id' => $host->id, 'type' => 'profile_change_approved']);
+        $this->actingAs($host)->getJson('/api/host/profile')->assertJsonPath('profile_change.status', 'approved');
+    }
+
+    public function test_more_changes_join_the_pending_request_and_unchanged_values_are_left_out(): void
+    {
+        $host = $this->activeHost();
+
+        $this->actingAs($host)->putJson('/api/host/profile', ['name' => $host->name, 'phone' => '081234567890'])->assertOk();
+        $this->actingAs($host)->putJson('/api/host/profile/sensitive', ['bank_name' => 'BCA'])->assertOk();
+
+        $request = ProfileChangeRequest::sole();
+        $this->assertSame(['phone' => '081234567890', 'bank_name' => 'BCA'], $request->new_values);
+
+        // Asking for what is already saved is not a change
+        $other = $this->activeHost();
+        $this->actingAs($other)->putJson('/api/host/profile', ['name' => $other->name])->assertJsonValidationErrors('changes');
+    }
+
+    public function test_admin_rejects_with_a_reason_and_the_host_sees_it(): void
+    {
+        $host = $this->activeHost();
+        $this->actingAs($host)->putJson('/api/host/profile/sensitive', ['bank_name' => 'BCA', 'bank_account' => '1234567890'])->assertOk();
+        $id = ProfileChangeRequest::sole()->id;
+
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$id}/reject")->assertJsonValidationErrors('note');
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$id}/reject", ['note' => 'Rekening tidak sesuai nama'])->assertOk();
+
+        $this->assertNull($host->hostProfile->fresh()->sensitiveData);
+        $this->actingAs($host)->getJson('/api/host/profile')
+            ->assertJsonPath('profile_change.status', 'rejected')
+            ->assertJsonPath('profile_change.review_note', 'Rekening tidak sesuai nama');
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$id}/approve")->assertJsonValidationErrors('request');
+    }
+
+    public function test_host_can_cancel_only_their_own_pending_request(): void
+    {
+        $host = $this->activeHost();
+        $this->actingAs($host)->putJson('/api/host/profile', ['phone' => '081234567890'])->assertOk();
+        $id = ProfileChangeRequest::sole()->id;
+
+        $this->actingAs($this->activeHost())->postJson("/api/host/profile/changes/{$id}/cancel")->assertForbidden();
+        $this->actingAs($host)->postJson("/api/host/profile/changes/{$id}/cancel")->assertOk()->assertJsonPath('profile_change', null);
+
+        $this->assertSame('cancelled', ProfileChangeRequest::sole()->status);
+    }
+
+    public function test_only_admins_review_profile_changes(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operator');
+
+        $this->actingAs($operator)->getJson('/api/admin/profile-changes')->assertForbidden();
+        $this->actingAs($this->activeHost())->getJson('/api/admin/profile-changes')->assertForbidden();
     }
 
     public function test_contact_numbers_and_bank_details_are_digits_only(): void
@@ -152,6 +234,13 @@ class HostProfileTest extends TestCase
             'bank_account' => '1234567890',
             'account_holder_name' => 'Test Host',
         ])->assertOk()
+            ->assertJsonPath('profile_change.fields.0.value', '************0001');
+
+        // Waiting for approval, the numbers are encrypted too
+        $this->assertStringNotContainsString('3201234567890001', DB::table('profile_change_requests')->value('new_values'));
+
+        $this->approve($host);
+        $this->actingAs($host)->getJson('/api/host/profile')
             ->assertJsonPath('host_profile.sensitive_data.ktp_number_masked', '************0001')
             ->assertJsonPath('host_profile.sensitive_data.bank_account_masked', '******7890')
             ->assertJsonMissingPath('host_profile.sensitive_data.ktp_number');
@@ -177,21 +266,6 @@ class HostProfileTest extends TestCase
         $this->actingAs($operator)->getJson('/api/operator/hosts')
             ->assertOk()
             ->assertJsonMissingPath('data.0.sensitive_data');
-    }
-
-    public function test_ktp_image_goes_to_private_storage_and_only_admin_can_view(): void
-    {
-        Storage::fake('local');
-        $host = $this->activeHost();
-
-        $this->actingAs($host)->postJson('/api/host/profile/ktp-image', [
-            'ktp_image' => $this->png('ktp.png'),
-        ])->assertOk()->assertJsonPath('host_profile.sensitive_data.has_ktp_image', true);
-
-        $path = $host->hostProfile->sensitiveData->ktp_image_path;
-        Storage::disk('local')->assertExists($path);
-
-        $this->actingAs($this->admin)->get("/api/admin/hosts/{$host->hostProfile->id}/ktp-image")->assertOk();
     }
 
     public function test_profile_photo_upload_sets_avatar_url(): void

@@ -57,6 +57,9 @@ class AuditLogTest extends TestCase
         ])->assertOk();
         $this->actingAs($host)->putJson('/api/host/profile/sensitive', ['ktp_number' => '3201234567890001', 'bank_account' => '1234567890'])
             ->assertOk();
+        $change = \App\Models\ProfileChangeRequest::sole();
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$change->id}/approve")->assertOk();
+        $this->assertSame('[hidden]', AuditLog::where(['action' => 'create', 'target_table' => 'profile_change_requests'])->sole()->new_value['new_values']);
 
         $password = AuditLog::where(['action' => 'update', 'target_table' => 'users', 'target_id' => $host->id])->sole();
         $this->assertSame(['password' => '[hidden]'], $password->new_value);

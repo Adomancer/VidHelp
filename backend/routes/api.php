@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\HostController as AdminHostController;
 use App\Http\Controllers\Admin\PointAdminController;
+use App\Http\Controllers\Admin\ProfileChangeController;
 use App\Http\Controllers\Admin\RateCategoryController;
 use App\Http\Controllers\Admin\RatingController;
 use App\Http\Controllers\Admin\SettingsController as AdminSettingsController;
@@ -130,10 +131,14 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::put('/rate-categories/{rateCategory}', [RateCategoryController::class, 'update']);
         Route::delete('/rate-categories/{rateCategory}', [RateCategoryController::class, 'destroy']);
 
+        // Hosts' personal data changes, waiting for approval
+        Route::get('/profile-changes', [ProfileChangeController::class, 'index']);
+        Route::post('/profile-changes/{change}/approve', [ProfileChangeController::class, 'approve']);
+        Route::post('/profile-changes/{change}/reject', [ProfileChangeController::class, 'reject']);
+
         // Host details incl. KTP & bank (admin only)
         Route::get('/hosts/{host}', [AdminHostController::class, 'show']);
         Route::put('/hosts/{host}', [AdminHostController::class, 'update']);
-        Route::get('/hosts/{host}/ktp-image', [AdminHostController::class, 'ktpImage']);
 
         // Lock/unlock schedule slots
         Route::put('/schedules/{schedule}/lock', [ScheduleController::class, 'lock']);
@@ -287,7 +292,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::post('/profile/password', [ProfileController::class, 'changePassword']);
         Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
         Route::put('/profile/sensitive', [ProfileController::class, 'updateSensitive']);
-        Route::post('/profile/ktp-image', [ProfileController::class, 'uploadKtpImage']);
+        Route::post('/profile/changes/{change}/cancel', [ProfileController::class, 'cancelChange']);
 
         // My points, SPs and ratings (read-only)
         Route::get('/performance', [PerformanceController::class, 'index']);
