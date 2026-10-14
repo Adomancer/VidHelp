@@ -47,9 +47,10 @@ class RoleSeeder extends Seeder
             Permission::firstOrCreate(['name' => $permission]);
         }
 
-        // Create roles and assign permissions
+        // Create roles and assign permissions. Admin can do everything but change payroll
+        // and kasbon (it only sees them); finance can do everything admin can, plus those.
         $admin = Role::firstOrCreate(['name' => 'admin']);
-        $admin->givePermissionTo(Permission::all());
+        $admin->syncPermissions(Permission::where('name', '!=', 'manage-finance')->get());
 
         $operator = Role::firstOrCreate(['name' => 'operator']);
         $operator->givePermissionTo([
@@ -61,12 +62,8 @@ class RoleSeeder extends Seeder
             'manage-backup-hosts',
         ]);
 
-        // Payroll and kasbon only (no users, settings or schedules)
         $finance = Role::firstOrCreate(['name' => 'finance']);
-        $finance->givePermissionTo([
-            'view-finance',
-            'manage-finance',
-        ]);
+        $finance->syncPermissions(Permission::all());
 
         $host = Role::firstOrCreate(['name' => 'host']);
         $host->givePermissionTo([

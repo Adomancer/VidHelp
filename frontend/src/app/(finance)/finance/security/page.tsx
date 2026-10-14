@@ -1,13 +1,6 @@
-import PageHeader from "@/components/PageHeader";
-import PasswordForm from "@/components/PasswordForm";
-import TwoFactorSettings from "@/components/TwoFactorSettings";
+import { redirect } from "next/navigation";
 
-export default function FinanceSecurityPage() {
-  return (
-    <div className="max-w-3xl space-y-6">
-      <PageHeader title="Keamanan akun" description="Verifikasi dua langkah dan kata sandi untuk akunmu." />
-      <TwoFactorSettings />
-      <PasswordForm />
-    </div>
-  );
+/** Old link: finance now works in the admin panel. */
+export default function FinanceSecurityRedirect() {
+  redirect("/admin/security");
 }

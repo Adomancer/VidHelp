@@ -74,16 +74,16 @@ class Notifier
         $this->toChannel('admin', 'signup_pending', $title, $body, '/admin/users');
     }
 
-    /** Active admins. */
+    /** Active admins (finance included: it has every admin right). */
     public function admins(): Collection
     {
-        return User::role('admin')->where('status', 'active')->with('discordLink')->get();
+        return User::role(['admin', 'finance'])->where('status', 'active')->with('discordLink')->get();
     }
 
-    /** Active admins and operators. */
+    /** Active admins, finance and operators. */
     public function staff(): Collection
     {
-        return User::role(['admin', 'operator'])->where('status', 'active')->with('discordLink')->get();
+        return User::role(['admin', 'finance', 'operator'])->where('status', 'active')->with('discordLink')->get();
     }
 
     /**

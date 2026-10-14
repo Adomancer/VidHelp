@@ -96,10 +96,10 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
     /*
     |----------------------------------------------------------------------
-    | Admin Routes
+    | Admin Routes (finance has every admin right too)
     |----------------------------------------------------------------------
     */
-    Route::prefix('admin')->middleware('role:admin')->group(function () {
+    Route::prefix('admin')->middleware('role:admin|finance')->group(function () {
         Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 
         // User Management: create, approve, deactivate (temporary), archive (resigned), delete permanently
@@ -153,31 +153,36 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
     /*
     |----------------------------------------------------------------------
-    | Finance Routes (payroll and kasbon)
+    | Finance Routes (payroll and kasbon): admins may look, only finance may change
     |----------------------------------------------------------------------
     */
     Route::prefix('finance')->middleware('role:finance|admin')->group(function () {
         Route::get('/brands', [PayrollController::class, 'brands']);
         Route::get('/hosts', [PayrollController::class, 'hosts']);
 
-        // Payroll: periods per brand, adjustments, payment requests, salary slips
+        // Payroll: periods per brand, salary slips
         Route::get('/payroll/periods', [PayrollController::class, 'periods']);
         Route::get('/payroll/periods/{period}', [PayrollController::class, 'show']);
-        Route::post('/payroll/periods/{period}/adjustments', [PayrollController::class, 'storeAdjustment']);
-        Route::delete('/payroll/adjustments/{adjustment}', [PayrollController::class, 'destroyAdjustment']);
-        Route::post('/payroll/periods/{period}/request', [PayrollController::class, 'requestPayment']);
-        Route::post('/payroll/periods/{period}/cancel-request', [PayrollController::class, 'cancelRequest']);
-        Route::post('/payroll/periods/{period}/paid', [PayrollController::class, 'markPaid']);
         Route::get('/payroll/periods/{period}/export', [PayrollController::class, 'export']);
         Route::get('/payroll/slips/{slip}', [PayrollController::class, 'slip']);
 
         // Kasbon (cash advances)
         Route::get('/cash-advances', [CashAdvanceController::class, 'index']);
         Route::get('/cash-advances/limit/{host}', [CashAdvanceController::class, 'limit']);
-        Route::post('/cash-advances', [CashAdvanceController::class, 'store']);
-        Route::post('/cash-advances/{advance}/settle', [CashAdvanceController::class, 'settle']);
-        Route::post('/cash-advances/{advance}/reschedule', [CashAdvanceController::class, 'reschedule']);
-        Route::delete('/cash-advances/{advance}', [CashAdvanceController::class, 'destroy']);
+
+        Route::middleware('role:finance')->group(function () {
+            // Adjustments, payment requests, marking paid
+            Route::post('/payroll/periods/{period}/adjustments', [PayrollController::class, 'storeAdjustment']);
+            Route::delete('/payroll/adjustments/{adjustment}', [PayrollController::class, 'destroyAdjustment']);
+            Route::post('/payroll/periods/{period}/request', [PayrollController::class, 'requestPayment']);
+            Route::post('/payroll/periods/{period}/cancel-request', [PayrollController::class, 'cancelRequest']);
+            Route::post('/payroll/periods/{period}/paid', [PayrollController::class, 'markPaid']);
+
+            Route::post('/cash-advances', [CashAdvanceController::class, 'store']);
+            Route::post('/cash-advances/{advance}/settle', [CashAdvanceController::class, 'settle']);
+            Route::post('/cash-advances/{advance}/reschedule', [CashAdvanceController::class, 'reschedule']);
+            Route::delete('/cash-advances/{advance}', [CashAdvanceController::class, 'destroy']);
+        });
     });
 
     /*
@@ -185,7 +190,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
     | Operator Routes
     |----------------------------------------------------------------------
     */
-    Route::prefix('operator')->middleware('role:operator|admin')->group(function () {
+    Route::prefix('operator')->middleware('role:operator|admin|finance')->group(function () {
         Route::get('/dashboard', [OperatorDashboardController::class, 'index']);
 
         // Hosts & brand assignments
@@ -241,7 +246,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
     | Host Routes
     |----------------------------------------------------------------------
     */
-    Route::prefix('host')->middleware('role:host|operator|admin')->group(function () {
+    Route::prefix('host')->middleware('role:host|operator|admin|finance')->group(function () {
         // My Schedule (read-only)
         Route::get('/schedules', [MyScheduleController::class, 'index']);
         Route::get('/availability', [AvailabilityController::class, 'show']);

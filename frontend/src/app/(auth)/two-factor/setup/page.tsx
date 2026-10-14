@@ -6,7 +6,7 @@ import AuthCard from "@/components/AuthCard";
 import { RequireAuth, useAuth } from "@/components/AuthProvider";
 import TwoFactorSetup from "@/components/TwoFactorSetup";
 import { Button } from "@/components/ui/button";
-import { hasAnyRole, homePathFor } from "@/lib/auth";
+import { homePathFor } from "@/lib/auth";
 
 /** Admins and finance land here after sign-in until they have set up 2FA. */
 export default function TwoFactorSetupPage() {
@@ -30,7 +30,7 @@ function RequiredSetup() {
 
   // Opened by hand after 2FA is already on: nothing to do here
   useEffect(() => {
-    if (alreadyOn) router.replace(hasAnyRole(user, ["admin"]) ? "/admin/security" : "/finance/security");
+    if (alreadyOn) router.replace("/admin/security");
   }, [alreadyOn, router, user]);
 
   if (alreadyOn) return null;

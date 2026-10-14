@@ -1,13 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useParams } from "next/navigation";
-import { payrollApi } from "@/lib/api";
-import { useAuth } from "@/components/AuthProvider";
-import SlipPage from "@/components/SlipPage";
-
-export default function FinanceSlipPage() {
-  const { id } = useParams<{ id: string }>();
-  const { token } = useAuth();
-
-  return <SlipPage cacheKey={`slip-${id}`} load={() => payrollApi.slip(token, id)} back={{ href: "/finance/payroll", label: "Penggajian" }} />;
+/** Old link: finance now works in the admin panel. */
+export default async function FinanceSlipRedirect({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  redirect(`/admin/payroll/slips/${id}`);
 }
