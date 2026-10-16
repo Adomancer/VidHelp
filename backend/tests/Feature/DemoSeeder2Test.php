@@ -48,8 +48,8 @@ class DemoSeeder2Test extends TestCase
         $this->assertGreaterThan(0, PointLog::where('source', 'brand_complaint')->count());
         $this->assertGreaterThan(80, HostRating::count());
 
-        $this->assertSame(6, SpecialEvent::count());
-        $this->assertSame(1, SpecialEvent::where('status', 'cancelled')->count());
+        $this->assertSame(5, SpecialEvent::count());
+        $this->assertSame(0, SpecialEvent::where('status', 'cancelled')->count());
         $this->assertGreaterThan(0, Attendance::whereNotNull('event_claim_id')->count());
         $this->assertGreaterThan(0, EventSlotClaim::where('start_at', '>', now())->count());
 

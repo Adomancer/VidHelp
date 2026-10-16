@@ -1,15 +1,6 @@
 import BackupDesk from "@/components/BackupDesk";
-import PageHeader from "@/components/PageHeader";
-import BackupTimingNote from "@/components/BackupTimingNote";
 
+/** Header, counts, requests and the side panel (rules from Settings) all live in BackupDesk. */
 export default function AdminBackupsPage() {
-  return (
-    <div className="max-w-6xl space-y-6">
-      <PageHeader
-        title="Backup"
-        description={<BackupTimingNote />}
-      />
-      <BackupDesk />
-    </div>
-  );
+  return <BackupDesk />;
 }

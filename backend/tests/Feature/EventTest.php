@@ -258,15 +258,114 @@ class EventTest extends TestCase
         $this->assertSame(2, EventSlotClaim::active()->where('host_id', $this->regular->id)->count());
     }
 
-    public function test_cancelling_an_event_releases_every_block(): void
+    private function edit(SpecialEvent $event, array $changes)
+    {
+        return $this->actingAs($this->operator)->putJson("/api/operator/events/{$event->id}", $changes);
+    }
+
+    public function test_operator_edits_everything_but_the_brand(): void
+    {
+        $event = $this->event();
+
+        $this->edit($event, [
+            'brand_id' => $this->brandB->id,
+            'name' => 'PD 10.10 diperpanjang',
+            'start_date' => '2026-10-08',
+            'end_date' => '2026-10-11',
+            'daily_start_time' => '09:00',
+            'daily_end_time' => '21:00',
+            'block_minutes' => 180,
+            'open_full_schedule' => true,
+            'max_slots_per_host' => 4,
+        ])->assertOk()->assertJsonPath('event.name', 'PD 10.10 diperpanjang');
+
+        $event->refresh();
+        $this->assertSame($this->brandA->id, $event->brand_id);
+        $this->assertSame(['2026-10-08', '2026-10-11', '09:00', '21:00', 180, true, 4], [
+            $event->start_date->toDateString(), $event->end_date->toDateString(), $event->daily_start_time, $event->daily_end_time,
+            $event->block_minutes, $event->open_full_schedule, $event->max_slots_per_host,
+        ]);
+        $this->assertCount(16, $event->blocks()); // 4 days x 4 blocks of 3 hours
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->other->user->id, 'type' => 'event_updated']);
+    }
+
+    public function test_renaming_does_not_tell_the_hosts(): void
+    {
+        $event = $this->event();
+
+        $this->edit($event, ['name' => 'PD 10.10 (baru)', 'max_slots_per_host' => 3])->assertOk();
+
+        $this->assertDatabaseMissing('notifications', ['type' => 'event_updated']);
+    }
+
+    public function test_new_schedule_must_keep_every_held_block(): void
+    {
+        $event = $this->event();
+        $this->claim($this->other, $event, '2026-10-10 14:00')->assertCreated();
+
+        // Shorter blocks: 14:00-16:00 would become 14:00-15:00
+        $this->edit($event, ['block_minutes' => 60])->assertJsonValidationErrors('schedule');
+        // Dropping the Saturday
+        $this->edit($event, ['end_date' => '2026-10-09'])
+            ->assertJsonPath('errors.schedule.0', fn (string $message) => str_starts_with($message, '1 blok yang sudah diambil tidak ada di jadwal baru')
+                && str_contains($message, $this->other->user->name));
+        $this->assertSame('2026-10-10', $event->fresh()->end_date->toDateString());
+
+        // Keeping it: one more day, later close
+        $this->edit($event, ['end_date' => '2026-10-11', 'daily_end_time' => '18:00'])->assertOk();
+        $this->assertSame(1, EventSlotClaim::active()->count());
+    }
+
+    public function test_edited_schedule_is_checked(): void
+    {
+        $event = $this->event();
+        $this->event(['brand_id' => $this->brandA->id, 'name' => 'Double date', 'start_date' => '2026-10-12', 'end_date' => '2026-10-12']);
+
+        $this->edit($event, ['start_date' => '2026-10-04'])->assertJsonValidationErrors('start_date');
+        $this->edit($event, ['end_date' => '2026-10-08'])->assertJsonValidationErrors('end_date');
+        $this->edit($event, ['daily_end_time' => '10:00'])->assertJsonValidationErrors('daily_end_time');
+        $this->edit($event, ['block_minutes' => 0])->assertJsonValidationErrors('block_minutes');
+        $this->edit($event, ['end_date' => '2026-10-12'])->assertJsonValidationErrors('start_date'); // overlaps "Double date"
+    }
+
+    public function test_deleting_an_event_removes_its_blocks_and_tells_their_hosts(): void
     {
         $event = $this->event();
         $this->claim($this->other, $event, '2026-10-09 10:00')->assertCreated();
 
-        $this->actingAs($this->operator)->postJson("/api/operator/events/{$event->id}/cancel")->assertOk();
+        $this->actingAs($this->operator)->deleteJson("/api/operator/events/{$event->id}")->assertOk();
 
-        $this->assertSame(0, EventSlotClaim::active()->count());
-        $this->claim($this->regular, $event, '2026-10-09 12:00')->assertJsonPath('errors.start_at.0', 'Event ini sudah dibatalkan.');
+        $this->assertModelMissing($event);
+        $this->assertSame(0, EventSlotClaim::count());
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->other->user->id, 'type' => 'event_deleted']);
+        $this->assertDatabaseMissing('notifications', ['user_id' => $this->regular->user->id, 'type' => 'event_deleted']);
+        $this->actingAs($this->operator)->getJson('/api/operator/events')->assertJsonCount(0, 'events');
+    }
+
+    public function test_event_with_a_check_in_cannot_be_deleted(): void
+    {
+        $event = $this->event();
+        $claimId = $this->claim($this->other, $event, '2026-10-09 10:00')->json('claim.id');
+        $this->travelTo(CarbonImmutable::parse('2026-10-09 09:50'));
+        $this->actingAs($this->other->user)->postJson('/api/host/live/check-in', ['event_claim_id' => $claimId])->assertCreated();
+
+        $this->actingAs($this->operator)->deleteJson("/api/operator/events/{$event->id}")->assertJsonValidationErrors('event');
+        $this->assertModelExists($event);
+    }
+
+    public function test_only_managers_edit_or_delete_events(): void
+    {
+        $event = $this->event();
+
+        $this->actingAs($this->other->user)->putJson("/api/operator/events/{$event->id}", ['name' => 'x'])->assertForbidden();
+        $this->actingAs($this->other->user)->deleteJson("/api/operator/events/{$event->id}")->assertForbidden();
+    }
+
+    public function test_events_cancelled_before_are_left_out(): void
+    {
+        $this->event()->update(['status' => 'cancelled']);
+
+        $this->actingAs($this->operator)->getJson('/api/operator/events')->assertJsonCount(0, 'events');
     }
 
     public function test_host_sees_their_blocks_and_others(): void

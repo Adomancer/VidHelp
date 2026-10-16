@@ -185,6 +185,16 @@ class DiscordPreview
                 ->field('Tanggal', $start->translatedFormat('l, j F Y').' – '.$start->addDay()->translatedFormat('l, j F Y'), inline: false)
                 ->field('Jam harian', '10:00–22:00')->field('Panjang blok', '120 menit')->field('Maks per host', '2 blok')
                 ->link('/host/events', 'Ambil blok'),
+            Notice::make('event_updated', "Jadwal event berubah: PD 11.11 ({$brand})")
+                ->body("Sekarang {$start->translatedFormat('j M')} – {$start->addDay()->translatedFormat('j M')}, 10:00–23:00, blok 120 menit. Blok yang sudah kamu ambil tetap milikmu.")
+                ->brand($brand)
+                ->field('Tanggal', "{$start->translatedFormat('j M')} – {$start->addDay()->translatedFormat('j M')}")
+                ->field('Jam harian', '10:00–23:00')->field('Panjang blok', '120 menit')
+                ->link('/host/events', 'Lihat blok'),
+            Notice::make('event_deleted', "Event dihapus: PD 11.11 ({$brand})")
+                ->body('Event ini dihapus admin, jadi blok yang kamu ambil di event ini ikut dilepas.')
+                ->brand($brand)
+                ->link('/host/events', 'Lihat event lain'),
 
             Notice::make('period_ready', "Target 100 jam {$brand} tercapai")
                 ->body("{$period}: 100 jam bisa ditagihkan. Ajukan pembayaran ke brand.")
