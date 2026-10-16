@@ -21,6 +21,7 @@ use App\Http\Controllers\Finance\PayrollController;
 use App\Http\Controllers\Host\AvailabilityController;
 use App\Http\Controllers\Host\BackupController as HostBackupController;
 use App\Http\Controllers\Host\BrandController as HostBrandController;
+use App\Http\Controllers\Host\DashboardController as HostDashboardController;
 use App\Http\Controllers\Host\EventController as HostEventController;
 use App\Http\Controllers\Host\LiveController;
 use App\Http\Controllers\Host\MyScheduleController;
@@ -264,6 +265,9 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
     |----------------------------------------------------------------------
     */
     Route::prefix('host')->middleware('role:host|operator|admin|finance')->group(function () {
+        // My overview: next session, to-dos, pay and score
+        Route::get('/dashboard', [HostDashboardController::class, 'index']);
+
         // My Schedule (read-only)
         Route::get('/schedules', [MyScheduleController::class, 'index']);
         Route::get('/availability', [AvailabilityController::class, 'show']);

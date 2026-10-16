@@ -18,16 +18,17 @@ interface TabItem {
   icon: NavIconName;
 }
 
-/** Always one tap away: the things with a time limit. */
+/** Always one tap away: the overview and the things with a time limit (the dashboard shows open backups). */
 const tabs: TabItem[] = [
+  { href: "/host/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/host/live", label: "Live", icon: "live" },
   { href: "/host/schedule", label: "Jadwal", icon: "calendar" },
   { href: "/host/events", label: "Event", icon: "event" },
-  { href: "/host/backups", label: "Backup", icon: "backup" },
 ];
 
 /** In the "Lainnya" sheet. */
 const more: (TabItem & { description: string })[] = [
+  { href: "/host/backups", label: "Backup", icon: "backup", description: "Minta pengganti atau gantikan host lain" },
   { href: "/host/pay", label: "Gaji", icon: "payroll", description: "Perkiraan, slip dan kasbon" },
   { href: "/host/rating", label: "Skor", icon: "rating", description: "Poin, SP dan rating" },
   { href: "/host/brands", label: "Brand", icon: "brand", description: "Product knowledge" },

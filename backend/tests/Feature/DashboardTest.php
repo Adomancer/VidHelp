@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Models\Attendance;
 use App\Models\BackupRequest;
 use App\Models\Brand;
+use App\Models\DiscordLink;
 use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
 use App\Models\HostRateCategory;
+use App\Models\HostRating;
 use App\Models\LiveReport;
+use App\Models\PaymentPeriod;
 use App\Models\ScheduleSlot;
 use App\Models\User;
 use App\Models\WorkSession;
@@ -152,11 +155,158 @@ class DashboardTest extends TestCase
             ->assertJsonPath('people.active_hosts', 1);
     }
 
+    public function test_backups_lists_upcoming_requests_without_a_cover_soonest_first(): void
+    {
+        [$host, $slot] = $this->hostWithSlot('08:00', '10:00');
+        [$cover] = $this->hostWithSlot('19:00', '21:00');
+        $backup = fn (string $date, string $status, string $reason = 'permit') => BackupRequest::create([
+            'slot_id' => $slot->id, 'brand_id' => $this->brand->id, 'requesting_host_id' => $host->id, 'created_by' => $host->user_id,
+            'backup_date' => $date, 'start_at' => "{$date} 08:00", 'end_at' => "{$date} 10:00",
+            'reason_type' => $reason, 'status' => $status,
+            'auto_open_at' => '2026-10-06 15:30', 'auto_fill_at' => "{$date} 07:30",
+        ]);
+        $later = $backup('2026-10-13', 'pending', 'sick');
+        $later->applications()->create(['applicant_host_id' => $cover->id, 'status' => 'applied']);
+        $backup('2026-10-08', 'open');
+        $backup('2026-10-09', 'filled');
+        $backup('2026-10-05', 'open'); // already over
+
+        $backups = $this->actingAs($this->admin)->getJson('/api/admin/dashboard')->assertOk()->json('backups');
+
+        $this->assertSame(['open', 'pending'], array_column($backups, 'status'));
+        $this->assertSame([0, 1], array_column($backups, 'applicants_count'));
+        $this->assertSame('sick', $backups[1]['reason_type']);
+        $this->assertSame($host->user->name, $backups[1]['requester_name']);
+        $this->assertSame('Glow', $backups[1]['brand']['name']);
+    }
+
     public function test_only_admins_see_the_admin_dashboard(): void
     {
         $operator = User::factory()->create();
         $operator->assignRole('operator');
 
         $this->actingAs($operator)->getJson('/api/admin/dashboard')->assertForbidden();
+    }
+
+    /** A backup request for the host's slot on `$date`, at the slot's times. */
+    private function backupFor(HostProfile $host, ScheduleSlot $slot, string $date, array $attributes): BackupRequest
+    {
+        return BackupRequest::create([
+            'slot_id' => $slot->id, 'brand_id' => $this->brand->id, 'requesting_host_id' => $host->id, 'created_by' => $host->user_id,
+            'backup_date' => $date, 'start_at' => "{$date} {$slot->start_time}", 'end_at' => "{$date} {$slot->end_time}",
+            'reason_type' => 'permit', 'status' => 'open',
+            'auto_open_at' => '2026-10-06 15:30', 'auto_fill_at' => "{$date} 07:30",
+            ...$attributes,
+        ]);
+    }
+
+    /** Another weekly slot on the host's assignment, on Tuesdays like the first. */
+    private function extraSlot(ScheduleSlot $slot, string $start, string $end): ScheduleSlot
+    {
+        return ScheduleSlot::create([
+            'assignment_id' => $slot->assignment_id, 'day_of_week' => 2,
+            'start_time' => $start, 'end_time' => $end, 'effective_from' => '2026-09-01',
+        ]);
+    }
+
+    public function test_host_dashboard_lists_my_sessions_this_week_with_their_state(): void
+    {
+        [$host, $slot] = $this->hostWithSlot('14:00', '16:00');
+        [$other] = $this->hostWithSlot('08:00', '10:00');
+        $evening = $this->extraSlot($slot, '19:00', '21:00');
+        $this->backupFor($host, $evening, self::TUESDAY, ['status' => 'filled', 'filled_by_host_id' => $other->id]);
+        $this->attend($host, $slot, '13:58');
+
+        $sessions = $this->actingAs($host->user)->getJson('/api/host/dashboard')->assertOk()->json('sessions');
+
+        // Next Tuesday is past the 7 days shown, and the other host's slot is not mine
+        $this->assertSame(['own', 'off'], array_column($sessions, 'role'));
+        $this->assertSame(['live', null], array_column($sessions, 'state'));
+        $this->assertSame($other->user->name, $sessions[1]['covered_by']);
+    }
+
+    public function test_host_dashboard_counts_what_i_still_have_to_do(): void
+    {
+        [$host, $slot] = $this->hostWithSlot('08:00', '10:00');
+        $this->attend($host, $slot, '08:00', '10:00'); // over, no report yet
+        $this->attend($host, $this->extraSlot($slot, '14:00', '16:00'), '14:00'); // still live
+        $this->backupFor($host, $slot, '2026-10-13', ['reason_type' => 'sick']); // letter due, no cover yet
+        $this->backupFor($host, $slot, '2026-10-20', ['status' => 'pending']); // applicants waiting
+        $this->backupFor($host, $slot, '2026-10-05', ['reason_type' => 'sick', 'status' => 'filled']); // letter 24 hours late
+        $this->backupFor($host, $slot, '2026-10-27', ['reason_type' => 'sick', 'status' => 'cancelled']);
+        HostBrandAssignment::where('host_id', $host->id)->update(['is_leader' => true]);
+        PaymentPeriod::create([
+            'brand_id' => $this->brand->id, 'period_start' => '2026-10-01', 'period_end' => '2026-10-05',
+            'target_hours' => 10, 'status' => 'waiting_payment',
+        ]);
+
+        $this->actingAs($host->user)->getJson('/api/host/dashboard')
+            ->assertOk()
+            ->assertJsonPath('attention', ['reports_to_send' => 1, 'sick_letters_due' => 1, 'backups_uncovered' => 2, 'periods_to_request' => 1]);
+    }
+
+    public function test_host_dashboard_counts_backups_i_could_still_take(): void
+    {
+        [$host] = $this->hostWithSlot('08:00', '10:00');
+        [$requester, $slot] = $this->hostWithSlot('19:00', '21:00');
+        $this->backupFor($requester, $slot, '2026-10-08', []);
+        $this->backupFor($requester, $slot, '2026-10-09', ['request_type' => 'direct'])->nominees()->create(['nominee_host_id' => $host->id]);
+        $this->backupFor($requester, $slot, '2026-10-10', ['request_type' => 'direct']); // asks someone else
+        $this->backupFor($requester, $slot, '2026-10-11', [])->applications()->create(['applicant_host_id' => $host->id, 'status' => 'applied']);
+
+        $this->actingAs($host->user)->getJson('/api/host/dashboard')
+            ->assertOk()
+            ->assertJsonPath('cover_chances', ['count' => 2, 'asked_me' => 1]);
+    }
+
+    public function test_host_dashboard_shows_my_pay_points_rating_and_hours(): void
+    {
+        [$host, $slot] = $this->hostWithSlot('08:00', '10:00');
+        [$other, $otherSlot] = $this->hostWithSlot('10:00', '13:00');
+        $this->approvedSession($this->attend($host, $slot, '08:00', '10:00'), 2, 0);
+        $this->approvedSession($this->attend($other, $otherSlot, '10:00', '13:00'), 3, 0);
+        HostRating::create(['host_id' => $host->id, 'month_year' => '2026-08', 'rating' => 3]);
+        HostRating::create(['host_id' => $host->id, 'month_year' => '2026-09', 'rating' => 4.5]);
+
+        $response = $this->actingAs($host->user)->getJson('/api/host/dashboard')->assertOk();
+
+        $period = $response->json('pay.periods.0');
+        $this->assertEquals(2, $period['hours']);
+        $this->assertEquals(40000, $period['estimate']);
+        $this->assertEquals(5, $period['brand_hours']); // both hosts count toward the target
+        $this->assertEquals(10, $period['target_hours']);
+
+        $this->assertSame(['points' => 100, 'opening_points' => 100, 'sp_level' => 0, 'period' => ['start' => '2026-10-01', 'end' => '2026-12-31']], $response->json('points'));
+        $this->assertSame(['month_year' => '2026-09', 'rating' => 4.5], $response->json('rating'));
+
+        $days = $response->json('hours_by_day');
+        $this->assertEquals(['date' => self::TUESDAY, 'hours' => 2], end($days)); // mine only
+    }
+
+    public function test_host_dashboard_asks_to_connect_discord_while_unlinked(): void
+    {
+        [$host] = $this->hostWithSlot('08:00', '10:00');
+        config(['services.discord.client_id' => 'client', 'services.discord.client_secret' => 'secret', 'services.discord.bot_token' => 'token']);
+
+        $this->actingAs($host->user)->getJson('/api/host/dashboard')->assertOk()->assertJsonPath('discord_unlinked', true);
+    }
+
+    public function test_host_dashboard_does_not_ask_for_discord_once_linked(): void
+    {
+        [$host] = $this->hostWithSlot('08:00', '10:00');
+        config(['services.discord.client_id' => 'client', 'services.discord.client_secret' => 'secret', 'services.discord.bot_token' => 'token']);
+        DiscordLink::create(['user_id' => $host->user_id, 'discord_user_id' => '123', 'discord_username' => 'sari', 'linked_at' => now()]);
+
+        $this->actingAs($host->user)->getJson('/api/host/dashboard')->assertOk()->assertJsonPath('discord_unlinked', false);
+    }
+
+    public function test_host_dashboard_returns_404_without_a_host_profile(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operator');
+
+        $this->actingAs($operator)->getJson('/api/host/dashboard')
+            ->assertNotFound()
+            ->assertJsonPath('message', 'Kamu tidak punya profil host.');
     }
 }

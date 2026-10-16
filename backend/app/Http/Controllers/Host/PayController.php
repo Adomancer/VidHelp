@@ -6,11 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Brand;
 use App\Models\CashAdvance;
 use App\Models\HostProfile;
-use App\Models\HourAdjustment;
-use App\Models\PaymentItem;
 use App\Models\PaymentPeriod;
 use App\Models\SalarySlip;
-use App\Models\WorkSession;
 use App\Services\PayrollReport;
 use App\Services\PayrollService;
 use Illuminate\Http\JsonResponse;
@@ -19,9 +16,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PayController extends Controller
 {
-    public function __construct(private PayrollService $payroll)
-    {
-    }
+    public function __construct(private PayrollService $payroll) {}
 
     /**
      * Pay so far in open periods (estimate at today's rate), my salary slips and my kasbon.
@@ -31,43 +26,8 @@ class PayController extends Controller
     {
         $host = $this->host($request);
 
-        // Periods I worked in, and the ones my hours over a target carried into
-        $periodIds = WorkSession::where('host_id', $host->id)->whereNotNull('payment_period_id')->pluck('payment_period_id')
-            ->merge(HourAdjustment::where('host_id', $host->id)->pluck('payment_period_id'))
-            ->merge(PaymentItem::where('host_id', $host->id)->where('carried_out_hours', '>', 0)->with('period')->get()
-                ->map(fn (PaymentItem $item) => $this->payroll->nextPeriod($item->period)?->id)
-                ->filter())
-            ->unique();
-
-        $current = PaymentPeriod::with('brand:id,name')
-            ->whereIn('id', $periodIds)
-            ->whereIn('status', ['in_progress', 'waiting_payment'])
-            ->orderBy('period_start')
-            ->get()
-            ->map(function (PaymentPeriod $period) use ($host) {
-                $row = $this->payroll->breakdown($period)['hosts']->firstWhere('host_id', $host->id);
-
-                return $row ? [
-                    'period_id' => $period->id,
-                    'brand' => $period->brand->only('id', 'name'),
-                    'period_start' => $period->period_start->toDateString(),
-                    'period_end' => $period->period_end?->toDateString(),
-                    'status' => $period->status,
-                    'session_count' => $row['session_count'],
-                    'carried_in_hours' => $row['carried_in_hours'],
-                    'worked_hours' => $row['worked_hours'],
-                    'hours' => $row['hours'],
-                    'carried_out_hours' => $row['carried_out_hours'],
-                    'rate_per_hour' => $row['rate_per_hour'],
-                    'estimate' => $row['amount'],
-                    'host_paid' => $row['host_paid'],
-                ] : null;
-            })
-            ->filter()
-            ->values();
-
         return response()->json([
-            'current' => $current,
+            'current' => $this->payroll->hostOpenPeriods($host),
             'brand_periods' => $this->brandPeriods($host),
             'slips' => SalarySlip::where('host_id', $host->id)
                 ->with('period.brand:id,name')

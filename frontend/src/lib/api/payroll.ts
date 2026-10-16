@@ -242,6 +242,9 @@ export interface MyPay {
     period_start: string;
     period_end: string | null;
     status: PeriodStatus;
+    target_hours: number;
+    /** Everyone's hours toward the target so far (carried in + worked); the period closes once it's reached */
+    brand_hours: number;
     session_count: number;
     carried_in_hours: number;
     worked_hours: number;

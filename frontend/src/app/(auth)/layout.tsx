@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { CalendarDays, Radio, Wallet } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -59,6 +60,14 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <ThemeToggle />
         </div>
         <div className="flex flex-1 items-center justify-center px-5 pb-12 sm:px-8">{children}</div>
+        <nav className="flex justify-center gap-5 pb-6 text-xs text-muted-foreground">
+          <Link href="/terms" className="hover:text-foreground">
+            Ketentuan Layanan
+          </Link>
+          <Link href="/privacy" className="hover:text-foreground">
+            Kebijakan Privasi
+          </Link>
+        </nav>
       </main>
     </div>
   );

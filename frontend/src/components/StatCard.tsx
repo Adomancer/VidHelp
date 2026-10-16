@@ -21,25 +21,27 @@ interface StatCardProps {
   tone?: Tone;
   /** The whole card opens this page. */
   href?: string;
+  /** Tighter padding and a smaller number, for a strip of many cards. */
+  compact?: boolean;
   className?: string;
 }
 
 /** A headline number with its label, an icon and a line of context. */
-export default function StatCard({ icon: Icon, label, value, note, tone = "neutral", href, className }: StatCardProps) {
+export default function StatCard({ icon: Icon, label, value, note, tone = "neutral", href, compact = false, className }: StatCardProps) {
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", iconTones[tone])}>
-          <Icon className="size-4" aria-hidden="true" />
+        <p className={cn("text-muted-foreground", compact ? "truncate text-xs" : "text-sm")}>{label}</p>
+        <span className={cn("flex shrink-0 items-center justify-center rounded-lg", compact ? "size-7" : "size-8", iconTones[tone])}>
+          <Icon className={compact ? "size-3.5" : "size-4"} aria-hidden="true" />
         </span>
       </div>
-      <div className="mt-1.5 truncate text-2xl font-semibold tracking-tight text-foreground tabular-nums">{value}</div>
-      {note && <div className="mt-auto line-clamp-2 pt-1.5 text-xs text-muted-foreground">{note}</div>}
+      <div className={cn("truncate font-semibold tracking-tight text-foreground tabular-nums", compact ? "-mt-1 text-xl" : "mt-1.5 text-2xl")}>{value}</div>
+      {note && <div className={cn("mt-auto text-xs text-muted-foreground", compact ? "truncate pt-1" : "line-clamp-2 pt-1.5")}>{note}</div>}
     </>
   );
 
-  const classes = cn("flex min-w-0 flex-col rounded-xl border border-border bg-card p-5 shadow-xs dark:shadow-none", className);
+  const classes = cn("flex min-w-0 flex-col rounded-xl border border-border bg-card shadow-xs dark:shadow-none", compact ? "px-4 py-3" : "p-5", className);
 
   if (href) {
     return (

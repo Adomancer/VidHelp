@@ -121,6 +121,22 @@ export function formatDuration(hours: number): string {
   return m === 0 ? `${h} jam` : `${h} jam ${m} menit`;
 }
 
+/** 12.5 → "12j 30m": short enough for a headline number. */
+export function compactHours(hours: number): string {
+  const total = Math.round(hours * 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}j` : `${h}j ${m}m`;
+}
+
+const compactNumber = new Intl.NumberFormat("id-ID", { notation: "compact", maximumFractionDigits: 1 });
+
+/** 12_345_678 → "Rp 12,3 jt": short enough for a headline number. */
+export function compactRupiah(value: number): string {
+  return `Rp ${compactNumber.format(value)}`;
+}
+
 const relative = new Intl.RelativeTimeFormat("id-ID", { numeric: "auto" });
 
 /** "baru saja", "5 menit yang lalu", "kemarin"; older than a week falls back to the date. */

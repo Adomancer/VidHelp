@@ -11,7 +11,7 @@ class DashboardController extends Controller
     public function __construct(private DashboardService $dashboard) {}
 
     /**
-     * Admin overview: what needs attention, today's sessions, brand progress, recent hours, people.
+     * Admin overview: what needs attention, today's sessions, backups without a cover, brand progress, recent hours, people.
      */
     public function index(): JsonResponse
     {

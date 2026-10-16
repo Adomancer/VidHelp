@@ -57,7 +57,7 @@ export function homePathFor(user: AuthUser): string {
   if (user.two_factor_setup_required) return TWO_FACTOR_SETUP_PATH;
   if (hasAnyRole(user, ["admin", "finance"])) return "/admin/dashboard";
   if (hasAnyRole(user, ["operator"])) return "/operator/dashboard";
-  return "/host/live";
+  return "/host/dashboard";
 }
 
 /*

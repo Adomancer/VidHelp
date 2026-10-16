@@ -149,7 +149,7 @@ class UserManagementController extends Controller
             $notifier->toUsers($user, Notice::make('account_approved', 'Akunmu sudah disetujui')
                 ->body('Selamat datang di VidHelp! Kamu sudah bisa masuk.')
                 ->field('Disetujui oleh', $request->user()->name)
-                ->link('/host/live', 'Mulai'), dm: true);
+                ->link('/host/dashboard', 'Mulai'), dm: true);
         }
 
         return response()->json(['message' => 'Pengguna diaktifkan']);

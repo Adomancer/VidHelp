@@ -91,7 +91,7 @@ class DiscordPreview
             Notice::make('account_approved', 'Akunmu sudah disetujui')
                 ->body('Selamat datang di VidHelp! Kamu sudah bisa masuk.')
                 ->field('Disetujui oleh', 'Admin')
-                ->link('/host/live', 'Mulai'),
+                ->link('/host/dashboard', 'Mulai'),
 
             Notice::make('profile_change_requested', "Perubahan data: {$requester}")
                 ->body('No. HP, Nomor rekening. Setujui atau tolak di halaman Host.')

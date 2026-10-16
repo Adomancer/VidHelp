@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowLeftRight, Clock, Inbox, LifeBuoy, Plus, Upload } from "lucide-react";
+import { parseAsStringLiteral, useQueryState } from "nuqs";
 import {
   errorMessage,
   hostBackupApi,
@@ -39,12 +40,13 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type Tab = "needs" | "mine";
+const TABS = ["needs", "mine"] as const;
 type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
 
 export default function HostBackupsPage() {
   const { token } = useAuth();
-  const [tab, setTab] = useState<Tab>("needs");
+  // The tab lives in the URL, so the dashboard can link straight to my requests (?tab=mine)
+  const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(TABS).withDefault("needs"));
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
@@ -81,7 +83,7 @@ export default function HostBackupsPage() {
       {error && <FormAlert tone="error">{error}</FormAlert>}
       {(mine.error || needs.error) && <ErrorState message={(mine.error ?? needs.error)!} onRetry={() => (mine.reload(), needs.reload())} />}
 
-      <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)} className="gap-5">
+      <Tabs value={tab} onValueChange={(value) => void setTab(value as (typeof TABS)[number])} className="gap-5">
         <TabsList className="h-10 w-full sm:w-fit">
           <TabsTrigger value="needs" className="px-3">
             Butuh pengganti
@@ -105,7 +107,7 @@ export default function HostBackupsPage() {
         <RequestForm
           onDone={(message) => {
             setFormOpen(false);
-            setTab("mine");
+            void setTab("mine");
             notify({ text: message });
             mine.reload();
           }}

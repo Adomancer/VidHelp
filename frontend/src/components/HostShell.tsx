@@ -19,6 +19,7 @@ const links: SidebarGroup[] = [
   {
     group: "Hari ini",
     items: [
+      { href: "/host/dashboard", label: "Dashboard", icon: "dashboard" },
       { href: "/host/live", label: "Live", icon: "live" },
       { href: "/host/schedule", label: "Jadwal", icon: "calendar" },
     ],
@@ -50,7 +51,7 @@ export default function HostShell({ children }: { children: React.ReactNode }) {
   return (
     <AppShell
       panel="Host"
-      homeHref="/host/live"
+      homeHref="/host/dashboard"
       links={links}
       badges={{ "/host/events": claimable }}
       sidebarExtra={isHost ? <NextSession /> : undefined}

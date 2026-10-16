@@ -1,8 +1,11 @@
-/** Admin: accounts, the audit log, business-rule settings, and the admin and operator dashboards. */
+/** Admin: accounts, the audit log, business-rule settings, and the admin, operator and host dashboards. */
 
 import { api, type Message, type Paginated, post, put, query } from "./client";
 import type { UserStatus, RoleName, AuthUser } from "./auth";
-import type { PeriodStatus } from "./payroll";
+import type { BackupReason, BackupRequestType, BackupStatus } from "./backups";
+import type { LiveSession } from "./live";
+import type { MyPay, PeriodStatus } from "./payroll";
+import type { PointsPeriod } from "./points";
 
 /** Why an account may be deleted permanently. */
 export type EraseReason = "banned" | "host_request";
@@ -137,6 +140,22 @@ export interface BrandProgress {
   gmv?: number | null;
 }
 
+/** An upcoming backup still without a cover. */
+export interface DashboardBackup {
+  id: string;
+  brand: { id: string; name: string };
+  requester_name: string;
+  reason_type: BackupReason;
+  request_type: BackupRequestType;
+  start_at: string;
+  end_at: string;
+  status: Extract<BackupStatus, "open" | "pending">;
+  /** Applicants waiting on a decision */
+  applicants_count: number;
+  /** When the best applicant is picked automatically */
+  auto_fill_at: string | null;
+}
+
 export interface AdminDashboard {
   attention: {
     pending_signups: number;
@@ -148,6 +167,8 @@ export interface AdminDashboard {
     periods_awaiting_brand: number;
   };
   today: { sessions: TodaySession[]; counts: Partial<Record<SessionState, number>> };
+  /** Soonest first, capped; the backup desk has the rest. */
+  backups: DashboardBackup[];
   brands: BrandProgress[];
   hours_by_day: { date: string; hours: number }[];
   people: { active_hosts: number; operators: number; admins: number; warning_letters: number; points_period: { start: string } };
@@ -164,7 +185,51 @@ export interface OperatorDashboard {
   };
 }
 
+/** One of my sessions on the host dashboard; the first four fields are what check-in takes. */
+export interface HostDashboardSession extends Pick<LiveSession, "slot_id" | "date" | "backup_request_id"> {
+  event_claim_id: string | null;
+  brand: { id: string; name: string };
+  role: LiveSession["role"];
+  event_name: string | null;
+  /** cover: whose session I take over */
+  covered_for: string | null;
+  /** off: who takes over mine */
+  covered_by: string | null;
+  start_at: string;
+  end_at: string;
+  check_in_at: string | null;
+  /** null when someone else covers it (role "off") */
+  state: SessionState | null;
+}
+
+/** The host's own overview. */
+export interface HostDashboard {
+  /** Today and the 6 days after it, in time order (sessions crossing midnight into today included). */
+  sessions: HostDashboardSession[];
+  attention: {
+    /** Over, still without a report (last 7 days) */
+    reports_to_send: number;
+    /** Sick leave whose doctor's letter can still come in time */
+    sick_letters_due: number;
+    /** My backup requests nobody covers yet */
+    backups_uncovered: number;
+    /** As a brand's PIC: periods that reached the target, waiting for my payment request */
+    periods_to_request: number;
+  };
+  /** Other hosts' backups I could still apply for; asked_me = the ones that named me */
+  cover_chances: { count: number; asked_me: number };
+  pay: { periods: MyPay["current"]; advance_outstanding: number };
+  points: { points: number; opening_points: number; sp_level: number; period: PointsPeriod };
+  /** The latest monthly rating */
+  rating: { month_year: string; rating: number } | null;
+  rating_max: number;
+  hours_by_day: { date: string; hours: number }[];
+  /** Discord can be connected here and I haven't yet (reminders go there) */
+  discord_unlinked: boolean;
+}
+
 export const dashboardApi = {
   admin: (token: string) => api<AdminDashboard>("/admin/dashboard", { token }),
   operator: (token: string) => api<OperatorDashboard>("/operator/dashboard", { token }),
+  host: (token: string) => api<HostDashboard>("/host/dashboard", { token }),
 };

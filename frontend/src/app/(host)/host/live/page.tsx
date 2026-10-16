@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Check, Clock, LogIn, LogOut, Radio, RefreshCw } from "lucide-react";
-import { errorMessage, liveApi, type Attendance, type LiveReport, type LiveSession, type ReportInput } from "@/lib/api";
+import { CHECK_IN_OPENS_MINUTES, errorMessage, liveApi, type Attendance, type LiveReport, type LiveSession, type ReportInput } from "@/lib/api";
 import { formatClock, formatDateTime, formatWindow } from "@/lib/format";
 import { FLAG_REASONS, metricLabel, METRIC_LABELS } from "@/lib/reportFields";
 import { textareaClass } from "@/lib/ui";
@@ -26,9 +26,6 @@ import TextField from "@/components/TextField";
 import { notify } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-
-/** Minutes before the start that check-in opens (matches the backend default). */
-const CHECK_IN_OPENS_MINUTES = 60;
 
 type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
 

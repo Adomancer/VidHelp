@@ -3,6 +3,9 @@
 import { api, type Message, post, query } from "./client";
 import type { HostWithUser } from "./hosts";
 
+/** Minutes before the start that check-in opens (matches the backend default). */
+export const CHECK_IN_OPENS_MINUTES = 60;
+
 export type ReportStatus = "submitted" | "flagged" | "approved" | "rejected";
 
 export interface LiveReport {

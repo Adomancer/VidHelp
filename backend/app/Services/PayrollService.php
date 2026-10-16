@@ -134,7 +134,7 @@ class PayrollService
         }
 
         $summary = $this->breakdown($period)['summary'];
-        if ($summary['carried_in_hours'] + $summary['worked_hours'] < $period->target_hours) {
+        if ($period->target_hours > $summary['carried_in_hours'] + $summary['worked_hours']) {
             return false;
         }
 
@@ -731,11 +731,65 @@ class PayrollService
     public function advanceLimit(HostProfile $host): array
     {
         $salary = $this->monthlySalary($host);
-        $outstanding = (float) CashAdvanceInstallment::where('status', 'scheduled')
-            ->whereHas('advance', fn ($q) => $q->where('host_id', $host->id))
-            ->sum('amount');
+        $outstanding = $this->outstandingAdvances($host);
 
         return ['monthly_salary' => $salary, 'outstanding' => $outstanding, 'available' => max(0, $salary - $outstanding)];
+    }
+
+    /** Kasbon installments the host has not paid back yet. */
+    public function outstandingAdvances(HostProfile $host): float
+    {
+        return (float) CashAdvanceInstallment::where('status', 'scheduled')
+            ->whereHas('advance', fn ($q) => $q->where('host_id', $host->id))
+            ->sum('amount');
+    }
+
+    /**
+     * The host's pay so far in each period not yet paid (estimate at today's rate): the periods
+     * they worked in and the ones their hours over a target carried into. Oldest first, with the
+     * brand's progress to the target (the period closes, and gets billed, once it is reached).
+     *
+     * @return Collection<int, array>
+     */
+    public function hostOpenPeriods(HostProfile $host): Collection
+    {
+        $periodIds = WorkSession::where('host_id', $host->id)->whereNotNull('payment_period_id')->pluck('payment_period_id')
+            ->merge(HourAdjustment::where('host_id', $host->id)->pluck('payment_period_id'))
+            ->merge(PaymentItem::where('host_id', $host->id)->where('carried_out_hours', '>', 0)->with('period')->get()
+                ->map(fn (PaymentItem $item) => $this->nextPeriod($item->period)?->id)
+                ->filter())
+            ->unique();
+
+        return PaymentPeriod::with('brand:id,name')
+            ->whereIn('id', $periodIds)
+            ->whereIn('status', ['in_progress', 'waiting_payment'])
+            ->orderBy('period_start')
+            ->get()
+            ->map(function (PaymentPeriod $period) use ($host) {
+                $breakdown = $this->breakdown($period);
+                $row = $breakdown['hosts']->firstWhere('host_id', $host->id);
+
+                return $row ? [
+                    'period_id' => $period->id,
+                    'brand' => $period->brand->only('id', 'name'),
+                    'period_start' => $period->period_start->toDateString(),
+                    'period_end' => $period->period_end?->toDateString(),
+                    'status' => $period->status,
+                    'target_hours' => $period->target_hours,
+                    // Everyone's hours toward the target: carried in + worked
+                    'brand_hours' => round($breakdown['summary']['carried_in_hours'] + $breakdown['summary']['worked_hours'], 2),
+                    'session_count' => $row['session_count'],
+                    'carried_in_hours' => $row['carried_in_hours'],
+                    'worked_hours' => $row['worked_hours'],
+                    'hours' => $row['hours'],
+                    'carried_out_hours' => $row['carried_out_hours'],
+                    'rate_per_hour' => $row['rate_per_hour'],
+                    'estimate' => $row['amount'],
+                    'host_paid' => $row['host_paid'],
+                ] : null;
+            })
+            ->filter()
+            ->values();
     }
 
     /**
