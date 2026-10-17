@@ -18,13 +18,15 @@ class EventController extends Controller
     }
 
     /**
-     * Events that are running, upcoming, or ended in the last 30 days.
+     * Events that are running, upcoming, or ended in the last 30 days. Events cancelled before
+     * deleting replaced cancelling stay out of the list.
      */
     public function index(Request $request): JsonResponse
     {
         $events = SpecialEvent::query()
             ->with('brand:id,name')
             ->withCount(['claims as claimed_blocks' => fn ($q) => $q->where('status', 'active')])
+            ->where('status', 'active')
             ->when($request->brand_id, fn ($q, $id) => $q->where('brand_id', $id))
             ->whereDate('end_date', '>=', today()->subDays(30))
             ->orderBy('start_date')
@@ -65,25 +67,33 @@ class EventController extends Controller
     }
 
     /**
-     * Name, per-host limit and whether it replaces the regular schedule. Dates and hours
-     * can't change once blocks exist (cancel and recreate instead).
+     * Change anything but the brand. New dates, hours or block length must keep every block a
+     * host already holds (see EventService::update).
      */
     public function update(Request $request, SpecialEvent $event): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:100',
+            'name' => 'sometimes|required|string|max:100',
+            'start_date' => 'sometimes|required|date_format:Y-m-d',
+            'end_date' => 'sometimes|required|date_format:Y-m-d',
+            'daily_start_time' => 'sometimes|required|date_format:H:i',
+            'daily_end_time' => 'sometimes|required|date_format:H:i',
+            'block_minutes' => 'sometimes|required|integer|min:15|max:720',
             'open_full_schedule' => 'sometimes|boolean',
-            'max_slots_per_host' => 'sometimes|integer|min:1|max:100',
+            'max_slots_per_host' => 'sometimes|required|integer|min:1|max:100',
         ]);
 
         return response()->json(['event' => $this->events->update($event, $validated), 'message' => 'Event diperbarui']);
     }
 
-    public function cancel(SpecialEvent $event): JsonResponse
+    /**
+     * Remove the event with its blocks; refused once a host has checked in for one of them.
+     */
+    public function destroy(SpecialEvent $event): JsonResponse
     {
-        $this->events->cancel($event);
+        $this->events->delete($event);
 
-        return response()->json(['message' => 'Event dibatalkan; semua blok yang sudah diambil dilepas.']);
+        return response()->json(['message' => "{$event->name} dihapus"]);
     }
 
     /**

@@ -705,7 +705,7 @@ class DemoSeeder2 extends Seeder
     }
 
     /**
-     * Real clock: an event about to run with claims, one with no claims yet, a cancelled one,
+     * Real clock: an event about to run with claims, one with no claims yet,
      * then backups in the coming days (open with applicants, asked of named hosts, filled).
      */
     private function createUpcoming(CarbonImmutable $today): void
@@ -735,18 +735,6 @@ class DemoSeeder2 extends Seeder
             'open_full_schedule' => false,
             'max_slots_per_host' => 2,
         ], $this->operators[1]);
-
-        $events->cancel($events->create([
-            'brand_id' => $this->brands[4]->id,
-            'name' => 'Promo Akhir Bulan Sepatu Langkah',
-            'start_date' => $today->addDays(6)->toDateString(),
-            'end_date' => $today->addDays(6)->toDateString(),
-            'daily_start_time' => '13:00',
-            'daily_end_time' => '17:00',
-            'block_minutes' => 120,
-            'open_full_schedule' => false,
-            'max_slots_per_host' => 1,
-        ], $this->admin));
 
         $backups = app(BackupService::class);
         $made = 0;

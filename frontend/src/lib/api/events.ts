@@ -1,6 +1,6 @@
 /** Special events (PD, double date): blocks hosts claim, and the operator's event manager. */
 
-import { api, type Message, post, put } from "./client";
+import { api, del, type Message, post, put } from "./client";
 
 export interface SpecialEvent {
   id: string;
@@ -64,11 +64,13 @@ export const eventApi = {
   list: (token: string) => api<{ events: EventListItem[] }>("/operator/events", { token }),
   show: (token: string, id: string) => api<{ event: SpecialEvent; blocks: EventBlock[] }>(`/operator/events/${id}`, { token }),
   create: (token: string, data: EventInput) => post<{ event: SpecialEvent } & Message>("/operator/events", token, data),
-  update: (token: string, id: string, data: Partial<Pick<SpecialEvent, "name" | "open_full_schedule" | "max_slots_per_host">>) =>
-    put<{ event: SpecialEvent } & Message>(`/operator/events/${id}`, token, data),
-  cancel: (token: string, id: string) => post(`/operator/events/${id}/cancel`, token),
-  assign: (token: string, id: string, startAt: string, hostId: string) => post(`/operator/events/${id}/assign`, token, { start_at: startAt, host_id: hostId }),
-  release: (token: string, claimId: string) => post(`/operator/event-claims/${claimId}/release`, token),
+  /** Anything but the brand; new dates/hours must keep every block a host holds (else a `schedule` error). */
+  update: (token: string, id: string, data: Partial<Omit<EventInput, "brand_id">>) => put<{ event: SpecialEvent } & Message>(`/operator/events/${id}`, token, data),
+  /** Refused (`event` error) once a host has checked in for one of its blocks. */
+  remove: (token: string, id: string) => del<Message>(`/operator/events/${id}`, token),
+  assign: (token: string, id: string, startAt: string, hostId: string) =>
+    post<{ claim: { id: string } } & Message>(`/operator/events/${id}/assign`, token, { start_at: startAt, host_id: hostId }),
+  release: (token: string, claimId: string) => post<Message>(`/operator/event-claims/${claimId}/release`, token),
 
   // Hosts
   /** Events of my brands; `my_brands` = the brands whose events I'd see. */

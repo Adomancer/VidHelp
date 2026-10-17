@@ -9,6 +9,21 @@ export const richTextClass =
 
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** Formatted text as plain text (to search or copy): blocks and line breaks become new lines. */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>|<\/(p|h[1-3]|li|blockquote)>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 const marks = [
   ["\\*", "strong"],
   ["_", "em"],

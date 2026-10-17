@@ -60,6 +60,8 @@ final class NotificationTypes
         'backup_decision_due' => ['admin', '⏳', self::YELLOW],
 
         'event_opened' => ['schedule', '🎪', self::BLUE],
+        'event_updated' => ['schedule', '🗓️', self::YELLOW],
+        'event_deleted' => ['schedule', '🚫', self::GRAY],
 
         'period_ready' => ['payroll', '🎯', self::GREEN],
         'payment_requested' => ['payroll', '💸', self::PURPLE],

@@ -1,14 +1,6 @@
 import EventManager from "@/components/EventManager";
-import PageHeader from "@/components/PageHeader";
 
+/** Title, filters and the event board all live in EventManager (shared with operators). */
 export default function OperatorEventsPage() {
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Event khusus"
-        description="PD, double date, dan kampanye lainnya. Host dari brand mengambil blok yang sudah ditentukan; kamu bisa menunjuk atau menarik kembali blok mana pun."
-      />
-      <EventManager />
-    </div>
-  );
+  return <EventManager />;
 }

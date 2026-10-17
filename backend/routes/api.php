@@ -257,7 +257,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::post('/events', [OperatorEventController::class, 'store']);
         Route::get('/events/{event}', [OperatorEventController::class, 'show']);
         Route::put('/events/{event}', [OperatorEventController::class, 'update']);
-        Route::post('/events/{event}/cancel', [OperatorEventController::class, 'cancel']);
+        Route::delete('/events/{event}', [OperatorEventController::class, 'destroy']);
         Route::post('/events/{event}/assign', [OperatorEventController::class, 'assign']);
         Route::post('/event-claims/{claim}/release', [OperatorEventController::class, 'release']);
 
