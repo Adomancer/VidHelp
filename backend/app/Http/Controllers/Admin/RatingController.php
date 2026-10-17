@@ -18,18 +18,79 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class RatingController extends Controller
 {
-    public function __construct(private RatingService $ratings)
-    {
-    }
+    /** How many months of a host's ratings the review shows, up to the month being rated. */
+    private const RECENT_MONTHS = 6;
+
+    public function __construct(private RatingService $ratings) {}
 
     /**
-     * Every active host for a month (default this month): suggestion, violations, current rating.
+     * Every active host for a month (default this month): suggestion, violations, current rating,
+     * and the active brands they live for (the page groups hosts by brand).
      */
     public function index(Request $request): JsonResponse
     {
         $month = $this->month($request);
 
         return response()->json(['month' => $month, 'scale' => config('vidhelp.rating'), 'hosts' => $this->rows($month)]);
+    }
+
+    /**
+     * What a host's rating for the month rests on: the month's violations with their rating impact
+     * (together they make the suggestion) and the host's ratings of the months up to it, newest first.
+     */
+    public function show(Request $request, HostProfile $host): JsonResponse
+    {
+        $month = $this->month($request);
+        $first = CarbonImmutable::parse("{$month}-01");
+
+        return response()->json([
+            'violations' => PointLog::counting()
+                ->where('host_id', $host->id)
+                ->whereNotNull('violation_type_id')
+                ->whereBetween('occurred_on', [$first->toDateString(), $first->endOfMonth()->toDateString()])
+                ->with('violationType:id,name,rating_impact')
+                ->orderBy('occurred_on')
+                ->get()
+                ->map(fn (PointLog $log) => [
+                    'id' => $log->id,
+                    'name' => $log->violationType->name,
+                    'rating_impact' => $log->violationType->rating_impact,
+                    'points' => $log->points_change,
+                    'occurred_on' => $log->occurred_on->toDateString(),
+                    'reason' => $log->reason,
+                ]),
+            'ratings' => $host->ratings()
+                ->where('month_year', '<=', $month)
+                ->orderByDesc('month_year')
+                ->limit(self::RECENT_MONTHS)
+                ->get()
+                ->map(fn (HostRating $rating) => $rating->only('month_year', 'rating')),
+        ]);
+    }
+
+    /**
+     * Give every host not rated for the month yet their suggested rating (5 minus the month's violations);
+     * with `brand_id`, only that brand's hosts.
+     */
+    public function applySuggested(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'month_year' => 'required|date_format:Y-m',
+            'brand_id' => 'nullable|exists:brands,id',
+            'without_deductions' => 'nullable|boolean',
+        ]);
+
+        $count = $this->ratings->rateUnratedWithSuggestion(
+            $validated['month_year'],
+            $request->user(),
+            $validated['brand_id'] ?? null,
+            (bool) ($validated['without_deductions'] ?? false),
+        );
+
+        return response()->json([
+            'rated' => $count,
+            'message' => $count > 0 ? "{$count} host diberi rating saran" : 'Semua host sudah dinilai',
+        ]);
     }
 
     /**
@@ -208,12 +269,15 @@ class RatingController extends Controller
         return HostProfile::query()
             ->where('status', 'active')
             ->whereHas('user', fn ($q) => $q->where('status', 'active'))
-            ->with('user')
+            ->with(['user', 'assignments' => fn ($q) => $q->where('status', 'active')
+                ->whereHas('brand', fn ($q) => $q->where('status', 'active'))
+                ->with('brand:id,name')])
             ->get()
             ->map(fn (HostProfile $host) => [
                 'host_id' => $host->id,
                 'name' => $host->user->name,
                 'avatar_url' => $host->user->avatar_url,
+                'brands' => $host->assignments->map(fn ($assignment) => $assignment->brand->only('id', 'name'))->sortBy('name')->values(),
                 'violations' => (int) ($violations[$host->id] ?? 0),
                 'suggested' => $this->ratings->suggested($host, $month),
                 'rating' => $ratings->get($host->id),

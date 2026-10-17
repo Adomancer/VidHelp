@@ -6,51 +6,72 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\LiveReport;
 use App\Services\AttendanceService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
-    public function __construct(private AttendanceService $attendance)
-    {
-    }
+    /** Reports per page: compact rows, so a reviewer sees many at once. */
+    private const PER_PAGE = 30;
+
+    public function __construct(private AttendanceService $attendance) {}
 
     /**
-     * Live reports by status, or `missing`: check-ins whose report is overdue.
+     * Live reports by status, or `missing`: check-ins whose report is overdue. A page at a time,
+     * optionally for one session `date` and a host or brand name (`search`). Flagged reports
+     * come oldest first (a queue); the rest newest first. `counts` sizes both queues for the tabs.
      */
     public function index(Request $request): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'status' => 'nullable|in:flagged,approved,rejected,missing',
             'brand_id' => 'nullable|uuid',
+            'date' => 'nullable|date_format:Y-m-d',
+            'search' => 'nullable|string|max:100',
         ]);
-        $status = $request->status ?? 'flagged';
+        $status = $validated['status'] ?? 'flagged';
+        $search = $validated['search'] ?? null;
+        $matchesSearch = fn ($q) => $q->where(fn ($q) => $q
+            ->whereHas('host.user', fn ($q) => $q->where('name', 'like', "%{$search}%"))
+            ->orWhereHas('brand', fn ($q) => $q->where('name', 'like', "%{$search}%")));
+        $counts = [
+            'flagged' => LiveReport::where('status', 'flagged')->count(),
+            'missing' => $this->overdue()->count(),
+        ];
 
         if ($status === 'missing') {
-            $missing = Attendance::whereDoesntHave('report')
-                ->where('report_due_at', '<', now())
-                ->when($request->brand_id, fn ($q, $id) => $q->where('brand_id', $id))
+            $missing = $this->overdue()
+                ->when($validated['brand_id'] ?? null, fn ($q, $id) => $q->where('brand_id', $id))
+                ->when($validated['date'] ?? null, fn ($q, $date) => $q->whereDate('session_date', $date))
+                ->when($search, $matchesSearch)
                 ->with(['brand:id,name', 'host.user'])
                 ->latest('scheduled_start_at')
-                ->limit(100)
-                ->get();
+                ->paginate(self::PER_PAGE);
 
-            return response()->json(['attendances' => $missing]);
+            return response()->json([...$missing->toArray(), 'counts' => $counts]);
         }
 
         $reports = LiveReport::where('status', $status)
-            ->when($request->brand_id, fn ($q, $id) => $q->where('brand_id', $id))
+            ->when($validated['brand_id'] ?? null, fn ($q, $id) => $q->where('brand_id', $id))
+            ->when($validated['date'] ?? null, fn ($q, $date) => $q->whereHas('attendance', fn ($q) => $q->whereDate('session_date', $date)))
+            ->when($search, $matchesSearch)
             ->with(['brand:id,name', 'host.user', 'attendance', 'reviewer:id,name', 'workSession'])
-            ->latest('submitted_at')
-            ->limit(100)
-            ->get()
-            ->map(fn (LiveReport $report) => [
+            ->orderBy('submitted_at', $status === 'flagged' ? 'asc' : 'desc')
+            ->paginate(self::PER_PAGE)
+            ->through(fn (LiveReport $report) => [
                 ...$report->toArray(),
                 'scheduled_hours' => $report->attendance->scheduledHours(),
                 'attended_hours' => $report->attendance->attendedHours(),
             ]);
 
-        return response()->json(['reports' => $reports, 'metrics' => array_keys(config('vidhelp.report_metrics'))]);
+        return response()->json([...$reports->toArray(), 'metrics' => array_keys(config('vidhelp.report_metrics')), 'counts' => $counts]);
+    }
+
+    /** Check-ins whose report is past its deadline and still not sent. */
+    private function overdue(): Builder
+    {
+        return Attendance::whereDoesntHave('report')->where('report_due_at', '<', now());
     }
 
     /**

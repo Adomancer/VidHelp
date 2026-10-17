@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 
 export interface ToggleOption<T extends string> {
   value: T;
-  label: string;
+  /** Text, or text with a count badge */
+  label: React.ReactNode;
 }
 
 interface ToggleGroupProps<T extends string> {

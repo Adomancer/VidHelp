@@ -1,7 +1,7 @@
 /** Payroll: payment periods, salary slips and kasbon (finance), and a host's own pay. */
 
 import { toDateInput } from "../format";
-import { api, downloadFile, post, del, query } from "./client";
+import { api, downloadFile, post, del, query, type Paginated } from "./client";
 import type { Brand, HostWithUser } from "./hosts";
 
 export type PeriodStatus = "in_progress" | "waiting_payment" | "requested" | "paid";
@@ -74,6 +74,23 @@ export interface PaymentRequestRow {
 
 export interface PeriodListItem extends PaymentPeriod, PeriodSummary {
   hosts: number;
+  /** waiting_payment: when the target (or finance) closed it; requested: when payment was requested; otherwise null */
+  waiting_since: string | null;
+}
+
+/** The period list's filter: action = waiting for the PIC's request or the brand's payment; none = every period. */
+export type PeriodFilter = "action" | "in_progress" | "paid";
+
+/** Payroll at a glance; amounts are host pay. */
+export interface PayrollOverview {
+  /** Target reached, the PIC hasn't requested payment yet */
+  waiting_payment: { count: number; amount: number };
+  /** Requested, the brand hasn't paid yet */
+  requested: { count: number; amount: number; oldest_requested_at: string | null };
+  in_progress: { count: number };
+  paid_this_month: { count: number; amount: number };
+  /** Active brands whose hours go into no period yet; up to 5 names */
+  brands_without_start: { count: number; names: string[] };
 }
 
 /** Backup hours a host covered that the requesting host paid them for directly (not on payroll) */
@@ -195,7 +212,10 @@ export const payrollApi = {
   brands: (token: string) => api<{ brands: Pick<Brand, "id" | "name" | "status" | "payroll_start_date">[] }>("/finance/brands", { token }),
   /** Active hosts to pick for kasbon or an adjustment; with brandId, only that brand's. */
   hosts: (token: string, brandId = "") => api<{ hosts: { host_id: string; name: string }[] }>(`/finance/hosts${query({ brand_id: brandId })}`, { token }),
-  periods: (token: string, brandId = "") => api<{ periods: PeriodListItem[] }>(`/finance/payroll/periods${query({ brand_id: brandId })}`, { token }),
+  /** 25 a page; action: longest waiting first, in_progress: by brand, paid and all: newest first. */
+  periods: (token: string, params: { status?: PeriodFilter; search?: string; page?: number }) =>
+    api<Paginated<PeriodListItem>>(`/finance/payroll/periods${query(params)}`, { token }),
+  summary: (token: string) => api<PayrollOverview>("/finance/payroll/summary", { token }),
   period: (token: string, id: string) =>
     api<{
       period: PaymentPeriod;

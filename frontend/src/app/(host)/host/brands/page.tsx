@@ -52,7 +52,7 @@ export default function HostBrandsPage() {
               ) : undefined
             }
           >
-            <KnowledgeText text={brand.product_knowledge} />
+            <KnowledgeText text={brand.product_knowledge} files={brand.files} fileUrl={(file) => hostApi.knowledgeFileUrl(token, brand.id, file.id)} />
           </Card>
         ))}
       </div>

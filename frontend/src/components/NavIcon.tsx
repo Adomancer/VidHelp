@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   Bell,
+  BookOpen,
   CalendarDays,
   ClipboardCheck,
   FileText,
@@ -28,6 +29,7 @@ const icons = {
   host: Video,
   live: Radio,
   brand: Tag,
+  knowledge: BookOpen,
   rates: Layers,
   calendar: CalendarDays,
   event: Ticket,

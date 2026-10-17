@@ -1,7 +1,7 @@
 /** Hosts, brands and rate levels: a host's own profile, the operator's host list, and admin edits. */
 
 import { toDateInput } from "../format";
-import { api, downloadFile, type Message, type Paginated, post, put, del, query } from "./client";
+import { api, apiFileUrl, downloadFile, type Message, type Paginated, post, put, del, query } from "./client";
 import type { AuthUser } from "./auth";
 
 export type HostStatus = "active" | "inactive" | "archived" | "banned";
@@ -17,11 +17,30 @@ export interface RateCategory {
 
 export type RateCategoryInput = Pick<RateCategory, "name" | "min_tenure_months"> & { rate_per_hour: number };
 
+/** A host whose tenure reaches a higher level soon (the nightly re-placement moves them that day). */
+export interface RatePromotion {
+  host_id: string;
+  name: string;
+  avatar_url: string | null;
+  /** "YYYY-MM-DD" */
+  on: string;
+  from: Pick<RateCategory, "id" | "name" | "rate_per_hour"> | null;
+  to: Pick<RateCategory, "id" | "name" | "rate_per_hour">;
+}
+
+/** A host whose level an admin set by hand. */
+export interface PinnedRateHost {
+  host_id: string;
+  name: string;
+  avatar_url: string | null;
+  level: Pick<RateCategory, "id" | "name"> | null;
+}
+
 export interface Brand {
   id: string;
   name: string;
   is_obs: boolean;
-  /** What hosts assigned to the brand need to know (products, prices, talking points) */
+  /** What hosts assigned to the brand need to know (products, prices, talking points), as safe HTML */
   product_knowledge?: string | null;
   /** A pay period runs until this many hours are reached; the brand's leader then requests payment */
   target_hours_per_period: number;
@@ -30,7 +49,17 @@ export interface Brand {
   status: "active" | "inactive";
 }
 
-export type BrandInput = Omit<Brand, "id">;
+/** Product knowledge is edited on its own (text and files), not in the brand form. */
+export type BrandInput = Omit<Brand, "id" | "product_knowledge">;
+
+/** A file of a brand's product knowledge, as the brand sent it (PDF, screenshot, Office doc). */
+export interface KnowledgeFile {
+  id: string;
+  original_name: string;
+  mime_type: string;
+  size_kb: number;
+  created_at: string;
+}
 
 export interface BrandSummary extends Brand {
   active_hosts_count: number;
@@ -144,10 +173,14 @@ export const hostApi = {
 
   /** One brand's product knowledge (one I'm assigned to, or cover a backup or event block for). */
   brand: (token: string, id: string) => api<{ brand: Omit<MyBrand, "via"> }>(`/host/brands/${id}`, { token }),
+
+  /** One of its product knowledge files, as an object URL. */
+  knowledgeFileUrl: (token: string, brandId: string, fileId: string) => apiFileUrl(`/host/brands/${brandId}/files/${fileId}`, token),
 };
 
 export type MyBrand = Pick<Brand, "id" | "name" | "is_obs"> & {
   product_knowledge: string | null;
+  files: KnowledgeFile[];
   /** Why I see it: assigned to it, or going live for it as a backup or in an event block */
   via: "assigned" | "backup" | "event";
 };
@@ -175,8 +208,34 @@ export const operatorApi = {
     put<{ assignment: Assignment }>(`/operator/assignments/${id}`, token, data),
 };
 
+/** A brand's product knowledge: the text (often pasted from WA) and the files the brand sent. */
+export const knowledgeApi = {
+  get: (token: string, brandId: string) =>
+    api<{ brand: Pick<Brand, "id" | "name"> & { product_knowledge: string | null }; files: KnowledgeFile[] }>(`/operator/brands/${brandId}/knowledge`, {
+      token,
+    }),
+
+  saveText: (token: string, brandId: string, text: string | null) =>
+    put<{ brand: { product_knowledge: string | null } } & Message>(`/operator/brands/${brandId}/knowledge`, token, { product_knowledge: text }),
+
+  upload: (token: string, brandId: string, file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return post<{ file: KnowledgeFile } & Message>(`/operator/brands/${brandId}/knowledge/files`, token, body);
+  },
+
+  remove: (token: string, brandId: string, fileId: string) => del<Message>(`/operator/brands/${brandId}/knowledge/files/${fileId}`, token),
+
+  fileUrl: (token: string, brandId: string, fileId: string) => apiFileUrl(`/operator/brands/${brandId}/knowledge/files/${fileId}`, token),
+};
+
 export const adminHostsApi = {
-  rateCategories: (token: string) => api<{ rate_categories: (RateCategory & { hosts_count: number })[] }>("/admin/rate-categories", { token }),
+  /** Levels by tenure; plus who moves up within `upcoming_days` and who is placed by hand. */
+  rateCategories: (token: string) =>
+    api<{ rate_categories: (RateCategory & { hosts_count: number })[]; upcoming: RatePromotion[]; upcoming_days: number; pinned: PinnedRateHost[] }>(
+      "/admin/rate-categories",
+      { token }
+    ),
 
   createRateCategory: (token: string, data: RateCategoryInput) => post<{ rate_category: RateCategory }>("/admin/rate-categories", token, data),
 

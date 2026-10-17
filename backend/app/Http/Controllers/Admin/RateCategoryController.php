@@ -5,16 +5,29 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\HostProfile;
 use App\Models\HostRateCategory;
+use App\Services\RateLevelService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class RateCategoryController extends Controller
 {
+    /** How many days ahead the page lists hosts about to move up a level. */
+    private const PROMOTION_DAYS = 60;
+
+    public function __construct(private RateLevelService $levels) {}
+
+    /**
+     * The levels by tenure with how many hosts each has, the hosts moving up a level in the
+     * coming days, and the hosts whose level was set by hand.
+     */
     public function index(): JsonResponse
     {
         return response()->json([
             'rate_categories' => HostRateCategory::withCount('hosts')->orderBy('min_tenure_months')->get(),
+            'upcoming' => $this->levels->upcomingPromotions(self::PROMOTION_DAYS),
+            'upcoming_days' => self::PROMOTION_DAYS,
+            'pinned' => $this->levels->pinned(),
         ]);
     }
 

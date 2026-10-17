@@ -10,6 +10,8 @@ use App\Models\User;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class BrandAssignmentTest extends TestCase
@@ -219,19 +221,80 @@ class BrandAssignmentTest extends TestCase
         $this->actingAs($host->user)->postJson('/api/operator/assignments', [])->assertForbidden();
     }
 
-    public function test_admin_saves_product_knowledge(): void
+    public function test_operator_and_admin_save_product_knowledge_text(): void
     {
-        $id = $this->actingAs($this->admin)->postJson('/api/admin/brands', [
-            'name' => 'Skintific',
-            'product_knowledge' => "Serum 5X Ceramide\nHarga Rp 129.000",
-            'target_hours_per_period' => 120,
-        ])->assertCreated()
-            ->assertJsonPath('brand.product_knowledge', "Serum 5X Ceramide\nHarga Rp 129.000")
-            ->json('brand.id');
+        $brand = $this->brand(['name' => 'Skintific']);
 
-        $this->actingAs($this->admin)->putJson("/api/admin/brands/{$id}", ['product_knowledge' => null])
+        $this->actingAs($this->operator)->putJson("/api/operator/brands/{$brand->id}/knowledge", ['product_knowledge' => "Serum 5X Ceramide\nHarga Rp 129.000"])
+            ->assertOk()
+            ->assertJsonPath('brand.product_knowledge', '<p>Serum 5X Ceramide<br />Harga Rp 129.000</p>');
+
+        // Formatting pasted from a document stays; scripts don't
+        $this->actingAs($this->operator)->putJson("/api/operator/brands/{$brand->id}/knowledge", ['product_knowledge' => '<h2>Promo</h2><p><strong>Diskon</strong><script>alert(1)</script></p>'])
+            ->assertOk()
+            ->assertJsonPath('brand.product_knowledge', '<h2>Promo</h2><p><strong>Diskon</strong></p>');
+
+        $this->actingAs($this->admin)->putJson("/api/operator/brands/{$brand->id}/knowledge", ['product_knowledge' => null])
             ->assertOk()
             ->assertJsonPath('brand.product_knowledge', null);
+
+        $host = $this->host();
+        $this->actingAs($host->user)->putJson("/api/operator/brands/{$brand->id}/knowledge", ['product_knowledge' => 'x'])->assertForbidden();
+    }
+
+    public function test_operator_uploads_and_removes_product_knowledge_files(): void
+    {
+        Storage::fake('local');
+        $brand = $this->brand();
+        $url = "/api/operator/brands/{$brand->id}/knowledge/files";
+
+        $pdf = $this->actingAs($this->operator)->post($url, ['file' => UploadedFile::fake()->create('katalog.pdf', 500, 'application/pdf')], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('file.original_name', 'katalog.pdf')
+            ->assertJsonMissingPath('file.file_path')
+            ->json('file.id');
+        $this->actingAs($this->operator)->post($url, ['file' => UploadedFile::fake()->create('wa.png', 20, 'image/png')], ['Accept' => 'application/json'])->assertCreated();
+        $this->actingAs($this->operator)->post($url, ['file' => UploadedFile::fake()->create('pk.docx', 50, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')], ['Accept' => 'application/json'])->assertCreated();
+
+        // Other file types and files over 20 MB are refused
+        $this->actingAs($this->operator)->post($url, ['file' => UploadedFile::fake()->create('virus.exe', 10)], ['Accept' => 'application/json'])->assertJsonValidationErrors('file');
+        $this->actingAs($this->operator)->post($url, ['file' => UploadedFile::fake()->create('big.pdf', 21000, 'application/pdf')], ['Accept' => 'application/json'])->assertJsonValidationErrors('file');
+
+        $this->actingAs($this->operator)->getJson("/api/operator/brands/{$brand->id}/knowledge")->assertOk()->assertJsonCount(3, 'files');
+        $this->actingAs($this->operator)->get("{$url}/{$pdf}")->assertOk();
+
+        $path = $brand->attachments()->findOrFail($pdf)->file_path;
+        $this->actingAs($this->operator)->deleteJson("{$url}/{$pdf}")->assertOk();
+        Storage::disk('local')->assertMissing($path);
+        $this->assertSame(2, $brand->attachments()->count());
+
+        // A file of another brand can't be reached through this one
+        $other = $this->brand();
+        $theirs = $this->actingAs($this->operator)->post("/api/operator/brands/{$other->id}/knowledge/files", ['file' => UploadedFile::fake()->create('a.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])->json('file.id');
+        $this->actingAs($this->operator)->deleteJson("{$url}/{$theirs}")->assertNotFound();
+    }
+
+    public function test_host_opens_files_of_brands_they_go_live_for_only(): void
+    {
+        Storage::fake('local');
+        $host = $this->host();
+        $mine = $this->brand(['name' => 'Wardah']);
+        $notMine = $this->brand();
+        $host->assignments()->create(['brand_id' => $mine->id, 'status' => 'active']);
+        $upload = fn (Brand $brand) => $this->actingAs($this->operator)
+            ->post("/api/operator/brands/{$brand->id}/knowledge/files", ['file' => UploadedFile::fake()->create('pk.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])
+            ->json('file.id');
+        $file = $upload($mine);
+        $theirs = $upload($notMine);
+
+        $this->actingAs($host->user)->getJson('/api/host/brands')
+            ->assertJsonCount(1, 'brands.0.files')
+            ->assertJsonPath('brands.0.files.0.original_name', 'pk.pdf');
+        $this->actingAs($host->user)->getJson("/api/host/brands/{$mine->id}")->assertJsonCount(1, 'brand.files');
+
+        $this->actingAs($host->user)->get("/api/host/brands/{$mine->id}/files/{$file}")->assertOk();
+        $this->actingAs($host->user)->get("/api/host/brands/{$notMine->id}/files/{$theirs}")->assertForbidden();
+        $this->actingAs($host->user)->get("/api/host/brands/{$mine->id}/files/{$theirs}")->assertNotFound();
     }
 
     public function test_host_sees_product_knowledge_of_active_assigned_brands_only(): void
@@ -247,13 +310,13 @@ class BrandAssignmentTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'brands')
             ->assertJsonPath('brands.0.name', 'Wardah')
-            ->assertJsonPath('brands.0.product_knowledge', 'Lip cream 12 shades')
+            ->assertJsonPath('brands.0.product_knowledge', '<p>Lip cream 12 shades</p>')
             ->assertJsonPath('brands.0.via', 'assigned');
 
         // Opened from a session
         $this->actingAs($host->user)->getJson("/api/host/brands/{$assigned->id}")
             ->assertOk()
-            ->assertJsonPath('brand.product_knowledge', 'Lip cream 12 shades');
+            ->assertJsonPath('brand.product_knowledge', '<p>Lip cream 12 shades</p>');
         $this->actingAs($host->user)->getJson("/api/host/brands/{$banned->id}")->assertForbidden();
     }
 
@@ -275,7 +338,7 @@ class BrandAssignmentTest extends TestCase
 
         $this->actingAs($cover->user)->getJson("/api/host/brands/{$other->id}")
             ->assertOk()
-            ->assertJsonPath('brand.product_knowledge', 'Serum 5X Ceramide');
+            ->assertJsonPath('brand.product_knowledge', '<p>Serum 5X Ceramide</p>');
         $this->actingAs($cover->user)->getJson('/api/host/brands')
             ->assertJsonPath('brands.0.name', 'Skintific')
             ->assertJsonPath('brands.0.via', 'backup');

@@ -302,6 +302,106 @@ class PointsTest extends TestCase
         $this->actingAs($this->operator)->get('/api/admin/ratings/export')->assertForbidden();
     }
 
+    public function test_admin_gives_the_suggestion_to_every_host_not_yet_rated(): void
+    {
+        $this->violation(); // Telat, impact 0.2
+        $rated = $this->newHost();
+        $this->actingAs($this->admin)->putJson('/api/admin/ratings', ['host_id' => $rated->id, 'month_year' => '2026-10', 'rating' => 3])->assertOk();
+        $inactive = $this->newHost();
+        $inactive->update(['status' => 'inactive']);
+
+        $this->actingAs($this->admin)->postJson('/api/admin/ratings/apply-suggested', ['month_year' => '2026-10'])
+            ->assertOk()
+            ->assertJsonPath('rated', 1)
+            ->assertJsonPath('message', '1 host diberi rating saran');
+
+        $this->assertSame(4.8, HostRating::where('host_id', $this->host->id)->value('rating'));
+        $this->assertSame($this->admin->id, HostRating::where('host_id', $this->host->id)->value('rated_by'));
+        $this->assertSame(3.0, HostRating::where('host_id', $rated->id)->value('rating'));
+        $this->assertDatabaseMissing(HostRating::class, ['host_id' => $inactive->id]);
+    }
+
+    public function test_suggestions_for_one_brand_rate_only_its_hosts(): void
+    {
+        $other = Brand::create(['name' => 'Brand B', 'target_hours_per_period' => 100]);
+        $elsewhere = User::factory()->create();
+        $elsewhere->assignRole('host');
+        $elsewhere->ensureHostProfile();
+        HostBrandAssignment::create(['host_id' => $elsewhere->hostProfile->id, 'brand_id' => $other->id, 'status' => 'active']);
+
+        $this->actingAs($this->admin)->postJson('/api/admin/ratings/apply-suggested', ['month_year' => '2026-10', 'brand_id' => $this->brand->id])
+            ->assertOk()
+            ->assertJsonPath('rated', 1);
+
+        $this->assertDatabaseHas(HostRating::class, ['host_id' => $this->host->id, 'month_year' => '2026-10']);
+        $this->assertDatabaseMissing(HostRating::class, ['host_id' => $elsewhere->hostProfile->id]);
+    }
+
+    public function test_rating_rows_list_each_hosts_active_brands(): void
+    {
+        $inactive = Brand::create(['name' => 'Brand Lama', 'target_hours_per_period' => 100, 'status' => 'inactive']);
+        HostBrandAssignment::create(['host_id' => $this->host->id, 'brand_id' => $inactive->id, 'status' => 'active']);
+        $banned = Brand::create(['name' => 'Brand C', 'target_hours_per_period' => 100]);
+        HostBrandAssignment::create(['host_id' => $this->host->id, 'brand_id' => $banned->id, 'status' => 'banned']);
+
+        $row = collect($this->actingAs($this->admin)->getJson('/api/admin/ratings?month=2026-10')->json('hosts'))
+            ->firstWhere('host_id', $this->host->id);
+
+        $this->assertSame([['id' => $this->brand->id, 'name' => 'Brand A']], $row['brands']);
+    }
+
+    public function test_suggestions_without_deductions_skip_hosts_whose_violations_took_something_off(): void
+    {
+        $this->violation(); // Telat, impact 0.2
+        $clean = $this->newHost();
+
+        $this->actingAs($this->admin)->postJson('/api/admin/ratings/apply-suggested', ['month_year' => '2026-10', 'without_deductions' => true])
+            ->assertOk()
+            ->assertJsonPath('rated', 1);
+
+        $this->assertSame(5.0, HostRating::where('host_id', $clean->id)->value('rating'));
+        $this->assertDatabaseMissing(HostRating::class, ['host_id' => $this->host->id]);
+    }
+
+    public function test_rating_review_shows_the_months_violations_and_recent_ratings(): void
+    {
+        $this->violation(['violation_type_id' => $this->type('Main HP saat live')->id, 'reason' => 'HP di meja']); // impact 0.5
+        $this->violation(['occurred_on' => '2026-09-20']); // last month
+        foreach (['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-11'] as $index => $month) {
+            HostRating::create(['host_id' => $this->host->id, 'month_year' => $month, 'rating' => 3 + $index * 0.2, 'rated_by' => $this->admin->id]);
+        }
+
+        $response = $this->actingAs($this->admin)->getJson("/api/admin/ratings/hosts/{$this->host->id}?month=2026-10")->assertOk();
+
+        $this->assertSame([[
+            'id' => $response->json('violations.0.id'),
+            'name' => 'Main HP saat live',
+            'rating_impact' => 0.5,
+            'points' => -10,
+            'occurred_on' => '2026-10-05',
+            'reason' => 'HP di meja',
+        ]], $response->json('violations'));
+        $this->assertSame(['2026-09', '2026-08', '2026-07', '2026-06', '2026-05', '2026-04'], array_column($response->json('ratings'), 'month_year'));
+    }
+
+    public function test_only_admins_see_a_hosts_rating_review(): void
+    {
+        $this->actingAs($this->operator)->getJson("/api/admin/ratings/hosts/{$this->host->id}")->assertForbidden();
+    }
+
+    public function test_only_admins_apply_the_suggested_ratings(): void
+    {
+        $this->actingAs($this->operator)->postJson('/api/admin/ratings/apply-suggested', ['month_year' => '2026-10'])->assertForbidden();
+
+        $this->assertSame(0, HostRating::count());
+    }
+
+    public function test_applying_suggestions_needs_a_month(): void
+    {
+        $this->actingAs($this->admin)->postJson('/api/admin/ratings/apply-suggested', ['month_year' => 'Oktober'])
+            ->assertJsonValidationErrors('month_year');
+    }
+
     public function test_rating_must_be_within_the_scale(): void
     {
         $this->actingAs($this->admin)->putJson('/api/admin/ratings', [

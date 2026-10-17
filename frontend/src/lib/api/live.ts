@@ -1,6 +1,6 @@
 /** Check-in/out, live reports, and reviewing them. */
 
-import { api, type Message, post, query } from "./client";
+import { api, type Message, type Paginated, post, query } from "./client";
 import type { HostWithUser } from "./hosts";
 
 /** Minutes before the start that check-in opens (matches the backend default). */
@@ -83,10 +83,26 @@ export const liveApi = {
   report: (token: string, attendanceId: string, data: ReportInput) => post<{ report: LiveReport } & Message>(`/host/live/${attendanceId}/report`, token, data),
 };
 
+/** One session day ("YYYY-MM-DD") and/or a host or brand name; 30 a page. */
+export interface ReportFilters {
+  date?: string;
+  search?: string;
+  page?: number;
+}
+
+/** How many wait in each queue, whatever the filters (for the tab badges). */
+export interface ReportCounts {
+  flagged: number;
+  missing: number;
+}
+
 export const reportApi = {
-  list: (token: string, status: "flagged" | "approved" | "rejected") =>
-    api<{ reports: ReviewReport[]; metrics: string[] }>(`/operator/reports${query({ status })}`, { token }),
-  missing: (token: string) => api<{ attendances: Attendance[] }>(`/operator/reports${query({ status: "missing" })}`, { token }),
+  /** Flagged: oldest first (a queue); approved and rejected: newest first. */
+  list: (token: string, status: "flagged" | "approved" | "rejected", filters: ReportFilters = {}) =>
+    api<Paginated<ReviewReport> & { metrics: string[]; counts: ReportCounts }>(`/operator/reports${query({ status, ...filters })}`, { token }),
+  /** Check-ins whose report is overdue, newest first. */
+  missing: (token: string, filters: ReportFilters = {}) =>
+    api<Paginated<Attendance> & { counts: ReportCounts }>(`/operator/reports${query({ status: "missing", ...filters })}`, { token }),
   approve: (token: string, id: string, data: { duration_hours: number; review_note: string | null }) => post(`/operator/reports/${id}/approve`, token, data),
   reject: (token: string, id: string, reviewNote: string) => post(`/operator/reports/${id}/reject`, token, { review_note: reviewNote }),
 };

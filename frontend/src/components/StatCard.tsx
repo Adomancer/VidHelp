@@ -21,13 +21,27 @@ interface StatCardProps {
   tone?: Tone;
   /** The whole card opens this page. */
   href?: string;
+  /** The whole card is a filter button instead; `selected` while its filter is on. */
+  onClick?: () => void;
+  selected?: boolean;
   /** Tighter padding and a smaller number, for a strip of many cards. */
   compact?: boolean;
   className?: string;
 }
 
 /** A headline number with its label, an icon and a line of context. */
-export default function StatCard({ icon: Icon, label, value, note, tone = "neutral", href, compact = false, className }: StatCardProps) {
+export default function StatCard({
+  icon: Icon,
+  label,
+  value,
+  note,
+  tone = "neutral",
+  href,
+  onClick,
+  selected = false,
+  compact = false,
+  className,
+}: StatCardProps) {
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
@@ -51,6 +65,23 @@ export default function StatCard({ icon: Icon, label, value, note, tone = "neutr
       >
         {body}
       </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={selected}
+        className={cn(
+          classes,
+          "text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          selected ? "border-primary/50 bg-primary/[0.04] ring-1 ring-primary/20" : "hover:border-input hover:bg-muted/30"
+        )}
+      >
+        {body}
+      </button>
     );
   }
 

@@ -19,6 +19,7 @@ use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\ViolationTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\TestWith;
 use Tests\TestCase;
 
 class AttendanceTest extends TestCase
@@ -223,8 +224,8 @@ class AttendanceTest extends TestCase
         $report = LiveReport::findOrFail($this->report($this->attended(), 3)->json('report.id'));
 
         $this->actingAs($this->admin)->getJson('/api/operator/reports?status=flagged')
-            ->assertJsonPath('reports.0.scheduled_hours', 2)
-            ->assertJsonPath('reports.0.attended_hours', 2);
+            ->assertJsonPath('data.0.scheduled_hours', 2)
+            ->assertJsonPath('data.0.attended_hours', 2);
 
         $this->actingAs($this->admin)->postJson("/api/operator/reports/{$report->id}/approve", [
             'duration_hours' => 2,
@@ -283,7 +284,9 @@ class AttendanceTest extends TestCase
         $this->attended();
         $this->travelTo(CarbonImmutable::parse('2026-10-07 14:01'));
 
-        $this->actingAs($this->admin)->getJson('/api/operator/reports?status=missing')->assertJsonCount(1, 'attendances');
+        $this->actingAs($this->admin)->getJson('/api/operator/reports?status=missing')
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('counts.missing', 1);
     }
 
     public function test_unknown_metrics_are_dropped(): void
@@ -299,5 +302,88 @@ class AttendanceTest extends TestCase
 
         $this->actingAs($other->user)->postJson("/api/host/live/{$attendance->id}/report", ['session_count' => 1, 'duration_hours' => 2])
             ->assertForbidden();
+    }
+
+    /** A sent report for a 10:00-12:00 session of `$host` on `$brand`. */
+    private function sentReport(HostProfile $host, Brand $brand, string $date, string $submittedAt, string $status = 'flagged'): LiveReport
+    {
+        $attendance = Attendance::create([
+            'host_id' => $host->id, 'brand_id' => $brand->id, 'session_date' => $date,
+            'scheduled_start_at' => "{$date} 10:00", 'scheduled_end_at' => "{$date} 12:00",
+            'check_in_at' => "{$date} 10:00", 'check_out_at' => "{$date} 12:00", 'report_due_at' => "{$date} 23:59",
+        ]);
+
+        return LiveReport::create([
+            'attendance_id' => $attendance->id, 'host_id' => $host->id, 'brand_id' => $brand->id,
+            'session_count' => 1, 'duration_hours' => 3, 'status' => $status, 'submitted_at' => $submittedAt,
+        ]);
+    }
+
+    /** A host with a given name. */
+    private function namedHost(string $name): HostProfile
+    {
+        $host = $this->newHost();
+        $host->user->update(['name' => $name]);
+
+        return $host;
+    }
+
+    public function test_flagged_reports_queue_oldest_first_thirty_a_page(): void
+    {
+        $brand = Brand::firstOrFail();
+        $oldest = $this->sentReport($this->host, $brand, '2026-09-01', '2026-09-01 13:00');
+        foreach (range(2, 30) as $day) {
+            $this->sentReport($this->host, $brand, sprintf('2026-09-%02d', $day), sprintf('2026-09-%02d 13:00', $day));
+        }
+        $newest = $this->sentReport($this->host, $brand, '2026-10-01', '2026-10-01 13:00');
+        $this->sentReport($this->host, $brand, '2026-10-02', '2026-10-02 13:00', 'approved');
+
+        $this->actingAs($this->admin)->getJson('/api/operator/reports?status=flagged')
+            ->assertOk()
+            ->assertJsonPath('total', 31)
+            ->assertJsonCount(30, 'data')
+            ->assertJsonPath('data.0.id', $oldest->id)
+            ->assertJsonPath('counts.flagged', 31);
+        $this->actingAs($this->admin)->getJson('/api/operator/reports?status=flagged&page=2')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $newest->id);
+    }
+
+    public function test_reports_filter_by_session_date(): void
+    {
+        $brand = Brand::firstOrFail();
+        $this->sentReport($this->host, $brand, '2026-10-04', '2026-10-04 13:00', 'approved');
+        $sunday = $this->sentReport($this->host, $brand, '2026-10-05', '2026-10-05 13:00', 'approved');
+
+        $this->actingAs($this->admin)->getJson('/api/operator/reports?status=approved&date=2026-10-05')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $sunday->id);
+    }
+
+    #[TestWith(['ayu', 'Ayu Lestari', 'Teh'])]
+    #[TestWith(['kopi', 'Budi Santoso', 'Kopi'])]
+    public function test_reports_search_by_host_or_brand_name(string $search, string $host, string $brand): void
+    {
+        $teh = Brand::create(['name' => 'Teh', 'target_hours_per_period' => 100]);
+        $kopi = Brand::create(['name' => 'Kopi', 'target_hours_per_period' => 100]);
+        $ayu = $this->namedHost('Ayu Lestari');
+        $budi = $this->namedHost('Budi Santoso');
+        $this->sentReport($ayu, $teh, '2026-10-05', '2026-10-05 13:00');
+        $this->sentReport($budi, $kopi, '2026-10-05', '2026-10-05 14:00');
+        $this->sentReport($budi, $teh, '2026-10-05', '2026-10-05 15:00');
+
+        $this->actingAs($this->admin)->getJson("/api/operator/reports?status=flagged&search={$search}")
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.host.user.name', $host)
+            ->assertJsonPath('data.0.brand.name', $brand);
+    }
+
+    public function test_report_list_rejects_a_malformed_date(): void
+    {
+        $this->actingAs($this->admin)->getJson('/api/operator/reports?date=06-10-2026')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('date');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\BackupRequest;
+use App\Models\Brand;
 use App\Models\User;
 use App\Services\SettingsService;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -31,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
         // Short owner_type names in the attachments table (not enforced, so Spatie/Sanctum keep class names)
         Relation::morphMap([
             'backup_request' => BackupRequest::class,
+            'brand' => Brand::class,
         ]);
 
         // Password reset emails link to the Next.js frontend, not a Laravel page

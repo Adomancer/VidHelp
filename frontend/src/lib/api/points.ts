@@ -77,9 +77,19 @@ export interface RatingRow {
   host_id: string;
   name: string;
   avatar_url: string | null;
+  /** Active brands the host lives for; the rating itself is one per host per month */
+  brands: { id: string; name: string }[];
   violations: number;
   suggested: number;
   rating: HostRating | null;
+}
+
+/** What one host's rating for a month rests on. */
+export interface RatingReview {
+  /** The month's violations; their rating impacts make up the suggestion */
+  violations: { id: string; name: string; rating_impact: number; points: number; occurred_on: string; reason: string | null }[];
+  /** Up to six months up to the one being rated, newest first */
+  ratings: { month_year: string; rating: number }[];
 }
 
 export const pointsApi = {
@@ -106,6 +116,18 @@ export const pointsApi = {
     api<{ month: string; scale: { min: number; max: number }; hosts: RatingRow[] }>(`/admin/ratings${query({ month })}`, { token }),
   rate: (token: string, data: { host_id: string; month_year: string; rating: number; note: string | null }) =>
     put<{ rating: HostRating } & Message>("/admin/ratings", token, data),
+  /**
+   * Every host without a rating for the month gets their suggestion; given ratings stay. `brandId`: only
+   * that brand's hosts; `withoutDeductions`: only hosts whose violations took nothing off.
+   */
+  applySuggested: (token: string, month: string, options: { brandId?: string; withoutDeductions?: boolean } = {}) =>
+    post<{ rated: number } & Message>("/admin/ratings/apply-suggested", token, {
+      month_year: month,
+      brand_id: options.brandId,
+      without_deductions: options.withoutDeductions,
+    }),
+  /** What one host's rating for the month rests on: its violations and recent ratings. */
+  ratingReview: (token: string, hostId: string, month: string) => api<RatingReview>(`/admin/ratings/hosts/${hostId}${query({ month })}`, { token }),
   /** The current points period (balances, history, SP letters, violation types) as Excel. */
   exportPoints: (token: string) => downloadFile("/operator/points/export", token, `poin-sp-${new Date().toISOString().slice(0, 10)}.xlsx`),
   /** Ratings of the month, plus that month's point history and SP letters, as Excel. */

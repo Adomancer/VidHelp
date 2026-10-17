@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Crown, Pencil, Plus, Tag } from "lucide-react";
+import { BookOpen, Crown, Pencil, Plus, Tag } from "lucide-react";
 import { adminHostsApi, operatorApi, type BrandInput, type BrandSummary } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { statusLabel } from "@/lib/labels";
-import { textareaClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useAuth } from "@/components/AuthProvider";
+import { KnowledgeEditor } from "@/components/BrandKnowledge";
 import DataTable from "@/components/DataTable";
 import DatePicker from "@/components/DatePicker";
 import EmptyState from "@/components/EmptyState";
@@ -27,7 +27,7 @@ import { notify } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
-function brandColumns(onEdit: (brand: BrandSummary) => void): ColumnDef<BrandSummary>[] {
+function brandColumns(onEdit: (brand: BrandSummary) => void, onKnowledge: (brand: BrandSummary) => void): ColumnDef<BrandSummary>[] {
   return [
     { accessorKey: "name", header: "Brand", cell: ({ row }) => <BrandName brand={row.original} /> },
     {
@@ -44,11 +44,23 @@ function brandColumns(onEdit: (brand: BrandSummary) => void): ColumnDef<BrandSum
       id: "actions",
       header: () => <span className="sr-only">Aksi</span>,
       enableSorting: false,
-      meta: { headClassName: "w-14", cellClassName: "text-right" },
+      meta: { headClassName: "w-24", cellClassName: "text-right whitespace-nowrap" },
       cell: ({ row }) => (
-        <Button type="button" variant="ghost" size="icon-sm" onClick={() => onEdit(row.original)} aria-label={`Ubah ${row.original.name}`} title="Ubah">
-          <Pencil />
-        </Button>
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onKnowledge(row.original)}
+            aria-label={`Product knowledge ${row.original.name}`}
+            title="Product knowledge"
+          >
+            <BookOpen />
+          </Button>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={() => onEdit(row.original)} aria-label={`Ubah ${row.original.name}`} title="Ubah">
+            <Pencil />
+          </Button>
+        </>
       ),
     },
   ];
@@ -58,8 +70,9 @@ export default function AdminBrandsPage() {
   const { token } = useAuth();
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const [editing, setEditing] = useState<BrandSummary | "new" | null>(null);
+  const [knowledgeOf, setKnowledgeOf] = useState<BrandSummary | null>(null);
   const list = brands.data?.brands;
-  const columns = useMemo(() => brandColumns(setEditing), []);
+  const columns = useMemo(() => brandColumns(setEditing, setKnowledgeOf), []);
 
   return (
     <div className="space-y-6">
@@ -101,31 +114,43 @@ export default function AdminBrandsPage() {
             className="text-body"
             rowClassName={() => "hover:bg-muted/40"}
             renderMobile={(brand) => (
-              <button
-                type="button"
-                onClick={() => setEditing(brand)}
-                className="w-full space-y-2 p-4 text-left outline-none focus-visible:bg-muted/60 active:bg-muted/60"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <BrandName brand={brand} />
-                  <BrandStatus brand={brand} />
-                </div>
-                <dl className="grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <dt className="text-muted-foreground">Target</dt>
-                    <dd className="font-medium text-foreground tabular-nums">{brand.target_hours_per_period} jam</dd>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setEditing(brand)}
+                  className="w-full space-y-2 p-4 pr-14 text-left outline-none focus-visible:bg-muted/60 active:bg-muted/60"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <BrandName brand={brand} />
+                    <BrandStatus brand={brand} />
                   </div>
-                  <div>
-                    <dt className="text-muted-foreground">Penggajian</dt>
-                    <dd className="font-medium text-foreground tabular-nums">{brand.payroll_start_date ? formatDate(brand.payroll_start_date) : "Belum"}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground">Host</dt>
-                    <dd className="font-medium text-foreground tabular-nums">{brand.active_hosts_count}</dd>
-                  </div>
-                </dl>
-                <Leader brand={brand} />
-              </button>
+                  <dl className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <dt className="text-muted-foreground">Target</dt>
+                      <dd className="font-medium text-foreground tabular-nums">{brand.target_hours_per_period} jam</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Penggajian</dt>
+                      <dd className="font-medium text-foreground tabular-nums">{brand.payroll_start_date ? formatDate(brand.payroll_start_date) : "Belum"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Host</dt>
+                      <dd className="font-medium text-foreground tabular-nums">{brand.active_hosts_count}</dd>
+                    </div>
+                  </dl>
+                  <Leader brand={brand} />
+                </button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setKnowledgeOf(brand)}
+                  aria-label={`Product knowledge ${brand.name}`}
+                  className="absolute right-4 bottom-4"
+                >
+                  <BookOpen />
+                </Button>
+              </div>
             )}
           />
         )}
@@ -143,6 +168,8 @@ export default function AdminBrandsPage() {
           onCancel={() => setEditing(null)}
         />
       )}
+
+      {knowledgeOf && <KnowledgeEditor brand={knowledgeOf} onClose={() => setKnowledgeOf(null)} />}
     </div>
   );
 }
@@ -196,7 +223,6 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
       const input: BrandInput = {
         name: formValue(data, "name"),
         is_obs: data.get("is_obs") === "on",
-        product_knowledge: formValue(data, "product_knowledge") || null,
         target_hours_per_period: Number(formValue(data, "target_hours_per_period")),
         payroll_start_date: formValue(data, "payroll_start_date") || null,
         status: (formValue(data, "status") || "active") as BrandInput["status"],
@@ -252,23 +278,6 @@ function BrandForm({ brand, onDone, onCancel }: { brand: BrandSummary | null; on
           <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="size-4 accent-primary" />
           Brand OBS <span className="text-muted-foreground">(live pakai OBS)</span>
         </label>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="product_knowledge">Product knowledge</Label>
-          <textarea
-            id="product_knowledge"
-            name="product_knowledge"
-            rows={8}
-            defaultValue={brand?.product_knowledge ?? ""}
-            placeholder="Produk, harga, promo, poin penting saat live, link katalog…"
-            aria-invalid={errors.product_knowledge ? true : undefined}
-            className={textareaClass}
-          />
-          {errors.product_knowledge ? (
-            <FieldError>{errors.product_knowledge}</FieldError>
-          ) : (
-            <FieldHint>Host yang ditugaskan ke brand ini melihatnya di halaman Brand mereka. Link bisa diklik.</FieldHint>
-          )}
-        </div>
         <FormActions loading={loading} submitLabel="Simpan" onCancel={onCancel} />
       </form>
     </Modal>

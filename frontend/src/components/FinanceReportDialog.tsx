@@ -12,6 +12,7 @@ import { useAuth } from "./AuthProvider";
 import DatePicker, { MonthPicker, parseDateInput } from "./DatePicker";
 import Dialog from "./Dialog";
 import FormAlert from "./FormAlert";
+import SearchableSelect from "./SearchableSelect";
 import { NativeSelect } from "./SelectField";
 import { notify } from "./Toast";
 
@@ -168,14 +169,14 @@ export default function FinanceReportDialog({ onClose }: { onClose: () => void }
 
         <div className="space-y-1.5">
           <Label htmlFor="report-brand">Brand</Label>
-          <NativeSelect id="report-brand" value={brandId} onChange={(event) => setBrandId(event.target.value)} wrapperClassName="sm:w-72">
-            <option value="">Semua brand</option>
-            {brands.data?.brands.map((brand) => (
-              <option key={brand.id} value={brand.id}>
-                {brand.name}
-              </option>
-            ))}
-          </NativeSelect>
+          {/* Over a hundred brands: type to find one ("all" stands for every brand) */}
+          <SearchableSelect
+            id="report-brand"
+            value={brandId || "all"}
+            onChange={(value) => setBrandId(value === "all" ? "" : value)}
+            options={[{ value: "all", label: "Semua brand" }, ...(brands.data?.brands.map((brand) => ({ value: brand.id, label: brand.name })) ?? [])]}
+            className="sm:w-72"
+          />
         </div>
 
         <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">

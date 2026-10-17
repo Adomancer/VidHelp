@@ -554,6 +554,52 @@ class PayrollService
     }
 
     /**
+     * Payroll at a glance, with host pay: periods that reached the target waiting for the PIC's
+     * request, requested ones waiting for the brand's payment (and since when the oldest waits),
+     * running periods, periods paid this month, and active brands without a payroll start.
+     *
+     * @return array{
+     *     waiting_payment: array{count: int, amount: float},
+     *     requested: array{count: int, amount: float, oldest_requested_at: ?string},
+     *     in_progress: array{count: int},
+     *     paid_this_month: array{count: int, amount: float},
+     *     brands_without_start: array{count: int, names: list<string>},
+     * }
+     */
+    public function overview(): array
+    {
+        // Not locked yet: pay comes from the live breakdown (there are few, the target just closed them)
+        $waiting = PaymentPeriod::where('status', 'waiting_payment')->get();
+        $requested = PaymentPeriod::where('status', 'requested')->select('id');
+        $paidThisMonth = PaymentPeriod::where('status', 'paid')
+            ->whereHas('paymentRequest', fn ($q) => $q->where('paid_at', '>=', now()->startOfMonth()))
+            ->select('id');
+        $oldestRequest = PaymentRequest::whereIn('payment_period_id', $requested)->where('status', '!=', 'cancelled')->min('requested_at');
+        $withoutStart = Brand::where('status', 'active')->whereNull('payroll_start_date')->orderBy('name');
+
+        return [
+            'waiting_payment' => [
+                'count' => $waiting->count(),
+                'amount' => round($waiting->sum(fn (PaymentPeriod $period) => $this->breakdown($period)['summary']['total_amount']), 2),
+            ],
+            'requested' => [
+                'count' => $requested->count(),
+                'amount' => (float) PaymentItem::whereIn('payment_period_id', $requested)->sum('amount'),
+                'oldest_requested_at' => $oldestRequest ? CarbonImmutable::parse($oldestRequest)->toIso8601String() : null,
+            ],
+            'in_progress' => ['count' => PaymentPeriod::where('status', 'in_progress')->count()],
+            'paid_this_month' => [
+                'count' => $paidThisMonth->count(),
+                'amount' => (float) PaymentItem::whereIn('payment_period_id', $paidThisMonth)->sum('amount'),
+            ],
+            'brands_without_start' => [
+                'count' => $withoutStart->count(),
+                'names' => $withoutStart->limit(5)->pluck('name')->all(),
+            ],
+        ];
+    }
+
+    /**
      * Live reports for the period's brand and dates that nobody has approved or rejected yet.
      */
     public function pendingReports(PaymentPeriod $period): int

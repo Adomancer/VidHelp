@@ -2,10 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\HostProfile;
+use App\Models\AppNotification;
 use App\Models\HostRateCategory;
 use App\Models\ProfileChangeRequest;
-use App\Models\AppNotification;
 use App\Models\User;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
@@ -284,6 +283,28 @@ class HostProfileTest extends TestCase
     {
         $this->actingAs($this->admin)->putJson('/api/host/profile/sensitive', ['bank_name' => 'BCA'])->assertNotFound();
         $this->actingAs($this->admin)->getJson('/api/host/profile')->assertOk()->assertJsonPath('host_profile', null);
+    }
+
+    public function test_rate_levels_list_hosts_moving_up_soon_and_hosts_placed_by_hand(): void
+    {
+        $this->travelTo('2026-10-17 09:00');
+        $soon = $this->activeHost()->hostProfile;
+        $soon->update(['join_date' => '2025-10-27']); // 12 months on 27 Oct
+        $this->activeHost()->hostProfile->update(['join_date' => '2026-01-05']); // 12 months on 5 Jan: past the 60 days
+        $this->activeHost()->hostProfile->update(['join_date' => '2024-01-01']); // already on the top level
+        $pinned = $this->activeHost()->hostProfile;
+        $pinned->update(['join_date' => '2025-10-20', 'rate_category_overridden' => true, 'rate_category_id' => $this->category('Di atas 1 tahun')->id]);
+
+        $response = $this->actingAs($this->admin)->getJson('/api/admin/rate-categories')->assertOk();
+
+        $this->assertSame([$soon->id], array_column($response->json('upcoming'), 'host_id'));
+        $response->assertJsonPath('upcoming.0.on', '2026-10-27')
+            ->assertJsonPath('upcoming.0.from.name', 'Di bawah 1 tahun')
+            ->assertJsonPath('upcoming.0.to.name', 'Di atas 1 tahun')
+            ->assertJsonPath('upcoming_days', 60)
+            ->assertJsonPath('pinned.0.host_id', $pinned->id)
+            ->assertJsonPath('pinned.0.level.name', 'Di atas 1 tahun')
+            ->assertJsonCount(1, 'pinned');
     }
 
     public function test_rate_level_in_use_cannot_be_deleted(): void

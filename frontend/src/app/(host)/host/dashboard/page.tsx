@@ -287,7 +287,11 @@ function NextUp({ sessions, now, onChanged, className }: { sessions: HostDashboa
         </div>
       </div>
 
-      {error && <FormAlert tone="error" className="mt-4">{error}</FormAlert>}
+      {error && (
+        <FormAlert tone="error" className="mt-4">
+          {error}
+        </FormAlert>
+      )}
 
       {state === "live" && <Progress value={elapsed} aria-label="Waktu live berjalan" className="mt-4 h-1.5" indicatorClassName="bg-success" />}
 
@@ -318,7 +322,9 @@ function todoList(data: HostDashboard): TodoItem[] {
   const rest = counted.filter((item) => !item.urgent);
   // Someone is waiting for my answer: right after the deadlines
   const asked: TodoItem[] =
-    data.cover_chances.asked_me > 0 ? [{ key: "asked_me", label: "Host lain memintamu jadi backup", href: "/host/backups", icon: "backup", count: data.cover_chances.asked_me }] : [];
+    data.cover_chances.asked_me > 0
+      ? [{ key: "asked_me", label: "Host lain memintamu jadi backup", href: "/host/backups", icon: "backup", count: data.cover_chances.asked_me }]
+      : [];
   const discord: TodoItem[] = data.discord_unlinked
     ? [{ key: "discord", label: "Hubungkan Discord untuk pengingat jadwal", href: "/host/profile#discord", icon: "notifications" }]
     : [];
@@ -478,7 +484,11 @@ function Week({ sessions, now, className }: { sessions: HostDashboardSession[]; 
               <p className="px-4 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-faint uppercase">{dayWord(day, now)}</p>
               <ul>
                 {list.map((session) => (
-                  <WeekRow key={`${session.role}-${session.slot_id ?? session.event_claim_id}-${session.start_at}`} session={session} state={stateNow(session, now)} />
+                  <WeekRow
+                    key={`${session.role}-${session.slot_id ?? session.event_claim_id}-${session.start_at}`}
+                    session={session}
+                    state={stateNow(session, now)}
+                  />
                 ))}
               </ul>
             </div>
@@ -509,8 +519,14 @@ function WeekRow({ session, state }: { session: HostDashboardSession; state: Ses
       </div>
       <span className={cn("w-0.5 self-stretch rounded-full", roleFill[session.role])} aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className={cn("truncate text-sm font-medium", off ? "text-muted-foreground line-through decoration-faint" : "text-foreground")}>{session.brand.name}</p>
-        {note && <p className={cn("truncate text-xs", session.role === "cover" ? "text-info" : session.role === "event" ? "text-brand" : "text-muted-foreground")}>{note}</p>}
+        <p className={cn("truncate text-sm font-medium", off ? "text-muted-foreground line-through decoration-faint" : "text-foreground")}>
+          {session.brand.name}
+        </p>
+        {note && (
+          <p className={cn("truncate text-xs", session.role === "cover" ? "text-info" : session.role === "event" ? "text-brand" : "text-muted-foreground")}>
+            {note}
+          </p>
+        )}
       </div>
       {badge && (
         <StatusBadge tone={badge.tone} dot pulse={state === "live"} className="h-5 px-1.5 text-[11px]">
@@ -538,7 +554,13 @@ function Chances({ claimable, covers }: { claimable: number | null; covers: Host
           icon={ArrowLeftRight}
           count={covers.count}
           label="Backup bisa kamu ambil"
-          note={covers.asked_me > 0 ? `${covers.asked_me} memintamu langsung` : covers.count > 0 ? "Gantikan host yang berhalangan" : "Belum ada yang butuh pengganti"}
+          note={
+            covers.asked_me > 0
+              ? `${covers.asked_me} memintamu langsung`
+              : covers.count > 0
+                ? "Gantikan host yang berhalangan"
+                : "Belum ada yang butuh pengganti"
+          }
           highlight={covers.asked_me > 0}
         />
       </ul>
@@ -571,10 +593,7 @@ function ChanceRow({
         className="group flex items-center gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors outline-none hover:border-input hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <span
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-lg",
-            some ? "bg-primary/10 text-brand" : "bg-muted text-muted-foreground"
-          )}
+          className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", some ? "bg-primary/10 text-brand" : "bg-muted text-muted-foreground")}
         >
           <Icon className="size-4" aria-hidden="true" />
         </span>
@@ -651,7 +670,11 @@ function Pay({ pay, className }: { pay: HostDashboard["pay"]; className?: string
                     <span className="truncate tabular-nums" title={`${formatDuration(period.brand_hours)} dari ${formatDuration(period.target_hours)}`}>
                       Target brand {compactHours(period.brand_hours)} / {compactHours(period.target_hours)}
                     </span>
-                    {period.status === "in_progress" ? <span className="shrink-0 tabular-nums">kurang {compactHours(left)}</span> : <PeriodBadge status={period.status} />}
+                    {period.status === "in_progress" ? (
+                      <span className="shrink-0 tabular-nums">kurang {compactHours(left)}</span>
+                    ) : (
+                      <PeriodBadge status={period.status} />
+                    )}
                   </div>
                 </li>
               );

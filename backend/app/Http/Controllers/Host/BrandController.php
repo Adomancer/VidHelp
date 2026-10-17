@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Host;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Operator\BrandKnowledgeController;
+use App\Models\Attachment;
 use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\EventSlotClaim;
@@ -10,6 +12,7 @@ use App\Models\HostProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BrandController extends Controller
 {
@@ -35,8 +38,13 @@ class BrandController extends Controller
         $brands = Brand::query()
             ->whereIn('id', $via->keys())
             ->where('status', 'active')
+            ->with('attachments')
             ->get(['id', 'name', 'is_obs', 'product_knowledge'])
-            ->map(fn (Brand $brand) => [...$brand->toArray(), 'via' => $via[$brand->id]])
+            ->map(fn (Brand $brand) => [
+                ...$brand->withoutRelations()->toArray(),
+                'files' => $brand->attachments,
+                'via' => $via[$brand->id],
+            ])
             ->sortBy([['via', 'asc'], ['name', 'asc']])
             ->values();
 
@@ -49,6 +57,22 @@ class BrandController extends Controller
      */
     public function show(Request $request, Brand $brand): JsonResponse
     {
+        $this->ensureLivesFor($request, $brand);
+
+        return response()->json(['brand' => [...$brand->only('id', 'name', 'is_obs', 'product_knowledge'), 'files' => $brand->attachments()->get()]]);
+    }
+
+    /** One of the brand's product knowledge files (PDFs and images open in the browser). */
+    public function file(Request $request, Brand $brand, Attachment $attachment): StreamedResponse
+    {
+        $this->ensureLivesFor($request, $brand);
+
+        return BrandKnowledgeController::stream($brand, $attachment);
+    }
+
+    /** A brand I'm assigned to, or cover a backup or took an event block for. */
+    private function ensureLivesFor(Request $request, Brand $brand): void
+    {
         $profile = $request->user()->hostProfile;
 
         abort_unless(
@@ -58,8 +82,6 @@ class BrandController extends Controller
             403,
             'Kamu tidak live untuk brand ini.'
         );
-
-        return response()->json(['brand' => $brand->only('id', 'name', 'is_obs', 'product_knowledge')]);
     }
 
     /** @return Collection<int, string> */

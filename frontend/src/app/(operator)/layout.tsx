@@ -18,6 +18,7 @@ const links: SidebarGroup[] = [
       { href: "/operator/schedules", label: "Jadwal", icon: "calendar" },
       { href: "/operator/events", label: "Event", icon: "event" },
       { href: "/operator/backups", label: "Backup", icon: "backup" },
+      { href: "/operator/brands", label: "Product Knowledge", icon: "knowledge" },
     ],
   },
   {

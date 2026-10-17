@@ -31,6 +31,7 @@ use App\Http\Controllers\Host\ProfileController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Operator\AssignmentController;
 use App\Http\Controllers\Operator\BackupController as OperatorBackupController;
+use App\Http\Controllers\Operator\BrandKnowledgeController;
 use App\Http\Controllers\Operator\DashboardController as OperatorDashboardController;
 use App\Http\Controllers\Operator\EventController as OperatorEventController;
 use App\Http\Controllers\Operator\HostController as OperatorHostController;
@@ -162,8 +163,10 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::put('/violation-types/{violationType}', [ViolationTypeController::class, 'update']);
         Route::get('/ratings', [RatingController::class, 'index']);
         Route::get('/ratings/export', [RatingController::class, 'export']);
+        Route::get('/ratings/hosts/{host}', [RatingController::class, 'show']);
         Route::get('/ratings/hosts/{host}/history', [RatingController::class, 'history']);
         Route::put('/ratings', [RatingController::class, 'upsert']);
+        Route::post('/ratings/apply-suggested', [RatingController::class, 'applySuggested']);
     });
 
     /*
@@ -176,6 +179,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::get('/hosts', [PayrollController::class, 'hosts']);
 
         // Payroll: periods per brand, salary slips
+        Route::get('/payroll/summary', [PayrollController::class, 'summary']);
         Route::get('/payroll/periods', [PayrollController::class, 'periods']);
         Route::get('/payroll/periods/{period}', [PayrollController::class, 'show']);
         Route::get('/payroll/periods/{period}/export', [PayrollController::class, 'export']);
@@ -215,6 +219,13 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         Route::get('/hosts/export', [OperatorHostController::class, 'export']);
         Route::get('/brands', [BrandController::class, 'index']);
         Route::get('/brands/{brand}/hosts', [BrandController::class, 'hosts']);
+
+        // Product knowledge: the text pasted from WA plus the files the brand sent
+        Route::get('/brands/{brand}/knowledge', [BrandKnowledgeController::class, 'show']);
+        Route::put('/brands/{brand}/knowledge', [BrandKnowledgeController::class, 'update']);
+        Route::post('/brands/{brand}/knowledge/files', [BrandKnowledgeController::class, 'upload']);
+        Route::get('/brands/{brand}/knowledge/files/{attachment}', [BrandKnowledgeController::class, 'file']);
+        Route::delete('/brands/{brand}/knowledge/files/{attachment}', [BrandKnowledgeController::class, 'destroy']);
         Route::post('/assignments', [AssignmentController::class, 'store']);
         Route::put('/assignments/{assignment}', [AssignmentController::class, 'update']);
 
@@ -276,6 +287,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         // Product knowledge of the brands I'm assigned to
         Route::get('/brands', [HostBrandController::class, 'index']);
         Route::get('/brands/{brand}', [HostBrandController::class, 'show']);
+        Route::get('/brands/{brand}/files/{attachment}', [HostBrandController::class, 'file']);
 
         // Backups: request cover for my slot (open or to named hosts), apply to cover others
         Route::get('/backups', [HostBackupController::class, 'index']);

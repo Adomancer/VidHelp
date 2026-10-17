@@ -18,6 +18,9 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PayrollController extends Controller
 {
+    /** Periods per page in the list. */
+    private const PERIODS_PER_PAGE = 25;
+
     public function __construct(private PayrollService $payroll) {}
 
     /**
@@ -50,25 +53,59 @@ class PayrollController extends Controller
     }
 
     /**
-     * Recent payment periods (newest first), with worked hours and pay totals.
+     * Payroll at a glance: what waits for the PIC and for the brand, what runs, what was paid this month.
+     */
+    public function summary(): JsonResponse
+    {
+        return response()->json($this->payroll->overview());
+    }
+
+    /**
+     * Payment periods a page at a time, with hours and pay totals. `status`: action (waiting for
+     * the PIC's request or the brand's payment, longest waiting first), in_progress (by brand),
+     * paid (newest first); none = every period, newest first. `search` matches the brand name.
      */
     public function periods(Request $request): JsonResponse
     {
-        $request->validate(['brand_id' => 'nullable|uuid']);
+        $validated = $request->validate([
+            'status' => 'nullable|in:action,in_progress,paid',
+            'search' => 'nullable|string|max:100',
+        ]);
+        $status = $validated['status'] ?? null;
+        $brandName = Brand::select('name')->whereColumn('brands.id', 'payment_periods.brand_id');
 
-        $periods = PaymentPeriod::query()
-            ->with('brand:id,name')
-            ->when($request->brand_id, fn ($q, $id) => $q->where('brand_id', $id))
-            ->orderByDesc('period_start')
-            ->limit(60)
-            ->get()
-            ->map(function (PaymentPeriod $period) {
+        $query = PaymentPeriod::query()
+            ->with(['brand:id,name', 'paymentRequest'])
+            ->when($validated['search'] ?? null, fn ($q, $search) => $q->whereHas('brand', fn ($q) => $q->where('name', 'like', "%{$search}%")))
+            ->when($status === 'action', fn ($q) => $q->whereIn('status', ['waiting_payment', 'requested']))
+            ->when(in_array($status, ['in_progress', 'paid'], true), fn ($q) => $q->where('status', $status));
+
+        match ($status) {
+            'action' => $query->orderBy('closed_at'),
+            'in_progress' => $query->orderBy($brandName),
+            'paid' => $query->orderByDesc('period_end'),
+            default => $query->orderByDesc('period_start'),
+        };
+
+        $periods = $query->orderBy($brandName)
+            ->paginate(self::PERIODS_PER_PAGE)
+            ->through(function (PaymentPeriod $period) {
                 ['hosts' => $hosts, 'summary' => $summary] = $this->payroll->breakdown($period);
 
-                return [...$period->toArray(), ...$summary, 'hosts' => $hosts->count()];
+                return [
+                    ...$period->toArray(),
+                    ...$summary,
+                    'hosts' => $hosts->count(),
+                    // Waiting on the brand since the request, on the PIC since the target closed it
+                    'waiting_since' => match ($period->status) {
+                        'requested' => $period->paymentRequest?->requested_at,
+                        'waiting_payment' => $period->closed_at,
+                        default => null,
+                    },
+                ];
             });
 
-        return response()->json(['periods' => $periods]);
+        return response()->json($periods);
     }
 
     /**

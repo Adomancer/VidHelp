@@ -752,4 +752,102 @@ class PayrollTest extends TestCase
 
         $this->actingAs($operator)->getJson('/api/finance/payroll/periods')->assertForbidden();
     }
+
+    /** Another brand (payroll from 1 Sep, target 10 h) with one period in `$status`. */
+    private function brandPeriod(string $name, string $status, array $attributes = []): PaymentPeriod
+    {
+        $brand = Brand::create(['name' => $name, 'target_hours_per_period' => 10, 'payroll_start_date' => '2026-09-01']);
+
+        return PaymentPeriod::create(['brand_id' => $brand->id, 'period_start' => '2026-09-01', 'target_hours' => 10, 'status' => $status, ...$attributes]);
+    }
+
+    /** A locked period's request and the host pay snapshotted with it. */
+    private function lockedPay(PaymentPeriod $period, string $requestedAt, float $amount, ?string $paidAt = null): void
+    {
+        $period->paymentRequests()->create([
+            'requested_by' => $this->finance->id, 'requested_at' => $requestedAt,
+            'status' => $paidAt ? 'paid' : 'requested', 'paid_at' => $paidAt,
+        ]);
+        $period->items()->create([
+            'host_id' => $this->host->id, 'session_count' => 1, 'hours' => $amount / 20000, 'rate_per_hour' => 20000, 'amount' => $amount,
+        ]);
+    }
+
+    public function test_period_list_puts_what_waits_longest_first_under_action(): void
+    {
+        $this->brandPeriod('Teh', 'waiting_payment', ['period_end' => '2026-10-02', 'closed_at' => '2026-10-02 20:00']);
+        $kopi = $this->brandPeriod('Kopi', 'requested', ['period_end' => '2026-09-20', 'closed_at' => '2026-09-20 20:00']);
+        $this->lockedPay($kopi, '2026-09-22 09:00', 200000);
+        $this->brandPeriod('Susu', 'in_progress');
+        $this->brandPeriod('Roti', 'paid', ['period_end' => '2026-09-10', 'closed_at' => '2026-09-10 20:00']);
+
+        $periods = $this->actingAs($this->finance)->getJson('/api/finance/payroll/periods?status=action')->assertOk()->json('data');
+
+        $this->assertSame(['Kopi', 'Teh'], array_column(array_column($periods, 'brand'), 'name'));
+        $this->assertSame(['2026-09-22T02:00:00.000000Z', '2026-10-02T13:00:00.000000Z'], array_column($periods, 'waiting_since')); // request, then the close
+        $this->assertEquals(200000, $periods[0]['total_amount']);
+    }
+
+    public function test_running_periods_list_brand_by_brand_a_page_at_a_time(): void
+    {
+        foreach (range(1, 26) as $number) {
+            $this->brandPeriod(sprintf('Kopi %02d', $number), 'in_progress');
+        }
+        $this->brandPeriod('Teh', 'in_progress');
+        $this->brandPeriod('Susu', 'paid');
+
+        $this->actingAs($this->finance)->getJson('/api/finance/payroll/periods?status=in_progress&page=2')
+            ->assertOk()
+            ->assertJsonPath('total', 27)
+            ->assertJsonPath('last_page', 2)
+            ->assertJsonPath('data.0.brand.name', 'Kopi 26')
+            ->assertJsonPath('data.1.brand.name', 'Teh');
+    }
+
+    public function test_period_list_finds_brands_by_part_of_their_name(): void
+    {
+        $this->brandPeriod('Kopi Nusantara', 'in_progress');
+        $this->brandPeriod('Teh Manis', 'paid');
+
+        $this->actingAs($this->finance)->getJson('/api/finance/payroll/periods?search=nusa')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.brand.name', 'Kopi Nusantara');
+    }
+
+    public function test_period_list_rejects_an_unknown_status(): void
+    {
+        $this->actingAs($this->finance)->getJson('/api/finance/payroll/periods?status=lost')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_payroll_summary_adds_up_pay_at_each_stage(): void
+    {
+        $this->workSession($this->host, '2026-10-02', 12); // Brand A reaches its 10 h: 200.000 waits for the PIC, the next period runs
+        $this->lockedPay($this->brandPeriod('Kopi', 'requested'), '2026-09-28 10:00', 300000);
+        $this->lockedPay($this->brandPeriod('Teh', 'requested'), '2026-10-01 10:00', 100000);
+        $this->lockedPay($this->brandPeriod('Roti', 'paid'), '2026-09-29 10:00', 80000, '2026-10-02 15:00');
+        $this->lockedPay($this->brandPeriod('Susu', 'paid'), '2026-09-15 10:00', 50000, '2026-09-25 15:00'); // last month
+        Brand::create(['name' => 'Baru', 'target_hours_per_period' => 10]);
+        Brand::create(['name' => 'Lama', 'target_hours_per_period' => 10, 'status' => 'inactive']);
+
+        $this->actingAs($this->finance)->getJson('/api/finance/payroll/summary')
+            ->assertOk()
+            ->assertExactJson([
+                'waiting_payment' => ['count' => 1, 'amount' => 200000],
+                'requested' => ['count' => 2, 'amount' => 400000, 'oldest_requested_at' => '2026-09-28T10:00:00+07:00'],
+                'in_progress' => ['count' => 1],
+                'paid_this_month' => ['count' => 1, 'amount' => 80000],
+                'brands_without_start' => ['count' => 1, 'names' => ['Baru']],
+            ]);
+    }
+
+    public function test_operator_cannot_open_the_payroll_summary(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operator');
+
+        $this->actingAs($operator)->getJson('/api/finance/payroll/summary')->assertForbidden();
+    }
 }
