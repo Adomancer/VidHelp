@@ -25,6 +25,25 @@ export function notify({ text, tone = "success", undo }: ToastMessage) {
   });
 }
 
+/**
+ * A dark capsule at the bottom center for about two seconds: confirmations and errors on
+ * pages where people work quickly and don't need an undo.
+ */
+export function notifyCapsule(text: string, tone: "success" | "error" = "success", duration = 2000) {
+  toast.custom(
+    () => (
+      <div
+        role={tone === "error" ? "alert" : "status"}
+        className="mx-auto flex w-fit max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white shadow-lg ring-1 ring-white/10"
+      >
+        <span className={tone === "error" ? "size-2 shrink-0 rounded-full bg-red-400" : "size-2 shrink-0 rounded-full bg-emerald-400"} aria-hidden="true" />
+        {text}
+      </div>
+    ),
+    { position: "bottom-center", duration }
+  );
+}
+
 /** `show` for components that send toasts. */
 export function useToast() {
   return { show: notify };

@@ -34,6 +34,7 @@ export type BrandInput = Omit<Brand, "id">;
 
 export interface BrandSummary extends Brand {
   active_hosts_count: number;
+  created_at?: string;
   leader: { id: string; name: string } | null;
 }
 

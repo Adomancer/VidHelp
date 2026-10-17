@@ -42,20 +42,111 @@ class EventService
         return $event;
     }
 
-    /** Only settings that don't move existing blocks can change. */
+    /** Fields that move the block grid. */
+    private const SCHEDULE = ['start_date', 'end_date', 'daily_start_time', 'daily_end_time', 'block_minutes'];
+
+    /**
+     * Change anything but the brand. Dates, hours and block length may change as long as every
+     * block a host holds is still a block afterwards (same start and end); otherwise the change
+     * is refused with the blocks in the way. Hosts of the brand hear about a new schedule.
+     */
     public function update(SpecialEvent $event, array $attributes): SpecialEvent
     {
+        $next = (clone $event)->fill($attributes);
+        $moved = collect(self::SCHEDULE)->contains(fn (string $field) => array_key_exists($field, $attributes)
+            && (string) $next->getAttribute($field) !== (string) $event->getAttribute($field));
+
+        if ($moved) {
+            $this->ensureValidSchedule($event, $next);
+            $this->ensureNoOverlap($event->brand_id, $next->start_date->toDateString(), $next->end_date->toDateString(), $event->id);
+            $this->ensureClaimsFit($event, $next);
+        }
+
         $event->update($attributes);
+        $event->load('brand');
+
+        if ($moved) {
+            $days = $event->start_date->translatedFormat('j M').($event->end_date->equalTo($event->start_date) ? '' : ' – '.$event->end_date->translatedFormat('j M'));
+            $this->notifier->toUsers($this->notifier->hosts($event->brand_id), Notice::make('event_updated', "Jadwal event berubah: {$event->name} ({$event->brand->name})")
+                ->body("Sekarang {$days}, {$event->daily_start_time}–{$event->daily_end_time}, blok {$event->block_minutes} menit. Blok yang sudah kamu ambil tetap milikmu.")
+                ->brand($event->brand->name)
+                ->field('Tanggal', $days)
+                ->field('Jam harian', "{$event->daily_start_time}–{$event->daily_end_time}")
+                ->field('Panjang blok', "{$event->block_minutes} menit")
+                ->link('/host/events', 'Lihat blok'));
+        }
 
         return $event;
     }
 
-    public function cancel(SpecialEvent $event): void
+    /**
+     * Remove the event and its blocks. Not once a host has checked in for one of them (that
+     * live is part of their hours and pay); hosts holding blocks still to come are told.
+     */
+    public function delete(SpecialEvent $event): void
     {
+        $claimIds = $event->claims()->pluck('id');
+        if (Attendance::whereIn('event_claim_id', $claimIds)->exists()) {
+            throw ValidationException::withMessages(['event' => ['Event ini sudah berjalan: ada host yang check-in di salah satu bloknya, jadi tidak bisa dihapus.']]);
+        }
+
+        $event->load('brand');
+        $holders = $event->claims()->active()->where('end_at', '>', now())->with('host.user')->get()
+            ->map(fn (EventSlotClaim $claim) => $claim->host->user)->unique('id')->values();
+
         DB::transaction(function () use ($event) {
-            $event->update(['status' => 'cancelled']);
-            $event->claims()->active()->update(['status' => 'cancelled']);
+            $event->claims()->delete();
+            $event->delete();
         });
+
+        if ($holders->isNotEmpty()) {
+            $this->notifier->toUsers($holders, Notice::make('event_deleted', "Event dihapus: {$event->name} ({$event->brand->name})")
+                ->body('Event ini dihapus admin, jadi blok yang kamu ambil di event ini ikut dilepas.')
+                ->brand($event->brand->name)
+                ->link('/host/events', 'Lihat event lain'), dm: true);
+        }
+    }
+
+    private function ensureValidSchedule(SpecialEvent $event, SpecialEvent $next): void
+    {
+        $errors = [];
+        $today = today()->toDateString();
+        $start = $next->start_date->toDateString();
+        $end = $next->end_date->toDateString();
+
+        if ($start !== $event->start_date->toDateString() && $start < $today) {
+            $errors['start_date'] = ['Hari pertama yang baru tidak boleh sebelum hari ini.'];
+        }
+        if ($end < $start) {
+            $errors['end_date'] = ['Hari terakhir tidak boleh sebelum hari pertama.'];
+        } elseif ($end !== $event->end_date->toDateString() && $end < $today) {
+            $errors['end_date'] = ['Hari terakhir yang baru tidak boleh sebelum hari ini.'];
+        }
+        if ($next->daily_start_time === $next->daily_end_time) {
+            $errors['daily_end_time'] = ['Jam tutup harus beda dengan jam buka.'];
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /** Every held block must still exist, start and end alike, in the new grid. */
+    private function ensureClaimsFit(SpecialEvent $event, SpecialEvent $next): void
+    {
+        $grid = collect($next->blocks())->mapWithKeys(fn (array $block) => [$block[0]->format('Y-m-d H:i') => $block[1]->format('Y-m-d H:i')]);
+
+        $lost = $event->claims()->active()->with('host.user')->orderBy('start_at')->get()
+            ->reject(fn (EventSlotClaim $claim) => $grid->get($claim->start_at->format('Y-m-d H:i')) === $claim->end_at->format('Y-m-d H:i'));
+
+        if ($lost->isNotEmpty()) {
+            $list = $lost->take(3)->map(fn (EventSlotClaim $claim) => $claim->start_at->locale('id')->translatedFormat('D j M H:i').'–'.$claim->end_at->format('H:i')." ({$claim->host->user->name})")->implode(', ');
+            $more = $lost->count() > 3 ? ' dan '.($lost->count() - 3).' lainnya' : '';
+
+            throw ValidationException::withMessages(['schedule' => [
+                "{$lost->count()} blok yang sudah diambil tidak ada di jadwal baru: {$list}{$more}. Lepas blok itu dulu atau sesuaikan jadwalnya.",
+            ]]);
+        }
     }
 
     /**
