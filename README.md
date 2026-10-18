@@ -88,7 +88,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 | `app/Http/Controllers/Host/` | Profile, my schedule, availability, backups, live check-in/report, events, score, pay |
 | `app/Http/Controllers/Auth/` | Login, register, Google sign-in, password reset, 2FA code step |
 | `app/Http/Controllers/*.php` | Shared for every role: notifications, Discord link, my 2FA, public settings |
-| `app/Http/Middleware/` | `EnsureUserIsActive` (`active`), `EnsureTwoFactorSetUp` (`two_factor`) |
+| `app/Http/Middleware/` | `EnsureUserIsActive` (`active`), `EnsureTwoFactorSetUp` (`two_factor`), `VerifyDiscordSignature` (slash commands) |
 | `app/Models/` | 35 models; `Concerns/Auditable.php` is the audit trait |
 | `config/vidhelp.php` | Business rule defaults |
 | `routes/api.php` | Every API route, grouped by role |
@@ -107,6 +107,7 @@ House coding rules that every contributor (and AI agent) follows are in [`backen
 | `RatingService` | Monthly 1–5 host ratings and the suggested value |
 | `PayrollService` | Pay periods per brand (each runs until the brand's target hours, then the brand's leader requests payment), host pay, payment requests (blocked while reports await review; can be cancelled to reopen a period), salary slips, kasbon (installments, direct payback, rescheduling), CSV export |
 | `Notifier` / `DiscordClient` | Bell notifications, Discord channel posts and DMs, retries |
+| `DiscordCommands` | The bot's slash commands: `/jadwal`, `/backup`, `/poin`, `/gaji` for hosts (only they see the answer), `/clear` for members with Manage Messages |
 | `TwoFactorService` / `Totp` | Two-factor sign-in for admin and finance, recovery codes |
 | `SettingsService` | Admin-editable rules layered over `config/vidhelp.php` |
 | `AccountService` | Accounts made by admins, deactivate / archive (takes a host off the schedule), delete permanently (anonymize) |
@@ -137,6 +138,7 @@ Base URL `http://localhost:8000/api`. Send `Accept: application/json` and, once 
 | `/auth/me`, `/auth/logout` | Signed in | current user (with `roles`), sign out |
 | `/two-factor` | Admin, finance | status, `setup`, `confirm`, `recovery-codes`, turn off |
 | `/notifications`, `/discord`, `/settings` | Any active user | bell list and unread count, Discord link, public rule numbers |
+| `/discord/interactions` | Discord (signed with `DISCORD_PUBLIC_KEY`) | slash commands; set it as Interactions Endpoint URL in the Developer Portal, then run `php artisan discord:register-commands` |
 | `/admin/...` | Admin | `dashboard`, `users` (+ `archive`, `erase`), `hosts/{id}`, `brands`, `rate-categories`, `points/...`, `warning-letters`, `violation-types`, `ratings` (+ `export` to Excel, `hosts/{id}/history`), `settings`, `audit-logs` |
 | `/finance/...` | Finance, admin | `brands`, `hosts`, `payroll/...`, `cash-advances` |
 | `/operator/...` | Operator, admin | `dashboard`, `hosts` (+ `export` to Excel), `brands`, `assignments`, `schedules`, `backups/...`, `reports/...`, `events/...`, `points/...` |

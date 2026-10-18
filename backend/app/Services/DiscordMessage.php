@@ -59,11 +59,22 @@ class DiscordMessage
      */
     private static function buttons(AppNotification $notification, array $buttons): array
     {
-        if (! self::isPublic(config('app.frontend_url'))) {
-            return [];
-        }
         if ($buttons === [] && $notification->link) {
             $buttons = [['label' => 'Buka di VidHelp', 'path' => $notification->link]];
+        }
+
+        return self::linkButtons($buttons);
+    }
+
+    /**
+     * Buttons that open these VidHelp pages (at most 5); none when the frontend isn't public.
+     *
+     * @param  list<array{label: string, path: string}>  $buttons
+     */
+    public static function linkButtons(array $buttons): array
+    {
+        if (! self::isPublic(config('app.frontend_url'))) {
+            return [];
         }
 
         return collect($buttons)->take(5)->map(fn (array $button) => [

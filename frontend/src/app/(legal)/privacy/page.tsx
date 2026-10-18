@@ -73,6 +73,11 @@ export default function PrivacyPage() {
           channel server agensi. Riwayat pengiriman notifikasi (judul, isi, waktu, dan status terkirim) disimpan di VidHelp.
         </p>
         <p>
+          Saat kamu memakai command bot seperti /jadwal, /backup, /poin, atau /gaji, bot memakai ID Discord kamu untuk mencari akun VidHelp
+          yang terhubung. Jawabannya hanya terlihat oleh kamu. Command /clear hanya bisa dipakai pengurus server yang punya izin mengelola pesan.
+          Bot menghapus pesan di channel itu memakai ID pesan saja, tanpa membaca atau menyimpan isinya.
+        </p>
+        <p>
           Kamu bisa memutuskan Discord kapan saja dari halaman profil atau akun di VidHelp. Data penghubung Discord kamu langsung dihapus, dan bot berhenti mengirim
           DM.
         </p>

@@ -16,6 +16,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\DiscordController;
+use App\Http\Controllers\DiscordInteractionController;
 use App\Http\Controllers\Finance\CashAdvanceController;
 use App\Http\Controllers\Finance\PayrollController;
 use App\Http\Controllers\Host\AvailabilityController;
@@ -40,6 +41,7 @@ use App\Http\Controllers\Operator\ReportController;
 use App\Http\Controllers\Operator\ScheduleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\TwoFactorController;
+use App\Http\Middleware\VerifyDiscordSignature;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -60,6 +62,9 @@ Route::prefix('auth')->middleware('throttle:10,1')->group(function () {
     Route::get('/google/redirect', [GoogleAuthController::class, 'redirect']);
     Route::get('/google/callback', [GoogleAuthController::class, 'callback']);
 });
+
+// Slash commands from Discord (signed by Discord instead of a user token)
+Route::post('/discord/interactions', DiscordInteractionController::class)->middleware(VerifyDiscordSignature::class);
 
 /*
 |--------------------------------------------------------------------------

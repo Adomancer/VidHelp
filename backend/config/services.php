@@ -39,6 +39,8 @@ return [
         'client_id' => env('DISCORD_CLIENT_ID'),
         'client_secret' => env('DISCORD_CLIENT_SECRET'),
         'redirect' => env('DISCORD_REDIRECT_URI'),
+        // Checks that slash command requests come from Discord
+        'public_key' => env('DISCORD_PUBLIC_KEY'),
         'guild_id' => env('DISCORD_GUILD_ID'),
         'channels' => [
             'backups' => env('DISCORD_CHANNEL_BACKUPS'),

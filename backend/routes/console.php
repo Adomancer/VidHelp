@@ -4,6 +4,8 @@ use App\Models\AuditLog;
 use App\Models\HostProfile;
 use App\Models\User;
 use App\Services\BackupService;
+use App\Services\DiscordClient;
+use App\Services\DiscordCommands;
 use App\Services\DiscordPreview;
 use App\Services\Notifier;
 use App\Services\PayrollService;
@@ -95,6 +97,24 @@ Artisan::command('discord:preview {to=backups : backups, admin, or the email of 
 
     return 0;
 })->purpose('Send an example of every notification type to a Discord channel or DM, to see how they look');
+
+Artisan::command('discord:register-commands', function (DiscordClient $discord, DiscordCommands $commands) {
+    if (! $discord->hasGuild() || ! filled(config('services.discord.client_id'))) {
+        $this->error('Isi DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID dan DISCORD_GUILD_ID dulu.');
+
+        return 1;
+    }
+
+    foreach ($discord->registerCommands($commands->definitions()) as $command) {
+        $this->line("<info>✓</info> /{$command['name']}");
+    }
+
+    if (! filled(config('services.discord.public_key'))) {
+        $this->warn('DISCORD_PUBLIC_KEY is empty: the commands show up, but VidHelp refuses them until it is set.');
+    }
+
+    return 0;
+})->purpose('Register the bot\'s slash commands in the agency server (run again after changing them)');
 
 // Delete audit rows older than vidhelp.audit.keep_days
 Schedule::command('model:prune', ['--model' => [AuditLog::class]])->dailyAt('01:00');
