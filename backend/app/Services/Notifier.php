@@ -198,6 +198,42 @@ class Notifier
     }
 
     /**
+     * DM a password reset link to a user who linked Discord, after the response. It goes straight
+     * to Discord and is never stored (no bell, no delivery row): the link opens their account.
+     */
+    public function passwordResetDm(User $user, string $path): void
+    {
+        $link = $user->discordLink;
+        if (! $link || ! $this->discord->configured()) {
+            return;
+        }
+
+        $minutes = config('auth.passwords.'.config('auth.defaults.passwords').'.expire');
+        $notice = new AppNotification([
+            'type' => 'password_reset',
+            'title' => 'Atur ulang kata sandi',
+            'body' => "Ada permintaan atur ulang kata sandi untuk akun VidHelp {$user->email}. Link ini berlaku {$minutes} menit. Kalau bukan kamu yang meminta, abaikan pesan ini; kata sandimu tidak berubah.",
+            'link' => $path,
+            'payload' => ['buttons' => [['label' => 'Atur ulang kata sandi', 'path' => $path]]],
+        ]);
+        $notice->created_at = now();
+
+        $discordUserId = $link->discord_user_id;
+        $message = DiscordMessage::for($notice);
+        dispatch(static fn () => app(self::class)->sendDm($discordUserId, $message))->afterResponse();
+    }
+
+    /** One DM without a delivery row: a failure is only logged, not retried. */
+    private function sendDm(string $discordUserId, array $message): void
+    {
+        try {
+            $this->discord->postMessage($this->dmChannel($discordUserId), $message);
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
      * Send a sample DM right away (the "send me a test message" button). Returns the error, if any.
      */
     public function testDm(User $user): ?string

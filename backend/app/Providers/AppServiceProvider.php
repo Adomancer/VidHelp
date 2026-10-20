@@ -36,7 +36,6 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         // Password reset emails link to the Next.js frontend, not a Laravel page
-        ResetPassword::createUrlUsing(fn (User $user, string $token) => config('app.frontend_url')
-            .'/reset-password?'.http_build_query(['token' => $token, 'email' => $user->getEmailForPasswordReset()]));
+        ResetPassword::createUrlUsing(fn (User $user, string $token) => config('app.frontend_url').$user->passwordResetPath($token));
     }
 }

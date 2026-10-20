@@ -83,6 +83,12 @@ class User extends Authenticatable
         return $this->load('roles')->append('two_factor_setup_required');
     }
 
+    /** Where a password reset link opens: the frontend /reset-password page. */
+    public function passwordResetPath(#[\SensitiveParameter] string $token): string
+    {
+        return '/reset-password?'.http_build_query(['token' => $token, 'email' => $this->getEmailForPasswordReset()]);
+    }
+
     /** Changes on every sign-in; not worth an audit row. */
     public function auditExcept(): array
     {

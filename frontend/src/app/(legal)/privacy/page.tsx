@@ -69,7 +69,7 @@ export default function PrivacyPage() {
           <strong>tidak</strong> membaca isi pesan, daftar server, atau teman kamu, dan tidak menyimpan pesan yang kamu kirim di Discord.
         </p>
         <p>
-          Bot mengirim notifikasi dari VidHelp, misalnya pengingat jadwal, info backup, dan status akun, sebagai DM ke kamu atau sebagai pesan di
+          Bot mengirim notifikasi dari VidHelp, misalnya pengingat jadwal, info backup, status akun, dan link atur ulang kata sandi yang kamu minta, sebagai DM ke kamu atau sebagai pesan di
           channel server agensi. Riwayat pengiriman notifikasi (judul, isi, waktu, dan status terkirim) disimpan di VidHelp.
         </p>
         <p>

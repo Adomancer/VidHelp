@@ -7,7 +7,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthCard
       title="Lupa kata sandi?"
-      subtitle="Masukkan email kamu, nanti kami kirim link untuk membuat kata sandi baru. Bisa juga dipakai kalau kamu daftar lewat Google dan belum punya kata sandi."
+      subtitle="Masukkan email kamu, nanti kami kirim link untuk membuat kata sandi baru ke email itu, dan ke DM Discord kalau akunmu sudah terhubung. Bisa juga dipakai kalau kamu daftar lewat Google dan belum punya kata sandi."
     >
       <ForgotPasswordForm />
 

@@ -4,27 +4,39 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class PasswordResetController extends Controller
 {
     /**
-     * Email a reset link pointing at the frontend /reset-password page.
+     * Send a reset link pointing at the frontend /reset-password page by email and, when the
+     * user linked Discord, as a DM too (the way most people get it while the agency has no
+     * verified mail domain).
      *
      * Always answers the same way so the endpoint can't be used to discover registered emails.
      */
-    public function sendLink(Request $request): JsonResponse
+    public function sendLink(Request $request, Notifier $notifier): JsonResponse
     {
         $request->validate(['email' => 'required|email']);
 
-        Password::sendResetLink($request->only('email'));
+        Password::sendResetLink($request->only('email'), function (User $user, string $token) use ($notifier) {
+            $notifier->passwordResetDm($user, $user->passwordResetPath($token));
+
+            try {
+                $user->sendPasswordResetNotification($token);
+            } catch (Throwable $e) {
+                report($e); // The DM may still reach them, and the answer stays the same
+            }
+        });
 
         return response()->json([
-            'message' => 'Kalau email itu terdaftar, kami sudah mengirim link untuk mengatur ulang kata sandi.',
+            'message' => 'Kalau email itu terdaftar, kami sudah mengirim link untuk mengatur ulang kata sandi ke email itu, dan ke DM Discord kalau akunnya terhubung.',
         ]);
     }
 
