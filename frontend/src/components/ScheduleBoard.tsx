@@ -229,7 +229,14 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           </IconButton>
           <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
             <PopoverTrigger asChild>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label="Pilih tanggal di kalender" title="Pilih tanggal di kalender" className="text-body">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Pilih tanggal di kalender"
+                title="Pilih tanggal di kalender"
+                className="text-body max-md:size-10"
+              >
                 <CalendarDays />
               </Button>
             </PopoverTrigger>
@@ -370,7 +377,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                       onClick={() => setDialog({ kind: "slot", day: day.value })}
                       aria-label={`Tambah slot hari ${day.long}`}
                       title={`Tambah slot hari ${day.long}`}
-                      className="text-muted-foreground"
+                      className="text-muted-foreground max-md:size-10"
                     >
                       <Plus />
                     </Button>
@@ -541,7 +548,7 @@ function Hint({ text, children }: { text: string; children: ReactNode }) {
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <Button type="button" variant="ghost" size="icon-sm" onClick={onClick} aria-label={label} title={label} className="text-body">
+    <Button type="button" variant="ghost" size="icon-sm" onClick={onClick} aria-label={label} title={label} className="text-body max-md:size-10">
       {children}
     </Button>
   );

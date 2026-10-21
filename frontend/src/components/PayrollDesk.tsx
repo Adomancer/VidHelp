@@ -39,7 +39,7 @@ import StatCard from "./StatCard";
 import StatusBadge from "./StatusBadge";
 import SubmitButton from "./SubmitButton";
 import { notify } from "./Toast";
-import ToggleGroup from "./ToggleGroup";
+import ToggleGroup, { ShortLabel } from "./ToggleGroup";
 
 type Confirm = { title: string; body: string; label: string; destructive?: boolean; run: () => Promise<{ message: string }> } | null;
 
@@ -95,6 +95,9 @@ const periodTabs = [
 ] as const;
 
 type PeriodTab = (typeof periodTabs)[number][0];
+
+/** Phones can't fit the full labels on one row, and the tabs shouldn't scroll sideways. */
+const shortPeriodTabs: Record<PeriodTab, string> = { action: "Perlu aksi", in_progress: "Berjalan", paid: "Lunas", all: "Semua" };
 
 /** The filter, search and page live in the URL (with the open period), so a refresh or a shared link keeps the view. */
 const periodUrlState = {
@@ -165,7 +168,13 @@ function Periods() {
       {error && <FormAlert tone="error">{error}</FormAlert>}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <ToggleGroup label="Status periode" options={periodTabs} value={status} onChange={show} />
+        <ToggleGroup
+          label="Status periode"
+          options={periodTabs.map(([value, label]) => ({ value, label: <ShortLabel short={shortPeriodTabs[value]} full={label} /> }))}
+          value={status}
+          onChange={show}
+          fill
+        />
         <div className="relative lg:w-72">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input
@@ -660,7 +669,34 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
         {hosts.length === 0 ? (
           <p className="px-5 pb-3 text-sm text-muted-foreground md:px-6">Belum ada jam yang disetujui.</p>
         ) : (
-          <DataTable columns={hostPayColumns} data={hosts} getRowId={(host) => host.host_id} headerClassName="border-y" rowClassName={() => "text-body"} />
+          <DataTable
+            columns={hostPayColumns}
+            data={hosts}
+            getRowId={(host) => host.host_id}
+            headerClassName="border-y"
+            rowClassName={() => "text-body"}
+            renderMobile={(host) => (
+              <div className="flex items-start justify-between gap-3 px-5 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-foreground">{host.name}</p>
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    {host.session_count} sesi · dibayar {formatDuration(host.hours)}
+                  </p>
+                  {host.carried_in_hours > 0 && <p className="text-[11px] text-muted-foreground">+{formatDuration(host.carried_in_hours)} bawaan</p>}
+                  {host.carried_out_hours > 0 && <p className="text-[11px] text-warning">{formatDuration(host.carried_out_hours)} dibawa</p>}
+                  {host.host_paid.map((cover) => (
+                    <p key={cover.payer} className="text-[11px] text-muted-foreground">
+                      Backup {formatDuration(cover.hours)} dibayar langsung oleh {cover.payer}
+                    </p>
+                  ))}
+                </div>
+                <div className="shrink-0 text-right tabular-nums">
+                  <p className="font-medium text-foreground">{formatRupiah(host.amount)}</p>
+                  {host.estimate && <p className="text-[11px] text-muted-foreground">perkiraan</p>}
+                </div>
+              </div>
+            )}
+          />
         )}
       </Card>
 
@@ -677,7 +713,13 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
               </StatusBadge>
               <span className="min-w-32 flex-1 text-muted-foreground">{adjustment.notes}</span>
               {canManage && !locked && (
-                <Button type="button" variant="ghost" size="xs" onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))} className="text-destructive hover:text-destructive">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))}
+                  className="text-destructive hover:text-destructive max-md:h-10 max-md:px-3"
+                >
                   Hapus
                 </Button>
               )}
@@ -879,10 +921,12 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
         <p className="text-sm font-medium text-foreground">Tambah atau kurangi</p>
         <ToggleGroup
           label="Tambah atau kurangi"
-          options={[
-            ["1", "Tambah waktu"],
-            ["-1", "Kurangi waktu"],
-          ] as const}
+          options={
+            [
+              { value: "1", label: <ShortLabel short="Tambah" full="Tambah waktu" /> },
+              { value: "-1", label: <ShortLabel short="Kurangi" full="Kurangi waktu" /> },
+            ] as const
+          }
           value={String(direction) as "1" | "-1"}
           onChange={(value) => setDirection(Number(value) as 1 | -1)}
           className="grid w-full grid-cols-2"
@@ -1048,7 +1092,13 @@ function Kasbon() {
                     </>
                   )}
                   {paidCount === 0 && (
-                    <Button type="button" variant="ghost" size="xs" onClick={() => setRemoving(advance)} className="ml-auto text-destructive hover:text-destructive">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setRemoving(advance)}
+                      className="ml-auto text-destructive hover:text-destructive max-md:h-10 max-md:px-3"
+                    >
                       Hapus (salah catat)
                     </Button>
                   )}

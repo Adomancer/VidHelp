@@ -75,8 +75,11 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
     <div className="space-y-4">
       {hosts.data && (
         <p className="text-sm text-muted-foreground">
-          Periode poin <span className="font-medium text-foreground">{formatDate(hosts.data.period.start)} – {formatDate(hosts.data.period.end)}</span>. Semua mulai
-          dari 100; SP terbit otomatis di{" "}
+          Periode poin{" "}
+          <span className="font-medium text-foreground">
+            {formatDate(hosts.data.period.start)} – {formatDate(hosts.data.period.end)}
+          </span>
+          . Semua mulai dari 100; SP terbit otomatis di{" "}
           {Object.entries(hosts.data.thresholds)
             .map(([level, points]) => `SP${level} ≤ ${points}`)
             .join(", ")}
@@ -248,7 +251,7 @@ function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: b
                       {log.points_change}
                     </span>
                     {isAdmin && !log.voided_at && (
-                      <Button type="button" variant="link" size="xs" onClick={() => setVoiding(log)} className="h-auto px-0 text-destructive">
+                      <Button type="button" variant="link" size="xs" onClick={() => setVoiding(log)} className="h-auto px-0 text-destructive max-md:min-h-10">
                         Batalkan
                       </Button>
                     )}
@@ -299,7 +302,7 @@ function WarningsCard({ data, isAdmin, act }: { data: PointsHostDetail; isAdmin:
                 </p>
               </div>
               {isAdmin && !letter.voided_at && (
-                <Button type="button" variant="link" size="xs" onClick={() => setVoiding(letter)} className="h-auto px-0 text-destructive">
+                <Button type="button" variant="link" size="xs" onClick={() => setVoiding(letter)} className="h-auto px-0 text-destructive max-md:min-h-10">
                   Batalkan
                 </Button>
               )}

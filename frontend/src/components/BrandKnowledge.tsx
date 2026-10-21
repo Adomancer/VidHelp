@@ -123,7 +123,7 @@ export function KnowledgeFiles({
               onClick={() => onRemove(file)}
               aria-label={`Hapus ${file.original_name}`}
               title="Hapus"
-              className="text-muted-foreground hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive max-md:size-10"
             >
               <Trash2 />
             </Button>

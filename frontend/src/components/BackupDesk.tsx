@@ -48,11 +48,12 @@ import UserAvatar from "./UserAvatar";
 
 type Tab = "pending" | "open" | "filled" | "closed";
 
-const tabs: { value: Tab; label: string }[] = [
-  { value: "pending", label: "Perlu diputuskan" },
-  { value: "open", label: "Belum ada pendaftar" },
-  { value: "filled", label: "Sudah ada pengganti" },
-  { value: "closed", label: "Riwayat" },
+// The short labels let a narrow card (a phone) show every tab in a 2×2 grid instead of scrolling sideways
+const tabs: { value: Tab; label: string; short: string }[] = [
+  { value: "pending", label: "Perlu diputuskan", short: "Perlu putusan" },
+  { value: "open", label: "Belum ada pendaftar", short: "Belum ada" },
+  { value: "filled", label: "Sudah ada pengganti", short: "Ada pengganti" },
+  { value: "closed", label: "Riwayat", short: "Riwayat" },
 ];
 
 const emptyText: Record<Tab, string> = {
@@ -218,7 +219,11 @@ export default function BackupDesk() {
       <div className="grid gap-6 min-[1440px]:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="@container flex min-w-0 flex-col rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
           <div ref={toolbarRef} className="flex flex-col gap-3 border-b border-border p-4 @[58rem]:flex-row @[58rem]:items-center @[58rem]:justify-between">
-            <div role="radiogroup" aria-label="Status backup" className="flex max-w-full [scrollbar-width:none] gap-1 overflow-x-auto rounded-lg bg-muted p-1">
+            <div
+              role="radiogroup"
+              aria-label="Status backup"
+              className="grid max-w-full [scrollbar-width:none] grid-cols-2 gap-1 overflow-x-auto rounded-lg bg-muted p-1 @xl:flex"
+            >
               {tabs.map((option) => {
                 const selected = tab === option.value;
                 const total = count(option.value);
@@ -230,11 +235,14 @@ export default function BackupDesk() {
                     aria-checked={selected}
                     onClick={() => chooseTab(option.value)}
                     className={cn(
-                      "flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      "flex h-9 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @xl:shrink-0 @xl:px-3",
                       selected ? "bg-card text-foreground shadow-xs ring-1 ring-foreground/5 dark:bg-secondary" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    {option.label}
+                    <span aria-hidden="true" className="truncate @xl:hidden">
+                      {option.short}
+                    </span>
+                    <span className="sr-only @xl:not-sr-only">{option.label}</span>
                     {total !== undefined && option.value !== "closed" && (
                       <span
                         className={cn(
@@ -267,7 +275,7 @@ export default function BackupDesk() {
                   type="button"
                   onClick={() => setSearch("")}
                   aria-label="Hapus pencarian"
-                  className="absolute top-1/2 right-2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground md:right-2 md:size-6"
                 >
                   <X className="size-3.5" aria-hidden="true" />
                 </button>

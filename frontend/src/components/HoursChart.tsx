@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { formatDuration } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +22,7 @@ function dayLabel(date: string): { day: string; month: string; full: string } {
 }
 
 /**
- * Approved live hours per day, one bar per day. Hover a day for its exact total;
+ * Approved live hours per day, one bar per day. Hover (or tap, on a phone) a day for its exact total;
  * the same numbers are in a table for screen readers. The plot fills the chart's height
  * (`className` can change it, e.g. to stretch inside a tile).
  */
@@ -30,6 +31,8 @@ export default function HoursChart({ days, className }: { days: { date: string; 
   const step = tickStep(max || 1);
   const top = Math.max(step, Math.ceil(max / step) * step);
   const ticks = Array.from({ length: top / step + 1 }, (_, index) => index * step);
+  // Touch screens have no hover, so a tap pins a day's total until another tap
+  const [tapped, setTapped] = useState<string | null>(null);
 
   return (
     // Y axis | plot on top, x axis under the plot
@@ -52,7 +55,11 @@ export default function HoursChart({ days, className }: { days: { date: string; 
             const label = dayLabel(day.date);
             const tooltipSide = index > days.length / 2 ? "right-0" : "left-0";
             return (
-              <div key={day.date} className="group relative flex h-full flex-1 items-end justify-center">
+              <div
+                key={day.date}
+                onClick={() => setTapped((current) => (current === day.date ? null : day.date))}
+                className="group relative flex h-full flex-1 items-end justify-center"
+              >
                 {day.hours > 0 && (
                   <div
                     className="w-full max-w-6 rounded-t-[4px] bg-chart-1 transition-opacity group-hover:opacity-80"
@@ -60,7 +67,7 @@ export default function HoursChart({ days, className }: { days: { date: string; 
                   />
                 )}
                 <div
-                  className={`pointer-events-none absolute bottom-full mb-1.5 ${tooltipSide} z-10 hidden rounded-md bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground shadow-md ring-1 ring-foreground/10 group-hover:block`}
+                  className={`pointer-events-none absolute bottom-full mb-1.5 ${tooltipSide} z-10 rounded-md bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground shadow-md ring-1 ring-foreground/10 group-hover:block ${tapped === day.date ? "block" : "hidden"}`}
                 >
                   <span className="block text-muted-foreground">{label.full}</span>
                   <span className="block font-medium text-foreground tabular-nums">

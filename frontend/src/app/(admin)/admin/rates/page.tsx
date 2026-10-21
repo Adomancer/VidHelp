@@ -197,6 +197,8 @@ function LevelStep({ level, previous, index, last, onChanged }: { level: Level; 
               <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Users className="size-3.5" aria-hidden="true" />
                 <span className="font-medium text-foreground tabular-nums">{level.hosts_count}</span> host di level ini
+                {/* The delete button's reason is only a hover title, which phones never show */}
+                {level.hosts_count > 0 && <span className="md:hidden">· belum bisa dihapus</span>}
               </p>
               <div className="flex items-center gap-1">
                 <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
@@ -211,7 +213,7 @@ function LevelStep({ level, previous, index, last, onChanged }: { level: Level; 
                   disabled={level.hosts_count > 0}
                   title={level.hosts_count > 0 ? "Masih dipakai host" : "Hapus level"}
                   aria-label={`Hapus ${level.name}`}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground hover:text-destructive max-md:size-10"
                 >
                   <Trash2 />
                 </Button>

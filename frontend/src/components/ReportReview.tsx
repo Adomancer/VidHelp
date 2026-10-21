@@ -22,7 +22,7 @@ import FormAlert from "./FormAlert";
 import { RefreshBar } from "./Loading";
 import StatusBadge, { type Tone } from "./StatusBadge";
 import { notify } from "./Toast";
-import ToggleGroup from "./ToggleGroup";
+import ToggleGroup, { ShortLabel } from "./ToggleGroup";
 import UserAvatar from "./UserAvatar";
 import { Skeleton } from "./ui/skeleton";
 
@@ -39,6 +39,14 @@ const tabLabels: Record<Tab, string> = {
   missing: "Belum masuk",
   approved: "Disetujui",
   rejected: "Ditolak",
+};
+
+/** Phones can't fit the full labels on one row, and the tabs shouldn't scroll sideways. */
+const shortTabLabels: Record<Tab, string> = {
+  flagged: "Dicek",
+  missing: "Belum",
+  approved: "Setuju",
+  rejected: "Tolak",
 };
 
 /** Tab, day, search, page and the open report live in the URL, so a refresh or a shared link keeps the view. */
@@ -149,6 +157,7 @@ export default function ReportReview({ className }: { className?: string }) {
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <ToggleGroup
           label="Status laporan"
+          fill
           options={(Object.keys(tabLabels) as Tab[]).map((value) => ({ value, label: <TabLabel tab={value} counts={counts} /> }))}
           value={tab}
           onChange={selectTab}
@@ -266,8 +275,8 @@ function TabLabel({ tab, counts }: { tab: Tab; counts?: ReportCounts }) {
   const count = tab === "flagged" || tab === "missing" ? counts?.[tab] : undefined;
 
   return (
-    <span className="inline-flex items-center gap-1.5">
-      {tabLabels[tab]}
+    <span className="inline-flex items-center justify-center gap-1.5">
+      <ShortLabel short={shortTabLabels[tab]} full={tabLabels[tab]} />
       {count !== undefined && count > 0 && (
         <span
           className={cn(
@@ -357,13 +366,29 @@ function Pager({
         {from}–{to} dari {total}
       </span>
       <div className="flex items-center gap-1">
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Halaman sebelumnya" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="max-md:size-10"
+          aria-label="Halaman sebelumnya"
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+        >
           <ChevronLeft aria-hidden="true" />
         </Button>
         <span className="tabular-nums">
           {page} / {lastPage}
         </span>
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Halaman berikutnya" disabled={page >= lastPage} onClick={() => onChange(page + 1)}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="max-md:size-10"
+          aria-label="Halaman berikutnya"
+          disabled={page >= lastPage}
+          onClick={() => onChange(page + 1)}
+        >
           <ChevronRight aria-hidden="true" />
         </Button>
       </div>
@@ -613,7 +638,7 @@ function Decision({
               onClick={() => setHours(preset.hours)}
               aria-pressed={hours === preset.hours}
               className={cn(
-                "inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "inline-flex h-9 items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:h-7 md:px-2.5",
                 hours === preset.hours ? "border-primary/50 bg-primary/10 text-foreground" : "border-border text-body hover:bg-muted"
               )}
             >

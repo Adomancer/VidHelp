@@ -306,7 +306,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
                       aria-checked={form.day === value}
                       onClick={() => setForm((current) => ({ ...current, day: value }))}
                       className={cn(
-                        "rounded-md px-2 py-0.5 text-xs font-medium transition-colors",
+                        "rounded-md px-2.5 py-2 text-xs font-medium transition-colors md:px-2 md:py-0.5",
                         form.day === value ? "bg-primary/10 text-brand" : "text-muted-foreground hover:bg-muted"
                       )}
                     >
@@ -376,10 +376,8 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
               <ul className="list-disc pl-5 space-y-0.5">
                 {conflicts.map((conflict) => (
                   <li key={conflict.id}>
-                    {conflict.same_host
-                      ? `${hostName} sudah live di ${conflict.brand_name}`
-                      : `${conflict.host_name} sudah live di brand ini`}
-                    , {describeWeekly(conflict.day_of_week, conflict.start_time, conflict.end_time)}.
+                    {conflict.same_host ? `${hostName} sudah live di ${conflict.brand_name}` : `${conflict.host_name} sudah live di brand ini`},{" "}
+                    {describeWeekly(conflict.day_of_week, conflict.start_time, conflict.end_time)}.
                   </li>
                 ))}
               </ul>

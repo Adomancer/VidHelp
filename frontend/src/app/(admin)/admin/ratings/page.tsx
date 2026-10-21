@@ -239,9 +239,14 @@ export default function AdminRatingsPage() {
               Semua sudah dinilai
             </span>
           ) : (
-            <div className="flex shrink-0 flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-wrap">
               {clean.length > 0 && (
-                <Button type="button" onClick={() => setBulk({ withoutDeductions: true, count: clean.length })} title="Host tanpa potongan rating bulan ini">
+                <Button
+                  type="button"
+                  className="h-auto min-h-10 whitespace-normal md:min-h-9"
+                  onClick={() => setBulk({ withoutDeductions: true, count: clean.length })}
+                  title="Host tanpa potongan rating bulan ini"
+                >
                   <ThumbsUp aria-hidden="true" />
                   Beri {rating1(scale.max)} ke {clean.length} host tanpa pelanggaran
                 </Button>
@@ -271,6 +276,7 @@ export default function AdminRatingsPage() {
           }))}
           value={view}
           onChange={(next) => void setUrlState({ view: next, host: null })}
+          grid
         />
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center xl:ml-auto">
           <SearchableSelect
@@ -515,7 +521,11 @@ function HostPanel({
                 onChange={(event) => setRating(event.target.value)}
                 aria-label="Rating"
                 aria-invalid={!valid}
-                className={cn(inputSmClass, "w-20 text-base font-semibold tabular-nums", !valid && "border-destructive focus-visible:ring-destructive/30")}
+                className={cn(
+                  inputSmClass,
+                  "w-20 text-base font-semibold tabular-nums md:text-base",
+                  !valid && "border-destructive focus-visible:ring-destructive/30"
+                )}
               />
               {value !== row.suggested && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setRating(String(row.suggested))} className="text-muted-foreground">
@@ -608,9 +618,9 @@ function RecentRatings({ ratings, month, max }: { ratings: { month_year: string;
   const shown = [...ratings].reverse();
 
   return (
-    <div className="mt-2 flex items-end gap-3" role="list" aria-label="Rating per bulan">
+    <div className="mt-2 flex items-end gap-2 sm:gap-3" role="list" aria-label="Rating per bulan">
       {shown.map((item) => (
-        <div key={item.month_year} role="listitem" className="flex w-11 flex-none flex-col items-center gap-1">
+        <div key={item.month_year} role="listitem" className="flex w-11 min-w-0 flex-initial flex-col items-center gap-1">
           <span className="text-xs font-medium text-foreground tabular-nums">{rating1(item.rating)}</span>
           <div className="flex h-14 w-8 items-end rounded-md bg-muted">
             <div
