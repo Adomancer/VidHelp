@@ -125,11 +125,11 @@ export default function AuditLogPage() {
           event.stopPropagation();
           applyFilters({ ...filters, user_id: log.user!.id });
         }}
-        className="rounded text-left outline-none hover:text-brand focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="max-w-full min-w-0 rounded text-left outline-none hover:text-brand focus-visible:ring-3 focus-visible:ring-ring/50"
         title="Tampilkan semua yang dilakukan orang ini"
       >
-        <span className="block font-medium text-foreground">{log.user.name}</span>
-        <span className="block text-xs text-muted-foreground">{log.user.email}</span>
+        <span className="block truncate font-medium text-foreground">{log.user.name}</span>
+        <span className="block truncate text-xs text-muted-foreground">{log.user.email}</span>
       </button>
     ) : (
       <span className="text-muted-foreground">{log.action === "login_failed" ? "Tidak dikenal" : "Sistem"}</span>
@@ -283,7 +283,7 @@ export default function AuditLogPage() {
                         {formatDateTime(log.created_at)}
                         {log.ip_address && ` · ${log.ip_address}`}
                       </span>
-                      <Button type="button" variant="ghost" size="xs" onClick={() => toggle(log.id)} aria-expanded={open}>
+                      <Button type="button" variant="ghost" size="xs" className="max-md:h-10 max-md:px-3" onClick={() => toggle(log.id)} aria-expanded={open}>
                         Detail
                         <ChevronDown className={cn("transition-transform", open && "rotate-180")} aria-hidden="true" />
                       </Button>

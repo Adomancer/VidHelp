@@ -23,7 +23,7 @@ import SelectField, { NativeSelect } from "@/components/SelectField";
 import StatusBadge, { type Tone } from "@/components/StatusBadge";
 import TextField from "@/components/TextField";
 import { notify } from "@/components/Toast";
-import ToggleGroup from "@/components/ToggleGroup";
+import ToggleGroup, { ShortLabel } from "@/components/ToggleGroup";
 import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -44,6 +44,9 @@ const tabs = [
 ] as const;
 
 type TabValue = (typeof tabs)[number][0];
+
+/** Phones can't fit the full labels on one row, and the tabs shouldn't scroll sideways. */
+const shortTabs: Record<TabValue, string> = { pending: "Menunggu", active: "Aktif", inactive: "Nonaktif", archived: "Arsip", all: "Semua" };
 
 /** Tab, search and page live in the URL, so a refresh or a link keeps the same view. */
 const urlState = {
@@ -122,7 +125,13 @@ export default function AdminUsersPage() {
       />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <ToggleGroup label="Status pengguna" options={tabs} value={tab} onChange={selectTab} />
+        <ToggleGroup
+          label="Status pengguna"
+          options={tabs.map(([value, label]) => ({ value, label: <ShortLabel short={shortTabs[value]} full={label} /> }))}
+          value={tab}
+          onChange={selectTab}
+          fill
+        />
         <div className="relative lg:w-72">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input
@@ -375,7 +384,7 @@ function RowActions({
       {menu.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" size="icon-sm" disabled={busy} aria-label={`Aksi lain untuk ${user.name}`}>
+            <Button type="button" variant="ghost" size="icon-sm" className="max-md:size-10" disabled={busy} aria-label={`Aksi lain untuk ${user.name}`}>
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>

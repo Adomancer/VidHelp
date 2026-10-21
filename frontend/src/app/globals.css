@@ -181,6 +181,11 @@
   html {
     @apply font-sans;
   }
+  /* A stray wide element must never let a phone drag the whole page sideways. clip (not hidden) keeps sticky headers working. */
+  html,
+  body {
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-body;
   }

@@ -100,7 +100,14 @@ export default function Dialog({
                 </DialogPrimitive.Description>
               )}
             </div>
-            <Button type="button" variant="ghost" size="icon-sm" onClick={requestClose} aria-label="Tutup" className="-mt-1 -mr-2 shrink-0 text-muted-foreground">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={requestClose}
+              aria-label="Tutup"
+              className="-mt-1 -mr-2 shrink-0 text-muted-foreground max-md:size-10"
+            >
               <X />
             </Button>
           </div>

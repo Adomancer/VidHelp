@@ -108,17 +108,17 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
         {value.map((chip, index) => (
           <span
             key={chip.kind === "host" ? chip.id : `text-${chip.text}`}
-            className={`flex h-6 items-center gap-1.5 rounded-md pr-1 pl-1 text-xs font-medium ${
+            className={`flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-md pr-1 pl-1 text-xs font-medium ${
               chip.kind === "host" ? "bg-primary/10 text-brand" : "bg-secondary text-foreground"
             }`}
           >
             {chip.kind === "host" ? (
               <>
                 <UserAvatar user={{ name: chip.name, avatar_url: chip.avatar_url }} size="w-4 h-4 text-[9px]" />
-                {chip.name}
+                <span className="truncate">{chip.name}</span>
               </>
             ) : (
-              <span className="pl-1">“{chip.text}”</span>
+              <span className="truncate pl-1">“{chip.text}”</span>
             )}
             <button
               type="button"
@@ -127,7 +127,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
                 onChange(value.filter((_, at) => at !== index));
               }}
               aria-label={`Hapus ${chip.kind === "host" ? chip.name : chip.text}`}
-              className="ml-0.5 flex size-4 items-center justify-center rounded-sm text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
+              className="relative ml-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground after:absolute after:-inset-2.5 hover:bg-foreground/10 hover:text-foreground md:after:hidden"
             >
               <X className="size-3" aria-hidden="true" />
             </button>

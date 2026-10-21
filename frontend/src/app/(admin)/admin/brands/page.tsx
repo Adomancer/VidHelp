@@ -160,7 +160,7 @@ export default function AdminBrandsPage() {
               type="button"
               onClick={() => setInput("")}
               aria-label="Hapus pencarian"
-              className="absolute top-1/2 right-2.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors outline-none hover:bg-muted-foreground/20 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="absolute top-1/2 right-1.5 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors outline-none hover:bg-muted-foreground/20 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 md:right-2.5 md:size-6"
             >
               <X className="size-3.5" aria-hidden="true" />
             </button>
@@ -408,6 +408,7 @@ function BrandCard({
             type="button"
             variant="ghost"
             size="icon-sm"
+            className="max-md:size-10"
             onClick={(click) => {
               click.stopPropagation();
               onKnowledge();
@@ -422,6 +423,7 @@ function BrandCard({
             type="button"
             variant="ghost"
             size="icon-sm"
+            className="max-md:size-10"
             onClick={(click) => {
               click.stopPropagation();
               onEdit();
@@ -847,7 +849,7 @@ function Pager({ page, lastPage, total, onChange }: { page: number; lastPage: nu
               aria-current={item === page ? "page" : undefined}
               aria-label={`Halaman ${item}`}
               onClick={() => onChange(item)}
-              className="tabular-nums"
+              className="tabular-nums max-md:size-10"
             >
               {item}
             </Button>

@@ -249,7 +249,7 @@ function SettingRow({
           disabled={isDefault}
           title="Pakai nilai bawaan"
           aria-label={`Pakai nilai bawaan untuk ${setting.label}`}
-          className={cn("text-muted-foreground", isDefault && "invisible")}
+          className={cn("max-md:size-10", "text-muted-foreground", isDefault && "invisible")}
         >
           <RotateCcw />
         </Button>

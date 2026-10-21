@@ -157,7 +157,14 @@ function Setup({ setup, onChecked, checking }: { setup: DiscordSetup; onChecked:
               }
               action={
                 channel.ok && (
-                  <Button type="button" variant="outline" size="xs" disabled={testing !== null} onClick={() => void test(channel.key)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    className="max-md:h-10 max-md:px-3"
+                    disabled={testing !== null}
+                    onClick={() => void test(channel.key)}
+                  >
                     <Send aria-hidden="true" />
                     {testing === channel.key ? "Mengirim…" : "Kirim tes"}
                   </Button>
@@ -330,7 +337,7 @@ function Deliveries({ onChanged }: { onChanged: () => void }) {
 
   const resendButton = (delivery: NotificationDelivery) =>
     (delivery.status === "failed" || delivery.status === "skipped") && (
-      <Button type="button" variant="outline" size="xs" disabled={resending !== null} onClick={() => void resend(delivery)}>
+      <Button type="button" variant="outline" size="xs" className="max-md:h-10 max-md:px-3" disabled={resending !== null} onClick={() => void resend(delivery)}>
         <RotateCw aria-hidden="true" className={resending === delivery.id ? "animate-spin" : undefined} />
         Kirim ulang
       </Button>

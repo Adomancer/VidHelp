@@ -281,8 +281,11 @@ function BrandChips({ host }: { host: HostListItem }) {
   return (
     <div className="flex flex-wrap gap-1">
       {active.map((assignment) => (
-        <span key={assignment.id} className="inline-flex h-6 items-center gap-1 rounded-md bg-secondary px-2 text-xs font-medium whitespace-nowrap text-body">
-          {assignment.brand.name}
+        <span
+          key={assignment.id}
+          className="inline-flex h-6 max-w-full items-center gap-1 rounded-md bg-secondary px-2 text-xs font-medium whitespace-nowrap text-body"
+        >
+          <span className="truncate">{assignment.brand.name}</span>
           {assignment.is_leader && <Crown className="size-3 text-warning" aria-label="Leader" />}
         </span>
       ))}
