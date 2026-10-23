@@ -4,9 +4,10 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { authApi } from "@/lib/api";
-import { homePathFor, saveSession } from "@/lib/auth";
+import { homePathFor } from "@/lib/auth";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { Button } from "@/components/ui/button";
+import { useSignIn } from "./AuthProvider";
 import FormAlert from "./FormAlert";
 import OtpField from "./OtpField";
 import SubmitButton from "./SubmitButton";
@@ -18,6 +19,7 @@ import TextField from "./TextField";
  */
 export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { challengeToken: string; onRestart: () => void }) {
   const router = useRouter();
+  const signIn = useSignIn();
   const [useRecovery, setUseRecovery] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -28,7 +30,7 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
         useRecovery ? { recovery_code: formValue(data, "recovery_code") } : { code: formValue(data, "code") }
       ),
     ({ token, user }) => {
-      saveSession(token, user);
+      signIn(token, user);
       router.replace(homePathFor(user));
     },
     ["challenge_token"]

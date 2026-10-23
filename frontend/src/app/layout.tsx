@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { headers } from "next/headers";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { AuthSessionProvider } from "@/components/AuthProvider";
 import QueryProvider from "@/components/QueryProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,9 +31,11 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full flex flex-col font-sans">
         <QueryProvider>
-          <NuqsAdapter>
-            <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
-          </NuqsAdapter>
+          <AuthSessionProvider>
+            <NuqsAdapter>
+              <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+            </NuqsAdapter>
+          </AuthSessionProvider>
         </QueryProvider>
         <Toaster position="bottom-right" closeButton />
       </body>
