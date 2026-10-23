@@ -138,15 +138,13 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
           </div>
         </div>
 
-        {wide ? (
-          detail || <CardsSkeleton count={2} />
-        ) : (
-          hostId && (
-            <Dialog title="Poin host" placement="side" size="lg" onClose={() => setSelected(null)}>
-              {detail}
-            </Dialog>
-          )
-        )}
+        {wide
+          ? detail || <CardsSkeleton count={2} />
+          : hostId && (
+              <Dialog title="Poin host" placement="side" size="lg" onClose={() => setSelected(null)}>
+                {detail}
+              </Dialog>
+            )}
       </div>
     </div>
   );
@@ -246,7 +244,12 @@ function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: b
                     {log.reason && <p className="mt-1 text-xs text-body">{log.reason}</p>}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className={cn("text-sm font-semibold tabular-nums", log.voided_at ? "text-faint" : log.points_change < 0 ? "text-destructive" : "text-success")}>
+                    <span
+                      className={cn(
+                        "text-sm font-semibold tabular-nums",
+                        log.voided_at ? "text-faint" : log.points_change < 0 ? "text-destructive" : "text-success"
+                      )}
+                    >
                       {log.points_change > 0 ? "+" : ""}
                       {log.points_change}
                     </span>
@@ -485,4 +488,3 @@ function WarningForm({ hostId, onDone, onCancel }: FormProps) {
     </form>
   );
 }
-

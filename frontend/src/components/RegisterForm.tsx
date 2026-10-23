@@ -50,7 +50,15 @@ export default function RegisterForm() {
 
         <TextField label="Nama lengkap" name="name" autoComplete="name" required error={errors.name} />
         <TextField label="Email" name="email" type="email" autoComplete="email" placeholder="nama@email.com" required error={errors.email} />
-        <PasswordField label="Kata sandi" name="password" autoComplete="new-password" minLength={8} hint="Minimal 8 karakter." required error={errors.password} />
+        <PasswordField
+          label="Kata sandi"
+          name="password"
+          autoComplete="new-password"
+          minLength={8}
+          hint="Minimal 8 karakter."
+          required
+          error={errors.password}
+        />
         <PasswordField label="Ulangi kata sandi" name="password_confirmation" autoComplete="new-password" required />
 
         <SubmitButton loading={loading}>Buat akun</SubmitButton>

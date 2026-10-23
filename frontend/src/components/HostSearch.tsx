@@ -8,9 +8,7 @@ import { useAuth } from "./AuthProvider";
 import UserAvatar from "./UserAvatar";
 
 /** One thing being searched for: a host picked from the list, or typed text (name or email). */
-export type SearchChip =
-  | { kind: "host"; id: string; name: string; avatar_url: string | null }
-  | { kind: "text"; text: string };
+export type SearchChip = { kind: "host"; id: string; name: string; avatar_url: string | null } | { kind: "text"; text: string };
 
 type Option = { kind: "text"; text: string } | { kind: "host"; host: HostListItem };
 
@@ -35,7 +33,10 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
   const listId = useId();
 
   // Only fetch while the list is open
-  const suggestions = useApiData(`host-suggest|${query}`, () => operatorApi.hosts(token, { search: query ? [query] : [], page: 1 }), { enabled: open, keepPrevious: true });
+  const suggestions = useApiData(`host-suggest|${query}`, () => operatorApi.hosts(token, { search: query ? [query] : [], page: 1 }), {
+    enabled: open,
+    keepPrevious: true,
+  });
 
   useEffect(() => {
     function closeOutside(event: MouseEvent) {
@@ -164,7 +165,12 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
       </div>
 
       {open && (
-        <ul id={listId} role="listbox" aria-multiselectable="true" className="absolute z-30 mt-1.5 max-h-80 w-full overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 animate-in fade-in-0 zoom-in-95 duration-100">
+        <ul
+          id={listId}
+          role="listbox"
+          aria-multiselectable="true"
+          className="absolute z-30 mt-1.5 max-h-80 w-full animate-in overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 fade-in-0 zoom-in-95"
+        >
           {options.map((option, index) => (
             <li
               key={option.kind === "text" ? "text" : option.host.id}
@@ -192,10 +198,10 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
                 <>
                   <UserAvatar user={option.host.user} size="w-7 h-7" />
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm text-foreground truncate">{option.host.user.name}</span>
-                    <span className="block text-xs text-muted-foreground truncate">{option.host.user.email}</span>
+                    <span className="block truncate text-sm text-foreground">{option.host.user.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{option.host.user.email}</span>
                   </span>
-                  <span className="hidden sm:flex flex-wrap justify-end gap-1">
+                  <span className="hidden flex-wrap justify-end gap-1 sm:flex">
                     {option.host.assignments
                       .filter((assignment) => assignment.status === "active")
                       .map((assignment) => (

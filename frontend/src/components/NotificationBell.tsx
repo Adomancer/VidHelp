@@ -52,7 +52,7 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
         >
           <Bell />
           {unread > 0 && (
-            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white ring-2 ring-background tabular-nums">
+            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white tabular-nums ring-2 ring-background">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
@@ -99,14 +99,14 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
                   !notification.read_at && "bg-primary/[0.04]"
                 )}
               >
-                <span
-                  className={cn("mt-1.5 size-2 shrink-0 rounded-full", notification.read_at ? "bg-transparent" : "bg-primary")}
-                  aria-hidden="true"
-                />
+                <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", notification.read_at ? "bg-transparent" : "bg-primary")} aria-hidden="true" />
                 <span className="min-w-0 flex-1">
                   <span className={cn("block text-sm", notification.read_at ? "text-body" : "font-medium text-foreground")}>{notification.title}</span>
                   {notification.body && <span className="mt-0.5 block text-xs text-muted-foreground">{notification.body}</span>}
-                  <span className="mt-1 block text-[11px] text-faint" title={new Date(notification.created_at).toLocaleString("id-ID", { timeZone: APP_TIME_ZONE })}>
+                  <span
+                    className="mt-1 block text-[11px] text-faint"
+                    title={new Date(notification.created_at).toLocaleString("id-ID", { timeZone: APP_TIME_ZONE })}
+                  >
                     {formatRelative(notification.created_at)}
                   </span>
                 </span>

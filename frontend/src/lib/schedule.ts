@@ -152,12 +152,9 @@ export function describePlan(plan: { hostName: string; days: number[]; start: st
 
 /** "Setiap minggu sejak 6 Okt 2026" or "Sementara: 6 Okt – 31 Okt 2026" */
 export function describePeriod(slot: Pick<ScheduleSlot, "effective_from" | "effective_to">): string {
-  const short = (date: string) =>
-    new Date(`${date}T00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const short = (date: string) => new Date(`${date}T00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 
-  return slot.effective_to
-    ? `Sementara: ${short(slot.effective_from)} – ${short(slot.effective_to)}`
-    : `Setiap minggu sejak ${short(slot.effective_from)}`;
+  return slot.effective_to ? `Sementara: ${short(slot.effective_from)} – ${short(slot.effective_to)}` : `Setiap minggu sejak ${short(slot.effective_from)}`;
 }
 
 /** The next dates (from `from`, at most `count`) a slot runs on. */
@@ -186,9 +183,7 @@ export function describeChange(entry: SlotHistoryEntry): string {
 
   if (entry.action === "delete") return "Slot dihapus";
   if (entry.action === "create") {
-    return after.previous_slot_id
-      ? `Perubahan mulai berlaku ${rawDate(after.effective_from)}`
-      : `Slot dibuat, mulai ${rawDate(after.effective_from)}`;
+    return after.previous_slot_id ? `Perubahan mulai berlaku ${rawDate(after.effective_from)}` : `Slot dibuat, mulai ${rawDate(after.effective_from)}`;
   }
 
   const changes: string[] = [];

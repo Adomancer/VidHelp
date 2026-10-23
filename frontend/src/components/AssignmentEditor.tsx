@@ -80,7 +80,13 @@ export default function AssignmentEditor({ hostId, assignments, brands, onChange
 
       {available.length > 0 && (
         <div className="flex gap-2">
-          <NativeSelect small wrapperClassName="flex-1" value={brandId} onChange={(event) => setBrandId(event.target.value)} aria-label="Brand yang ditambahkan">
+          <NativeSelect
+            small
+            wrapperClassName="flex-1"
+            value={brandId}
+            onChange={(event) => setBrandId(event.target.value)}
+            aria-label="Brand yang ditambahkan"
+          >
             <option value="">Tambahkan ke brand…</option>
             {available.map((brand) => (
               <option key={brand.id} value={brand.id}>

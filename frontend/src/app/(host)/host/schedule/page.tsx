@@ -3,7 +3,19 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, CalendarClock, CalendarX2, ChevronRight, Clock, Moon, Plus, Ticket, Trash2 } from "lucide-react";
-import { errorMessage, scheduleApi, shownKeys, splitApiError, type AvailabilityRange, type BackupNeed, type DayOfWeek, type MyEventClaim, type ReplacingEvent, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
+import {
+  errorMessage,
+  scheduleApi,
+  shownKeys,
+  splitApiError,
+  type AvailabilityRange,
+  type BackupNeed,
+  type DayOfWeek,
+  type MyEventClaim,
+  type ReplacingEvent,
+  type ScheduleSlot,
+  type SlotBackupMarker,
+} from "@/lib/api";
 import { appDate, appMinutes, appMoment, DAYS, dayWord, formatClock, formatDate, isoWeekday, previousDay, toDateInput } from "@/lib/format";
 import { addDays, durationMinutes, formatDayDate, inEffectOn, toMinutes, weekStart } from "@/lib/schedule";
 import { inputSmClass } from "@/lib/ui";
@@ -124,7 +136,12 @@ function buildDays(
       .filter((slot) => slot.day_of_week === weekday && inEffectOn(slot, date))
       .map((slot) => {
         const begin = toMinutes(slot.start_time);
-        return slotEntry(slot, date, { key: `${slot.id}|${date}`, date, start: begin, end: Math.min(DAY_MINUTES, begin + durationMinutes(slot.start_time, slot.end_time)) });
+        return slotEntry(slot, date, {
+          key: `${slot.id}|${date}`,
+          date,
+          start: begin,
+          end: Math.min(DAY_MINUTES, begin + durationMinutes(slot.start_time, slot.end_time)),
+        });
       });
 
     // Overnight slots from the evening before, still running this morning
@@ -374,7 +391,11 @@ function DayCell({ day, focused, selected, onOpen }: { day: Day; focused: boolea
         >
           {Number(day.date.slice(8))}
         </span>
-        {day.minutes > 0 && <span className={cn("hidden text-[11px] tabular-nums md:inline", day.past ? "text-faint" : "text-muted-foreground")}>{compactHours(day.minutes)}</span>}
+        {day.minutes > 0 && (
+          <span className={cn("hidden text-[11px] tabular-nums md:inline", day.past ? "text-faint" : "text-muted-foreground")}>
+            {compactHours(day.minutes)}
+          </span>
+        )}
       </div>
 
       {/* Phones: a dot per kind */}
@@ -426,7 +447,12 @@ function DayDetail({ day }: { day: Day }) {
           <li key={entry.key} className="flex items-center gap-3 bg-card px-3.5 py-3">
             <span className={cn("h-10 w-1 shrink-0 rounded-full", entry.needsCover === "open" ? "bg-destructive" : kinds[entry.kind].bar)} aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <p className={cn("truncate text-sm font-medium", entry.kind === "off" || entry.kind === "replaced" ? "text-muted-foreground line-through" : "text-foreground")}>
+              <p
+                className={cn(
+                  "truncate text-sm font-medium",
+                  entry.kind === "off" || entry.kind === "replaced" ? "text-muted-foreground line-through" : "text-foreground"
+                )}
+              >
                 {entry.brand}
               </p>
               <p className="flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
@@ -495,10 +521,16 @@ function NextUp({ days }: { days: Day[] }) {
             const running = entry.date === today && entry.start <= minutesNow;
             return (
               <li key={entry.key} className={cn("flex items-start gap-3", index === 0 && "rounded-lg border border-primary/30 bg-primary/[0.05] p-3")}>
-                <span className={cn("mt-1 h-8 w-1 shrink-0 rounded-full", entry.needsCover === "open" ? "bg-destructive" : kinds[entry.kind].bar)} aria-hidden="true" />
+                <span
+                  className={cn("mt-1 h-8 w-1 shrink-0 rounded-full", entry.needsCover === "open" ? "bg-destructive" : kinds[entry.kind].bar)}
+                  aria-hidden="true"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-muted-foreground">
-                    {dayWord(entry.date)} · <span className="tabular-nums">{entry.from}–{entry.to}</span>
+                    {dayWord(entry.date)} ·{" "}
+                    <span className="tabular-nums">
+                      {entry.from}–{entry.to}
+                    </span>
                   </p>
                   <p className="truncate text-sm font-semibold text-foreground">{entry.brand}</p>
                   {entry.note && <p className="truncate text-xs text-muted-foreground">{entry.note}</p>}
@@ -576,10 +608,7 @@ function AvailabilityEditor() {
   }
 
   return (
-    <Card
-      title="Waktu luang"
-      description="Membantu operator menyusun slot. Jam selesai lebih awal dari jam mulai berarti lewat tengah malam."
-    >
+    <Card title="Waktu luang" description="Membantu operator menyusun slot. Jam selesai lebih awal dari jam mulai berarti lewat tengah malam.">
       {saved.error && <FormAlert tone="error">{saved.error}</FormAlert>}
       {status && <FormAlert tone="error">{status.text}</FormAlert>}
 
@@ -614,9 +643,21 @@ function AvailabilityEditor() {
               </Button>
             </div>
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-              <input type="time" value={range.available_from} onChange={(event) => change(index, { available_from: event.target.value })} aria-label="Dari" className={cn(inputSmClass, "tabular-nums")} />
+              <input
+                type="time"
+                value={range.available_from}
+                onChange={(event) => change(index, { available_from: event.target.value })}
+                aria-label="Dari"
+                className={cn(inputSmClass, "tabular-nums")}
+              />
               <span className="text-muted-foreground">–</span>
-              <input type="time" value={range.available_to} onChange={(event) => change(index, { available_to: event.target.value })} aria-label="Sampai" className={cn(inputSmClass, "tabular-nums")} />
+              <input
+                type="time"
+                value={range.available_to}
+                onChange={(event) => change(index, { available_to: event.target.value })}
+                aria-label="Sampai"
+                className={cn(inputSmClass, "tabular-nums")}
+              />
             </div>
             <input
               value={range.note ?? ""}

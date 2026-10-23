@@ -99,10 +99,12 @@ export default function ReportReview({ className }: { className?: string }) {
 
   const filters = { date: date || undefined, search: search || undefined, page };
   // One query for every tab, so the counts in the tabs stay while another tab loads
-  const result = useApiData(`reports-${tab}-${JSON.stringify(filters)}`, (): Promise<ListPage> =>
-    tab === "missing"
-      ? reportApi.missing(token, filters).then((data) => ({ ...data, kind: "missing" as const, tab }))
-      : reportApi.list(token, tab, filters).then((data) => ({ ...data, kind: "reports" as const, tab })),
+  const result = useApiData(
+    `reports-${tab}-${JSON.stringify(filters)}`,
+    (): Promise<ListPage> =>
+      tab === "missing"
+        ? reportApi.missing(token, filters).then((data) => ({ ...data, kind: "missing" as const, tab }))
+        : reportApi.list(token, tab, filters).then((data) => ({ ...data, kind: "reports" as const, tab })),
     { keepPrevious: true }
   );
   const data = result.data;

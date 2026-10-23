@@ -109,7 +109,8 @@ export function AuthSessionProvider({ children }: { children: React.ReactNode })
     });
     const stopTabs = onTokenChangedElsewhere((newToken) => {
       if (newToken === token) return;
-      if (newToken) window.location.reload(); // someone else signed in on this browser
+      if (newToken)
+        window.location.reload(); // someone else signed in on this browser
       else end("Kamu sudah keluar di tab lain.");
     });
 
@@ -172,15 +173,7 @@ function FullScreenLoader() {
  * Signed-out users go to /login; users with the wrong role go to their own home page;
  * admins who must still set up 2FA go to the setup page (unless this is that page).
  */
-export function RequireAuth({
-  roles,
-  allowTwoFactorSetup = false,
-  children,
-}: {
-  roles: RoleName[];
-  allowTwoFactorSetup?: boolean;
-  children: React.ReactNode;
-}) {
+export function RequireAuth({ roles, allowTwoFactorSetup = false, children }: { roles: RoleName[]; allowTwoFactorSetup?: boolean; children: React.ReactNode }) {
   const router = useRouter();
   const { state, setUser, logout, retry } = useSession();
   const rolesKey = roles.join("|");

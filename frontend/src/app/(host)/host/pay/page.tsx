@@ -44,14 +44,25 @@ export default function HostPayPage() {
       {data && (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
-            <StatCard icon={Wallet} tone="brand" label="Perkiraan periode ini" value={formatRupiah(estimate)} note={`${data.current.length} brand · ${formatDuration(hours)}`} />
+            <StatCard
+              icon={Wallet}
+              tone="brand"
+              label="Perkiraan periode ini"
+              value={formatRupiah(estimate)}
+              note={`${data.current.length} brand · ${formatDuration(hours)}`}
+            />
             <StatCard
               icon={FileText}
               label="Slip terakhir"
               value={data.slips[0] ? formatRupiah(data.slips[0].net_amount) : "–"}
               note={data.slips[0] ? `${data.slips[0].brand.name} · ${formatShortDate(data.slips[0].period_end)}` : "Belum ada slip"}
             />
-            <StatCard icon={HandCoins} label="Sisa kasbon" value={formatRupiah(owed)} note={owed > 0 ? `${openKasbon.length} kasbon berjalan` : "Tidak ada kasbon"} />
+            <StatCard
+              icon={HandCoins}
+              label="Sisa kasbon"
+              value={formatRupiah(owed)}
+              note={owed > 0 ? `${openKasbon.length} kasbon berjalan` : "Tidak ada kasbon"}
+            />
           </div>
 
           {data.brand_periods.length > 0 && <BrandPeriods periods={data.brand_periods} onChanged={pay.reload} />}
@@ -74,7 +85,9 @@ export default function HostPayPage() {
                             <p className="text-xs text-muted-foreground">+{formatDuration(period.carried_in_hours)} bawaan dari periode lalu, dibayar duluan</p>
                           )}
                           {period.carried_out_hours > 0 && (
-                            <p className="text-xs text-warning">{formatDuration(period.carried_out_hours)} melewati target brand, dibayar di periode berikutnya</p>
+                            <p className="text-xs text-warning">
+                              {formatDuration(period.carried_out_hours)} melewati target brand, dibayar di periode berikutnya
+                            </p>
                           )}
                           {period.host_paid.map((cover) => (
                             <p key={cover.payer} className="text-xs text-muted-foreground">
@@ -212,7 +225,8 @@ function BrandPeriods({ periods, onChanged }: { periods: BrandPeriod[]; onChange
                 <>
                   <Progress value={percent} aria-label={`Jam ${period.brand.name}`} className="h-1.5" />
                   <p className="text-xs text-muted-foreground tabular-nums">
-                    {formatDuration(period.progress_hours)} / {period.target_hours} jam · kurang {formatDuration(Math.max(0, period.target_hours - period.progress_hours))}
+                    {formatDuration(period.progress_hours)} / {period.target_hours} jam · kurang{" "}
+                    {formatDuration(Math.max(0, period.target_hours - period.progress_hours))}
                   </p>
                 </>
               )}
@@ -220,7 +234,8 @@ function BrandPeriods({ periods, onChanged }: { periods: BrandPeriod[]; onChange
               {period.status === "waiting_payment" && (
                 <>
                   <p className="text-sm text-body">
-                    {period.closed_early ? "Periode ditutup lebih awal oleh agensi" : "Target tercapai"}: {formatDuration(period.achieved_hours)} bisa ditagihkan ke brand.
+                    {period.closed_early ? "Periode ditutup lebih awal oleh agensi" : "Target tercapai"}: {formatDuration(period.achieved_hours)} bisa
+                    ditagihkan ke brand.
                   </p>
                   {blocked && (
                     <p className="text-xs text-warning">
@@ -244,7 +259,8 @@ function BrandPeriods({ periods, onChanged }: { periods: BrandPeriod[]; onChange
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <p className="text-xs text-muted-foreground">
                     {formatDuration(period.achieved_hours)} ditagihkan
-                    {period.request && ` · diajukan ${formatDate(period.request.requested_at)}${period.request.requester ? ` oleh ${period.request.requester}` : ""}`}
+                    {period.request &&
+                      ` · diajukan ${formatDate(period.request.requested_at)}${period.request.requester ? ` oleh ${period.request.requester}` : ""}`}
                     {period.request?.paid_at && ` · lunas ${formatDate(period.request.paid_at)}`}
                   </p>
                   <Button type="button" variant="outline" size="xs" onClick={() => download(period)}>
@@ -274,8 +290,8 @@ function BrandPeriods({ periods, onChanged }: { periods: BrandPeriod[]; onChange
           }}
           onClose={() => setAsking(null)}
         >
-          {formatDuration(asking.achieved_hours)} untuk {formatPeriodDates(asking.period_start, asking.period_end)}. Jam dan gaji host dikunci, lalu unduh laporannya dan kirim ke brand.
-          Finance menandai lunas setelah brand membayar.
+          {formatDuration(asking.achieved_hours)} untuk {formatPeriodDates(asking.period_start, asking.period_end)}. Jam dan gaji host dikunci, lalu unduh
+          laporannya dan kirim ke brand. Finance menandai lunas setelah brand membayar.
         </ConfirmDialog>
       )}
     </Card>

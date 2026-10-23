@@ -160,8 +160,7 @@ export default function EventClaimBoard({ events }: { events: HostEventsState })
           }
         >
           <p className="font-medium text-foreground">
-            {releasing.event.name}, {shortDay(appDate(releasing.block.start_at))} {clock(releasing.block.start_at)}–
-            {clock(releasing.block.end_at)}
+            {releasing.event.name}, {shortDay(appDate(releasing.block.start_at))} {clock(releasing.block.start_at)}–{clock(releasing.block.end_at)}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">Host lain bisa langsung mengambilnya, dan belum tentu bisa kamu ambil lagi.</p>
         </Dialog>
@@ -255,7 +254,7 @@ function EventPanel({
         </div>
 
         {days.length > 1 && (
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" role="tablist" aria-label="Hari event">
+          <div className="-mx-1 flex [scrollbar-width:thin] gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Hari event">
             {days.map(([date, dayBlocks]) => {
               const open = dayBlocks.filter((block) => block.state === "free").length;
               const mine = dayBlocks.some((block) => block.state === "mine");

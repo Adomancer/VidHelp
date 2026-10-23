@@ -24,11 +24,7 @@ function shownInForm(form: HTMLFormElement, key: string, shown: readonly string[
  * goes to `error`, so a failed submit never ends without a message. `shown` lists error keys the form
  * renders for controls that have no `name`.
  */
-export function useApiForm<T>(
-  submit: (data: FormData) => Promise<T>,
-  onSuccess: (result: T, form: HTMLFormElement) => void,
-  shown: readonly string[] = []
-) {
+export function useApiForm<T>(submit: (data: FormData) => Promise<T>, onSuccess: (result: T, form: HTMLFormElement) => void, shown: readonly string[] = []) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);

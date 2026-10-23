@@ -62,7 +62,15 @@ export default function TwoFactorSettings() {
     <Card
       title="Verifikasi dua langkah (2FA)"
       description="Setelah kata sandi atau Google, kamu juga memasukkan kode 6 digit dari aplikasi authenticator di HP."
-      action={data?.enabled ? <StatusBadge tone="success" dot>Aktif</StatusBadge> : data ? <StatusBadge tone="neutral">Belum aktif</StatusBadge> : undefined}
+      action={
+        data?.enabled ? (
+          <StatusBadge tone="success" dot>
+            Aktif
+          </StatusBadge>
+        ) : data ? (
+          <StatusBadge tone="neutral">Belum aktif</StatusBadge>
+        ) : undefined
+      }
     >
       {status.error && <FormAlert tone="error">{status.error}</FormAlert>}
       {error && <FormAlert tone="error">{error}</FormAlert>}

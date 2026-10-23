@@ -70,7 +70,7 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
             <UserAvatar user={detail.user} size="size-10 text-sm" />
             <span className="min-w-0">
               <span className="block truncate">{detail.user.name}</span>
-              <span className="block text-sm font-normal text-muted-foreground truncate">{detail.user.email}</span>
+              <span className="block truncate text-sm font-normal text-muted-foreground">{detail.user.email}</span>
             </span>
           </span>
         ) : (
@@ -103,7 +103,14 @@ export default function HostDetailDialog({ hostId, onClose, onChanged }: HostDet
                   </div>
                 )}
                 <DigitsField label="No. HP" name="phone" defaultValue={detail.phone} maxLength={15} placeholder="08…" error={errors.phone} />
-                <DigitsField label="No. HP wali" name="guardian_phone" defaultValue={detail.guardian_phone} maxLength={15} placeholder="08…" error={errors.guardian_phone} />
+                <DigitsField
+                  label="No. HP wali"
+                  name="guardian_phone"
+                  defaultValue={detail.guardian_phone}
+                  maxLength={15}
+                  placeholder="08…"
+                  error={errors.guardian_phone}
+                />
                 <div className="space-y-1.5">
                   <Label htmlFor="join_date">Tanggal bergabung</Label>
                   {/* A hidden input doesn't fire the form's change event, so mark the form as edited here */}
@@ -221,12 +228,12 @@ function SensitiveData({ host }: { host: AdminHostDetail }) {
 
   return (
     <dl className="grid gap-3 sm:grid-cols-2">
-        {rows.map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="mt-0.5 text-sm text-foreground tabular-nums">{value || <span className="text-faint">belum diisi</span>}</dd>
-          </div>
-        ))}
+      {rows.map(([label, value]) => (
+        <div key={label} className="rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+          <dt className="text-xs text-muted-foreground">{label}</dt>
+          <dd className="mt-0.5 text-sm text-foreground tabular-nums">{value || <span className="text-faint">belum diisi</span>}</dd>
+        </div>
+      ))}
     </dl>
   );
 }

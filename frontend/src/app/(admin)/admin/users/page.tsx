@@ -28,13 +28,7 @@ import ToggleGroup, { ShortLabel } from "@/components/ToggleGroup";
 import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const tabs = [
   ["pending", "Menunggu persetujuan"],
@@ -79,7 +73,9 @@ export default function AdminUsersPage() {
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const status = tab === "all" ? undefined : tab;
-  const result = useApiData(`admin-users-${JSON.stringify({ status, search, page })}`, () => adminApi.users(token, { status, search, page }), { keepPrevious: true });
+  const result = useApiData(`admin-users-${JSON.stringify({ status, search, page })}`, () => adminApi.users(token, { status, search, page }), {
+    keepPrevious: true,
+  });
   const invalidate = useInvalidate();
   const reloadUsers = () => invalidate("admin-users-");
 
@@ -219,7 +215,15 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      {users && <Pagination page={users.current_page} lastPage={users.last_page} total={users.total} unit="pengguna" onChange={(next) => void setUrlState({ page: next })} />}
+      {users && (
+        <Pagination
+          page={users.current_page}
+          lastPage={users.last_page}
+          total={users.total}
+          unit="pengguna"
+          onChange={(next) => void setUrlState({ page: next })}
+        />
+      )}
 
       {creating && (
         <CreateAccountForm
@@ -398,7 +402,13 @@ function RowActions({
   return (
     <div className={cn("flex items-center justify-end gap-2", stretch && "[&>button:first-child]:flex-1")}>
       {canActivate && (
-        <Button type="button" size="sm" variant={user.status === "pending" ? "default" : "outline"} disabled={busy} onClick={() => run(user.id, () => adminApi.activateUser(token, user.id))}>
+        <Button
+          type="button"
+          size="sm"
+          variant={user.status === "pending" ? "default" : "outline"}
+          disabled={busy}
+          onClick={() => run(user.id, () => adminApi.activateUser(token, user.id))}
+        >
           {user.status === "pending" ? "Setujui" : user.status === "archived" ? "Pulihkan" : "Aktifkan"}
         </Button>
       )}
@@ -451,7 +461,13 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
         <TextField label="Nama" name="name" autoComplete="off" error={errors.name} />
         <TextField label="Email" name="email" type="email" autoComplete="off" error={errors.email} />
         <TextField label="Kata sandi" name="password" type="text" autoComplete="new-password" placeholder="Minimal 8 karakter" error={errors.password} />
-        <SelectField label="Peran" name="role" defaultValue="host" error={errors.role} options={roles.map((role) => ({ value: role, label: roleLabel(role) }))} />
+        <SelectField
+          label="Peran"
+          name="role"
+          defaultValue="host"
+          error={errors.role}
+          options={roles.map((role) => ({ value: role, label: roleLabel(role) }))}
+        />
         <FormActions loading={loading} submitLabel="Buat akun" onCancel={onCancel} />
       </form>
     </Modal>
@@ -478,8 +494,8 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
   return (
     <Modal title={`Hapus ${user.name} permanen`} onClose={onCancel}>
       <FormAlert tone="warning">
-        Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini
-        tidak bisa dibatalkan.
+        Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini tidak bisa
+        dibatalkan.
       </FormAlert>
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (

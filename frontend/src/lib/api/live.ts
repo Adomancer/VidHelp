@@ -81,8 +81,10 @@ export interface ReviewReport extends LiveReport {
 
 export const liveApi = {
   today: (token: string) => api<{ sessions: LiveSession[]; missing_reports: Attendance[]; metrics: string[] }>("/host/live", { token }),
-  checkIn: (token: string, { slot_id, date, backup_request_id, event_claim_id }: Pick<LiveSession, "slot_id" | "date" | "backup_request_id" | "event_claim_id">) =>
-    post<{ attendance: Attendance } & Message>("/host/live/check-in", token, { slot_id, date, backup_request_id, event_claim_id }),
+  checkIn: (
+    token: string,
+    { slot_id, date, backup_request_id, event_claim_id }: Pick<LiveSession, "slot_id" | "date" | "backup_request_id" | "event_claim_id">
+  ) => post<{ attendance: Attendance } & Message>("/host/live/check-in", token, { slot_id, date, backup_request_id, event_claim_id }),
   checkOut: (token: string, attendanceId: string) => post<{ attendance: Attendance } & Message>(`/host/live/${attendanceId}/check-out`, token),
   report: (token: string, attendanceId: string, data: ReportInput) => post<{ report: LiveReport } & Message>(`/host/live/${attendanceId}/report`, token, data),
 };

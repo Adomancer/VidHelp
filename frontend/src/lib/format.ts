@@ -128,7 +128,9 @@ export function formatClock(value: string | Date): string {
 /** "Sel 6 Okt, 14:00–16:00" or "Sel 6 Okt, 23:00 – Rab 02:00" (WIB) */
 export function formatWindow(startIso: string, endIso: string): string {
   const sameDay = appDate(startIso) === appDate(endIso);
-  const end = sameDay ? formatClock(endIso) : ` ${new Date(endIso).toLocaleDateString("id-ID", { weekday: "short", timeZone: APP_TIME_ZONE })} ${formatClock(endIso)}`;
+  const end = sameDay
+    ? formatClock(endIso)
+    : ` ${new Date(endIso).toLocaleDateString("id-ID", { weekday: "short", timeZone: APP_TIME_ZONE })} ${formatClock(endIso)}`;
   return `${formatDay(startIso)}, ${formatClock(startIso)}${sameDay ? "–" : " –"}${end}`;
 }
 

@@ -55,12 +55,21 @@ export function EventBoard({
 
   return (
     <div className="space-y-5">
-      <Summary event={event} blocks={blocks} days={days.map(([day]) => day)} held={held} now={now} onEdit={() => setEditing(true)} onDelete={() => setDeleting(true)} refresh={() => refresh(event.id)} />
+      <Summary
+        event={event}
+        blocks={blocks}
+        days={days.map(([day]) => day)}
+        held={held}
+        now={now}
+        onEdit={() => setEditing(true)}
+        onDelete={() => setDeleting(true)}
+        refresh={() => refresh(event.id)}
+      />
 
       <Legend />
 
       {/* Days side by side, earliest on the left: they share the width when few, scroll sideways (snapping to a card's edge) when many */}
-      <ul aria-label="Hari event" className="flex snap-x snap-mandatory items-start gap-4 overflow-x-auto pb-3 [scrollbar-width:thin]">
+      <ul aria-label="Hari event" className="flex snap-x snap-mandatory [scrollbar-width:thin] items-start gap-4 overflow-x-auto pb-3">
         {days.map(([day, dayBlocks]) => (
           <li key={day} className="min-w-[85%] flex-1 basis-0 snap-start sm:min-w-[300px]">
             <DayCard day={day} blocks={dayBlocks} now={now} highlightHost={highlightHost} onOpen={setOpen} />

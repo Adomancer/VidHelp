@@ -179,7 +179,11 @@ function ShellHeader({ panel, homeHref, links, search, hostSearchPath, mobileNav
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-md md:px-5 print:hidden">
       {/* Phones with a tab bar get the logo; everyone else the menu button */}
       {mobileNav && (
-        <Link href={homeHref} className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden" aria-label="VidHelp">
+        <Link
+          href={homeHref}
+          className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+          aria-label="VidHelp"
+        >
           <Logo panel={panel} compact />
         </Link>
       )}
@@ -201,7 +205,11 @@ function ShellHeader({ panel, homeHref, links, search, hostSearchPath, mobileNav
         <ThemeToggle />
         <NotificationBell />
         {mobileNav && profileHref && (
-          <Link href={profileHref} aria-label="Profil saya" className="ml-1 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden">
+          <Link
+            href={profileHref}
+            aria-label="Profil saya"
+            className="ml-1 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+          >
             <UserAvatar size="size-8 text-xs" />
           </Link>
         )}

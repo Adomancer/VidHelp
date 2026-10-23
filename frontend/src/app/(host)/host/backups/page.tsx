@@ -3,15 +3,7 @@
 import { useState } from "react";
 import { ArrowLeftRight, Clock, Inbox, LifeBuoy, Plus, Upload } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
-import {
-  errorMessage,
-  hostBackupApi,
-  settingsApi,
-  type BackupNeed,
-  type BackupReason,
-  type BackupRequest,
-  type BackupRequestType,
-} from "@/lib/api";
+import { errorMessage, hostBackupApi, settingsApi, type BackupNeed, type BackupReason, type BackupRequest, type BackupRequestType } from "@/lib/api";
 import { acceptOf, LETTER_UPLOAD, uploadProblem } from "@/lib/files";
 import { formatDateTime, formatDuration, formatWindow } from "@/lib/format";
 import { textareaClass } from "@/lib/ui";
@@ -123,17 +115,7 @@ function CountPill({ children }: { children: React.ReactNode }) {
   return <span className="ml-1 rounded-full bg-primary/12 px-1.5 text-[11px] font-semibold text-brand tabular-nums">{children}</span>;
 }
 
-function NeedsTab({
-  covers,
-  needs,
-  quota,
-  act,
-}: {
-  covers: BackupNeed[];
-  needs?: BackupNeed[];
-  quota?: { quota_used: number; quota_max: number };
-  act: Act;
-}) {
+function NeedsTab({ covers, needs, quota, act }: { covers: BackupNeed[]; needs?: BackupNeed[]; quota?: { quota_used: number; quota_max: number }; act: Act }) {
   const { token } = useAuth();
   const [dropping, setDropping] = useState<BackupNeed | null>(null);
   const upcomingCovers = covers.filter((cover) => new Date(cover.end_at) > new Date());
@@ -152,7 +134,10 @@ function NeedsTab({
           {needs?.map((need) => {
             const applied = need.my_application?.status === "applied";
             return (
-              <li key={need.id} className={cn("space-y-3 rounded-xl border bg-card p-4 shadow-xs dark:shadow-none", need.asked_me ? "border-primary/40" : "border-border")}>
+              <li
+                key={need.id}
+                className={cn("space-y-3 rounded-xl border bg-card p-4 shadow-xs dark:shadow-none", need.asked_me ? "border-primary/40" : "border-border")}
+              >
                 {need.asked_me && <StatusBadge tone="brand">{need.requester_name} meminta kamu</StatusBadge>}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -496,8 +481,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             reasonType === "sick" &&
             settings && (
               <FieldHint>
-                Kalau belum ada, unggah paling lambat {formatDuration(settings["backup.sick_letter_grace_hours"])} setelah sesi dimulai, atau poinmu
-                dipotong.
+                Kalau belum ada, unggah paling lambat {formatDuration(settings["backup.sick_letter_grace_hours"])} setelah sesi dimulai, atau poinmu dipotong.
               </FieldHint>
             )
           )}
@@ -588,7 +572,9 @@ function NomineePicker({
                 <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="size-7 text-xs" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-foreground">{candidate.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{candidate.ineligible_reason ?? (candidate.same_brand ? "Brand kamu" : "Brand lain")}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {candidate.ineligible_reason ?? (candidate.same_brand ? "Brand kamu" : "Brand lain")}
+                  </span>
                 </span>
               </label>
             </li>

@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { appDate, appMinutes, appMoment, dateOfWeekday, dayWord, formatClock, formatDate, formatTimeRange, formatWindow, isoWeekday, toDateInput } from "./format";
+import {
+  appDate,
+  appMinutes,
+  appMoment,
+  dateOfWeekday,
+  dayWord,
+  formatClock,
+  formatDate,
+  formatTimeRange,
+  formatWindow,
+  isoWeekday,
+  toDateInput,
+} from "./format";
 
 // Tests run with TZ=America/New_York (vitest.config.mts): what is shown must still be WIB.
 describe("WIB on a device outside WIB", () => {
@@ -15,7 +27,9 @@ describe("WIB on a device outside WIB", () => {
   it("takes the WIB date of a moment", () => {
     // 20:00 UTC on the 6th is already the 7th in Jakarta, still the 6th in New York
     expect(appDate("2026-10-06T20:00:00Z")).toBe("2026-10-07");
-    expect(formatDate("2026-10-06T20:00:00Z")).toBe(new Date(Date.UTC(2026, 9, 7, 5)).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }));
+    expect(formatDate("2026-10-06T20:00:00Z")).toBe(
+      new Date(Date.UTC(2026, 9, 7, 5)).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" })
+    );
   });
 
   it("treats a date-only value as that calendar day", () => {

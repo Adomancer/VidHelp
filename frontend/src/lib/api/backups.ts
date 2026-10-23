@@ -164,10 +164,9 @@ export const operatorBackupApi = {
     api<{ requests: BackupRequest[]; total: number }>(`/operator/backups${query({ status })}`, { token }),
   /** Past, cancelled and rejected requests: 25 a page, searched on the server. */
   closed: (token: string, params: { page: number; search?: string; reason_types?: BackupReason[] }) =>
-    api<{ requests: BackupRequest[]; total: number; current_page: number; last_page: number }>(
-      `/operator/backups${query({ status: "closed", ...params })}`,
-      { token }
-    ),
+    api<{ requests: BackupRequest[]; total: number; current_page: number; last_page: number }>(`/operator/backups${query({ status: "closed", ...params })}`, {
+      token,
+    }),
   /** Sick requests still missing their doctor's letter, on any tab and however old. */
   letters: (token: string) => api<{ requests: BackupRequest[]; total: number }>("/operator/backups/letters", { token }),
   recap: (token: string) => api<BackupRecap>("/operator/backups/recap", { token }),

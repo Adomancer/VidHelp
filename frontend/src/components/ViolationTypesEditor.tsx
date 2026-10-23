@@ -68,7 +68,11 @@ export default function ViolationTypesEditor({ plain = false }: { plain?: boolea
   if (plain) return <div className="-mx-5 -mt-5 sm:-mx-6">{content}</div>;
 
   return (
-    <Card title="Jenis pelanggaran" description="Poin dipotong dari saldo 3 bulanan; dampak rating menurunkan saran rating bulanan." bodyClassName="px-0 md:px-0">
+    <Card
+      title="Jenis pelanggaran"
+      description="Poin dipotong dari saldo 3 bulanan; dampak rating menurunkan saran rating bulanan."
+      bodyClassName="px-0 md:px-0"
+    >
       {content}
     </Card>
   );
@@ -124,7 +128,13 @@ function TypeRow({ type, onSave }: { type?: ViolationType; onSave: (action: () =
         <Switch checked={active} disabled={!type} onCheckedChange={setActive} />
         {active ? "Aktif" : "Nonaktif"}
       </label>
-      <Button type="button" size="sm" variant={type ? "outline" : "default"} onClick={submit} disabled={saving || !name.trim() || points === "" || impact === ""}>
+      <Button
+        type="button"
+        size="sm"
+        variant={type ? "outline" : "default"}
+        onClick={submit}
+        disabled={saving || !name.trim() || points === "" || impact === ""}
+      >
         {!type && <Plus aria-hidden="true" />}
         {saving ? "Menyimpan…" : type ? "Simpan" : "Tambah"}
       </Button>

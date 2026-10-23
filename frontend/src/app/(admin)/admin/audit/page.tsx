@@ -184,7 +184,12 @@ export default function AuditLogPage() {
             </option>
           ))}
         </NativeSelect>
-        <NativeSelect wrapperClassName="lg:w-48" value={filters.target_table ?? ""} onChange={(event) => change("target_table", event.target.value)} aria-label="Jenis data">
+        <NativeSelect
+          wrapperClassName="lg:w-48"
+          value={filters.target_table ?? ""}
+          onChange={(event) => change("target_table", event.target.value)}
+          aria-label="Jenis data"
+        >
           <option value="">Semua data</option>
           {result.data?.target_tables.map((table) => (
             <option key={table} value={table}>
@@ -194,11 +199,25 @@ export default function AuditLogPage() {
         </NativeSelect>
         <div className="space-y-1 text-xs text-muted-foreground lg:w-40">
           <span id="audit-from">Dari</span>
-          <DatePicker value={filters.from ?? ""} onChange={(value) => change("from", value)} max={filters.to} placeholder="Awal" clearable aria-describedby="audit-from" />
+          <DatePicker
+            value={filters.from ?? ""}
+            onChange={(value) => change("from", value)}
+            max={filters.to}
+            placeholder="Awal"
+            clearable
+            aria-describedby="audit-from"
+          />
         </div>
         <div className="space-y-1 text-xs text-muted-foreground lg:w-40">
           <span id="audit-to">Sampai</span>
-          <DatePicker value={filters.to ?? ""} onChange={(value) => change("to", value)} min={filters.from} placeholder="Hari ini" clearable aria-describedby="audit-to" />
+          <DatePicker
+            value={filters.to ?? ""}
+            onChange={(value) => change("to", value)}
+            min={filters.from}
+            placeholder="Hari ini"
+            clearable
+            aria-describedby="audit-to"
+          />
         </div>
         {filtered && (
           <Button type="button" variant="ghost" onClick={() => applyFilters({})} className="text-muted-foreground">
@@ -211,7 +230,11 @@ export default function AuditLogPage() {
       {scoped && (
         <FormAlert tone="info">
           Hanya menampilkan riwayat {filters.target_id ? "satu data" : "satu orang"}.{" "}
-          <button type="button" onClick={() => applyFilters({ ...filters, target_id: undefined, user_id: undefined })} className="font-medium underline underline-offset-2">
+          <button
+            type="button"
+            onClick={() => applyFilters({ ...filters, target_id: undefined, user_id: undefined })}
+            className="font-medium underline underline-offset-2"
+          >
             Tampilkan semua
           </button>
         </FormAlert>
@@ -221,7 +244,9 @@ export default function AuditLogPage() {
       <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
         <RefreshBar active={result.loading && Boolean(logs)} />
         {!logs && !result.error && <TableSkeleton rows={8} columns={5} />}
-        {logs?.data.length === 0 && <EmptyState icon={ClipboardList} title="Tidak ada catatan" description="Tidak ada aktivitas yang cocok dengan filter ini." />}
+        {logs?.data.length === 0 && (
+          <EmptyState icon={ClipboardList} title="Tidak ada catatan" description="Tidak ada aktivitas yang cocok dengan filter ini." />
+        )}
 
         {logs && logs.data.length > 0 && (
           <>
@@ -243,7 +268,11 @@ export default function AuditLogPage() {
                   const open = openId === log.id;
                   return (
                     <Fragment key={log.id}>
-                      <TableRow onClick={() => toggle(log.id)} className={cn("cursor-pointer text-body hover:bg-muted/40", open && "bg-muted/40")} aria-expanded={open}>
+                      <TableRow
+                        onClick={() => toggle(log.id)}
+                        className={cn("cursor-pointer text-body hover:bg-muted/40", open && "bg-muted/40")}
+                        aria-expanded={open}
+                      >
                         <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">{formatDateTime(log.created_at)}</TableCell>
                         <TableCell>{who(log)}</TableCell>
                         <TableCell>
@@ -297,7 +326,15 @@ export default function AuditLogPage() {
         )}
       </div>
 
-      {logs && <Pagination page={logs.current_page} lastPage={logs.last_page} total={logs.total} unit="catatan" onChange={(next) => void setUrlState({ page: next })} />}
+      {logs && (
+        <Pagination
+          page={logs.current_page}
+          lastPage={logs.last_page}
+          total={logs.total}
+          unit="catatan"
+          onChange={(next) => void setUrlState({ page: next })}
+        />
+      )}
     </div>
   );
 }
@@ -353,7 +390,9 @@ function Details({ log }: { log: AuditLogEntry }) {
         )}
         {log.user_agent ?? "Browser tidak dikenal"}
       </p>
-      <p className="text-xs text-faint">&quot;[hidden]&quot; berarti kolom itu berubah, tapi nilainya (kata sandi, KTP, nomor rekening) tidak pernah disimpan di log.</p>
+      <p className="text-xs text-faint">
+        &quot;[hidden]&quot; berarti kolom itu berubah, tapi nilainya (kata sandi, KTP, nomor rekening) tidak pernah disimpan di log.
+      </p>
     </div>
   );
 }

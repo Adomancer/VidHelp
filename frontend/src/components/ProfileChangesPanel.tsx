@@ -74,9 +74,7 @@ export default function ProfileChangesPanel() {
                 <UserAvatar user={{ name: request.host.name, avatar_url: request.host.avatar_url }} size="size-9" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-foreground">{request.host.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {request.fields.map((field) => field.label).join(" · ")}
-                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">{request.fields.map((field) => field.label).join(" · ")}</span>
                 </span>
                 <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">{formatDateTime(request.created_at)}</span>
                 <span className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground">Tinjau</span>
@@ -156,7 +154,12 @@ function ReviewDialog({
             <Button type="button" variant="outline" onClick={() => setRejecting(false)} disabled={busy}>
               Kembali
             </Button>
-            <Button type="button" variant="danger" disabled={busy || !note.trim()} onClick={() => decide(() => adminHostsApi.rejectChange(token, request.id, note.trim()))}>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={busy || !note.trim()}
+              onClick={() => decide(() => adminHostsApi.rejectChange(token, request.id, note.trim()))}
+            >
               <X aria-hidden="true" />
               {busy ? "Menolak…" : "Tolak perubahan"}
             </Button>
@@ -192,7 +195,12 @@ function ReviewDialog({
                 {request.fields.map((field) => (
                   <tr key={field.field}>
                     <td className="px-3 py-2.5 text-muted-foreground">{field.label}</td>
-                    <td className={cn("px-3 py-2.5 break-words", field.current ? "text-foreground line-through decoration-muted-foreground/50" : "text-muted-foreground italic")}>
+                    <td
+                      className={cn(
+                        "px-3 py-2.5 break-words",
+                        field.current ? "text-foreground line-through decoration-muted-foreground/50" : "text-muted-foreground italic"
+                      )}
+                    >
                       {field.current ?? "kosong"}
                     </td>
                     <td className="text-muted-foreground">

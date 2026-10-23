@@ -22,7 +22,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/* Soft grid and glow, drawn in CSS */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 opacity-[0.07] [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [background-size:44px_44px] [mask-image:radial-gradient(ellipse_at_top_left,black_30%,transparent_75%)]"
+          className="absolute inset-0 [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_top_left,black_30%,transparent_75%)] [background-size:44px_44px] opacity-[0.07]"
         />
         <div aria-hidden="true" className="absolute -top-40 -left-32 size-[32rem] rounded-full bg-[#5750f1] opacity-40 blur-[120px]" />
         <div aria-hidden="true" className="absolute -right-24 -bottom-48 size-[28rem] rounded-full bg-[#5750f1] opacity-25 blur-[120px]" />

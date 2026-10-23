@@ -51,7 +51,11 @@ const hostPayColumns: ColumnDef<HostPayRow>[] = [
   {
     accessorKey: "worked_hours",
     header: "Kerja",
-    meta: { align: "right", headClassName: "hidden px-3 py-2.5 sm:table-cell", cellClassName: "hidden px-3 py-2.5 whitespace-nowrap text-muted-foreground sm:table-cell" },
+    meta: {
+      align: "right",
+      headClassName: "hidden px-3 py-2.5 sm:table-cell",
+      cellClassName: "hidden px-3 py-2.5 whitespace-nowrap text-muted-foreground sm:table-cell",
+    },
     cell: ({ row }) => formatDuration(row.original.worked_hours),
   },
   {
@@ -69,7 +73,11 @@ const hostPayColumns: ColumnDef<HostPayRow>[] = [
   {
     accessorKey: "rate_per_hour",
     header: "Tarif",
-    meta: { align: "right", headClassName: "hidden px-3 py-2.5 sm:table-cell", cellClassName: "hidden px-3 py-2.5 whitespace-nowrap text-muted-foreground sm:table-cell" },
+    meta: {
+      align: "right",
+      headClassName: "hidden px-3 py-2.5 sm:table-cell",
+      cellClassName: "hidden px-3 py-2.5 whitespace-nowrap text-muted-foreground sm:table-cell",
+    },
     cell: ({ row }) => formatRupiah(row.original.rate_per_hour),
   },
   {
@@ -207,8 +215,8 @@ export function PeriodDetail({ periodId, onChanged }: { periodId: string; onChan
         )}
         {period.status !== "paid" && pendingLetters > 0 && (
           <FormAlert tone="warning">
-            {pendingLetters} sesi backup karena sakit masih menunggu surat dokter. Kalau surat masuk tepat waktu agensi yang membayar penggantinya; kalau tidak, host yang
-            minta backup. Pembayaran bisa diajukan setelah suratnya masuk atau batas waktunya lewat.
+            {pendingLetters} sesi backup karena sakit masih menunggu surat dokter. Kalau surat masuk tepat waktu agensi yang membayar penggantinya; kalau tidak,
+            host yang minta backup. Pembayaran bisa diajukan setelah suratnya masuk atau batas waktunya lewat.
           </FormAlert>
         )}
 
@@ -226,7 +234,9 @@ export function PeriodDetail({ periodId, onChanged }: { periodId: string; onChan
           {summary.host_paid_hours > 0 &&
             ` ${formatDuration(summary.host_paid_hours)} backup dibayar langsung oleh host yang minta backup: ikut ditagihkan, tapi tidak masuk gaji.`}
         </p>
-        {period.status === "in_progress" && <p className="text-xs text-muted-foreground">Gaji masih perkiraan dengan tarif hari ini sampai pembayaran diajukan.</p>}
+        {period.status === "in_progress" && (
+          <p className="text-xs text-muted-foreground">Gaji masih perkiraan dengan tarif hari ini sampai pembayaran diajukan.</p>
+        )}
         {paymentReference && <p className="text-xs text-muted-foreground">Referensi transfer brand: {paymentReference}</p>}
         {period.status === "requested" && (
           <p className="text-xs text-muted-foreground">
@@ -550,7 +560,15 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
         <Label htmlFor={`adjust-sessions-${periodId}`}>
           Sesi <span className="font-normal text-muted-foreground">(opsional)</span>
         </Label>
-        <input id={`adjust-sessions-${periodId}`} name="sessions" type="number" min={0} max={50} defaultValue={0} className={cn(inputClass, "w-28 tabular-nums")} />
+        <input
+          id={`adjust-sessions-${periodId}`}
+          name="sessions"
+          type="number"
+          min={0}
+          max={50}
+          defaultValue={0}
+          className={cn(inputClass, "w-28 tabular-nums")}
+        />
         <FieldError>{errors.sessions_added}</FieldError>
       </div>
       <div className="space-y-1.5 sm:col-span-2">

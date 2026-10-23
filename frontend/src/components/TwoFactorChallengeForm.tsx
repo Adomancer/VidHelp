@@ -24,11 +24,7 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
   const formRef = useRef<HTMLFormElement>(null);
 
   const { loading, errors, error, handleSubmit } = useApiForm(
-    (data) =>
-      authApi.twoFactorChallenge(
-        challengeToken,
-        useRecovery ? { recovery_code: formValue(data, "recovery_code") } : { code: formValue(data, "code") }
-      ),
+    (data) => authApi.twoFactorChallenge(challengeToken, useRecovery ? { recovery_code: formValue(data, "recovery_code") } : { code: formValue(data, "code") }),
     ({ token, user }) => {
       signIn(token, user);
       router.replace(homePathFor(user));

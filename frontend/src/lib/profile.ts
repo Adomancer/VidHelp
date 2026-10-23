@@ -13,5 +13,9 @@ export function changedPersonalFields(form: FormData, saved: { name: string; hos
   const changed = (Object.keys(current) as (keyof typeof current)[])
     .map((field) => [field, formValue(form, field).trim()] as const)
     .filter(([field, value]) => value !== current[field]);
-  return Object.fromEntries(changed.map(([field, value]) => [field, value || null])) as { name?: string | null; phone?: string | null; guardian_phone?: string | null };
+  return Object.fromEntries(changed.map(([field, value]) => [field, value || null])) as {
+    name?: string | null;
+    phone?: string | null;
+    guardian_phone?: string | null;
+  };
 }

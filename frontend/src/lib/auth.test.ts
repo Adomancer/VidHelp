@@ -33,7 +33,10 @@ describe("loadSession", () => {
 
   it("keeps the token when the server can't be reached", async () => {
     saveSession("still-good");
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError("Failed to fetch")))
+    );
     expect(await loadSession()).toBe("unreachable");
     expect(getToken()).toBe("still-good");
   });

@@ -17,7 +17,9 @@ describe("error messages", () => {
   });
 
   it("replaces Laravel's own messages and model names", async () => {
-    expect((await failure(404, { message: "No query results for model [App\\Models\\BackupRequest] 0199" })).message).toBe("Data tidak ditemukan atau sudah dihapus.");
+    expect((await failure(404, { message: "No query results for model [App\\Models\\BackupRequest] 0199" })).message).toBe(
+      "Data tidak ditemukan atau sudah dihapus."
+    );
     expect((await failure(429, { message: "Too Many Attempts." })).message).toBe("Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.");
     expect((await failure(403, { message: "This action is unauthorized." })).message).toBe("Kamu tidak punya akses untuk ini.");
   });
@@ -42,7 +44,11 @@ describe("session problems", () => {
     await failure(403, { message: "Atur verifikasi dua langkah untuk melanjutkan.", code: "two_factor_setup_required" });
     await failure(403, { message: "Ini bukan sesimu." }); // one action refused: not the session
     stop();
-    expect(seen).toEqual(["signed-out:Sesi kamu sudah berakhir. Silakan masuk lagi.", "signed-out:Akunmu sudah dinonaktifkan.", "two-factor:Atur verifikasi dua langkah untuk melanjutkan."]);
+    expect(seen).toEqual([
+      "signed-out:Sesi kamu sudah berakhir. Silakan masuk lagi.",
+      "signed-out:Akunmu sudah dinonaktifkan.",
+      "two-factor:Atur verifikasi dua langkah untuk melanjutkan.",
+    ]);
   });
 });
 

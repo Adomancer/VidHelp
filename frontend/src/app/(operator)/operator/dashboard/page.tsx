@@ -61,7 +61,14 @@ export default function OperatorDashboardPage() {
 
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={CalendarDays} tone="brand" label="Slot live hari ini" value={stats.today_schedules} note="Lihat jadwal per brand" href="/operator/schedules" />
+          <StatCard
+            icon={CalendarDays}
+            tone="brand"
+            label="Slot live hari ini"
+            value={stats.today_schedules}
+            note="Lihat jadwal per brand"
+            href="/operator/schedules"
+          />
           <StatCard
             icon={ArrowLeftRight}
             tone={stats.pending_backups > 0 ? "warning" : "neutral"}

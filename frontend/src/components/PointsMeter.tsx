@@ -11,7 +11,9 @@ export function SpBadge({ level }: { level: number }) {
  */
 export default function PointsMeter({ points, opening, thresholds }: { points: number; opening: number; thresholds: SpThresholds }) {
   const pct = (value: number) => `${Math.max(0, Math.min(100, (value / opening) * 100))}%`;
-  const reached = Object.entries(thresholds).filter(([, threshold]) => points <= threshold).map(([level]) => Number(level));
+  const reached = Object.entries(thresholds)
+    .filter(([, threshold]) => points <= threshold)
+    .map(([level]) => Number(level));
   const worst = reached.length === 0 ? 0 : Math.max(...reached);
   const tone = worst === 0 ? "bg-success" : worst >= 3 ? "bg-destructive" : "bg-warning";
 
@@ -31,7 +33,12 @@ export default function PointsMeter({ points, opening, thresholds }: { points: n
       >
         <div className={`h-full rounded-full transition-[width] duration-500 ease-out ${tone}`} style={{ width: pct(points) }} />
         {Object.entries(thresholds).map(([level, threshold]) => (
-          <div key={level} className="absolute -top-1 h-[18px] w-0.5 rounded-full bg-foreground/25" style={{ left: pct(threshold) }} title={`SP${level} di ${threshold}`} />
+          <div
+            key={level}
+            className="absolute -top-1 h-[18px] w-0.5 rounded-full bg-foreground/25"
+            style={{ left: pct(threshold) }}
+            title={`SP${level} di ${threshold}`}
+          />
         ))}
       </div>
       <div className="relative h-4 text-[11px] text-muted-foreground tabular-nums">

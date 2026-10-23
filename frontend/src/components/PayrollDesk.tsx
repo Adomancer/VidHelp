@@ -31,10 +31,12 @@ export default function PayrollDesk() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ToggleGroup
           label="Bagian penggajian"
-          options={[
-            ["periods", "Periode pembayaran"],
-            ["kasbon", "Kasbon"],
-          ] as const}
+          options={
+            [
+              ["periods", "Periode pembayaran"],
+              ["kasbon", "Kasbon"],
+            ] as const
+          }
           value={tab}
           onChange={(next) => void setTab(next)}
         />

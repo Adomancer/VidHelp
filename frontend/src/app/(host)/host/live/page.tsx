@@ -78,7 +78,10 @@ export default function HostLivePage() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-medium text-foreground">
                           {attendance.brand?.name}
-                          <span className="font-normal text-muted-foreground"> · {formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}</span>
+                          <span className="font-normal text-muted-foreground">
+                            {" "}
+                            · {formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}
+                          </span>
                         </p>
                         <StatusBadge tone="danger">Terlambat</StatusBadge>
                       </div>
@@ -105,9 +108,7 @@ export default function HostLivePage() {
 function CurrentSessions({ sessions, metrics, act }: { sessions: LiveSession[]; metrics: string[]; act: Act }) {
   const now = useNow();
   const current = sessions.filter(
-    (session) =>
-      new Date(session.end_at) > now ||
-      (session.attendance && (!session.attendance.report || session.attendance.report.status === "flagged"))
+    (session) => new Date(session.end_at) > now || (session.attendance && (!session.attendance.report || session.attendance.report.status === "flagged"))
   );
 
   if (current.length === 0) {
@@ -194,7 +195,9 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h2 className={cn("truncate text-base font-semibold", session.role === "off" ? "text-muted-foreground" : "text-foreground")}>{session.brand.name}</h2>
+            <h2 className={cn("truncate text-base font-semibold", session.role === "off" ? "text-muted-foreground" : "text-foreground")}>
+              {session.brand.name}
+            </h2>
             <StatusBadge tone={state.tone} pulse={state.pulse}>
               {state.label}
             </StatusBadge>
@@ -249,7 +252,14 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
           </dl>
 
           {!attendance.check_out_at && (
-            <Button type="button" variant="outline" size="lg" className="w-full" disabled={busy} onClick={() => run(() => liveApi.checkOut(token, attendance.id))}>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="w-full"
+              disabled={busy}
+              onClick={() => run(() => liveApi.checkOut(token, attendance.id))}
+            >
               <LogOut aria-hidden="true" />
               {busy ? "Memproses…" : "Check-out"}
             </Button>
@@ -277,7 +287,10 @@ function Progress({ attendance }: { attendance: Attendance | null }) {
       {steps.map((step, index) => {
         const current = index === currentIndex;
         return (
-          <li key={step.label} className="flex flex-1 flex-col items-center gap-1.5 text-center last:flex-none last:basis-auto first:items-start first:text-left last:items-end last:text-right">
+          <li
+            key={step.label}
+            className="flex flex-1 flex-col items-center gap-1.5 text-center first:items-start first:text-left last:flex-none last:basis-auto last:items-end last:text-right"
+          >
             <div className="flex w-full items-center">
               <span
                 className={cn(
@@ -465,7 +478,9 @@ function TodayTimeline({ sessions }: { sessions: LiveSession[] }) {
                   <p className="text-xs text-muted-foreground tabular-nums">
                     {formatClock(session.start_at)}–{formatClock(session.end_at)}
                   </p>
-                  <p className={cn("truncate text-sm font-medium", past || session.role === "off" ? "text-muted-foreground" : "text-foreground")}>{session.brand.name}</p>
+                  <p className={cn("truncate text-sm font-medium", past || session.role === "off" ? "text-muted-foreground" : "text-foreground")}>
+                    {session.brand.name}
+                  </p>
                   <div className="mt-1">
                     <StatusBadge tone={state.tone} pulse={state.pulse} className="h-5 px-1.5 text-[11px]">
                       {state.label}

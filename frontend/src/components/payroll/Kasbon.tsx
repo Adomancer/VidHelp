@@ -132,8 +132,8 @@ export function Kasbon() {
               </div>
               {skipped && (
                 <FormAlert tone="warning">
-                  Cicilan {skipped.seq} ({formatRupiah(skipped.amount)}) dilewati di {skipped.skip_count} slip karena gaji tidak cukup. Pertimbangkan menjadwal ulang
-                  jadi cicilan yang lebih kecil.
+                  Cicilan {skipped.seq} ({formatRupiah(skipped.amount)}) dilewati di {skipped.skip_count} slip karena gaji tidak cukup. Pertimbangkan menjadwal
+                  ulang jadi cicilan yang lebih kecil.
                 </FormAlert>
               )}
               {advance.settled_at && (
@@ -261,7 +261,15 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="advance-installments">Jumlah cicilan</Label>
-          <input id="advance-installments" name="installment_count" type="number" min={1} max={24} defaultValue={1} className={cn(inputClass, "tabular-nums")} />
+          <input
+            id="advance-installments"
+            name="installment_count"
+            type="number"
+            min={1}
+            max={24}
+            defaultValue={1}
+            className={cn(inputClass, "tabular-nums")}
+          />
           <FieldError>{errors.installment_count}</FieldError>
         </div>
         <p id="advance-limit" className={cn("text-xs text-muted-foreground sm:col-span-2", limit.loading && "opacity-60")}>

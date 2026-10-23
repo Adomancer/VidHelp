@@ -43,7 +43,9 @@ export default function RupiahInput({ name, defaultValue, className = "", ...pro
 
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground" aria-hidden="true">Rp</span>
+      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-muted-foreground" aria-hidden="true">
+        Rp
+      </span>
       <input
         ref={inputRef}
         type="text"
@@ -54,7 +56,12 @@ export default function RupiahInput({ name, defaultValue, className = "", ...pro
           const { value, selectionStart } = event.target;
           caretAfterDigits.current = value.slice(0, selectionStart ?? value.length).replace(/\D/g, "").length;
           // Drop leading zeros so "0" then "5" reads "5", not "05"
-          setDigits(value.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 12));
+          setDigits(
+            value
+              .replace(/\D/g, "")
+              .replace(/^0+(?=\d)/, "")
+              .slice(0, 12)
+          );
         }}
         className={cn(inputClass, className, "pl-10 tabular-nums")}
         {...props}

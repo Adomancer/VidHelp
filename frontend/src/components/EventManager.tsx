@@ -74,9 +74,7 @@ export default function EventManager() {
   const noBrandHosts = Boolean(brandId) && brandHostsReady && hostPool.length === 0;
 
   const matching = (brand: string | null, host: string | null) =>
-    base.filter(
-      (event) => (!brand || event.brand_id === brand) && (!host || (blocksOf.get(event.id) ?? []).some((block) => block.claim?.host_id === host))
-    );
+    base.filter((event) => (!brand || event.brand_id === brand) && (!host || (blocksOf.get(event.id) ?? []).some((block) => block.claim?.host_id === host)));
   const filtered = matching(brandId, hostFilter);
   const eventOptions: FilterOption[] = filtered.map((event) => ({
     value: event.id,
@@ -94,7 +92,8 @@ export default function EventManager() {
   // Choosing a brand or host shows the first event that matches
   function chooseBrand(value: string | null) {
     // The chosen host stays only if they're on the new brand; otherwise the filter starts over
-    const keepHost = value && hostId && queryClient.getQueryData<{ assignments: BrandHost[] }>([`brand-hosts-${value}`])?.assignments.some((item) => item.host_id === hostId);
+    const keepHost =
+      value && hostId && queryClient.getQueryData<{ assignments: BrandHost[] }>([`brand-hosts-${value}`])?.assignments.some((item) => item.host_id === hostId);
     void setBrandId(value);
     if (value && !keepHost) void setHostId(null);
     void setEventParam(matching(value, value && !keepHost ? null : hostId)[0]?.id ?? null);
@@ -127,7 +126,14 @@ export default function EventManager() {
       <Card bodyClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_auto] xl:items-end">
         <div className="space-y-1.5">
           <Label htmlFor="filter-brand">Brand</Label>
-          <FilterCombobox id="filter-brand" options={brandOptions} value={brandId} onChange={chooseBrand} placeholder="Semua brand" empty="Brand tidak ditemukan." />
+          <FilterCombobox
+            id="filter-brand"
+            options={brandOptions}
+            value={brandId}
+            onChange={chooseBrand}
+            placeholder="Semua brand"
+            empty="Brand tidak ditemukan."
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="filter-host">Host</Label>
@@ -162,22 +168,24 @@ export default function EventManager() {
       {events.error && <ErrorState message={events.error} onRetry={events.reload} />}
       {!events.data && !events.error && <CardsSkeleton count={2} />}
 
-      {events.data && !selected && (hostFilter && detailsLoading ? (
-        <CardsSkeleton count={2} />
-      ) : (
-        <Card>
-          <EmptyState
-            icon={Ticket}
-            title={list.length === 0 ? "Belum ada event" : "Tidak ada event yang cocok"}
-            description={
-              list.length === 0
-                ? "Buat event untuk kampanye PD atau double date. Host dari brand-nya bisa langsung mengambil blok."
-                : "Ubah atau reset filternya, atau buat event baru."
-            }
-            action={newEventButton}
-          />
-        </Card>
-      ))}
+      {events.data &&
+        !selected &&
+        (hostFilter && detailsLoading ? (
+          <CardsSkeleton count={2} />
+        ) : (
+          <Card>
+            <EmptyState
+              icon={Ticket}
+              title={list.length === 0 ? "Belum ada event" : "Tidak ada event yang cocok"}
+              description={
+                list.length === 0
+                  ? "Buat event untuk kampanye PD atau double date. Host dari brand-nya bisa langsung mengambil blok."
+                  : "Ubah atau reset filternya, atau buat event baru."
+              }
+              action={newEventButton}
+            />
+          </Card>
+        ))}
 
       {selected && (
         <EventBoard

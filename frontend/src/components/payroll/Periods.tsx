@@ -92,7 +92,9 @@ export function Periods() {
     debounce.current = setTimeout(() => void setUrlState({ q: next.trim(), page: null }), 300);
   }
 
-  const empty = search ? { title: `Tidak ada brand yang cocok dengan "${search}"`, description: "Coba nama lain, atau lihat semua status." } : emptyTexts[status];
+  const empty = search
+    ? { title: `Tidak ada brand yang cocok dengan "${search}"`, description: "Coba nama lain, atau lihat semua status." }
+    : emptyTexts[status];
 
   return (
     <div className="space-y-4">
@@ -147,7 +149,10 @@ export function Periods() {
                 <button
                   type="button"
                   onClick={() => select(period.id)}
-                  className={cn("w-full space-y-2.5 p-4 text-left outline-none focus-visible:bg-muted/60", period.id === selected ? "bg-primary/[0.06]" : "active:bg-muted/60")}
+                  className={cn(
+                    "w-full space-y-2.5 p-4 text-left outline-none focus-visible:bg-muted/60",
+                    period.id === selected ? "bg-primary/[0.06]" : "active:bg-muted/60"
+                  )}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

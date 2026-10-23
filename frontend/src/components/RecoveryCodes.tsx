@@ -25,8 +25,8 @@ export default function RecoveryCodes({ codes }: { codes: string[] }) {
       <p className="flex gap-2 text-sm text-warning">
         <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>
-          Simpan kode pemulihan ini di tempat aman (password manager atau dicatat di kertas). Kalau HP kamu hilang, setiap kode bisa dipakai untuk masuk
-          satu kali. <strong>Kode ini tidak akan ditampilkan lagi.</strong>
+          Simpan kode pemulihan ini di tempat aman (password manager atau dicatat di kertas). Kalau HP kamu hilang, setiap kode bisa dipakai untuk masuk satu
+          kali. <strong>Kode ini tidak akan ditampilkan lagi.</strong>
         </span>
       </p>
       <ul className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-card p-4 font-mono text-sm text-foreground">

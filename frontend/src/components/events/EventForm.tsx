@@ -43,7 +43,12 @@ export function EventForm({ event, onDone, onCancel }: { event?: SpecialEvent; o
   const [checks, setChecks] = useState<Record<string, string>>({});
   const input = cn(inputClass, TALL, "tabular-nums");
 
-  const { loading, errors: serverErrors, error, handleSubmit } = useApiForm(
+  const {
+    loading,
+    errors: serverErrors,
+    error,
+    handleSubmit,
+  } = useApiForm(
     (data) => {
       const payload: Omit<EventInput, "brand_id"> = {
         name: formValue(data, "name").trim(),
@@ -133,11 +138,30 @@ export function EventForm({ event, onDone, onCancel }: { event?: SpecialEvent; o
         {field(
           "Nama",
           "name",
-          <input name="name" placeholder="PD 10.10" maxLength={100} defaultValue={event?.name} aria-invalid={errors.name ? true : undefined} className={input} />
+          <input
+            name="name"
+            placeholder="PD 10.10"
+            maxLength={100}
+            defaultValue={event?.name}
+            aria-invalid={errors.name ? true : undefined}
+            className={input}
+          />
         )}
-        {field("Hari pertama", "start_date", <DatePicker name="start_date" defaultValue={event?.start_date.slice(0, 10) ?? today} min={event ? undefined : today} />)}
-        {field("Hari terakhir", "end_date", <DatePicker name="end_date" defaultValue={event?.end_date.slice(0, 10) ?? today} min={event ? undefined : today} />)}
-        {field("Jam buka", "daily_start_time", <input name="daily_start_time" type="time" defaultValue={event?.daily_start_time ?? "10:00"} className={input} />)}
+        {field(
+          "Hari pertama",
+          "start_date",
+          <DatePicker name="start_date" defaultValue={event?.start_date.slice(0, 10) ?? today} min={event ? undefined : today} />
+        )}
+        {field(
+          "Hari terakhir",
+          "end_date",
+          <DatePicker name="end_date" defaultValue={event?.end_date.slice(0, 10) ?? today} min={event ? undefined : today} />
+        )}
+        {field(
+          "Jam buka",
+          "daily_start_time",
+          <input name="daily_start_time" type="time" defaultValue={event?.daily_start_time ?? "10:00"} className={input} />
+        )}
         {field(
           "Jam tutup (boleh lewat tengah malam)",
           "daily_end_time",
@@ -153,16 +177,43 @@ export function EventForm({ event, onDone, onCancel }: { event?: SpecialEvent; o
           "Durasi blok",
           "block_minutes",
           <div className="flex items-center gap-2">
-            <input name="block_hours" type="number" min={0} max={12} defaultValue={event ? Math.floor(event.block_minutes / 60) : 2} aria-label="Jam per blok" aria-invalid={errors.block_minutes ? true : undefined} className={input} />
+            <input
+              name="block_hours"
+              type="number"
+              min={0}
+              max={12}
+              defaultValue={event ? Math.floor(event.block_minutes / 60) : 2}
+              aria-label="Jam per blok"
+              aria-invalid={errors.block_minutes ? true : undefined}
+              className={input}
+            />
             <span className="text-sm text-muted-foreground">jam</span>
-            <input name="block_extra_minutes" type="number" min={0} max={59} step={15} defaultValue={event ? event.block_minutes % 60 : 0} aria-label="Menit per blok" aria-invalid={errors.block_minutes ? true : undefined} className={input} />
+            <input
+              name="block_extra_minutes"
+              type="number"
+              min={0}
+              max={59}
+              step={15}
+              defaultValue={event ? event.block_minutes % 60 : 0}
+              aria-label="Menit per blok"
+              aria-invalid={errors.block_minutes ? true : undefined}
+              className={input}
+            />
             <span className="text-sm text-muted-foreground">menit</span>
           </div>
         )}
         {field(
           "Maks blok per host",
           "max_slots_per_host",
-          <input name="max_slots_per_host" type="number" min={1} max={100} defaultValue={event?.max_slots_per_host ?? 3} aria-invalid={errors.max_slots_per_host ? true : undefined} className={input} />
+          <input
+            name="max_slots_per_host"
+            type="number"
+            min={1}
+            max={100}
+            defaultValue={event?.max_slots_per_host ?? 3}
+            aria-invalid={errors.max_slots_per_host ? true : undefined}
+            className={input}
+          />
         )}
         <label className="flex min-h-11 items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 text-sm text-body sm:col-span-2">
           <input type="checkbox" name="open_full_schedule" defaultChecked={event?.open_full_schedule} className="size-4 accent-primary" />

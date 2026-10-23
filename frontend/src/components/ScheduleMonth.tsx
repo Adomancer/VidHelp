@@ -197,7 +197,19 @@ interface ScheduleMonthProps {
  * hours stand out), the hours, events and backups. A summary on top filters the days;
  * a day opens its full detail. Arrow keys move between days.
  */
-export default function ScheduleMonth({ month, gridStart, gridDays, today, slots, backups, events, hosts, loading, onOpenSlot, onAddSlot }: ScheduleMonthProps) {
+export default function ScheduleMonth({
+  month,
+  gridStart,
+  gridDays,
+  today,
+  slots,
+  backups,
+  events,
+  hosts,
+  loading,
+  onOpenSlot,
+  onAddSlot,
+}: ScheduleMonthProps) {
   const wide = useMediaQuery("(min-width: 768px)");
   const days = buildDays(gridStart, gridDays, month, today, slots, backups, events);
   const inMonth = days.filter((day) => day.inMonth);
@@ -228,7 +240,10 @@ export default function ScheduleMonth({ month, gridStart, gridDays, today, slots
     ? inMonth.reduce(
         (total, day) => {
           const own = byHost(day);
-          return { sessions: total.sessions + own.filter((session) => !session.carried).length, minutes: total.minutes + own.reduce((sum, s) => sum + s.end - s.start, 0) };
+          return {
+            sessions: total.sessions + own.filter((session) => !session.carried).length,
+            minutes: total.minutes + own.reduce((sum, s) => sum + s.end - s.start, 0),
+          };
         },
         { sessions: 0, minutes: 0 }
       )
@@ -469,7 +484,13 @@ function DayCell({
         <span
           className={cn(
             "flex size-6 items-center justify-center rounded-full text-xs font-medium tabular-nums",
-            day.isToday ? "bg-primary font-semibold text-primary-foreground" : day.inMonth ? (day.past ? "text-muted-foreground" : "text-foreground") : "text-faint"
+            day.isToday
+              ? "bg-primary font-semibold text-primary-foreground"
+              : day.inMonth
+                ? day.past
+                  ? "text-muted-foreground"
+                  : "text-foreground"
+                : "text-faint"
           )}
         >
           {Number(day.date.slice(8))}

@@ -185,8 +185,23 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
         <TextField label="Nama lengkap" name="name" defaultValue={data.user.name} autoComplete="name" required error={errors.name} />
         {host && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <DigitsField label="No. HP (WhatsApp)" name="phone" defaultValue={host.phone} maxLength={15} placeholder="08…" autoComplete="tel" error={errors.phone} />
-            <DigitsField label="No. HP wali / keluarga" name="guardian_phone" defaultValue={host.guardian_phone} maxLength={15} placeholder="08…" error={errors.guardian_phone} />
+            <DigitsField
+              label="No. HP (WhatsApp)"
+              name="phone"
+              defaultValue={host.phone}
+              maxLength={15}
+              placeholder="08…"
+              autoComplete="tel"
+              error={errors.phone}
+            />
+            <DigitsField
+              label="No. HP wali / keluarga"
+              name="guardian_phone"
+              defaultValue={host.guardian_phone}
+              maxLength={15}
+              placeholder="08…"
+              error={errors.guardian_phone}
+            />
           </div>
         )}
 
@@ -235,9 +250,7 @@ function ChangeStatus({ change, onUpdated }: { change: MyProfileChange; onUpdate
   }
 
   if (change.status === "approved") {
-    return recent ? (
-      <FormAlert tone="success">Perubahan data disetujui admin{change.reviewed_at && ` pada ${sameDay(change.reviewed_at)}`}.</FormAlert>
-    ) : null;
+    return recent ? <FormAlert tone="success">Perubahan data disetujui admin{change.reviewed_at && ` pada ${sameDay(change.reviewed_at)}`}.</FormAlert> : null;
   }
 
   return (
@@ -279,7 +292,10 @@ function BrandsCard({ host }: { host: HostProfileData }) {
       ) : (
         <ul className="flex flex-wrap gap-2">
           {host.assignments.map((assignment) => (
-            <li key={assignment.id} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground">
+            <li
+              key={assignment.id}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
+            >
               {assignment.brand.name}
               {assignment.is_leader && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">

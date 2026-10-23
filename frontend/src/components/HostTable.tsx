@@ -124,7 +124,11 @@ export default function HostTable({ onSelect, editableBrands = false }: HostTabl
         {!list && !hosts.error && <TableSkeleton rows={6} columns={4} />}
 
         {list?.length === 0 && (
-          <EmptyState icon={Users} title="Tidak ada host" description="Host muncul di sini setelah admin menyetujui akunnya. Coba ubah pencarian atau filter brand." />
+          <EmptyState
+            icon={Users}
+            title="Tidak ada host"
+            description="Host muncul di sini setelah admin menyetujui akunnya. Coba ubah pencarian atau filter brand."
+          />
         )}
 
         {list && list.length > 0 && (
@@ -223,14 +227,25 @@ export default function HostTable({ onSelect, editableBrands = false }: HostTabl
                 return (
                   <li key={host.id}>
                     {onSelect ? (
-                      <button type="button" onClick={() => onSelect(host)} className="w-full space-y-3 p-4 text-left transition-colors outline-none active:bg-muted/60 focus-visible:bg-muted/60">
+                      <button
+                        type="button"
+                        onClick={() => onSelect(host)}
+                        className="w-full space-y-3 p-4 text-left transition-colors outline-none focus-visible:bg-muted/60 active:bg-muted/60"
+                      >
                         {body}
                       </button>
                     ) : (
                       <div className="space-y-3 p-4">
                         {body}
                         {editableBrands && (
-                          <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => setOpenId(open ? null : host.id)} aria-expanded={open}>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setOpenId(open ? null : host.id)}
+                            aria-expanded={open}
+                          >
                             Atur brand
                             <ChevronDown className={cn("transition-transform", open && "rotate-180")} aria-hidden="true" />
                           </Button>
@@ -246,7 +261,15 @@ export default function HostTable({ onSelect, editableBrands = false }: HostTabl
         )}
       </div>
 
-      {hosts.data && <Pagination page={hosts.data.current_page} lastPage={hosts.data.last_page} total={hosts.data.total} unit="host" onChange={(next) => void setUrlState({ page: next })} />}
+      {hosts.data && (
+        <Pagination
+          page={hosts.data.current_page}
+          lastPage={hosts.data.last_page}
+          total={hosts.data.total}
+          unit="host"
+          onChange={(next) => void setUrlState({ page: next })}
+        />
+      )}
     </div>
   );
 }

@@ -38,7 +38,7 @@ export function withSignal<T>(signal: AbortSignal, start: () => T): T {
 /** The caller's signal (if any) plus a timeout, so a hanging server can't keep a spinner going forever. */
 function requestSignal(signal: AbortSignal | null | undefined, timeout: number): AbortSignal {
   const timer = AbortSignal.timeout(timeout);
-  return signal && typeof AbortSignal.any === "function" ? AbortSignal.any([signal, timer]) : signal ?? timer;
+  return signal && typeof AbortSignal.any === "function" ? AbortSignal.any([signal, timer]) : (signal ?? timer);
 }
 
 /** Laravel's own English messages (and model class names): not for users' eyes. */

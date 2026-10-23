@@ -14,7 +14,9 @@ describe("changedPersonalFields", () => {
   });
 
   it("sends only the edited field, so a pending change to another one stays", () => {
-    expect(changedPersonalFields(form({ name: "Ayu Lestari", phone: "081277700003", guardian_phone: "081299998888" }), saved)).toEqual({ guardian_phone: "081299998888" });
+    expect(changedPersonalFields(form({ name: "Ayu Lestari", phone: "081277700003", guardian_phone: "081299998888" }), saved)).toEqual({
+      guardian_phone: "081299998888",
+    });
   });
 
   it("sends a cleared field as null", () => {

@@ -89,8 +89,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
     applyDate: thisWeek,
   };
   const [form, setForm] = useState(initial);
-  const set = <K extends keyof typeof initial>(key: K, value: (typeof initial)[K]) =>
-    !readOnly && setForm((current) => ({ ...current, [key]: value }));
+  const set = <K extends keyof typeof initial>(key: K, value: (typeof initial)[K]) => !readOnly && setForm((current) => ({ ...current, [key]: value }));
 
   /** Adding: days toggle on and off (at least one stays). Editing: one day, as before. */
   function toggleDay(value: number) {
@@ -352,7 +351,12 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
                 Setiap hari
               </Chip>
               {DAYS.map((option) => (
-                <Chip key={option.value} selected={form.days.includes(option.value)} onClick={() => toggleDay(option.value)} className="min-w-12 justify-center">
+                <Chip
+                  key={option.value}
+                  selected={form.days.includes(option.value)}
+                  onClick={() => toggleDay(option.value)}
+                  className="min-w-12 justify-center"
+                >
                   {option.short}
                 </Chip>
               ))}
@@ -361,7 +365,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
           {!slot && <p className="mt-1.5 text-xs text-muted-foreground">Pilih satu hari atau lebih; tiap hari jadi slot sendiri dengan jam yang sama.</p>}
           <FieldError message={errors.day_of_week ?? errors.days_of_week} />
 
-          <div className="mt-3 grid grid-cols-2 gap-3 max-w-sm">
+          <div className="mt-3 grid max-w-sm grid-cols-2 gap-3">
             <TimeInput label="Mulai" value={form.start} onChange={(value) => set("start", value)} error={problems.start ?? errors.start_time} />
             <TimeInput label="Selesai" value={form.end} onChange={(value) => set("end", value)} error={problems.end ?? errors.end_time} />
           </div>
@@ -376,7 +380,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
           {conflicts && conflicts.length > 0 && (
             <div role="alert" className="mt-3 space-y-1 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               <p className="font-medium">Bentrok dengan jadwal lain:</p>
-              <ul className="list-disc pl-5 space-y-0.5">
+              <ul className="list-disc space-y-0.5 pl-5">
                 {conflicts.map((conflict) => (
                   <li key={conflict.id}>
                     {conflict.same_host ? `${hostName} sudah live di ${conflict.brand_name}` : `${conflict.host_name} sudah live di brand ini`},{" "}
@@ -482,7 +486,10 @@ function Choice({ checked, onSelect, children }: { checked: boolean; onSelect: (
         checked ? "border-primary bg-primary/[0.06] text-foreground" : "border-input text-body hover:bg-muted/60"
       )}
     >
-      <span className={cn("mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2", checked ? "border-primary" : "border-input")} aria-hidden="true">
+      <span
+        className={cn("mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border-2", checked ? "border-primary" : "border-input")}
+        aria-hidden="true"
+      >
         {checked && <span className="size-1.5 rounded-full bg-primary" />}
       </span>
       <span className="flex-1">{children}</span>
