@@ -4,8 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
-import { homePathFor, saveSession } from "@/lib/auth";
+import { homePathFor } from "@/lib/auth";
 import { formValue, useApiForm } from "@/lib/useApiForm";
+import { useSignIn } from "./AuthProvider";
 import FormAlert from "./FormAlert";
 import GoogleButton from "./GoogleButton";
 import PasswordField from "./PasswordField";
@@ -15,6 +16,7 @@ import TwoFactorChallengeForm from "./TwoFactorChallengeForm";
 
 export default function LoginForm() {
   const router = useRouter();
+  const signIn = useSignIn();
   const [challenge, setChallenge] = useState<string | null>(null);
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) => authApi.login(formValue(data, "email"), formValue(data, "password")),
@@ -23,7 +25,7 @@ export default function LoginForm() {
         setChallenge(result.challenge_token); // admin with 2FA: ask for the code next
         return;
       }
-      saveSession(result.token, result.user);
+      signIn(result.token, result.user);
       router.replace(homePathFor(result.user));
     }
   );

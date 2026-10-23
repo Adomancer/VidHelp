@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, Download, TriangleAlert } from "lucide-react";
+import { saveBlob } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 /** One-time recovery codes, shown once right after they're created. */
@@ -16,10 +17,7 @@ export default function RecoveryCodes({ codes }: { codes: string[] }) {
   }
 
   function download() {
-    const url = URL.createObjectURL(new Blob([`Kode pemulihan VidHelp\n\n${text}\n\nSetiap kode hanya bisa dipakai sekali.\n`], { type: "text/plain" }));
-    const link = Object.assign(document.createElement("a"), { href: url, download: "vidhelp-recovery-codes.txt" });
-    link.click();
-    URL.revokeObjectURL(url);
+    saveBlob(new Blob([`Kode pemulihan VidHelp\n\n${text}\n\nSetiap kode hanya bisa dipakai sekali.\n`], { type: "text/plain" }), "vidhelp-recovery-codes.txt");
   }
 
   return (
@@ -27,8 +25,8 @@ export default function RecoveryCodes({ codes }: { codes: string[] }) {
       <p className="flex gap-2 text-sm text-warning">
         <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>
-          Simpan kode pemulihan ini di tempat aman (password manager atau dicatat di kertas). Kalau HP kamu hilang, setiap kode bisa dipakai untuk masuk
-          satu kali. <strong>Kode ini tidak akan ditampilkan lagi.</strong>
+          Simpan kode pemulihan ini di tempat aman (password manager atau dicatat di kertas). Kalau HP kamu hilang, setiap kode bisa dipakai untuk masuk satu
+          kali. <strong>Kode ini tidak akan ditampilkan lagi.</strong>
         </span>
       </p>
       <ul className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-card p-4 font-mono text-sm text-foreground">

@@ -4,20 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { ApiError, authApi } from "@/lib/api";
-import { consumeOAuthState, homePathFor, saveSession } from "@/lib/auth";
+import { ApiError, authApi, type AuthUser } from "@/lib/api";
+import { consumeOAuthState, homePathFor } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { useSignIn } from "./AuthProvider";
 import FormAlert from "./FormAlert";
 import TwoFactorChallengeForm from "./TwoFactorChallengeForm";
 
 type Outcome =
-  | { kind: "signed-in"; path: string }
+  | { kind: "signed-in"; token: string; user: AuthUser }
   | { kind: "pending"; message: string }
   | { kind: "two-factor"; challengeToken: string }
   | { kind: "error"; message: string };
 
 /**
- * Verify `state`, exchange the Google `code` with the backend and store the token.
+ * Verify `state` and exchange the Google `code` with the backend for a token.
  */
 async function finishGoogleLogin(params: URLSearchParams): Promise<Outcome> {
   const code = params.get("code");
@@ -39,8 +40,7 @@ async function finishGoogleLogin(params: URLSearchParams): Promise<Outcome> {
       return { kind: "pending", message: response.message };
     }
 
-    saveSession(response.token, response.user);
-    return { kind: "signed-in", path: homePathFor(response.user) };
+    return { kind: "signed-in", token: response.token, user: response.user };
   } catch (error) {
     if (error instanceof ApiError && error.data?.status === "pending") {
       return { kind: "pending", message: error.message };
@@ -57,6 +57,7 @@ async function finishGoogleLogin(params: URLSearchParams): Promise<Outcome> {
  */
 export default function GoogleCallback() {
   const router = useRouter();
+  const signIn = useSignIn();
   const searchParams = useSearchParams();
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const started = useRef(false); // an auth code can only be exchanged once (StrictMode runs effects twice)
@@ -67,12 +68,13 @@ export default function GoogleCallback() {
 
     finishGoogleLogin(new URLSearchParams(searchParams.toString())).then((result) => {
       if (result.kind === "signed-in") {
-        router.replace(result.path);
+        signIn(result.token, result.user);
+        router.replace(homePathFor(result.user));
       } else {
         setOutcome(result);
       }
     });
-  }, [router, searchParams]);
+  }, [router, searchParams, signIn]);
 
   if (!outcome || outcome.kind === "signed-in") {
     return (

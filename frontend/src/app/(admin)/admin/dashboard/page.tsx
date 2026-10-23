@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, CalendarDays, ClipboardCheck, Layers, Radio, RefreshCw, Tag, Wallet } from "lucide-react";
 import { dashboardApi, type AdminDashboard, type BrandProgress, type DashboardBackup, type SessionState, type TodaySession } from "@/lib/api";
-import { compactRupiah, dayWord, formatClock, formatDuration, formatRupiah, formatShortDate } from "@/lib/format";
+import { compactRupiah, dayWord, formatClock, formatDuration, formatFullDay, formatRupiah, formatShortDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
@@ -75,7 +75,7 @@ export default function AdminDashboardPage() {
     <div className={cn("flex flex-col gap-4", FIT_SCREEN)}>
       <PageHeader
         title="Dashboard"
-        description={new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        description={formatFullDay()}
         actions={
           updatedAt && (
             <Button type="button" variant="outline" size="sm" onClick={reload} disabled={loading} className="text-muted-foreground">

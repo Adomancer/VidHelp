@@ -148,9 +148,28 @@ export const hostBackupApi = {
   drop: (token: string, id: string) => post(`/host/backups/${id}/drop`, token),
 };
 
+/** How the latest closed requests went (the "Ringkasan riwayat" card). */
+export interface BackupRecap {
+  /** Requests counted: the latest `window` closed ones, or fewer. */
+  total: number;
+  window: number;
+  filled: number;
+  auto_filled: number;
+  top_covers: { name: string; avatar_url: string | null; count: number }[];
+}
+
 export const operatorBackupApi = {
-  list: (token: string, status: "pending" | "open" | "filled" | "closed") =>
-    api<{ requests: BackupRequest[] }>(`/operator/backups${query({ status })}`, { token }),
+  /** An upcoming tab, whole (up to 100), with its `total`. */
+  list: (token: string, status: "pending" | "open" | "filled") =>
+    api<{ requests: BackupRequest[]; total: number }>(`/operator/backups${query({ status })}`, { token }),
+  /** Past, cancelled and rejected requests: 25 a page, searched on the server. */
+  closed: (token: string, params: { page: number; search?: string; reason_types?: BackupReason[] }) =>
+    api<{ requests: BackupRequest[]; total: number; current_page: number; last_page: number }>(`/operator/backups${query({ status: "closed", ...params })}`, {
+      token,
+    }),
+  /** Sick requests still missing their doctor's letter, on any tab and however old. */
+  letters: (token: string) => api<{ requests: BackupRequest[]; total: number }>("/operator/backups/letters", { token }),
+  recap: (token: string) => api<BackupRecap>("/operator/backups/recap", { token }),
   /** With `host_id`, that host covers it right away. */
   create: (token: string, data: BackupRequestInput & { host_id?: string | null }) =>
     post<{ request: BackupRequest } & Message>("/operator/backups", token, data),

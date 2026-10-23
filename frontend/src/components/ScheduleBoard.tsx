@@ -87,16 +87,16 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const activeBrands = brands.data?.brands.filter((brand) => brand.status === "active") ?? [];
   const linkedBrandId = activeBrands.some((brand) => brand.id === chosenBrandId) ? chosenBrandId : "";
-  const brandId =
-    linkedBrandId || (activeBrands.length > 0 ? rememberedBrand(activeBrands.map((brand) => brand.id)) ?? activeBrands[0].id : "");
+  const brandId = linkedBrandId || (activeBrands.length > 0 ? (rememberedBrand(activeBrands.map((brand) => brand.id)) ?? activeBrands[0].id) : "");
 
   // The week board loads 7 days; the month calendar every day its grid shows (5 or 6 weeks)
   const grid = monthGrid(month);
   const range = view === "week" ? { on: week, days: 7 } : { on: grid.start, days: grid.days };
-  const board = useApiData(`schedule-board|${brandId}|${range.on}|${range.days}`, () =>
-    brandId
-      ? scheduleApi.list(token, { brand_id: brandId, ...range })
-      : Promise.resolve({ slots: [], backups: [], replacing_events: [] })
+  const board = useApiData(
+    `schedule-board|${brandId}|${range.on}|${range.days}`,
+    () => (brandId ? scheduleApi.list(token, { brand_id: brandId, ...range }) : Promise.resolve({ slots: [], backups: [], replacing_events: [] })),
+    // Paging through weeks keeps the board up; another brand's slots never show under this one
+    { keepPrevious: (previousKey) => previousKey.startsWith(`schedule-board|${brandId}|`) }
   );
   const hosts = useApiData(`brand-hosts-${brandId}`, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
 
@@ -203,10 +203,12 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
 
         <ToggleGroup
           label="Tampilan jadwal"
-          options={[
-            ["month", "Bulan"],
-            ["week", "Minggu"],
-          ] as const}
+          options={
+            [
+              ["month", "Bulan"],
+              ["week", "Minggu"],
+            ] as const
+          }
           value={view}
           onChange={switchView}
         />
@@ -218,7 +220,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           >
             <ChevronLeft />
           </IconButton>
-          <span className="min-w-36 px-2 text-center text-sm font-medium text-foreground tabular-nums capitalize sm:min-w-44">
+          <span className="min-w-36 px-2 text-center text-sm font-medium text-foreground capitalize tabular-nums sm:min-w-44">
             {view === "week" ? formatWeekRange(week) : formatMonth(month)}
           </span>
           <IconButton
@@ -261,17 +263,12 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
         </div>
 
         {(view === "week" ? !isThisWeek : !isThisMonth) && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => (view === "week" ? goToWeek(weekStart()) : setMonth(monthStart()))}
-            className="text-brand"
-          >
+          <Button type="button" variant="outline" onClick={() => (view === "week" ? goToWeek(weekStart()) : setMonth(monthStart()))} className="text-brand">
             {view === "week" ? "Minggu ini" : "Bulan ini"}
           </Button>
         )}
 
-        <Button type="button" onClick={() => setDialog({ kind: "slot", day: mobileDay })} disabled={!brandId} className="ml-auto">
+        <Button type="button" onClick={() => setDialog({ kind: "slot", day: mobileDay })} disabled={!brandId || !hosts.data} className="ml-auto">
           <Plus aria-hidden="true" />
           Tambah slot
         </Button>
@@ -312,7 +309,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           </p>
 
           {/* Phones: one day at a time, tabs on top (swipe to move) */}
-          <div className="lg:hidden grid grid-cols-7 gap-1" role="tablist" aria-label="Hari">
+          <div className="grid grid-cols-7 gap-1 lg:hidden" role="tablist" aria-label="Hari">
             {days.map((day) => (
               <button
                 key={day.value}
@@ -340,7 +337,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           </div>
 
           <div
-            className={`grid grid-cols-1 lg:grid-cols-7 gap-2 transition-opacity ${board.loading ? "opacity-60" : ""}`}
+            className={`grid grid-cols-1 gap-2 transition-opacity lg:grid-cols-7 ${board.loading ? "opacity-60" : ""}`}
             onTouchStart={(event) => (swipeFrom.current = event.touches[0].clientX)}
             onTouchEnd={(event) => {
               if (swipeFrom.current === null) return;
@@ -369,7 +366,9 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                       <span className="hidden lg:inline">{day.short}</span>
                       <span className={cn("ml-1 text-xs font-normal", isToday ? "text-brand" : "text-muted-foreground")}>{formatShortDate(day.date)}</span>
                     </h3>
-                    {isToday && <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground lg:hidden 2xl:inline">Hari ini</span>}
+                    {isToday && (
+                      <span className="rounded bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground lg:hidden 2xl:inline">Hari ini</span>
+                    )}
                     <Button
                       type="button"
                       variant="ghost"
@@ -406,7 +405,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                       <span className="block text-[11px] text-muted-foreground">
                         Lanjutan dari {dayLong(slot.day_of_week)}, {slot.start_time}
                       </span>
-                      <span className="block text-xs text-body truncate">
+                      <span className="block truncate text-xs text-body">
                         s.d. {slot.end_time} · {coverName(slot, backups, addDays(day.date, -1))}
                       </span>
                     </button>
@@ -467,11 +466,8 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           onSaved={saved}
         />
       )}
-      {dialog?.kind === "backup" && (
-        <BackupDialog slot={dialog.slot} date={dialog.date} markers={backups} onClose={() => setDialog(null)} onSaved={saved} />
-      )}
+      {dialog?.kind === "backup" && <BackupDialog slot={dialog.slot} date={dialog.date} markers={backups} onClose={() => setDialog(null)} onSaved={saved} />}
       {dialog?.kind === "stop" && <StopSlotDialog slot={dialog.slot} week={dialog.week ?? week} onClose={() => setDialog(null)} onSaved={saved} />}
-
     </div>
   );
 }
@@ -567,4 +563,3 @@ function coverName(slot: ScheduleSlot, markers: SlotBackupMarker[], date: string
   const marker = markerOn(markers, slot.id, date);
   return marker?.status === "filled" ? `${marker.filler_name} (backup)` : (slot.assignment.host?.user.name ?? "Host");
 }
-

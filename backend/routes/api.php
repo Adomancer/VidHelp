@@ -242,6 +242,8 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
 
         // Backups: approve or reject applicants, assign a cover directly in emergencies
         Route::get('/backups', [OperatorBackupController::class, 'index']);
+        Route::get('/backups/letters', [OperatorBackupController::class, 'letters']);
+        Route::get('/backups/recap', [OperatorBackupController::class, 'recap']);
         Route::post('/backups', [OperatorBackupController::class, 'store']);
         Route::get('/backups/candidates', [OperatorBackupController::class, 'slotCandidates']);
         Route::get('/backups/{backup}/applicants', [OperatorBackupController::class, 'applicants']);

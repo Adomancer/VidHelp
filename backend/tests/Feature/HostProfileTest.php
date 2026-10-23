@@ -120,8 +120,8 @@ class HostProfileTest extends TestCase
     /** Approve the host's pending change as admin. */
     private function approve(User $host): void
     {
-        $id = $this->actingAs($this->admin)->getJson('/api/admin/profile-changes')->assertOk()->json('requests.0.id');
-        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$id}/approve")->assertOk();
+        $request = $this->actingAs($this->admin)->getJson('/api/admin/profile-changes')->assertOk()->json('requests.0');
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$request['id']}/approve", ['version' => $request['version']])->assertOk();
     }
 
     public function test_host_personal_data_only_changes_once_an_admin_approves(): void
@@ -188,7 +188,28 @@ class HostProfileTest extends TestCase
         $this->actingAs($host)->getJson('/api/host/profile')
             ->assertJsonPath('profile_change.status', 'rejected')
             ->assertJsonPath('profile_change.review_note', 'Rekening tidak sesuai nama');
-        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$id}/approve")->assertJsonValidationErrors('request');
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$id}/approve", ['version' => ProfileChangeRequest::sole()->version()])
+            ->assertJsonValidationErrors('request');
+    }
+
+    public function test_admin_only_approves_the_values_they_reviewed(): void
+    {
+        $host = $this->activeHost();
+        $this->actingAs($host)->putJson('/api/host/profile/sensitive', ['bank_name' => 'BCA', 'bank_account' => '1111111111'])->assertOk();
+        $seen = $this->actingAs($this->admin)->getJson('/api/admin/profile-changes')->assertOk()->json('requests.0');
+
+        // The host changes the account number while the admin is looking at the old one
+        $this->actingAs($host)->putJson('/api/host/profile/sensitive', ['bank_account' => '2222222222'])->assertOk();
+
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$seen['id']}/approve")->assertJsonValidationErrors('version');
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$seen['id']}/approve", ['version' => $seen['version']])
+            ->assertJsonValidationErrors('version');
+        $this->assertNull($host->hostProfile->fresh()->sensitiveData);
+        $this->assertSame('pending', ProfileChangeRequest::sole()->status);
+
+        // Approving what is there now works
+        $this->approve($host);
+        $this->assertSame('2222222222', $host->hostProfile->fresh()->sensitiveData->bank_account);
     }
 
     public function test_host_can_cancel_only_their_own_pending_request(): void

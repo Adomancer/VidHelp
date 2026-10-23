@@ -318,7 +318,7 @@ function Deliveries({ onChanged }: { onChanged: () => void }) {
   const { token } = useAuth();
   const [{ status, channel, page }, setUrlState] = useQueryStates(urlState);
   const filters = { status: status ?? undefined, channel: channel ?? undefined, page };
-  const result = useApiData(`discord-deliveries-${JSON.stringify(filters)}`, () => notificationAdminApi.deliveries(token, filters));
+  const result = useApiData(`discord-deliveries-${JSON.stringify(filters)}`, () => notificationAdminApi.deliveries(token, filters), { keepPrevious: true });
   const rows = result.data?.deliveries;
   const [resending, setResending] = useState<string | null>(null);
 

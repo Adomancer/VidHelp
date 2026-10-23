@@ -617,4 +617,65 @@ class BackupTest extends TestCase
         $this->assertFalse($candidates->firstWhere('host_id', $this->otherBrand->id)['eligible']);
         $this->assertNull($candidates->firstWhere('host_id', $this->requester->id));
     }
+
+    /** A request for a session that already ran, `$daysAgo` days back. */
+    private function pastRequest(int $daysAgo, array $overrides = []): BackupRequest
+    {
+        $start = now()->subDays($daysAgo)->setTime(14, 0);
+
+        return BackupRequest::create($overrides + [
+            'slot_id' => $this->slot->id, 'brand_id' => $this->brandA->id, 'requesting_host_id' => $this->requester->id,
+            'backup_date' => $start->toDateString(), 'start_at' => $start, 'end_at' => $start->copy()->addHours(2),
+            'reason_type' => 'permit', 'request_type' => 'open', 'status' => 'filled', 'filled_by_host_id' => $this->sameBrand->id,
+            'auto_fill_at' => $start->copy()->subMinutes(30),
+        ]);
+    }
+
+    public function test_closed_requests_are_paged_and_searched_on_the_server(): void
+    {
+        foreach (range(1, 30) as $daysAgo) {
+            $this->pastRequest($daysAgo);
+        }
+        $this->pastRequest(40, ['reason' => 'Acara keluarga', 'status' => 'cancelled', 'filled_by_host_id' => null]);
+
+        $first = $this->actingAs($this->admin)->getJson('/api/operator/backups?status=closed')->assertOk();
+        $first->assertJsonPath('total', 31)->assertJsonPath('last_page', 2)->assertJsonCount(25, 'requests');
+        $this->actingAs($this->admin)->getJson('/api/operator/backups?status=closed&page=2')->assertJsonCount(6, 'requests');
+
+        // The oldest one is found by its reason, though it isn't on the first page
+        $this->actingAs($this->admin)->getJson('/api/operator/backups?status=closed&search=keluarga')
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('requests.0.status', 'cancelled');
+        $this->actingAs($this->admin)->getJson('/api/operator/backups?status=closed&search='.urlencode($this->brandA->name))->assertJsonPath('total', 31);
+    }
+
+    public function test_missing_doctor_letters_are_listed_however_old(): void
+    {
+        foreach (range(1, 120) as $daysAgo) {
+            $this->pastRequest($daysAgo);
+        }
+        $old = $this->pastRequest(200, ['reason_type' => 'sick']);
+        $this->pastRequest(201, ['reason_type' => 'sick', 'status' => 'cancelled']);
+
+        $this->actingAs($this->admin)->getJson('/api/operator/backups/letters')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('requests.0.id', $old->id)
+            ->assertJsonPath('requests.0.letter_status', 'late');
+    }
+
+    public function test_recap_counts_the_latest_closed_requests(): void
+    {
+        $this->pastRequest(1);
+        $this->pastRequest(2, ['auto_filled' => true]);
+        $this->pastRequest(3, ['status' => 'cancelled', 'filled_by_host_id' => null]);
+
+        $this->actingAs($this->admin)->getJson('/api/operator/backups/recap')
+            ->assertOk()
+            ->assertJsonPath('total', 3)
+            ->assertJsonPath('filled', 2)
+            ->assertJsonPath('auto_filled', 1)
+            ->assertJsonPath('top_covers.0.name', $this->sameBrand->user->name)
+            ->assertJsonPath('top_covers.0.count', 2);
+    }
 }

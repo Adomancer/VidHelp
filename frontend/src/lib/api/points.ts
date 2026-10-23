@@ -1,5 +1,6 @@
 /** Points, warning letters (SP), ratings, and a host's own performance. */
 
+import { toDateInput } from "../format";
 import { api, downloadFile, type Message, post, put, query } from "./client";
 import type { AuthUser } from "./auth";
 import type { HostProfile } from "./hosts";
@@ -129,7 +130,7 @@ export const pointsApi = {
   /** What one host's rating for the month rests on: its violations and recent ratings. */
   ratingReview: (token: string, hostId: string, month: string) => api<RatingReview>(`/admin/ratings/hosts/${hostId}${query({ month })}`, { token }),
   /** The current points period (balances, history, SP letters, violation types) as Excel. */
-  exportPoints: (token: string) => downloadFile("/operator/points/export", token, `poin-sp-${new Date().toISOString().slice(0, 10)}.xlsx`),
+  exportPoints: (token: string) => downloadFile("/operator/points/export", token, `poin-sp-${toDateInput()}.xlsx`),
   /** Ratings of the month, plus that month's point history and SP letters, as Excel. */
   exportRatings: (token: string, month: string) => downloadFile(`/admin/ratings/export${query({ month })}`, token, `ratings-${month}.xlsx`),
   /** A host's full point and SP history across all periods, newest first. */

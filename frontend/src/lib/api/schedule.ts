@@ -95,8 +95,10 @@ export const scheduleApi = {
   remove: (token: string, id: string, from?: string) => del(`/operator/schedules/${id}${query({ from })}`, token),
 
   /** Clashes on any of the days (`days_of_week` for a new slot on several days). */
-  conflicts: (token: string, params: Omit<SlotInput, "slot_type" | "day_of_week"> & ({ day_of_week: number } | { days_of_week: number[] }) & { ignore_id?: string }) =>
-    api<{ conflicts: SlotConflict[] }>(`/operator/schedules/conflicts${query(params)}`, { token }),
+  conflicts: (
+    token: string,
+    params: Omit<SlotInput, "slot_type" | "day_of_week"> & ({ day_of_week: number } | { days_of_week: number[] }) & { ignore_id?: string }
+  ) => api<{ conflicts: SlotConflict[] }>(`/operator/schedules/conflicts${query(params)}`, { token }),
 
   history: (token: string, id: string) => api<{ history: SlotHistoryEntry[] }>(`/operator/schedules/${id}/history`, { token }),
 

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
+import ErrorState from "./ErrorState";
 import FormAlert from "./FormAlert";
 import { ListSkeleton } from "./Loading";
 import StatusBadge from "./StatusBadge";
@@ -49,7 +50,12 @@ export default function ViolationTypesEditor({ plain = false }: { plain?: boolea
         <span>Aktif</span>
         <span className="sr-only">Aksi</span>
       </div>
-      {!types.data && <ListSkeleton rows={3} className="px-5 md:px-6" />}
+      {types.error && !types.data && (
+        <div className="px-5 py-3 md:px-6">
+          <ErrorState message={types.error} onRetry={types.reload} />
+        </div>
+      )}
+      {!types.data && !types.error && <ListSkeleton rows={3} className="px-5 md:px-6" />}
       <div className="divide-y divide-border">
         {types.data?.violation_types.map((type) => (
           <TypeRow key={`${type.id}-${type.default_points}-${type.rating_impact}-${type.is_active}`} type={type} onSave={save} />
@@ -62,7 +68,11 @@ export default function ViolationTypesEditor({ plain = false }: { plain?: boolea
   if (plain) return <div className="-mx-5 -mt-5 sm:-mx-6">{content}</div>;
 
   return (
-    <Card title="Jenis pelanggaran" description="Poin dipotong dari saldo 3 bulanan; dampak rating menurunkan saran rating bulanan." bodyClassName="px-0 md:px-0">
+    <Card
+      title="Jenis pelanggaran"
+      description="Poin dipotong dari saldo 3 bulanan; dampak rating menurunkan saran rating bulanan."
+      bodyClassName="px-0 md:px-0"
+    >
       {content}
     </Card>
   );
@@ -118,7 +128,13 @@ function TypeRow({ type, onSave }: { type?: ViolationType; onSave: (action: () =
         <Switch checked={active} disabled={!type} onCheckedChange={setActive} />
         {active ? "Aktif" : "Nonaktif"}
       </label>
-      <Button type="button" size="sm" variant={type ? "outline" : "default"} onClick={submit} disabled={saving || !name.trim() || points === "" || impact === ""}>
+      <Button
+        type="button"
+        size="sm"
+        variant={type ? "outline" : "default"}
+        onClick={submit}
+        disabled={saving || !name.trim() || points === "" || impact === ""}
+      >
         {!type && <Plus aria-hidden="true" />}
         {saving ? "Menyimpan…" : type ? "Simpan" : "Tambah"}
       </Button>

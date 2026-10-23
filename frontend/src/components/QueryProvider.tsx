@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { ApiError, onDataChanged } from "@/lib/api";
+import { ApiError, isTimeout, onDataChanged } from "@/lib/api";
 
 function makeQueryClient() {
   return new QueryClient({
@@ -16,8 +16,9 @@ function makeQueryClient() {
         // Pages not visited for half an hour are dropped from memory and load fresh next time
         gcTime: 30 * 60_000,
         refetchOnWindowFocus: false,
-        // Only retry when the server couldn't be reached; its own errors (401, 422, 500…) won't change
-        retry: (failureCount, error) => !(error instanceof ApiError) && failureCount < 2,
+        // Only retry when the server couldn't be reached; its own errors (401, 422, 500…) won't change,
+        // and one that took the whole timeout would only keep the spinner going longer
+        retry: (failureCount, error) => !(error instanceof ApiError) && !isTimeout(error) && failureCount < 2,
       },
     },
   });

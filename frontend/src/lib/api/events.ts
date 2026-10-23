@@ -65,7 +65,8 @@ export const eventApi = {
   show: (token: string, id: string) => api<{ event: SpecialEvent; blocks: EventBlock[] }>(`/operator/events/${id}`, { token }),
   create: (token: string, data: EventInput) => post<{ event: SpecialEvent } & Message>("/operator/events", token, data),
   /** Anything but the brand; new dates/hours must keep every block a host holds (else a `schedule` error). */
-  update: (token: string, id: string, data: Partial<Omit<EventInput, "brand_id">>) => put<{ event: SpecialEvent } & Message>(`/operator/events/${id}`, token, data),
+  update: (token: string, id: string, data: Partial<Omit<EventInput, "brand_id">>) =>
+    put<{ event: SpecialEvent } & Message>(`/operator/events/${id}`, token, data),
   /** Refused (`event` error) once a host has checked in for one of its blocks. */
   remove: (token: string, id: string) => del<Message>(`/operator/events/${id}`, token),
   assign: (token: string, id: string, startAt: string, hostId: string) =>

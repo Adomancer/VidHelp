@@ -16,8 +16,10 @@ export default function UserAvatar({ user, size = "w-8 h-8" }: UserAvatarProps) 
   const shown = user ?? me;
 
   if (shown.avatar_url) {
-    // eslint-disable-next-line @next/next/no-img-element -- Google or backend-hosted photo, no next/image config needed
-    return <img src={shown.avatar_url} alt="" referrerPolicy="no-referrer" className={cn("shrink-0 rounded-full object-cover ring-1 ring-foreground/10", size)} />;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- Google or backend-hosted photo, no next/image config needed
+      <img src={shown.avatar_url} alt="" referrerPolicy="no-referrer" className={cn("shrink-0 rounded-full object-cover ring-1 ring-foreground/10", size)} />
+    );
   }
 
   return (

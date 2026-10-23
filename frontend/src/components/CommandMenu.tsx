@@ -7,16 +7,7 @@ import { operatorApi } from "@/lib/api";
 import { setThemeMode } from "@/lib/theme";
 import { useApiData } from "@/lib/useApiData";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
+import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { useAuth } from "./AuthProvider";
 import NavIcon from "./NavIcon";
 import type { SidebarGroup } from "./SidebarLayout";
@@ -51,7 +42,10 @@ export default function CommandMenu({ links, hostSearchPath }: CommandMenuProps)
   useEffect(() => () => clearTimeout(debounce.current), []);
 
   const searchHosts = Boolean(hostSearchPath) && open && query.length >= 2;
-  const hosts = useApiData(`palette-hosts|${query}`, () => operatorApi.hosts(token, { search: [query], page: 1 }), { enabled: searchHosts });
+  const hosts = useApiData(`palette-hosts|${query}`, () => operatorApi.hosts(token, { search: [query], page: 1 }), {
+    enabled: searchHosts,
+    keepPrevious: true,
+  });
 
   function type(next: string) {
     setText(next);

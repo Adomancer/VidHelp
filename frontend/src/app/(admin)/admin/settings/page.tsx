@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw } from "lucide-react";
-import { errorMessage, fieldErrors, settingsApi, type Setting, type SettingGroup, type SettingValue } from "@/lib/api";
+import { settingsApi, shownKeys, splitApiError, type Setting, type SettingGroup, type SettingValue } from "@/lib/api";
 import { TWO_FACTOR_SETUP_PATH } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { inputSmClass } from "@/lib/ui";
@@ -115,9 +115,9 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
       }
       onSaved(result.groups, result.message);
     } catch (caught) {
-      const fields = fieldErrors(caught);
+      const { fields, message } = splitApiError(caught, shownKeys(...all.map((setting) => setting.key)));
       setErrors(fields);
-      if (Object.keys(fields).length === 0) setError(errorMessage(caught));
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -143,12 +143,12 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
       ))}
 
       {changed.length > 0 && (
-        <div className="sticky bottom-4 z-10 space-y-3 rounded-xl border border-primary/30 bg-popover/95 p-4 shadow-lg ring-1 ring-foreground/5 backdrop-blur-md animate-in fade-in-0 slide-in-from-bottom-2 duration-200">
+        <div className="sticky bottom-4 z-10 animate-in space-y-3 rounded-xl border border-primary/30 bg-popover/95 p-4 shadow-lg ring-1 ring-foreground/5 backdrop-blur-md duration-200 fade-in-0 slide-in-from-bottom-2">
           {error && <FormAlert tone="error">{error}</FormAlert>}
           {turningOn2fa && (
             <FormAlert tone="warning">
-              Admin dan finance yang belum memakai verifikasi dua langkah{user.two_factor_enabled ? "" : ", termasuk kamu,"} harus mengaturnya dulu sebelum
-              bisa melakukan hal lain.
+              Admin dan finance yang belum memakai verifikasi dua langkah{user.two_factor_enabled ? "" : ", termasuk kamu,"} harus mengaturnya dulu sebelum bisa
+              melakukan hal lain.
             </FormAlert>
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">

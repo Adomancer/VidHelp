@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
 import { notificationApi, type AppNotification } from "@/lib/api";
-import { formatRelative } from "@/lib/format";
-import { useApiData } from "@/lib/useApiData";
+import { APP_TIME_ZONE, formatRelative } from "@/lib/format";
+import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,11 +22,12 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
 
   const count = useApiData("notification-count", () => notificationApi.unreadCount(token), { refetchInterval: POLL_MS });
   const list = useApiData("notification-list", () => notificationApi.list(token), { enabled: open });
+  const invalidate = useInvalidate();
 
   async function openNotification(notification: AppNotification) {
     if (!notification.read_at) await notificationApi.read(token, notification.id).catch(() => {});
     setOpen(false);
-    count.reload();
+    void invalidate("notification-"); // the count now, the list when the bell opens again
     if (notification.link) router.push(notification.link);
   }
 
@@ -51,7 +52,7 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
         >
           <Bell />
           {unread > 0 && (
-            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white ring-2 ring-background tabular-nums">
+            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white tabular-nums ring-2 ring-background">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
@@ -98,14 +99,14 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
                   !notification.read_at && "bg-primary/[0.04]"
                 )}
               >
-                <span
-                  className={cn("mt-1.5 size-2 shrink-0 rounded-full", notification.read_at ? "bg-transparent" : "bg-primary")}
-                  aria-hidden="true"
-                />
+                <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", notification.read_at ? "bg-transparent" : "bg-primary")} aria-hidden="true" />
                 <span className="min-w-0 flex-1">
                   <span className={cn("block text-sm", notification.read_at ? "text-body" : "font-medium text-foreground")}>{notification.title}</span>
                   {notification.body && <span className="mt-0.5 block text-xs text-muted-foreground">{notification.body}</span>}
-                  <span className="mt-1 block text-[11px] text-faint" title={new Date(notification.created_at).toLocaleString("id-ID")}>
+                  <span
+                    className="mt-1 block text-[11px] text-faint"
+                    title={new Date(notification.created_at).toLocaleString("id-ID", { timeZone: APP_TIME_ZONE })}
+                  >
                     {formatRelative(notification.created_at)}
                   </span>
                 </span>

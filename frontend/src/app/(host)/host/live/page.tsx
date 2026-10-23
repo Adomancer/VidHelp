@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Check, Clock, LogIn, LogOut, Radio, RefreshCw } from "lucide-react";
-import { CHECK_IN_OPENS_MINUTES, errorMessage, liveApi, type Attendance, type LiveReport, type LiveSession, type ReportInput } from "@/lib/api";
-import { formatClock, formatDateTime, formatWindow } from "@/lib/format";
+import { checkInOpensAt, errorMessage, liveApi, settingsApi, type Attendance, type LiveReport, type LiveSession, type ReportInput } from "@/lib/api";
+import { formatClock, formatDateTime, formatFullDay, formatWindow } from "@/lib/format";
 import { FLAG_REASONS, metricLabel, METRIC_LABELS } from "@/lib/reportFields";
 import { textareaClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
@@ -16,6 +16,7 @@ import { KnowledgeButton } from "@/components/BrandKnowledge";
 import Card from "@/components/Card";
 import DurationInput from "@/components/DurationInput";
 import EmptyState from "@/components/EmptyState";
+import { FieldError } from "@/components/FieldMessage";
 import ErrorState from "@/components/ErrorState";
 import FormAlert from "@/components/FormAlert";
 import { CardsSkeleton } from "@/components/Loading";
@@ -33,7 +34,6 @@ export default function HostLivePage() {
   const { token } = useAuth();
   const live = useApiData("live-today", () => liveApi.today(token));
   const [error, setError] = useState<string | null>(null);
-  const now = useNow();
 
   async function act(action: () => Promise<{ message: string }>) {
     setError(null);
@@ -46,19 +46,13 @@ export default function HostLivePage() {
   }
 
   const sessions = live.data?.sessions ?? [];
-  // Still actionable: not over yet, or report missing / flagged for fixing
-  const current = sessions.filter(
-    (session) =>
-      new Date(session.end_at) > now ||
-      (session.attendance && (!session.attendance.report || session.attendance.report.status === "flagged"))
-  );
   const missing = live.data?.missing_reports ?? [];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Live"
-        description={now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}
+        description={formatFullDay(new Date(), false)}
         actions={
           <Button type="button" variant="outline" onClick={live.reload} disabled={live.loading}>
             <RefreshCw className={cn(live.loading && "animate-spin")} aria-hidden="true" />
@@ -74,27 +68,7 @@ export default function HostLivePage() {
       {live.data && (
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="min-w-0 space-y-6">
-            {current.length === 0 && (
-              <Card>
-                <EmptyState
-                  icon={Radio}
-                  title="Tidak ada sesi saat ini"
-                  description="Sesi live berikutnya ada di jadwalmu."
-                  action={
-                    <Button asChild variant="outline">
-                      <Link href="/host/schedule">
-                        <CalendarDays aria-hidden="true" />
-                        Lihat jadwal
-                      </Link>
-                    </Button>
-                  }
-                />
-              </Card>
-            )}
-
-            {current.map((session) => (
-              <SessionCard key={sessionKey(session)} session={session} metrics={live.data!.metrics} act={act} now={now} />
-            ))}
+            <CurrentSessions sessions={sessions} metrics={live.data.metrics} act={act} />
 
             {missing.length > 0 && (
               <Card title="Laporan yang belum kamu kirim" description="Sudah lewat batas waktunya. Tetap kirim supaya jam live-mu bisa dicek.">
@@ -104,7 +78,10 @@ export default function HostLivePage() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-sm font-medium text-foreground">
                           {attendance.brand?.name}
-                          <span className="font-normal text-muted-foreground"> · {formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}</span>
+                          <span className="font-normal text-muted-foreground">
+                            {" "}
+                            · {formatWindow(attendance.scheduled_start_at, attendance.scheduled_end_at)}
+                          </span>
                         </p>
                         <StatusBadge tone="danger">Terlambat</StatusBadge>
                       </div>
@@ -116,7 +93,7 @@ export default function HostLivePage() {
             )}
           </div>
 
-          <TodayTimeline sessions={sessions} now={now} />
+          <TodayTimeline sessions={sessions} />
         </div>
       )}
     </div>
@@ -124,6 +101,39 @@ export default function HostLivePage() {
 }
 
 /** Event blocks have no weekly slot, so they are keyed by their claim. */
+/**
+ * The sessions still to act on: not over yet, or report missing / flagged for fixing. The clock ticks
+ * here (and in the timeline), so report forms elsewhere on the page don't re-render with it.
+ */
+function CurrentSessions({ sessions, metrics, act }: { sessions: LiveSession[]; metrics: string[]; act: Act }) {
+  const now = useNow();
+  const current = sessions.filter(
+    (session) => new Date(session.end_at) > now || (session.attendance && (!session.attendance.report || session.attendance.report.status === "flagged"))
+  );
+
+  if (current.length === 0) {
+    return (
+      <Card>
+        <EmptyState
+          icon={Radio}
+          title="Tidak ada sesi saat ini"
+          description="Sesi live berikutnya ada di jadwalmu."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/host/schedule">
+                <CalendarDays aria-hidden="true" />
+                Lihat jadwal
+              </Link>
+            </Button>
+          }
+        />
+      </Card>
+    );
+  }
+
+  return current.map((session) => <SessionCard key={sessionKey(session)} session={session} metrics={metrics} act={act} now={now} />);
+}
+
 function sessionKey(session: LiveSession): string {
   return session.event_claim_id ?? `${session.slot_id}|${session.date}|${session.role}`;
 }
@@ -156,9 +166,10 @@ function reportState(report: LiveReport | null): { label: string; tone: Tone } {
 
 function SessionCard({ session, metrics, act, now }: { session: LiveSession; metrics: string[]; act: Act; now: Date }) {
   const { token } = useAuth();
+  const settings = useApiData("public-settings", () => settingsApi.public(token)).data?.settings;
   const [busy, setBusy] = useState(false);
   const start = new Date(session.start_at);
-  const opensAt = new Date(start.getTime() - CHECK_IN_OPENS_MINUTES * 60_000);
+  const opensAt = checkInOpensAt(start, settings);
   const ended = new Date(session.end_at) <= now;
   const attendance = session.attendance;
   const state = sessionState(session, now);
@@ -184,7 +195,9 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h2 className={cn("truncate text-base font-semibold", session.role === "off" ? "text-muted-foreground" : "text-foreground")}>{session.brand.name}</h2>
+            <h2 className={cn("truncate text-base font-semibold", session.role === "off" ? "text-muted-foreground" : "text-foreground")}>
+              {session.brand.name}
+            </h2>
             <StatusBadge tone={state.tone} pulse={state.pulse}>
               {state.label}
             </StatusBadge>
@@ -207,7 +220,7 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
         !attendance &&
         (ended ? (
           <FormAlert tone="error">Kamu tidak check-in untuk sesi ini.</FormAlert>
-        ) : now < opensAt ? (
+        ) : !opensAt ? null : now < opensAt ? (
           <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-3 text-sm">
             <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <p className="text-body">
@@ -239,7 +252,14 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
           </dl>
 
           {!attendance.check_out_at && (
-            <Button type="button" variant="outline" size="lg" className="w-full" disabled={busy} onClick={() => run(() => liveApi.checkOut(token, attendance.id))}>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="w-full"
+              disabled={busy}
+              onClick={() => run(() => liveApi.checkOut(token, attendance.id))}
+            >
               <LogOut aria-hidden="true" />
               {busy ? "Memproses…" : "Check-out"}
             </Button>
@@ -267,7 +287,10 @@ function Progress({ attendance }: { attendance: Attendance | null }) {
       {steps.map((step, index) => {
         const current = index === currentIndex;
         return (
-          <li key={step.label} className="flex flex-1 flex-col items-center gap-1.5 text-center last:flex-none last:basis-auto first:items-start first:text-left last:items-end last:text-right">
+          <li
+            key={step.label}
+            className="flex flex-1 flex-col items-center gap-1.5 text-center first:items-start first:text-left last:flex-none last:basis-auto last:items-end last:text-right"
+          >
             <div className="flex w-full items-center">
               <span
                 className={cn(
@@ -368,7 +391,8 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
       };
       return liveApi.report(token, attendance.id, input);
     },
-    (result) => act(async () => result)
+    (result) => act(async () => result),
+    ["duration_hours", "metrics"]
   );
 
   return (
@@ -411,8 +435,11 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
           rows={3}
           placeholder="Masalah atau gangguan selama live"
           defaultValue={report?.notes ?? ""}
+          maxLength={2000}
+          aria-invalid={errors.notes ? true : undefined}
           className={textareaClass}
         />
+        <FieldError>{errors.notes}</FieldError>
       </div>
       <div className="flex justify-end">
         <SubmitButton loading={loading} className="sm:w-auto">
@@ -424,7 +451,8 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
 }
 
 /** All of today's sessions in time order, with where each one stands. */
-function TodayTimeline({ sessions, now }: { sessions: LiveSession[]; now: Date }) {
+function TodayTimeline({ sessions }: { sessions: LiveSession[] }) {
+  const now = useNow();
   const ordered = [...sessions].sort((a, b) => a.start_at.localeCompare(b.start_at));
 
   return (
@@ -450,7 +478,9 @@ function TodayTimeline({ sessions, now }: { sessions: LiveSession[]; now: Date }
                   <p className="text-xs text-muted-foreground tabular-nums">
                     {formatClock(session.start_at)}–{formatClock(session.end_at)}
                   </p>
-                  <p className={cn("truncate text-sm font-medium", past || session.role === "off" ? "text-muted-foreground" : "text-foreground")}>{session.brand.name}</p>
+                  <p className={cn("truncate text-sm font-medium", past || session.role === "off" ? "text-muted-foreground" : "text-foreground")}>
+                    {session.brand.name}
+                  </p>
                   <div className="mt-1">
                     <StatusBadge tone={state.tone} pulse={state.pulse} className="h-5 px-1.5 text-[11px]">
                       {state.label}

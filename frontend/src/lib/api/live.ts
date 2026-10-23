@@ -1,10 +1,14 @@
 /** Check-in/out, live reports, and reviewing them. */
 
+import type { PublicSettings } from "./admin";
 import { api, type Message, type Paginated, post, query } from "./client";
 import type { HostWithUser } from "./hosts";
 
-/** Minutes before the start that check-in opens (matches the backend default). */
-export const CHECK_IN_OPENS_MINUTES = 60;
+/** When check-in opens for a session starting at `start` (an admin setting), or null until the settings have loaded. */
+export function checkInOpensAt(start: Date, settings: PublicSettings | undefined): Date | null {
+  const minutes = settings?.["attendance.check_in_opens_minutes"];
+  return minutes === undefined ? null : new Date(start.getTime() - minutes * 60_000);
+}
 
 export type ReportStatus = "submitted" | "flagged" | "approved" | "rejected";
 
@@ -77,8 +81,10 @@ export interface ReviewReport extends LiveReport {
 
 export const liveApi = {
   today: (token: string) => api<{ sessions: LiveSession[]; missing_reports: Attendance[]; metrics: string[] }>("/host/live", { token }),
-  checkIn: (token: string, session: Pick<LiveSession, "slot_id" | "date" | "backup_request_id" | "event_claim_id">) =>
-    post<{ attendance: Attendance } & Message>("/host/live/check-in", token, session),
+  checkIn: (
+    token: string,
+    { slot_id, date, backup_request_id, event_claim_id }: Pick<LiveSession, "slot_id" | "date" | "backup_request_id" | "event_claim_id">
+  ) => post<{ attendance: Attendance } & Message>("/host/live/check-in", token, { slot_id, date, backup_request_id, event_claim_id }),
   checkOut: (token: string, attendanceId: string) => post<{ attendance: Attendance } & Message>(`/host/live/${attendanceId}/check-out`, token),
   report: (token: string, attendanceId: string, data: ReportInput) => post<{ report: LiveReport } & Message>(`/host/live/${attendanceId}/report`, token, data),
 };

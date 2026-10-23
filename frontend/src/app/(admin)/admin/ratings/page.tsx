@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronRight, Download, History, MousePointerClick, Search, Sparkles, Star, ThumbsUp, Users } from "lucide-react";
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { errorMessage, pointsApi, type RatingRow } from "@/lib/api";
-import { formatDate, formatShortDate } from "@/lib/format";
+import { appDate, formatDate, formatShortDate } from "@/lib/format";
 import { inputClass, inputSmClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
@@ -30,8 +30,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function thisMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return appDate().slice(0, 7);
 }
 
 const views = ["todo", "violations", "rated", "all"] as const;
@@ -99,7 +98,7 @@ export default function AdminRatingsPage() {
   const [historyOf, setHistoryOf] = useState<RatingRow | null>(null);
   const sideBySide = useMediaQuery(SIDE_BY_SIDE);
   const invalidate = useInvalidate();
-  const ratings = useApiData(`ratings-${month}`, () => pointsApi.ratings(token, month));
+  const ratings = useApiData(`ratings-${month}`, () => pointsApi.ratings(token, month), { keepPrevious: true });
 
   const rows = ratings.data?.hosts;
   const scale = ratings.data?.scale ?? { min: 1, max: 5 };

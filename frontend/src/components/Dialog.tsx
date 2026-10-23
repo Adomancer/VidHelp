@@ -62,7 +62,7 @@ export default function Dialog({
   return (
     <DialogPrimitive.Root open onOpenChange={(open) => !open && requestClose()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 duration-150 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 dark:bg-black/60" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 duration-150 supports-backdrop-filter:backdrop-blur-xs dark:bg-black/60 data-open:animate-in data-open:fade-in-0" />
         <DialogPrimitive.Content
           ref={panelRef}
           // Without a description, say so explicitly (Radix warns otherwise)
@@ -127,7 +127,12 @@ export default function Dialog({
             </div>
           ) : (
             footer && (
-              <div className={cn("flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-muted/40 px-5 py-3.5 sm:px-6", placement === "center" && "sm:rounded-b-xl")}>
+              <div
+                className={cn(
+                  "flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-muted/40 px-5 py-3.5 sm:px-6",
+                  placement === "center" && "sm:rounded-b-xl"
+                )}
+              >
                 {footer}
               </div>
             )

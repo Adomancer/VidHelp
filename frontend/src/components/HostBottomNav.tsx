@@ -109,11 +109,16 @@ export default function HostBottomNav({ claimable = 0 }: { claimable?: number })
                       onClick={() => setSheetOpen(false)}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex min-h-14 items-center gap-3 px-4 py-3 transition-colors outline-none active:bg-muted focus-visible:bg-muted",
+                        "flex min-h-14 items-center gap-3 px-4 py-3 transition-colors outline-none focus-visible:bg-muted active:bg-muted",
                         active && "bg-primary/[0.06]"
                       )}
                     >
-                      <span className={cn("flex size-9 items-center justify-center rounded-lg", active ? "bg-primary/10 text-brand" : "bg-muted text-muted-foreground")}>
+                      <span
+                        className={cn(
+                          "flex size-9 items-center justify-center rounded-lg",
+                          active ? "bg-primary/10 text-brand" : "bg-muted text-muted-foreground"
+                        )}
+                      >
                         <NavIcon name={item.icon} className="size-[18px]" />
                       </span>
                       <span className="min-w-0 flex-1">
@@ -154,7 +159,7 @@ function TabIcon({ icon, active, badge }: { icon: NavIconName; active: boolean; 
     >
       <NavIcon name={icon} className="size-5" />
       {badge && (
-        <span className="absolute -top-0.5 right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none font-semibold text-primary-foreground ring-2 ring-background tabular-nums">
+        <span className="absolute -top-0.5 right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none font-semibold text-primary-foreground tabular-nums ring-2 ring-background">
           {badge}
         </span>
       )}

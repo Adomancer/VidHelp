@@ -15,7 +15,9 @@ export default function SlipView({ slip }: { slip: SlipDetail }) {
     <article className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-zinc-200 bg-white text-zinc-900 shadow-sm print:max-w-none print:rounded-none print:border-0 print:shadow-none">
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-zinc-200 px-4 py-5 sm:px-8">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-[#5750f1] text-base font-bold text-white print:border print:border-[#5750f1]">V</span>
+          <span className="flex size-10 items-center justify-center rounded-lg bg-[#5750f1] text-base font-bold text-white print:border print:border-[#5750f1]">
+            V
+          </span>
           <div>
             <p className="text-lg font-semibold tracking-tight">VidHelp</p>
             <p className="text-sm text-zinc-500">Slip gaji</p>

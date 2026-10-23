@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { ShieldCheck } from "lucide-react";
-import { errorMessage, fieldErrors, twoFactorApi } from "@/lib/api";
+import { shownKeys, splitApiError, twoFactorApi } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
@@ -48,9 +48,9 @@ export default function TwoFactorSettings() {
       setFormKey((current) => current + 1);
       status.reload();
     } catch (caught) {
-      const fields = fieldErrors(caught);
+      const { fields, message } = splitApiError(caught, shownKeys("code"));
       if (fields.code) setCodeError(fields.code);
-      else setError(errorMessage(caught));
+      setError(message);
     } finally {
       setBusy(false);
     }
@@ -62,7 +62,15 @@ export default function TwoFactorSettings() {
     <Card
       title="Verifikasi dua langkah (2FA)"
       description="Setelah kata sandi atau Google, kamu juga memasukkan kode 6 digit dari aplikasi authenticator di HP."
-      action={data?.enabled ? <StatusBadge tone="success" dot>Aktif</StatusBadge> : data ? <StatusBadge tone="neutral">Belum aktif</StatusBadge> : undefined}
+      action={
+        data?.enabled ? (
+          <StatusBadge tone="success" dot>
+            Aktif
+          </StatusBadge>
+        ) : data ? (
+          <StatusBadge tone="neutral">Belum aktif</StatusBadge>
+        ) : undefined
+      }
     >
       {status.error && <FormAlert tone="error">{status.error}</FormAlert>}
       {error && <FormAlert tone="error">{error}</FormAlert>}

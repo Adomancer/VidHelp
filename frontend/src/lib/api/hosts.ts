@@ -131,6 +131,8 @@ export interface MyProfile {
 export interface ProfileChangeRequest {
   id: string;
   status: ProfileChangeStatus;
+  /** Approving sends this back: the server refuses if the host changed the request since. */
+  version: string;
   host: { id: string; name: string; email: string; avatar_url: string | null };
   fields: ProfileChangeField[];
   created_at: string;
@@ -154,7 +156,7 @@ export type AdminHostInput = Partial<Pick<HostProfile, "phone" | "guardian_phone
 export const hostApi = {
   profile: (token: string) => api<MyProfile>("/host/profile", { token }),
 
-  updateProfile: (token: string, data: { name?: string; phone?: string | null; guardian_phone?: string | null }) =>
+  updateProfile: (token: string, data: { name?: string | null; phone?: string | null; guardian_phone?: string | null }) =>
     put<MyProfile & Message>("/host/profile", token, data),
 
   uploadPhoto: (token: string, photo: File) => {
@@ -257,6 +259,6 @@ export const adminHostsApi = {
   /** Hosts' personal data changes: waiting (oldest first) or decided (latest 50). */
   profileChanges: (token: string, status: "pending" | "decided" = "pending") =>
     api<{ requests: ProfileChangeRequest[]; pending_count: number }>(`/admin/profile-changes${query({ status })}`, { token }),
-  approveChange: (token: string, id: string) => post(`/admin/profile-changes/${id}/approve`, token),
+  approveChange: (token: string, id: string, version: string) => post(`/admin/profile-changes/${id}/approve`, token, { version }),
   rejectChange: (token: string, id: string, note: string) => post(`/admin/profile-changes/${id}/reject`, token, { note }),
 };

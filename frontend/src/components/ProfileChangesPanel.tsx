@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, UserPen, X } from "lucide-react";
 import { useQueryState } from "nuqs";
-import { adminHostsApi, errorMessage, type ProfileChangeRequest } from "@/lib/api";
+import { adminHostsApi, errorMessage, fieldErrors, type ProfileChangeRequest } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import Dialog from "./Dialog";
+import ErrorState from "./ErrorState";
 import FormAlert from "./FormAlert";
 import { notify } from "./Toast";
 import UserAvatar from "./UserAvatar";
@@ -23,18 +24,30 @@ import UserAvatar from "./UserAvatar";
  */
 export default function ProfileChangesPanel() {
   const { token } = useAuth();
-  const changes = useApiData("profile-changes", () => adminHostsApi.profileChanges(token));
+  // Never served from cache: an admin approves KTP and bank details from this list
+  const changes = useApiData("profile-changes", () => adminHostsApi.profileChanges(token), { staleTime: 0 });
   const invalidate = useInvalidate();
-  const [reviewing, setReviewing] = useState<ProfileChangeRequest | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   // Opened from the "Perubahan data" notification
   const [fromLink, setFromLink] = useQueryState("changes");
   const panelRef = useRef<HTMLDivElement>(null);
   const list = changes.data?.requests ?? [];
+  // Always the latest copy: the list loads again when a request is opened
+  const reviewing = list.find((request) => request.id === reviewingId);
+
+  function open(request: ProfileChangeRequest) {
+    setReviewingId(request.id);
+    changes.reload();
+  }
 
   useEffect(() => {
     if (fromLink && list.length > 0) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [fromLink, list.length]);
 
+  // A failed load isn't "nothing to decide": say so, or pending changes would go unnoticed
+  if (changes.error && !changes.data) {
+    return <ErrorState message={`Permintaan perubahan data belum bisa dimuat. ${changes.error}`} onRetry={changes.reload} />;
+  }
   if (list.length === 0) return null;
 
   return (
@@ -55,15 +68,13 @@ export default function ProfileChangesPanel() {
             <li key={request.id}>
               <button
                 type="button"
-                onClick={() => setReviewing(request)}
+                onClick={() => open(request)}
                 className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none md:px-6"
               >
                 <UserAvatar user={{ name: request.host.name, avatar_url: request.host.avatar_url }} size="size-9" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-foreground">{request.host.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {request.fields.map((field) => field.label).join(" · ")}
-                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">{request.fields.map((field) => field.label).join(" · ")}</span>
                 </span>
                 <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">{formatDateTime(request.created_at)}</span>
                 <span className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-foreground">Tinjau</span>
@@ -77,10 +88,12 @@ export default function ProfileChangesPanel() {
         <ReviewDialog
           key={reviewing.id}
           request={reviewing}
-          onClose={() => setReviewing(null)}
+          loading={changes.loading}
+          onStale={changes.reload}
+          onClose={() => setReviewingId(null)}
           onDecided={(message) => {
             notify({ text: message });
-            setReviewing(null);
+            setReviewingId(null);
             void setFromLink(null);
             changes.reload();
             void invalidate("hosts-");
@@ -92,7 +105,21 @@ export default function ProfileChangesPanel() {
 }
 
 /** What is saved next to what the host asked for, then approve or reject with a reason. */
-function ReviewDialog({ request, onClose, onDecided }: { request: ProfileChangeRequest; onClose: () => void; onDecided: (message: string) => void }) {
+function ReviewDialog({
+  request,
+  loading,
+  onStale,
+  onClose,
+  onDecided,
+}: {
+  request: ProfileChangeRequest;
+  /** The list is loading again: what is shown may be about to change. */
+  loading: boolean;
+  /** The server refused: load the latest values to look at. */
+  onStale: () => void;
+  onClose: () => void;
+  onDecided: (message: string) => void;
+}) {
   const { token } = useAuth();
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
@@ -104,8 +131,13 @@ function ReviewDialog({ request, onClose, onDecided }: { request: ProfileChangeR
     try {
       onDecided((await action()).message);
     } catch (caught) {
-      setError(errorMessage(caught));
       setBusy(false);
+      const fields = fieldErrors(caught);
+      // Already decided or cancelled: it leaves the list (and this dialog) on reload, so say why in a toast
+      if (fields.request) notify({ text: fields.request, tone: "error" });
+      else setError(errorMessage(caught));
+      // Changed or decided meanwhile: show what is there now
+      if (Object.keys(fields).length > 0) onStale();
     }
   }
 
@@ -122,7 +154,12 @@ function ReviewDialog({ request, onClose, onDecided }: { request: ProfileChangeR
             <Button type="button" variant="outline" onClick={() => setRejecting(false)} disabled={busy}>
               Kembali
             </Button>
-            <Button type="button" variant="danger" disabled={busy || !note.trim()} onClick={() => decide(() => adminHostsApi.rejectChange(token, request.id, note.trim()))}>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={busy || !note.trim()}
+              onClick={() => decide(() => adminHostsApi.rejectChange(token, request.id, note.trim()))}
+            >
               <X aria-hidden="true" />
               {busy ? "Menolak…" : "Tolak perubahan"}
             </Button>
@@ -132,7 +169,7 @@ function ReviewDialog({ request, onClose, onDecided }: { request: ProfileChangeR
             <Button type="button" variant="outline" onClick={() => setRejecting(true)} disabled={busy} className="text-destructive hover:text-destructive">
               Tolak…
             </Button>
-            <Button type="button" onClick={() => decide(() => adminHostsApi.approveChange(token, request.id))} disabled={busy}>
+            <Button type="button" onClick={() => decide(() => adminHostsApi.approveChange(token, request.id, request.version))} disabled={busy || loading}>
               <Check aria-hidden="true" />
               {busy ? "Menyimpan…" : "Setujui & terapkan"}
             </Button>
@@ -158,7 +195,12 @@ function ReviewDialog({ request, onClose, onDecided }: { request: ProfileChangeR
                 {request.fields.map((field) => (
                   <tr key={field.field}>
                     <td className="px-3 py-2.5 text-muted-foreground">{field.label}</td>
-                    <td className={cn("px-3 py-2.5 break-words", field.current ? "text-foreground line-through decoration-muted-foreground/50" : "text-muted-foreground italic")}>
+                    <td
+                      className={cn(
+                        "px-3 py-2.5 break-words",
+                        field.current ? "text-foreground line-through decoration-muted-foreground/50" : "text-muted-foreground italic"
+                      )}
+                    >
                       {field.current ?? "kosong"}
                     </td>
                     <td className="text-muted-foreground">

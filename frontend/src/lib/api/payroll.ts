@@ -19,7 +19,11 @@ export interface FinanceReportFilters {
 
 /** "Kopi Nusantara", "2026-10-01" → "kopi-nusantara-2026-10-01.xlsx" (the server names it the same) */
 function periodFileName(brandName: string, periodStart: string): string {
-  const slug = brandName.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = brandName
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
   return `${slug}-${periodStart.slice(0, 10)}.xlsx`;
 }
 

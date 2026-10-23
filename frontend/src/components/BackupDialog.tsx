@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, Megaphone, Search, Star } from "lucide-react";
-import { errorMessage, fieldErrors, operatorBackupApi, type BackupReason, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
+import { operatorBackupApi, shownKeys, splitApiError, type BackupReason, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
 import { toDateInput } from "@/lib/format";
 import { describeTimes, formatDayDate, upcomingDates } from "@/lib/schedule";
 import { inputSmClass, textareaClass } from "@/lib/ui";
@@ -43,7 +43,7 @@ const REASONS: { value: BackupReason; label: string }[] = [
 export default function BackupDialog({ slot, date, markers, onClose, onSaved }: BackupDialogProps) {
   const { token } = useAuth();
   const dates = upcomingDates(slot, toDateInput(), 6);
-  const [backupDate, setBackupDate] = useState(dates.includes(date) ? date : dates[0] ?? "");
+  const [backupDate, setBackupDate] = useState(dates.includes(date) ? date : (dates[0] ?? ""));
   const [cover, setCover] = useState("");
   const [search, setSearch] = useState("");
   const [reasonType, setReasonType] = useState<BackupReason | null>(null);
@@ -84,8 +84,8 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
         undo: () => operatorBackupApi.cancel(token, request.id),
       });
     } catch (caught) {
-      const fields = fieldErrors(caught);
-      setError(fields.host_id ?? fields.backup_date ?? errorMessage(caught));
+      const { fields, message } = splitApiError(caught, shownKeys("host_id", "backup_date"));
+      setError(message ?? fields.host_id ?? fields.backup_date);
       setSaving(false);
     }
   }
@@ -176,7 +176,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
                     className="size-4 accent-primary"
                   />
                   <UserAvatar user={{ name: candidate.name, avatar_url: candidate.avatar_url }} size="size-8 text-xs" />
-                  <span className="flex-1 min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-foreground">{candidate.name}</span>
                     <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
                       {candidate.rating != null && (
@@ -191,7 +191,9 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
                 </label>
               ))}
               {candidates.data && free.length === 0 && (
-                <p className="py-1 text-sm text-muted-foreground">{search ? "Tidak ada host kosong dengan nama itu." : "Tidak ada host yang kosong di jam ini."}</p>
+                <p className="py-1 text-sm text-muted-foreground">
+                  {search ? "Tidak ada host kosong dengan nama itu." : "Tidak ada host yang kosong di jam ini."}
+                </p>
               )}
 
               <label
@@ -245,7 +247,11 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
             </h3>
             <div className="flex flex-wrap gap-1.5">
               {REASONS.map((reason) => (
-                <Chip key={reason.value} selected={reasonType === reason.value} onClick={() => setReasonType(reasonType === reason.value ? null : reason.value)}>
+                <Chip
+                  key={reason.value}
+                  selected={reasonType === reason.value}
+                  onClick={() => setReasonType(reasonType === reason.value ? null : reason.value)}
+                >
                   {reason.label}
                 </Chip>
               ))}

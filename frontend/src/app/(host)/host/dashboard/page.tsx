@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, ArrowRight, CalendarDays, Flag, Layers, LogIn, LogOut, RefreshCw, Star, Ticket, Wallet } from "lucide-react";
-import { CHECK_IN_OPENS_MINUTES, dashboardApi, errorMessage, liveApi, type HostDashboard, type HostDashboardSession, type SessionState } from "@/lib/api";
-import { compactHours, compactRupiah, dayWord, formatClock, formatDuration, formatRupiah, formatShortDate, toDateInput } from "@/lib/format";
+import { checkInOpensAt, dashboardApi, errorMessage, liveApi, settingsApi, type HostDashboard, type HostDashboardSession, type SessionState } from "@/lib/api";
+import { appDate, compactHours, compactRupiah, dayWord, formatClock, formatDuration, formatFullDay, formatRupiah, formatShortDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { timeUntil, useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
@@ -78,7 +78,6 @@ export default function HostDashboardPage() {
     refetchInterval: REFRESH_MS,
   });
   const events = useHostEvents(isHost, EVENTS_REFRESH_MS);
-  const now = useNow();
   const { reload, loading } = dashboard;
   const data = dashboard.data?.data;
   const updatedAt = dashboard.data?.loadedAt;
@@ -88,7 +87,7 @@ export default function HostDashboardPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={`Halo, ${user.name.split(" ")[0]}`}
-        description={now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        description={formatFullDay()}
         actions={
           updatedAt && (
             <Button type="button" variant="outline" size="sm" onClick={reload} disabled={loading} className="text-muted-foreground">
@@ -106,7 +105,7 @@ export default function HostDashboardPage() {
         <>
           {/* What to do now; the to-do list beside it only when there is something on it */}
           <div className="grid gap-3 lg:grid-cols-3">
-            <NextUp sessions={data.sessions} now={now} onChanged={reload} className={todos.length > 0 ? "lg:col-span-2" : "lg:col-span-3"} />
+            <NextUp sessions={data.sessions} onChanged={reload} className={todos.length > 0 ? "lg:col-span-2" : "lg:col-span-3"} />
             {todos.length > 0 && <Todo items={todos} />}
           </div>
 
@@ -120,7 +119,7 @@ export default function HostDashboardPage() {
           {/* The week runs down the left; the other tiles fill the space beside it */}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {/* Height 0 + full height: the week takes the height of the tiles beside it and scrolls inside */}
-            <Week sessions={data.sessions} now={now} className="md:row-span-2 md:h-0 md:min-h-full md:overflow-hidden xl:min-h-full" />
+            <Week sessions={data.sessions} className="md:row-span-2 md:h-0 md:min-h-full md:overflow-hidden xl:min-h-full" />
             <Chances claimable={events.data ? events.claimable : null} covers={data.cover_chances} />
             <HoursTile days={data.hours_by_day} />
             <Pay pay={data.pay} className="md:col-span-2" />
@@ -171,8 +170,10 @@ const focusStyles = {
   upcoming: { eyebrow: "Sesi berikutnya", tone: "text-brand", frame: "" },
 };
 
-function NextUp({ sessions, now, onChanged, className }: { sessions: HostDashboardSession[]; now: Date; onChanged: () => void; className?: string }) {
+function NextUp({ sessions, onChanged, className }: { sessions: HostDashboardSession[]; onChanged: () => void; className?: string }) {
   const { token } = useAuth();
+  const now = useNow();
+  const settings = useApiData("public-settings", () => settingsApi.public(token)).data?.settings;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const focus = focusOf(sessions, now);
@@ -211,8 +212,8 @@ function NextUp({ sessions, now, onChanged, className }: { sessions: HostDashboa
   const style = focusStyles[state];
   const start = new Date(session.start_at);
   const end = new Date(session.end_at);
-  const opensAt = new Date(start.getTime() - CHECK_IN_OPENS_MINUTES * 60_000);
-  const canCheckIn = state === "late" || (state === "upcoming" && opensAt <= now);
+  const opensAt = checkInOpensAt(start, settings);
+  const canCheckIn = state === "late" || (state === "upcoming" && opensAt !== null && opensAt <= now);
   const elapsed = Math.min(100, Math.max(0, ((now.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100));
   const later = sessions.find((candidate) => candidate !== session && candidate.start_at > session.start_at && stateNow(candidate, now) === "upcoming");
 
@@ -271,7 +272,7 @@ function NextUp({ sessions, now, onChanged, className }: { sessions: HostDashboa
                 <LogIn aria-hidden="true" />
                 {busy ? "Memproses…" : "Check-in sekarang"}
               </Button>
-            ) : dayWord(opensAt.toISOString(), now) === "Hari ini" ? (
+            ) : opensAt && dayWord(opensAt.toISOString(), now) === "Hari ini" ? (
               <span className="flex flex-1 items-center gap-1 rounded-lg border border-dashed border-border px-3 text-xs text-muted-foreground sm:flex-none">
                 Check-in dibuka <span className="font-medium text-body tabular-nums">{formatClock(opensAt)}</span>
               </span>
@@ -452,13 +453,14 @@ function RatingStat({ rating, max }: { rating: HostDashboard["rating"]; max: num
 /* Tiles                                                               */
 /* ------------------------------------------------------------------ */
 
-function Week({ sessions, now, className }: { sessions: HostDashboardSession[]; now: Date; className?: string }) {
+function Week({ sessions, className }: { sessions: HostDashboardSession[]; className?: string }) {
+  const now = useNow();
   const working = sessions.filter((session) => session.role !== "off");
   const total = working.reduce((sum, session) => sum + hoursOf(session), 0);
   // One group per day it starts on, in order
   const days = new Map<string, HostDashboardSession[]>();
   for (const session of sessions) {
-    const day = toDateInput(new Date(session.start_at));
+    const day = appDate(session.start_at);
     days.set(day, [...(days.get(day) ?? []), session]);
   }
 

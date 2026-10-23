@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Archive, Ban, KeyRound, MoreHorizontal, Search, Trash2, UserPlus, Users } from "lucide-react";
 import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { adminApi, errorMessage, type AuthUser, type EraseReason, type RoleName, type UserStatus } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 import { roleLabel, statusLabel } from "@/lib/labels";
 import { inputClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
@@ -27,13 +28,7 @@ import ToggleGroup, { ShortLabel } from "@/components/ToggleGroup";
 import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const tabs = [
   ["pending", "Menunggu persetujuan"],
@@ -64,7 +59,7 @@ const statusTones: Record<UserStatus, Tone> = {
   archived: "neutral",
 };
 
-type Confirm = { kind: "reset2fa" | "deactivate" | "archive"; user: AuthUser } | null;
+type Confirm = { kind: "reset2fa" | "deactivate" | "archive"; user: AuthUser } | { kind: "role"; user: AuthUser; role: RoleName } | null;
 
 export default function AdminUsersPage() {
   const { user: me, token } = useAuth();
@@ -78,7 +73,9 @@ export default function AdminUsersPage() {
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const status = tab === "all" ? undefined : tab;
-  const result = useApiData(`admin-users-${JSON.stringify({ status, search, page })}`, () => adminApi.users(token, { status, search, page }));
+  const result = useApiData(`admin-users-${JSON.stringify({ status, search, page })}`, () => adminApi.users(token, { status, search, page }), {
+    keepPrevious: true,
+  });
   const invalidate = useInvalidate();
   const reloadUsers = () => invalidate("admin-users-");
 
@@ -188,7 +185,7 @@ export default function AdminUsersPage() {
                       <UserStatusBadge user={user} />
                     </TableCell>
                     <TableCell>
-                      <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} run={run} />
+                      <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} onConfirm={setConfirm} />
                     </TableCell>
                     <TableCell>
                       <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} />
@@ -208,7 +205,7 @@ export default function AdminUsersPage() {
                   </div>
                   <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                     <Signup user={user} inline />
-                    <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} run={run} />
+                    <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} onConfirm={setConfirm} />
                   </div>
                   <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} stretch />
                 </li>
@@ -218,7 +215,15 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      {users && <Pagination page={users.current_page} lastPage={users.last_page} total={users.total} unit="pengguna" onChange={(next) => void setUrlState({ page: next })} />}
+      {users && (
+        <Pagination
+          page={users.current_page}
+          lastPage={users.last_page}
+          total={users.total}
+          unit="pengguna"
+          onChange={(next) => void setUrlState({ page: next })}
+        />
+      )}
 
       {creating && (
         <CreateAccountForm
@@ -244,6 +249,19 @@ export default function AdminUsersPage() {
         />
       )}
 
+      {confirm?.kind === "role" && (
+        <ConfirmDialog
+          title={`Jadikan ${confirm.user.name} ${roleLabel(confirm.role)}?`}
+          confirmLabel={`Jadikan ${roleLabel(confirm.role)}`}
+          destructive={staffRoles.includes(confirm.role)}
+          onConfirm={() => run(confirm.user.id, () => adminApi.setRole(token, confirm.user.id, confirm.role))}
+          onClose={() => setConfirm(null)}
+        >
+          {staffRoles.includes(confirm.role)
+            ? `${roleLabel(confirm.role)} bisa melihat KTP, rekening, dan penggajian semua host, serta mengelola semua akun. Pastikan ini orang yang tepat.`
+            : `Peran ${roleLabel(confirm.user.roles[0]?.name ?? "host")} diganti menjadi ${roleLabel(confirm.role)}; aksesnya ikut berubah saat ia memuat halaman berikutnya.`}
+        </ConfirmDialog>
+      )}
       {confirm?.kind === "reset2fa" && (
         <ConfirmDialog
           title={`Reset 2FA ${confirm.user.name}?`}
@@ -301,7 +319,7 @@ function UserCell({ user }: { user: AuthUser }) {
 
 function Signup({ user, inline = false }: { user: AuthUser; inline?: boolean }) {
   const source = user.signup_source === "admin_created" ? "oleh admin" : user.has_password ? "email" : "Google";
-  const date = new Date(user.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const date = formatDate(user.created_at);
   return inline ? (
     <span>
       Daftar {date} · {source}
@@ -323,16 +341,23 @@ function UserStatusBadge({ user }: { user: AuthUser }) {
   );
 }
 
-function RoleSelect({ user, disabled, run }: { user: AuthUser; disabled: boolean; run: (userId: string, action: () => Promise<unknown>) => Promise<void> }) {
-  const { token } = useAuth();
+/** Roles that see every host's KTP, bank details and payroll. */
+const staffRoles: RoleName[] = ["admin", "finance"];
+
+/** Picking a role only asks first (arrow keys on a closed select change it without opening). */
+function RoleSelect({ user, disabled, onConfirm }: { user: AuthUser; disabled: boolean; onConfirm: (confirm: Confirm) => void }) {
+  const current = user.roles[0]?.name ?? "host";
   return (
     <NativeSelect
       small
       wrapperClassName="w-32"
-      value={user.roles[0]?.name ?? "host"}
+      value={current}
       disabled={disabled}
       aria-label={`Peran ${user.name}`}
-      onChange={(event) => run(user.id, () => adminApi.setRole(token, user.id, event.target.value as RoleName))}
+      onChange={(event) => {
+        const role = event.target.value as RoleName;
+        if (role !== current) onConfirm({ kind: "role", user, role });
+      }}
     >
       {roles.map((role) => (
         <option key={role} value={role}>
@@ -377,7 +402,13 @@ function RowActions({
   return (
     <div className={cn("flex items-center justify-end gap-2", stretch && "[&>button:first-child]:flex-1")}>
       {canActivate && (
-        <Button type="button" size="sm" variant={user.status === "pending" ? "default" : "outline"} disabled={busy} onClick={() => run(user.id, () => adminApi.activateUser(token, user.id))}>
+        <Button
+          type="button"
+          size="sm"
+          variant={user.status === "pending" ? "default" : "outline"}
+          disabled={busy}
+          onClick={() => run(user.id, () => adminApi.activateUser(token, user.id))}
+        >
           {user.status === "pending" ? "Setujui" : user.status === "archived" ? "Pulihkan" : "Aktifkan"}
         </Button>
       )}
@@ -430,7 +461,13 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
         <TextField label="Nama" name="name" autoComplete="off" error={errors.name} />
         <TextField label="Email" name="email" type="email" autoComplete="off" error={errors.email} />
         <TextField label="Kata sandi" name="password" type="text" autoComplete="new-password" placeholder="Minimal 8 karakter" error={errors.password} />
-        <SelectField label="Peran" name="role" defaultValue="host" error={errors.role} options={roles.map((role) => ({ value: role, label: roleLabel(role) }))} />
+        <SelectField
+          label="Peran"
+          name="role"
+          defaultValue="host"
+          error={errors.role}
+          options={roles.map((role) => ({ value: role, label: roleLabel(role) }))}
+        />
         <FormActions loading={loading} submitLabel="Buat akun" onCancel={onCancel} />
       </form>
     </Modal>
@@ -457,8 +494,8 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
   return (
     <Modal title={`Hapus ${user.name} permanen`} onClose={onCancel}>
       <FormAlert tone="warning">
-        Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini
-        tidak bisa dibatalkan.
+        Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini tidak bisa
+        dibatalkan.
       </FormAlert>
       <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
         {error && (

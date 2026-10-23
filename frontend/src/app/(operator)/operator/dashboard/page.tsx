@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeftRight, ArrowRight, CalendarDays, FileText, Flag, RefreshCw, Ticket, Users, Video } from "lucide-react";
 import { dashboardApi } from "@/lib/api";
-import { formatClock } from "@/lib/format";
+import { formatClock, formatFullDay } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
@@ -38,7 +38,7 @@ export default function OperatorDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description={new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        description={formatFullDay()}
         actions={
           dashboard.data && (
             <Button type="button" variant="outline" size="sm" onClick={reload} disabled={loading} className="text-muted-foreground">
@@ -61,7 +61,14 @@ export default function OperatorDashboardPage() {
 
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={CalendarDays} tone="brand" label="Slot live hari ini" value={stats.today_schedules} note="Lihat jadwal per brand" href="/operator/schedules" />
+          <StatCard
+            icon={CalendarDays}
+            tone="brand"
+            label="Slot live hari ini"
+            value={stats.today_schedules}
+            note="Lihat jadwal per brand"
+            href="/operator/schedules"
+          />
           <StatCard
             icon={ArrowLeftRight}
             tone={stats.pending_backups > 0 ? "warning" : "neutral"}

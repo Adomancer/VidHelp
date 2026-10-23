@@ -139,6 +139,7 @@ class SettingsTest extends TestCase
         $this->actingAs($host)->getJson('/api/settings')
             ->assertOk()
             ->assertJsonPath('settings', [
+                'attendance.check_in_opens_minutes' => 60,
                 'backup.request_min_hours_before' => 24,
                 'backup.direct_min_hosts' => 2,
                 'backup.direct_max_hosts' => 5,

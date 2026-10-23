@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { Camera, Clock, Crown, LogOut, XCircle } from "lucide-react";
 import { errorMessage, hostApi, type MyProfile, type MyProfileChange } from "@/lib/api";
-import { formatDate, formatTenure } from "@/lib/format";
+import { acceptOf, PHOTO_UPLOAD, uploadProblem } from "@/lib/files";
+import { APP_TIME_ZONE, formatDate, formatTenure } from "@/lib/format";
 import { roleLabel } from "@/lib/labels";
+import { changedPersonalFields } from "@/lib/profile";
 import { useApiData } from "@/lib/useApiData";
 import { useNow } from "@/lib/useNow";
 import { formValue, useApiForm } from "@/lib/useApiForm";
@@ -99,10 +101,14 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function upload(file: File | undefined) {
+  async function upload(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    input.value = ""; // picking the same file again (after an error) must fire onChange again
     if (!file) return;
+    const problem = uploadProblem(file, PHOTO_UPLOAD);
+    setError(problem);
+    if (problem) return;
     setUploading(true);
-    setError(null);
     try {
       onUpdated(await hostApi.uploadPhoto(token, file));
       notify({ text: "Foto profil diperbarui" });
@@ -127,7 +133,7 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
             <Camera className="size-3.5" aria-hidden="true" />
           </span>
           <span className="sr-only">{uploading ? "Mengunggah foto…" : "Ganti foto profil"}</span>
-          <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => upload(event.target.files?.[0])} />
+          <input type="file" accept={acceptOf(PHOTO_UPLOAD)} className="sr-only" disabled={uploading} onChange={(event) => upload(event.target)} />
         </label>
         <div className="min-w-0 space-y-1.5">
           <div>
@@ -159,14 +165,10 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
   const host = data.host_profile;
 
   const { loading, errors, error, handleSubmit } = useApiForm(
-    (form) =>
-      hostApi.updateProfile(token, {
-        name: formValue(form, "name"),
-        ...(host && {
-          phone: formValue(form, "phone") || null,
-          guardian_phone: formValue(form, "guardian_phone") || null,
-        }),
-      }),
+    (form) => {
+      if (!host) return hostApi.updateProfile(token, { name: formValue(form, "name") });
+      return hostApi.updateProfile(token, changedPersonalFields(form, { name: data.user.name, host }));
+    },
     (updated, form) => {
       // For hosts nothing changed yet: show the saved data again (what was sent is in the request card)
       if (host) form.reset();
@@ -183,8 +185,23 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
         <TextField label="Nama lengkap" name="name" defaultValue={data.user.name} autoComplete="name" required error={errors.name} />
         {host && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <DigitsField label="No. HP (WhatsApp)" name="phone" defaultValue={host.phone} maxLength={15} placeholder="08…" autoComplete="tel" error={errors.phone} />
-            <DigitsField label="No. HP wali / keluarga" name="guardian_phone" defaultValue={host.guardian_phone} maxLength={15} placeholder="08…" error={errors.guardian_phone} />
+            <DigitsField
+              label="No. HP (WhatsApp)"
+              name="phone"
+              defaultValue={host.phone}
+              maxLength={15}
+              placeholder="08…"
+              autoComplete="tel"
+              error={errors.phone}
+            />
+            <DigitsField
+              label="No. HP wali / keluarga"
+              name="guardian_phone"
+              defaultValue={host.guardian_phone}
+              maxLength={15}
+              placeholder="08…"
+              error={errors.guardian_phone}
+            />
           </div>
         )}
 
@@ -198,7 +215,7 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
   );
 }
 
-const sameDay = (iso: string) => new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+const sameDay = (iso: string) => new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: APP_TIME_ZONE });
 
 /**
  * Where my latest personal data change stands: waiting for an admin (with what I asked for),
@@ -233,9 +250,7 @@ function ChangeStatus({ change, onUpdated }: { change: MyProfileChange; onUpdate
   }
 
   if (change.status === "approved") {
-    return recent ? (
-      <FormAlert tone="success">Perubahan data disetujui admin{change.reviewed_at && ` pada ${sameDay(change.reviewed_at)}`}.</FormAlert>
-    ) : null;
+    return recent ? <FormAlert tone="success">Perubahan data disetujui admin{change.reviewed_at && ` pada ${sameDay(change.reviewed_at)}`}.</FormAlert> : null;
   }
 
   return (
@@ -277,7 +292,10 @@ function BrandsCard({ host }: { host: HostProfileData }) {
       ) : (
         <ul className="flex flex-wrap gap-2">
           {host.assignments.map((assignment) => (
-            <li key={assignment.id} className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground">
+            <li
+              key={assignment.id}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-sm text-foreground"
+            >
               {assignment.brand.name}
               {assignment.is_leader && (
                 <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">

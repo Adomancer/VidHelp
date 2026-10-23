@@ -35,6 +35,7 @@ class ProfileChangeController extends Controller
                 return [
                     'id' => $change->id,
                     'status' => $change->status,
+                    'version' => $change->version(),
                     'host' => [
                         'id' => $change->host->id,
                         'name' => $change->host->user->name,
@@ -55,9 +56,14 @@ class ProfileChangeController extends Controller
         ]);
     }
 
+    /**
+     * `version`: the one the admin reviewed (from the list); refused if the host changed the request since.
+     */
     public function approve(Request $request, ProfileChangeRequest $change): JsonResponse
     {
-        $this->changes->approve($change, $request->user());
+        $validated = $request->validate(['version' => 'required|string']);
+
+        $this->changes->approve($change, $request->user(), $validated['version']);
 
         return response()->json(['message' => 'Perubahan data disetujui']);
     }

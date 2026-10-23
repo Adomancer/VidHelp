@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { BookOpen, Download, FileImage, FileSpreadsheet, FileText, Loader2, Trash2, Upload } from "lucide-react";
-import { errorMessage, fieldErrors, hostApi, knowledgeApi, type KnowledgeFile } from "@/lib/api";
+import { errorMessage, hostApi, knowledgeApi, saveObjectUrl, showInTab, shownKeys, splitApiError, type KnowledgeFile } from "@/lib/api";
+import { acceptOf, KNOWLEDGE_UPLOAD, uploadProblem } from "@/lib/files";
 import { formatDateTime } from "@/lib/format";
 import { richTextClass } from "@/lib/richText";
 import { useApiData } from "@/lib/useApiData";
@@ -20,8 +21,6 @@ import RichTextEditor from "./RichTextEditor";
 import { notify } from "./Toast";
 
 /** What the upload picker offers; the API refuses anything else (and files over 20 MB). */
-const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx";
-
 /**
  * A brand's product knowledge: the text, then the files the brand sent, or a note that there is
  * none yet. `fileUrl` loads one file as an object URL.
@@ -82,15 +81,8 @@ export function KnowledgeFiles({
     const tab = viewable(file) ? window.open("", "_blank") : null;
     try {
       const url = await fileUrl(file);
-      if (tab) {
-        tab.location.href = url;
-        return;
-      }
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.original_name;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (tab) showInTab(tab, url);
+      else saveObjectUrl(url, file.original_name);
     } catch (caught) {
       tab?.close();
       notify({ text: errorMessage(caught), tone: "error" });
@@ -205,7 +197,8 @@ export function KnowledgeEditor({ brand, onClose }: { brand: { id: string; name:
       setDraft(null);
       notify({ text: "Product knowledge disimpan" });
     } catch (caught) {
-      setTextError(fieldErrors(caught).product_knowledge ?? errorMessage(caught));
+      const { fields, message } = splitApiError(caught, shownKeys("product_knowledge"));
+      setTextError(message ?? fields.product_knowledge);
     } finally {
       setSaving(false);
     }
@@ -218,10 +211,16 @@ export function KnowledgeEditor({ brand, onClose }: { brand: { id: string; name:
     setUploadErrors([]);
     for (const [index, file] of files.entries()) {
       setUploading({ done: index, total: files.length });
+      const problem = uploadProblem(file, KNOWLEDGE_UPLOAD);
+      if (problem) {
+        failed.push(`${file.name}: ${problem}`);
+        continue;
+      }
       try {
         await knowledgeApi.upload(token, brand.id, file);
       } catch (caught) {
-        failed.push(`${file.name}: ${fieldErrors(caught).file ?? errorMessage(caught)}`);
+        const { fields, message } = splitApiError(caught, shownKeys("file"));
+        failed.push(`${file.name}: ${message ?? fields.file}`);
       }
     }
     setUploading(null);
@@ -282,7 +281,7 @@ export function KnowledgeEditor({ brand, onClose }: { brand: { id: string; name:
                   <input
                     type="file"
                     multiple
-                    accept={ACCEPT}
+                    accept={acceptOf(KNOWLEDGE_UPLOAD)}
                     className="sr-only"
                     disabled={Boolean(uploading)}
                     onChange={(event) => {
