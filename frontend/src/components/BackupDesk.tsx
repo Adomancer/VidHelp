@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   CalendarClock,
   CheckCircle2,
@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
-import { errorMessage, operatorBackupApi, scheduleApi, showInTab, type BackupCandidate, type BackupReason, type BackupRequest } from "@/lib/api";
+import { errorMessage, operatorBackupApi, scheduleApi, showInTab, type BackupCandidate, type BackupReason, type BackupRecap, type BackupRequest } from "@/lib/api";
 import { APP_TIME_ZONE, formatClock, formatDateTime, formatDay, formatDuration, formatTimeRange, formatWindow, isoWeekday, toDateInput } from "@/lib/format";
 import { inputClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
@@ -67,6 +67,8 @@ const emptyText: Record<Tab, string> = {
 const ROW_HEIGHT = 64;
 /** Rows per page when the side column is underneath (below 1440px). */
 const STACKED_PAGE_SIZE = 8;
+/** The server's page size for the closed tab. */
+const CLOSED_PAGE_SIZE = 25;
 
 /** An element's height, kept up to date; pass the setter as the element's `ref` (it may mount later). */
 function useHeight<T extends HTMLElement>(): [(node: T | null) => void, number] {
@@ -85,6 +87,10 @@ const hoursOf = (backup: BackupRequest) => (new Date(backup.end_at).getTime() - 
 
 type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
 type Confirm = { title: string; body: string; label: string; run: () => Promise<{ message: string }> } | null;
+
+/** Reason types whose label matches a search, e.g. "sak" → sick (the server searches the other fields). */
+const reasonsMatching = (query: string): BackupReason[] =>
+  query ? (Object.keys(reasonLabels) as BackupReason[]).filter((reason) => reasonLabels[reason].toLowerCase().includes(query.toLowerCase())) : [];
 
 const matches = (backup: BackupRequest, query: string) =>
   !query ||
@@ -116,30 +122,50 @@ export default function BackupDesk() {
   const [recapRef, recapHeight] = useHeight<HTMLDivElement>();
   const heights = { toolbar: toolbarHeight, head: headHeight, footer: footerHeight, soon: soonHeight, recap: recapHeight };
 
-  // Every tab at once (cached): the counts, the "starts soon" list and the recap need them all
-  const lists: Record<Tab, ReturnType<typeof useApiData<{ requests: BackupRequest[] }>>> = {
+  // The upcoming tabs at once (cached): the counts and the "starts soon" list need them all
+  const lists: Record<Exclude<Tab, "closed">, ReturnType<typeof useApiData<{ requests: BackupRequest[]; total: number }>>> = {
     pending: useApiData("operator-backups-pending", () => operatorBackupApi.list(token, "pending")),
     open: useApiData("operator-backups-open", () => operatorBackupApi.list(token, "open")),
     filled: useApiData("operator-backups-filled", () => operatorBackupApi.list(token, "filled")),
-    closed: useApiData("operator-backups-closed", () => operatorBackupApi.list(token, "closed")),
   };
-  const current = lists[tab];
-  const list = current.data?.requests.filter((backup) => matches(backup, search.trim()));
-  const count = (key: Tab) => lists[key].data?.requests.length;
+  // History grows forever: paged and searched on the server, loaded once its tab is open
+  const [closedSearch, setClosedSearch] = useState("");
+  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(debounce.current), []);
+  const closedPage = tab === "closed" ? pageState : 1;
+  const closed = useApiData(
+    `operator-backups-closed|${closedPage}|${closedSearch}`,
+    () => operatorBackupApi.closed(token, { page: closedPage, search: closedSearch, reason_types: reasonsMatching(closedSearch) }),
+    { enabled: tab === "closed", keepPrevious: true }
+  );
+  const lettersDue = useApiData("operator-backups-letters", () => operatorBackupApi.letters(token));
+  const recap = useApiData("operator-backups-recap", () => operatorBackupApi.recap(token));
+
+  const current = tab === "closed" ? closed : lists[tab];
+  const list = tab === "closed" ? closed.data?.requests : lists[tab].data?.requests.filter((backup) => matches(backup, search.trim()));
+  const count = (key: Tab) => (key === "closed" ? closed.data?.total : lists[key].data?.total);
 
   const active = [...(lists.pending.data?.requests ?? []), ...(lists.open.data?.requests ?? []), ...(lists.filled.data?.requests ?? [])];
-  const letters = [...active, ...(lists.closed.data?.requests ?? [])].filter((backup) => backup.letter_status === "due" || backup.letter_status === "late");
-  const opened = openId ? [...active, ...(lists.closed.data?.requests ?? [])].find((backup) => backup.id === openId) : undefined;
+  const letters = lettersDue.data?.requests ?? [];
+  const opened = openId ? [...active, ...(closed.data?.requests ?? []), ...letters].find((backup) => backup.id === openId) : undefined;
 
   // Beside the side column, a page holds as many rows as fit down to the end of "Ringkasan
   // riwayat" (measured at their natural height, so the two columns end on the same line)
   const sideHeight = heights.soon + 16 + heights.recap + 2;
   const fits = Math.floor((sideHeight - heights.toolbar - heights.head - heights.footer - 2) / ROW_HEIGHT);
-  const pageSize = wide && heights.soon > 0 && heights.recap > 0 ? Math.max(4, fits) : STACKED_PAGE_SIZE;
-  const total = list?.length ?? 0;
-  const lastPage = Math.max(1, Math.ceil(total / pageSize));
+  const serverPaged = tab === "closed";
+  const pageSize = serverPaged ? CLOSED_PAGE_SIZE : wide && heights.soon > 0 && heights.recap > 0 ? Math.max(4, fits) : STACKED_PAGE_SIZE;
+  const total = (serverPaged ? closed.data?.total : list?.length) ?? 0;
+  const lastPage = serverPaged ? (closed.data?.last_page ?? 1) : Math.max(1, Math.ceil(total / pageSize));
   const page = Math.min(pageState, lastPage);
-  const rows = list?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+  const rows = (serverPaged ? list : list?.slice((page - 1) * pageSize, page * pageSize)) ?? [];
+
+  function changeSearch(next: string) {
+    setSearch(next);
+    setPage(1);
+    clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => setClosedSearch(next.trim()), 300);
+  }
 
   function chooseTab(next: Tab) {
     void setTab(next);
@@ -158,8 +184,9 @@ export default function BackupDesk() {
 
   /** From the side column or the counts: the request's tab, and its details opened. */
   function show(backup: BackupRequest) {
-    const target: Tab = backup.status === "pending" || backup.status === "open" || backup.status === "filled" ? backup.status : "closed";
-    setSearch("");
+    const upcoming = new Date(backup.end_at) > new Date();
+    const target: Tab = upcoming && (backup.status === "pending" || backup.status === "open" || backup.status === "filled") ? backup.status : "closed";
+    changeSearch("");
     chooseTab(target);
     setOpenId(backup.id);
   }
@@ -209,7 +236,7 @@ export default function BackupDesk() {
           icon={FileWarning}
           tone="danger"
           label="Surat sakit"
-          value={lists.pending.data && lists.closed.data ? letters.length : undefined}
+          value={lettersDue.data?.total}
           note={letters.some((backup) => backup.letter_status === "late") ? "Ada yang terlambat" : "Belum diunggah host"}
           active={false}
           onClick={() => letters[0] && show(letters[0])}
@@ -262,10 +289,7 @@ export default function BackupDesk() {
               <input
                 type="search"
                 value={search}
-                onChange={(change) => {
-                  setSearch(change.target.value);
-                  setPage(1);
-                }}
+                onChange={(change) => changeSearch(change.target.value)}
                 placeholder="Cari host, brand, atau alasan…"
                 aria-label="Cari permintaan backup"
                 className={cn(inputClass, "pr-9 pl-9 [&::-webkit-search-cancel-button]:hidden")}
@@ -273,7 +297,7 @@ export default function BackupDesk() {
               {search && (
                 <button
                   type="button"
-                  onClick={() => setSearch("")}
+                  onClick={() => changeSearch("")}
                   aria-label="Hapus pencarian"
                   className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground md:right-2 md:size-6"
                 >
@@ -399,7 +423,7 @@ export default function BackupDesk() {
         {/* Beside the list from 1440px: the recap stretches so both columns end on the same line */}
         <aside className="grid items-start gap-4 min-[1440px]:flex min-[1440px]:flex-col min-[1440px]:items-stretch md:max-[1439px]:grid-cols-2">
           <StartingSoon ref={soonRef} requests={active} now={now} loading={!lists.pending.data || !lists.open.data || !lists.filled.data} onShow={show} />
-          <Recap innerRef={recapRef} requests={lists.closed.data?.requests} className="min-[1440px]:flex-1" />
+          <Recap innerRef={recapRef} recap={recap.data} className="min-[1440px]:flex-1" />
         </aside>
       </div>
 
@@ -554,36 +578,22 @@ function StartingSoon({
 
 /** How past requests turned out, and who covered most. */
 /** `innerRef` measures the content at its natural height (the card itself may stretch). */
-function Recap({
-  requests,
-  className,
-  innerRef,
-}: {
-  requests: BackupRequest[] | undefined;
-  className?: string;
-  innerRef: (node: HTMLDivElement | null) => void;
-}) {
-  const total = requests?.length ?? 0;
-  const filled = requests?.filter((backup) => backup.status === "filled") ?? [];
-  const auto = filled.filter((backup) => backup.auto_filled).length;
-  const dropped = total - filled.length;
-  const covers = new Map<string, { name: string; avatar_url: string | null; count: number }>();
-  for (const backup of filled) {
-    if (!backup.filler) continue;
-    const entry = covers.get(backup.filler.user.id) ?? { name: backup.filler.user.name, avatar_url: backup.filler.user.avatar_url, count: 0 };
-    covers.set(backup.filler.user.id, { ...entry, count: entry.count + 1 });
-  }
-  const top = [...covers.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "id")).slice(0, 3);
-  const rate = total > 0 ? Math.round((filled.length / total) * 100) : 0;
+function Recap({ recap, className, innerRef }: { recap: BackupRecap | undefined; className?: string; innerRef: (node: HTMLDivElement | null) => void }) {
+  const total = recap?.total ?? 0;
+  const filled = recap?.filled ?? 0;
+  const auto = recap?.auto_filled ?? 0;
+  const dropped = total - filled;
+  const top = recap?.top_covers ?? [];
+  const rate = total > 0 ? Math.round((filled / total) * 100) : 0;
 
   return (
     <section className={cn("rounded-xl border border-border bg-card shadow-xs dark:shadow-none", className)}>
       <div ref={innerRef}>
         <header className="flex items-baseline justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold text-foreground">Ringkasan riwayat</h2>
-          <span className="text-xs text-muted-foreground">{total >= 100 ? "100 terakhir" : `${total} permintaan`}</span>
+          <span className="text-xs text-muted-foreground">{recap && total >= recap.window ? `${recap.window} terakhir` : `${total} permintaan`}</span>
         </header>
-        {!requests ? (
+        {!recap ? (
           <div className="p-4">
             <ListSkeleton rows={2} />
           </div>
@@ -610,7 +620,7 @@ function Recap({
             <dl className="grid grid-cols-3 gap-2 text-center">
               {(
                 [
-                  ["Terisi", filled.length],
+                  ["Terisi", filled],
                   ["Otomatis", auto],
                   ["Tidak terisi", dropped],
                 ] as const

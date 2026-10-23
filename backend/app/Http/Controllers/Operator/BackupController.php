@@ -8,6 +8,7 @@ use App\Models\BackupRequest;
 use App\Models\HostProfile;
 use App\Models\ScheduleSlot;
 use App\Services\BackupService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -18,27 +19,117 @@ class BackupController extends Controller
 {
     public function __construct(private BackupService $backups) {}
 
+    /** Requests on the closed tab (past, cancelled, rejected) and the recap read 25 at a time / the latest 100. */
+    private const CLOSED_PER_PAGE = 25;
+
+    private const RECAP_SIZE = 100;
+
     /**
      * Requests by tab: pending (applicants wait for a decision) | open (no applicants yet)
-     * | filled (upcoming) | closed (past, cancelled, rejected).
+     * | filled (upcoming) | closed (past, cancelled, rejected), with `total` for the tab.
+     * The upcoming tabs come whole (up to 100); closed grows forever, so it is paged
+     * (`page`) and searched here (`search`: host, brand or reason; `reason_types[]`).
      */
     public function index(Request $request): JsonResponse
     {
-        $request->validate(['status' => 'nullable|in:pending,open,filled,closed']);
+        $request->validate([
+            'status' => 'nullable|in:pending,open,filled,closed',
+            'page' => 'nullable|integer|min:1',
+            'search' => 'nullable|string|max:100',
+            'reason_types' => 'nullable|array',
+            'reason_types.*' => 'in:sick,permit,other',
+        ]);
         $tab = $request->status ?? 'pending';
 
-        $requests = BackupRequest::query()
+        $query = BackupRequest::query()
             ->with(['brand:id,name', 'requester.user', 'filler.user', 'attachments', 'nominees.host.user'])
             ->withCount(['applications as applicants_count' => fn ($q) => $q->where('status', 'applied')])
-            ->when($tab === 'closed', fn ($q) => $q->where(fn ($q) => $q
-                ->whereIn('status', ['cancelled', 'rejected'])
-                ->orWhere('end_at', '<=', now())))
+            ->when($tab === 'closed', fn ($q) => $this->closed($q))
             ->when($tab !== 'closed', fn ($q) => $q->where('status', $tab)->where('end_at', '>', now()))
-            ->orderBy('start_at', $tab === 'closed' ? 'desc' : 'asc')
-            ->limit(100)
-            ->get();
+            ->orderBy('start_at', $tab === 'closed' ? 'desc' : 'asc');
 
-        return response()->json(['requests' => $requests]);
+        if ($tab === 'closed') {
+            $search = trim((string) $request->search);
+            $page = $query
+                ->when($search !== '' || $request->filled('reason_types'), fn ($q) => $q->where(fn ($q) => $q
+                    ->when($search !== '', fn ($q) => $q
+                        ->where('reason', 'like', "%{$search}%")
+                        ->orWhereHas('brand', fn ($q) => $q->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('requester.user', fn ($q) => $q->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('filler.user', fn ($q) => $q->where('name', 'like', "%{$search}%")))
+                    ->when($request->filled('reason_types'), fn ($q) => $q->orWhereIn('reason_type', $request->reason_types))))
+                ->paginate(self::CLOSED_PER_PAGE);
+
+            return response()->json([
+                'requests' => $page->items(),
+                'total' => $page->total(),
+                'current_page' => $page->currentPage(),
+                'last_page' => $page->lastPage(),
+            ]);
+        }
+
+        return response()->json([
+            'requests' => (clone $query)->limit(100)->get(),
+            'total' => $query->count(),
+        ]);
+    }
+
+    /** Past, cancelled or rejected requests. */
+    private function closed(Builder $query): Builder
+    {
+        return $query->where(fn ($q) => $q->whereIn('status', ['cancelled', 'rejected'])->orWhere('end_at', '<=', now()));
+    }
+
+    /**
+     * Sick requests still missing their doctor's letter (letter_status due or late), on any tab,
+     * however old: `total`, and the 100 that started most recently.
+     */
+    public function letters(): JsonResponse
+    {
+        $query = BackupRequest::query()
+            ->where('reason_type', 'sick')
+            ->whereNotIn('status', ['cancelled', 'rejected'])
+            ->whereDoesntHave('attachments');
+
+        return response()->json([
+            'requests' => (clone $query)
+                ->with(['brand:id,name', 'requester.user', 'filler.user', 'attachments', 'nominees.host.user'])
+                ->withCount(['applications as applicants_count' => fn ($q) => $q->where('status', 'applied')])
+                ->orderByDesc('start_at')
+                ->limit(100)
+                ->get(),
+            'total' => $query->count(),
+        ]);
+    }
+
+    /**
+     * How the latest 100 closed requests went: filled (and automatically), not filled, and who covered most.
+     */
+    public function recap(): JsonResponse
+    {
+        $requests = $this->closed(BackupRequest::query())
+            ->with('filler.user')
+            ->orderByDesc('start_at')
+            ->limit(self::RECAP_SIZE)
+            ->get(['id', 'status', 'auto_filled', 'filled_by_host_id', 'start_at']);
+        $filled = $requests->where('status', 'filled');
+
+        return response()->json([
+            'total' => $requests->count(),
+            'window' => self::RECAP_SIZE,
+            'filled' => $filled->count(),
+            'auto_filled' => $filled->where('auto_filled', true)->count(),
+            'top_covers' => $filled->whereNotNull('filler')
+                ->groupBy('filled_by_host_id')
+                ->map(fn ($group) => [
+                    'name' => $group->first()->filler->user->name,
+                    'avatar_url' => $group->first()->filler->user->avatar_url,
+                    'count' => $group->count(),
+                ])
+                ->sortBy([['count', 'desc'], ['name', 'asc']])
+                ->take(3)
+                ->values(),
+        ]);
     }
 
     /**
