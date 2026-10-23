@@ -16,8 +16,9 @@ export interface AppNotification {
 export const notificationApi = {
   list: (token: string) => api<{ notifications: AppNotification[]; unread: number }>("/notifications", { token }),
   unreadCount: (token: string) => api<{ unread: number }>("/notifications/unread-count", { token }),
-  read: (token: string, id: string) => post(`/notifications/${id}/read`, token),
-  readAll: (token: string) => post("/notifications/read-all", token),
+  // Reading notifications changes nothing other pages show (the bell reloads its own count)
+  read: (token: string, id: string) => post(`/notifications/${id}/read`, token, undefined, { invalidates: false }),
+  readAll: (token: string) => post("/notifications/read-all", token, undefined, { invalidates: false }),
 };
 
 export interface DiscordLink {
@@ -44,7 +45,7 @@ export const discordApi = {
   connectUrl: (token: string, state: string) => api<{ url: string }>(`/discord/connect-url${query({ state })}`, { token }),
   link: (token: string, code: string) => post<{ link: DiscordLink } & Message>("/discord/link", token, { code }),
   unlink: (token: string) => del("/discord/link", token),
-  test: (token: string) => post("/discord/test", token),
+  test: (token: string) => post("/discord/test", token, undefined, { invalidates: false }),
   preferences: (token: string, muted: string[]) => put<{ link: DiscordLink } & Message>("/discord/preferences", token, { muted }),
 };
 
@@ -95,8 +96,8 @@ export const notificationAdminApi = {
   deliveries: (token: string, filters: DeliveryFilters) =>
     api<{ deliveries: Paginated<NotificationDelivery> }>(`/admin/notifications/deliveries${query(filters)}`, { token }),
   resend: (token: string, id: string) => post<{ delivery: NotificationDelivery } & Message>(`/admin/notifications/deliveries/${id}/resend`, token),
-  testChannel: (token: string, channel: "backups" | "admin") => post("/admin/notifications/test-channel", token, { channel }),
+  testChannel: (token: string, channel: "backups" | "admin") => post("/admin/notifications/test-channel", token, { channel }, { invalidates: false }),
   /** The types that have an example; then `preview(…, type)` posts one of them. */
-  previewTypes: (token: string, to: PreviewTarget) => post<{ types: string[] }>("/admin/notifications/preview", token, { to }),
-  preview: (token: string, to: PreviewTarget, type: string) => post("/admin/notifications/preview", token, { to, type }),
+  previewTypes: (token: string, to: PreviewTarget) => post<{ types: string[] }>("/admin/notifications/preview", token, { to }, { invalidates: false }),
+  preview: (token: string, to: PreviewTarget, type: string) => post("/admin/notifications/preview", token, { to, type }, { invalidates: false }),
 };

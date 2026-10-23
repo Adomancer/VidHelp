@@ -9,6 +9,11 @@ interface FetchOptions extends RequestInit {
   token?: string;
   /** Give up after this many ms (default 30 s; longer for file downloads). */
   timeout?: number;
+  /**
+   * false: this change doesn't alter what other pages show (marking a notification read, a Discord
+   * test message), so the cached pages stay fresh. See `onDataChanged`.
+   */
+  invalidates?: boolean;
 }
 
 const TIMEOUT_MS = 30_000;
@@ -93,7 +98,7 @@ function sessionProblem(status: number, error: { message?: string; code?: string
  */
 
 async function request(endpoint: string, options: FetchOptions = {}): Promise<Response> {
-  const { token, headers, timeout = TIMEOUT_MS, signal, ...rest } = options;
+  const { token, headers, timeout = TIMEOUT_MS, signal, invalidates = true, ...rest } = options;
 
   const defaultHeaders: Record<string, string> = {
     Accept: "application/json",
@@ -125,7 +130,7 @@ async function request(endpoint: string, options: FetchOptions = {}): Promise<Re
   }
 
   const method = (rest.method ?? "GET").toUpperCase();
-  if (method !== "GET" && method !== "HEAD") changeListener?.();
+  if (method !== "GET" && method !== "HEAD" && invalidates) changeListener?.();
 
   return response;
 }
@@ -216,10 +221,13 @@ export interface Paginated<T> {
   total: number;
 }
 
-/** Calls that change something, signed in: `post(url, token, body?)`. A FormData body goes as is (uploads), anything else as JSON. */
+/**
+ * Calls that change something, signed in: `post(url, token, body?, options?)`. A FormData body goes as is
+ * (uploads), anything else as JSON.
+ */
 function sender(method: "POST" | "PUT" | "DELETE") {
-  return <T = Message>(endpoint: string, token: string, body?: unknown) =>
-    api<T>(endpoint, { method, token, body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body) });
+  return <T = Message>(endpoint: string, token: string, body?: unknown, options: Pick<FetchOptions, "invalidates"> = {}) =>
+    api<T>(endpoint, { ...options, method, token, body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body) });
 }
 
 export const post = sender("POST");

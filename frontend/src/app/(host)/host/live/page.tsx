@@ -34,7 +34,6 @@ export default function HostLivePage() {
   const { token } = useAuth();
   const live = useApiData("live-today", () => liveApi.today(token));
   const [error, setError] = useState<string | null>(null);
-  const now = useNow();
 
   async function act(action: () => Promise<{ message: string }>) {
     setError(null);
@@ -47,19 +46,13 @@ export default function HostLivePage() {
   }
 
   const sessions = live.data?.sessions ?? [];
-  // Still actionable: not over yet, or report missing / flagged for fixing
-  const current = sessions.filter(
-    (session) =>
-      new Date(session.end_at) > now ||
-      (session.attendance && (!session.attendance.report || session.attendance.report.status === "flagged"))
-  );
   const missing = live.data?.missing_reports ?? [];
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Live"
-        description={formatFullDay(now, false)}
+        description={formatFullDay(new Date(), false)}
         actions={
           <Button type="button" variant="outline" onClick={live.reload} disabled={live.loading}>
             <RefreshCw className={cn(live.loading && "animate-spin")} aria-hidden="true" />
@@ -75,27 +68,7 @@ export default function HostLivePage() {
       {live.data && (
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="min-w-0 space-y-6">
-            {current.length === 0 && (
-              <Card>
-                <EmptyState
-                  icon={Radio}
-                  title="Tidak ada sesi saat ini"
-                  description="Sesi live berikutnya ada di jadwalmu."
-                  action={
-                    <Button asChild variant="outline">
-                      <Link href="/host/schedule">
-                        <CalendarDays aria-hidden="true" />
-                        Lihat jadwal
-                      </Link>
-                    </Button>
-                  }
-                />
-              </Card>
-            )}
-
-            {current.map((session) => (
-              <SessionCard key={sessionKey(session)} session={session} metrics={live.data!.metrics} act={act} now={now} />
-            ))}
+            <CurrentSessions sessions={sessions} metrics={live.data.metrics} act={act} />
 
             {missing.length > 0 && (
               <Card title="Laporan yang belum kamu kirim" description="Sudah lewat batas waktunya. Tetap kirim supaya jam live-mu bisa dicek.">
@@ -117,7 +90,7 @@ export default function HostLivePage() {
             )}
           </div>
 
-          <TodayTimeline sessions={sessions} now={now} />
+          <TodayTimeline sessions={sessions} />
         </div>
       )}
     </div>
@@ -125,6 +98,41 @@ export default function HostLivePage() {
 }
 
 /** Event blocks have no weekly slot, so they are keyed by their claim. */
+/**
+ * The sessions still to act on: not over yet, or report missing / flagged for fixing. The clock ticks
+ * here (and in the timeline), so report forms elsewhere on the page don't re-render with it.
+ */
+function CurrentSessions({ sessions, metrics, act }: { sessions: LiveSession[]; metrics: string[]; act: Act }) {
+  const now = useNow();
+  const current = sessions.filter(
+    (session) =>
+      new Date(session.end_at) > now ||
+      (session.attendance && (!session.attendance.report || session.attendance.report.status === "flagged"))
+  );
+
+  if (current.length === 0) {
+    return (
+      <Card>
+        <EmptyState
+          icon={Radio}
+          title="Tidak ada sesi saat ini"
+          description="Sesi live berikutnya ada di jadwalmu."
+          action={
+            <Button asChild variant="outline">
+              <Link href="/host/schedule">
+                <CalendarDays aria-hidden="true" />
+                Lihat jadwal
+              </Link>
+            </Button>
+          }
+        />
+      </Card>
+    );
+  }
+
+  return current.map((session) => <SessionCard key={sessionKey(session)} session={session} metrics={metrics} act={act} now={now} />);
+}
+
 function sessionKey(session: LiveSession): string {
   return session.event_claim_id ?? `${session.slot_id}|${session.date}|${session.role}`;
 }
@@ -430,7 +438,8 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
 }
 
 /** All of today's sessions in time order, with where each one stands. */
-function TodayTimeline({ sessions, now }: { sessions: LiveSession[]; now: Date }) {
+function TodayTimeline({ sessions }: { sessions: LiveSession[] }) {
+  const now = useNow();
   const ordered = [...sessions].sort((a, b) => a.start_at.localeCompare(b.start_at));
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { errorMessage, withSignal } from "./api";
 
@@ -40,14 +40,24 @@ export function useApiData<T>(key: string, load: () => Promise<T>, { keepPreviou
     ...options,
   });
   const { refetch } = query;
+  const [reloading, setReloading] = useState(false);
 
-  const reload = useCallback(() => void refetch(), [refetch]);
+  const reload = useCallback(() => {
+    setReloading(true);
+    void refetch().finally(() => setReloading(false));
+  }, [refetch]);
   const setData = useCallback((data: T) => queryClient.setQueryData([key], data), [queryClient, key]);
 
   return {
     data: query.data,
     error: query.error ? errorMessage(query.error) : undefined,
-    loading: query.isFetching,
+    /**
+     * Waiting on something the user did: the first load, another key (a filter, a page) or `reload()`.
+     * Background polling (`refetchInterval`) doesn't count, so buttons don't spin or lock every minute.
+     */
+    loading: query.isLoading || query.isPlaceholderData || reloading,
+    /** Any request in flight, background polling included. */
+    refreshing: query.isFetching,
     /** Showing the previous key's data while this key loads (see `keepPrevious`). */
     stale: query.isPlaceholderData,
     reload,

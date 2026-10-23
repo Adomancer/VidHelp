@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
 import { notificationApi, type AppNotification } from "@/lib/api";
 import { APP_TIME_ZONE, formatRelative } from "@/lib/format";
-import { useApiData } from "@/lib/useApiData";
+import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -22,11 +22,12 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
 
   const count = useApiData("notification-count", () => notificationApi.unreadCount(token), { refetchInterval: POLL_MS });
   const list = useApiData("notification-list", () => notificationApi.list(token), { enabled: open });
+  const invalidate = useInvalidate();
 
   async function openNotification(notification: AppNotification) {
     if (!notification.read_at) await notificationApi.read(token, notification.id).catch(() => {});
     setOpen(false);
-    count.reload();
+    void invalidate("notification-"); // the count now, the list when the bell opens again
     if (notification.link) router.push(notification.link);
   }
 

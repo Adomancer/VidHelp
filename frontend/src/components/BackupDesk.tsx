@@ -105,7 +105,6 @@ const matches = (backup: BackupRequest, query: string) =>
 export default function BackupDesk() {
   const { token } = useAuth();
   const invalidate = useInvalidate();
-  const now = useNow(60_000);
   // The tab lives in the URL, so a refresh or the Back button keeps it
   const [tab, setTab] = useQueryState("tab", parseAsStringLiteral(tabs.map((option) => option.value)).withDefault("pending"));
   const [search, setSearch] = useState("");
@@ -422,7 +421,7 @@ export default function BackupDesk() {
 
         {/* Beside the list from 1440px: the recap stretches so both columns end on the same line */}
         <aside className="grid items-start gap-4 min-[1440px]:flex min-[1440px]:flex-col min-[1440px]:items-stretch md:max-[1439px]:grid-cols-2">
-          <StartingSoon ref={soonRef} requests={active} now={now} loading={!lists.pending.data || !lists.open.data || !lists.filled.data} onShow={show} />
+          <StartingSoon ref={soonRef} requests={active} loading={!lists.pending.data || !lists.open.data || !lists.filled.data} onShow={show} />
           <Recap innerRef={recapRef} recap={recap.data} className="min-[1440px]:flex-1" />
         </aside>
       </div>
@@ -511,16 +510,16 @@ function Stat({
 function StartingSoon({
   ref,
   requests,
-  now,
   loading,
   onShow,
 }: {
   ref: (node: HTMLElement | null) => void;
   requests: BackupRequest[];
-  now: Date;
   loading: boolean;
   onShow: (backup: BackupRequest) => void;
 }) {
+  // The countdowns tick here, not on the whole desk
+  const now = useNow(60_000);
   const soon = requests
     .filter((backup) => new Date(backup.end_at) > now)
     .sort((a, b) => a.start_at.localeCompare(b.start_at))

@@ -70,7 +70,6 @@ function activeHosts(assignments: BrandHost[]): HostLite[] {
 export default function EventManager() {
   const { token } = useAuth();
   const queryClient = useQueryClient();
-  const now = useNow(30_000);
   const events = useApiData("operator-events", () => eventApi.list(token));
   const [brandId, setBrandId] = useQueryState("brand");
   const [hostId, setHostId] = useQueryState("host");
@@ -228,7 +227,6 @@ export default function EventManager() {
           key={selected.id}
           listed={selected}
           highlightHost={hostFilter}
-          now={now}
           refresh={refresh}
           onDeleted={async () => {
             // Load the list first so nothing asks for the deleted event again, then drop its cache
@@ -258,16 +256,16 @@ export default function EventManager() {
 function EventBoard({
   listed,
   highlightHost,
-  now,
   refresh,
   onDeleted,
 }: {
   listed: EventListItem;
   highlightHost: string | null;
-  now: Date;
   refresh: (id: string) => Promise<unknown>;
   onDeleted: () => Promise<void>;
 }) {
+  // Block states follow the clock on the open event only, not the whole page
+  const now = useNow(30_000);
   const { token } = useAuth();
   const detail = useApiData(`operator-event-${listed.id}`, () => eventApi.show(token, listed.id));
   const brandHosts = useApiData(`brand-hosts-${listed.brand_id}`, () => scheduleApi.brandHosts(token, listed.brand_id));

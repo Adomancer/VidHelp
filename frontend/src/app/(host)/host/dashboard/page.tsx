@@ -78,7 +78,6 @@ export default function HostDashboardPage() {
     refetchInterval: REFRESH_MS,
   });
   const events = useHostEvents(isHost, EVENTS_REFRESH_MS);
-  const now = useNow();
   const { reload, loading } = dashboard;
   const data = dashboard.data?.data;
   const updatedAt = dashboard.data?.loadedAt;
@@ -88,7 +87,7 @@ export default function HostDashboardPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={`Halo, ${user.name.split(" ")[0]}`}
-        description={formatFullDay(now)}
+        description={formatFullDay()}
         actions={
           updatedAt && (
             <Button type="button" variant="outline" size="sm" onClick={reload} disabled={loading} className="text-muted-foreground">
@@ -106,7 +105,7 @@ export default function HostDashboardPage() {
         <>
           {/* What to do now; the to-do list beside it only when there is something on it */}
           <div className="grid gap-3 lg:grid-cols-3">
-            <NextUp sessions={data.sessions} now={now} onChanged={reload} className={todos.length > 0 ? "lg:col-span-2" : "lg:col-span-3"} />
+            <NextUp sessions={data.sessions} onChanged={reload} className={todos.length > 0 ? "lg:col-span-2" : "lg:col-span-3"} />
             {todos.length > 0 && <Todo items={todos} />}
           </div>
 
@@ -120,7 +119,7 @@ export default function HostDashboardPage() {
           {/* The week runs down the left; the other tiles fill the space beside it */}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {/* Height 0 + full height: the week takes the height of the tiles beside it and scrolls inside */}
-            <Week sessions={data.sessions} now={now} className="md:row-span-2 md:h-0 md:min-h-full md:overflow-hidden xl:min-h-full" />
+            <Week sessions={data.sessions} className="md:row-span-2 md:h-0 md:min-h-full md:overflow-hidden xl:min-h-full" />
             <Chances claimable={events.data ? events.claimable : null} covers={data.cover_chances} />
             <HoursTile days={data.hours_by_day} />
             <Pay pay={data.pay} className="md:col-span-2" />
@@ -171,8 +170,9 @@ const focusStyles = {
   upcoming: { eyebrow: "Sesi berikutnya", tone: "text-brand", frame: "" },
 };
 
-function NextUp({ sessions, now, onChanged, className }: { sessions: HostDashboardSession[]; now: Date; onChanged: () => void; className?: string }) {
+function NextUp({ sessions, onChanged, className }: { sessions: HostDashboardSession[]; onChanged: () => void; className?: string }) {
   const { token } = useAuth();
+  const now = useNow();
   const settings = useApiData("public-settings", () => settingsApi.public(token)).data?.settings;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -453,7 +453,8 @@ function RatingStat({ rating, max }: { rating: HostDashboard["rating"]; max: num
 /* Tiles                                                               */
 /* ------------------------------------------------------------------ */
 
-function Week({ sessions, now, className }: { sessions: HostDashboardSession[]; now: Date; className?: string }) {
+function Week({ sessions, className }: { sessions: HostDashboardSession[]; className?: string }) {
+  const now = useNow();
   const working = sessions.filter((session) => session.role !== "off");
   const total = working.reduce((sum, session) => sum + hoursOf(session), 0);
   // One group per day it starts on, in order
