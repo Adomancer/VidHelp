@@ -136,7 +136,7 @@ function Periods() {
   const [query, setQuery] = useState(search);
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   const filters = { status: status === "all" ? undefined : status, search, page };
-  const periods = useApiData(`payroll-periods-${JSON.stringify(filters)}`, () => payrollApi.periods(token, filters));
+  const periods = useApiData(`payroll-periods-${JSON.stringify(filters)}`, () => payrollApi.periods(token, filters), { keepPrevious: true });
   const overview = useApiData("payroll-summary", () => payrollApi.summary(token));
   const invalidate = useInvalidate();
   const [error, setError] = useState<string | null>(null);
@@ -971,7 +971,7 @@ function Kasbon() {
   const [statusParam, setStatusParam] = useQueryState("kasbon", parseAsStringLiteral(["open", "paid", "all"] as const).withDefault("open"));
   const status = statusParam === "all" ? "" : statusParam;
   const setStatus = (next: typeof status) => void setStatusParam(next || "all");
-  const advances = useApiData(`payroll-advances-${status}`, () => payrollApi.advances(token, status));
+  const advances = useApiData(`payroll-advances-${status}`, () => payrollApi.advances(token, status), { keepPrevious: true });
   const canManage = useCanManageFinance();
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);

@@ -35,7 +35,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
   const listId = useId();
 
   // Only fetch while the list is open
-  const suggestions = useApiData(`host-suggest|${query}`, () => operatorApi.hosts(token, { search: query ? [query] : [], page: 1 }), { enabled: open });
+  const suggestions = useApiData(`host-suggest|${query}`, () => operatorApi.hosts(token, { search: query ? [query] : [], page: 1 }), { enabled: open, keepPrevious: true });
 
   useEffect(() => {
     function closeOutside(event: MouseEvent) {

@@ -104,7 +104,7 @@ export default function AuditLogPage() {
   const filters: AuditFilters = {};
   for (const key of filterKeys) if (params[key]) filters[key] = params[key];
 
-  const result = useApiData(`audit-${JSON.stringify(filters)}-${page}`, () => adminApi.auditLogs(token, { ...filters, page }));
+  const result = useApiData(`audit-${JSON.stringify(filters)}-${page}`, () => adminApi.auditLogs(token, { ...filters, page }), { keepPrevious: true });
   const logs = result.data?.logs;
 
   function applyFilters(next: AuditFilters) {

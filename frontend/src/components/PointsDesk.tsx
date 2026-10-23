@@ -50,7 +50,7 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const hosts = useApiData(`points-hosts-${search}`, () => pointsApi.hosts(token, search));
+  const hosts = useApiData(`points-hosts-${search}`, () => pointsApi.hosts(token, search), { keepPrevious: true });
   const wide = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => () => clearTimeout(debounce.current), []);

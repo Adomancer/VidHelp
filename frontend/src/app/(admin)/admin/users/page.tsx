@@ -78,7 +78,7 @@ export default function AdminUsersPage() {
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const status = tab === "all" ? undefined : tab;
-  const result = useApiData(`admin-users-${JSON.stringify({ status, search, page })}`, () => adminApi.users(token, { status, search, page }));
+  const result = useApiData(`admin-users-${JSON.stringify({ status, search, page })}`, () => adminApi.users(token, { status, search, page }), { keepPrevious: true });
   const invalidate = useInvalidate();
   const reloadUsers = () => invalidate("admin-users-");
 

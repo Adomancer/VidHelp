@@ -67,7 +67,7 @@ export default function HostTable({ onSelect, editableBrands = false }: HostTabl
   }
 
   const brands = useApiData("brands", () => operatorApi.brands(token));
-  const hosts = useApiData(`hosts-${JSON.stringify({ filters, page })}`, () => operatorApi.hosts(token, { ...filters, page }));
+  const hosts = useApiData(`hosts-${JSON.stringify({ filters, page })}`, () => operatorApi.hosts(token, { ...filters, page }), { keepPrevious: true });
   const list = hosts.data?.data;
 
   const editor = (host: HostListItem) =>

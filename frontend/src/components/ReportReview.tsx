@@ -102,7 +102,8 @@ export default function ReportReview({ className }: { className?: string }) {
   const result = useApiData(`reports-${tab}-${JSON.stringify(filters)}`, (): Promise<ListPage> =>
     tab === "missing"
       ? reportApi.missing(token, filters).then((data) => ({ ...data, kind: "missing" as const, tab }))
-      : reportApi.list(token, tab, filters).then((data) => ({ ...data, kind: "reports" as const, tab }))
+      : reportApi.list(token, tab, filters).then((data) => ({ ...data, kind: "reports" as const, tab })),
+    { keepPrevious: true }
   );
   const data = result.data;
   const reports = useMemo(() => (data?.kind === "reports" ? data.data : []), [data]);

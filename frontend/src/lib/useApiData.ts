@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { errorMessage } from "./api";
 
 interface ApiDataOptions {
@@ -11,19 +11,33 @@ interface ApiDataOptions {
   enabled?: boolean;
   /** How long loaded data counts as fresh (no reload on mount or window focus). */
   staleTime?: number;
+  /**
+   * While a new key loads, keep showing the data of the previous key (`stale` is true meanwhile).
+   * Only for lists where that is harmless, e.g. the next page or another search; never for data
+   * people act on, like the hosts of the chosen brand. A function decides per previous key.
+   */
+  keepPrevious?: boolean | ((previousKey: string) => boolean);
 }
 
 /**
  * Load data for a page. Re-runs whenever `key` changes (put every input of
- * `load` in it) or `reload()` is called. Keeps the previous data while loading.
+ * `load` in it) or `reload()` is called. A new key starts without data unless `keepPrevious`.
  *
  * The key names one entry in the shared cache, so every component asking for the
  * same key gets the same data (one request). Start it with something unique to the
  * endpoint, e.g. `periods-${brandId}`.
  */
-export function useApiData<T>(key: string, load: () => Promise<T>, options: ApiDataOptions = {}) {
+export function useApiData<T>(key: string, load: () => Promise<T>, { keepPrevious = false, ...options }: ApiDataOptions = {}) {
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: [key], queryFn: load, placeholderData: keepPreviousData, ...options });
+  const query = useQuery<T>({
+    queryKey: [key],
+    queryFn: load,
+    placeholderData: (previous, previousQuery) => {
+      const previousKey = String(previousQuery?.queryKey[0] ?? "");
+      return keepPrevious === true || (typeof keepPrevious === "function" && keepPrevious(previousKey)) ? previous : undefined;
+    },
+    ...options,
+  });
   const { refetch } = query;
 
   const reload = useCallback(() => void refetch(), [refetch]);
@@ -33,6 +47,8 @@ export function useApiData<T>(key: string, load: () => Promise<T>, options: ApiD
     data: query.data,
     error: query.error ? errorMessage(query.error) : undefined,
     loading: query.isFetching,
+    /** Showing the previous key's data while this key loads (see `keepPrevious`). */
+    stale: query.isPlaceholderData,
     reload,
     setData,
   };

@@ -99,7 +99,7 @@ export default function AdminRatingsPage() {
   const [historyOf, setHistoryOf] = useState<RatingRow | null>(null);
   const sideBySide = useMediaQuery(SIDE_BY_SIDE);
   const invalidate = useInvalidate();
-  const ratings = useApiData(`ratings-${month}`, () => pointsApi.ratings(token, month));
+  const ratings = useApiData(`ratings-${month}`, () => pointsApi.ratings(token, month), { keepPrevious: true });
 
   const rows = ratings.data?.hosts;
   const scale = ratings.data?.scale ?? { min: 1, max: 5 };

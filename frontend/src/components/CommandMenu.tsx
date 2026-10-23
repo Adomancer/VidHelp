@@ -51,7 +51,7 @@ export default function CommandMenu({ links, hostSearchPath }: CommandMenuProps)
   useEffect(() => () => clearTimeout(debounce.current), []);
 
   const searchHosts = Boolean(hostSearchPath) && open && query.length >= 2;
-  const hosts = useApiData(`palette-hosts|${query}`, () => operatorApi.hosts(token, { search: [query], page: 1 }), { enabled: searchHosts });
+  const hosts = useApiData(`palette-hosts|${query}`, () => operatorApi.hosts(token, { search: [query], page: 1 }), { enabled: searchHosts, keepPrevious: true });
 
   function type(next: string) {
     setText(next);

@@ -96,7 +96,9 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
   const board = useApiData(`schedule-board|${brandId}|${range.on}|${range.days}`, () =>
     brandId
       ? scheduleApi.list(token, { brand_id: brandId, ...range })
-      : Promise.resolve({ slots: [], backups: [], replacing_events: [] })
+      : Promise.resolve({ slots: [], backups: [], replacing_events: [] }),
+    // Paging through weeks keeps the board up; another brand's slots never show under this one
+    { keepPrevious: (previousKey) => previousKey.startsWith(`schedule-board|${brandId}|`) }
   );
   const hosts = useApiData(`brand-hosts-${brandId}`, () => (brandId ? scheduleApi.brandHosts(token, brandId) : Promise.resolve({ assignments: [] })));
 
@@ -271,7 +273,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           </Button>
         )}
 
-        <Button type="button" onClick={() => setDialog({ kind: "slot", day: mobileDay })} disabled={!brandId} className="ml-auto">
+        <Button type="button" onClick={() => setDialog({ kind: "slot", day: mobileDay })} disabled={!brandId || !hosts.data} className="ml-auto">
           <Plus aria-hidden="true" />
           Tambah slot
         </Button>
