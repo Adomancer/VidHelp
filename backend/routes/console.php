@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Sleep;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -118,3 +119,15 @@ Artisan::command('discord:register-commands', function (DiscordClient $discord, 
 
 // Delete audit rows older than vidhelp.audit.keep_days
 Schedule::command('model:prune', ['--model' => [AuditLog::class]])->dailyAt('01:00');
+
+// Delete sign-ins that can't be used anymore (vidhelp.sessions): past their expires_at, or unused for
+// longer than any role's idle limit (this also clears tokens issued before they got an expiry)
+Schedule::command('sanctum:prune-expired', ['--hours' => 0])->dailyAt('01:10');
+Schedule::call(function () {
+    $cutoff = now()->subHours(collect(config('vidhelp.sessions'))->max('idle_hours'));
+
+    PersonalAccessToken::where(fn ($q) => $q
+        ->where('last_used_at', '<', $cutoff)
+        ->orWhere(fn ($q) => $q->whereNull('last_used_at')->where('created_at', '<', $cutoff)))
+        ->delete();
+})->name('sessions:prune-idle')->dailyAt('01:10');

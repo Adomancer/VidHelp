@@ -166,10 +166,12 @@ function reportState(report: LiveReport | null): { label: string; tone: Tone } {
 
 function SessionCard({ session, metrics, act, now }: { session: LiveSession; metrics: string[]; act: Act; now: Date }) {
   const { token } = useAuth();
-  const settings = useApiData("public-settings", () => settingsApi.public(token)).data?.settings;
+  const settings = useApiData("public-settings", () => settingsApi.public(token));
   const [busy, setBusy] = useState(false);
   const start = new Date(session.start_at);
-  const opensAt = checkInOpensAt(start, settings);
+  const opensAt = checkInOpensAt(start, settings.data?.settings);
+  // Settings that failed to load don't hide check-in: the server still says when it's too early
+  const opensUnknown = !opensAt && (Boolean(settings.error) || now >= start);
   const ended = new Date(session.end_at) <= now;
   const attendance = session.attendance;
   const state = sessionState(session, now);
@@ -220,7 +222,7 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
         !attendance &&
         (ended ? (
           <FormAlert tone="error">Kamu tidak check-in untuk sesi ini.</FormAlert>
-        ) : !opensAt ? null : now < opensAt ? (
+        ) : !opensAt && !opensUnknown ? null : opensAt && now < opensAt ? (
           <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-3 text-sm">
             <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <p className="text-body">

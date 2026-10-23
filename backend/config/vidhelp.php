@@ -96,6 +96,25 @@ return [
         'recovery_codes' => 8,
     ],
 
+    // How long a sign-in lasts: at most `max_hours` after logging in, and it ends early after
+    // `idle_hours` without any request. A user with several roles gets the strictest.
+    'sessions' => [
+        // Admin and finance see KTP, bank accounts and payroll
+        'admin' => [
+            'max_hours' => (int) env('SESSION_ADMIN_MAX_HOURS', 24),
+            'idle_hours' => (int) env('SESSION_ADMIN_IDLE_HOURS', 12),
+        ],
+        'operator' => [
+            'max_hours' => (int) env('SESSION_OPERATOR_MAX_HOURS', 24 * 7),
+            'idle_hours' => (int) env('SESSION_OPERATOR_IDLE_HOURS', 24),
+        ],
+        // Hosts sign in on their phone; logging in often would get in the way of checking in
+        'host' => [
+            'max_hours' => (int) env('SESSION_HOST_MAX_HOURS', 24 * 30),
+            'idle_hours' => (int) env('SESSION_HOST_IDLE_HOURS', 24 * 14),
+        ],
+    ],
+
     'audit' => [
         // Audit rows older than this are deleted daily (0 = keep forever)
         'keep_days' => (int) env('AUDIT_KEEP_DAYS', 365),

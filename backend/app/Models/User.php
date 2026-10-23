@@ -19,6 +19,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable([
@@ -146,12 +147,41 @@ class User extends Authenticatable
     }
 
     /**
-     * Record the login and issue a new API token.
+     * Record the login and issue a new API token, valid for this user's session length (vidhelp.sessions).
      */
     public function issueToken(string $name = 'auth-token'): string
     {
         $this->forceFill(['last_login_at' => now()])->save();
 
-        return $this->createToken($name)->plainTextToken;
+        return $this->createToken($name, ['*'], now()->addHours($this->sessionLimits()['max_hours']))->plainTextToken;
+    }
+
+    /**
+     * How long this user's sign-in lasts, by their strictest role (see vidhelp.sessions).
+     *
+     * @return array{max_hours: int, idle_hours: int}
+     */
+    public function sessionLimits(): array
+    {
+        $level = match (true) {
+            $this->hasAnyRole(['admin', 'finance']) => 'admin',
+            $this->hasRole('operator') => 'operator',
+            default => 'host',
+        };
+
+        return config("vidhelp.sessions.{$level}");
+    }
+
+    /**
+     * Whether `$token` may still be used: younger than the session's max length and used recently
+     * enough, by the user's current roles (so a promotion to admin shortens existing sign-ins, and
+     * tokens issued before these limits existed follow them too).
+     */
+    public function tokenStillValid(PersonalAccessToken $token): bool
+    {
+        ['max_hours' => $max, 'idle_hours' => $idle] = $this->sessionLimits();
+        $lastUsed = $token->last_used_at ?? $token->created_at;
+
+        return $token->created_at->gt(now()->subHours($max)) && $lastUsed->gt(now()->subHours($idle));
     }
 }
