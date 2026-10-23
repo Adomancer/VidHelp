@@ -30,7 +30,8 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
     ({ token, user }) => {
       saveSession(token, user);
       router.replace(homePathFor(user));
-    }
+    },
+    ["challenge_token"]
   );
 
   // Expired or too many wrong codes: the password/Google step has to be done again

@@ -897,7 +897,8 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
     ({ message }, form) => {
       form.reset();
       onDone(message);
-    }
+    },
+    ["hours_added", "sessions_added"]
   );
 
   return (
@@ -916,6 +917,7 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
             </option>
           ))}
         </NativeSelect>
+        <FieldError>{errors.host_id}</FieldError>
       </div>
       <div className="space-y-1.5">
         <p className="text-sm font-medium text-foreground">Tambah atau kurangi</p>
@@ -938,6 +940,7 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
           Sesi <span className="font-normal text-muted-foreground">(opsional)</span>
         </Label>
         <input id={`adjust-sessions-${periodId}`} name="sessions" type="number" min={0} max={50} defaultValue={0} className={cn(inputClass, "w-28 tabular-nums")} />
+        <FieldError>{errors.sessions_added}</FieldError>
       </div>
       <div className="space-y-1.5 sm:col-span-2">
         <Label htmlFor={`adjust-notes-${periodId}`}>Alasan</Label>
@@ -1163,6 +1166,7 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             placeholder="Pilih host…"
           />
           <input type="hidden" name="host_id" value={hostId} />
+          <FieldError>{errors.host_id}</FieldError>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="advance-type">Jenis</Label>
@@ -1170,6 +1174,7 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             <option value="loan">Pinjaman</option>
             <option value="early_payment">Gaji di muka</option>
           </NativeSelect>
+          <FieldError>{errors.type}</FieldError>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="advance-amount">Jumlah</Label>
@@ -1199,6 +1204,7 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             Catatan <span className="font-normal text-muted-foreground">(opsional)</span>
           </Label>
           <input id="advance-notes" name="notes" maxLength={255} className={inputClass} />
+          <FieldError>{errors.notes}</FieldError>
         </div>
         <FormActions loading={loading} submitLabel="Catat kasbon" onCancel={onCancel} />
       </form>

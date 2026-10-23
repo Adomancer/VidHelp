@@ -996,7 +996,8 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
         reason_type: reasonType,
         reason: formValue(data, "reason") || null,
       }),
-    ({ message }) => onDone(message)
+    ({ message }) => onDone(message),
+    ["backup_date"]
   );
 
   return (
@@ -1038,6 +1039,7 @@ function OnBehalfForm({ onDone, onCancel }: { onDone: (message: string) => void;
             Keterangan <span className="font-normal text-muted-foreground">(opsional)</span>
           </Label>
           <input id="on-behalf-reason" name="reason" maxLength={1000} className={inputClass} />
+          <FieldError>{errors.reason}</FieldError>
         </div>
         <FormActions loading={loading} submitLabel="Buka permintaan" onCancel={onCancel} disabled={daySlots.length === 0} />
       </form>

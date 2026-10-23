@@ -376,7 +376,8 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         letter: letter instanceof File && letter.size > 0 ? letter : null,
       });
     },
-    ({ message }) => onDone(message)
+    ({ message }) => onDone(message),
+    ["slot_id", "backup_date", "host_ids"]
   );
 
   // Nothing to request for (yet): no form, so it can't be sent without a session
@@ -463,6 +464,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             Keterangan <span className="font-normal text-muted-foreground">(opsional)</span>
           </Label>
           <textarea id="reason" name="reason" rows={2} maxLength={1000} className={textareaClass} />
+          <FieldError>{errors.reason}</FieldError>
         </div>
 
         <div className="space-y-1.5">

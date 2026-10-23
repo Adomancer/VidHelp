@@ -159,14 +159,19 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
   const host = data.host_profile;
 
   const { loading, errors, error, handleSubmit } = useApiForm(
-    (form) =>
-      hostApi.updateProfile(token, {
-        name: formValue(form, "name"),
-        ...(host && {
-          phone: formValue(form, "phone") || null,
-          guardian_phone: formValue(form, "guardian_phone") || null,
-        }),
-      }),
+    (form) => {
+      if (!host) return hostApi.updateProfile(token, { name: formValue(form, "name") });
+
+      // Only what was edited here: sending an unchanged field would drop that field from a pending
+      // request (the server treats "same as saved" as "never mind"), e.g. a phone change sent earlier
+      // (compared as the fields show them: phone fields keep digits only)
+      const digits = (value: string | null) => (value ?? "").replace(/\D/g, "");
+      const saved = { name: data.user.name, phone: digits(host.phone), guardian_phone: digits(host.guardian_phone) };
+      const changed = (Object.keys(saved) as (keyof typeof saved)[])
+        .map((field) => [field, formValue(form, field).trim()] as const)
+        .filter(([field, value]) => value !== saved[field]);
+      return hostApi.updateProfile(token, Object.fromEntries(changed.map(([field, value]) => [field, value || null])));
+    },
     (updated, form) => {
       // For hosts nothing changed yet: show the saved data again (what was sent is in the request card)
       if (host) form.reset();

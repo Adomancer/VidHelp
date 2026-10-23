@@ -343,7 +343,8 @@ function ViolationForm({ hostId, onDone, onCancel }: FormProps) {
         reason: formValue(data, "reason") || null,
         occurred_on: formValue(data, "occurred_on"),
       }),
-    ({ message }) => onDone(message)
+    ({ message }) => onDone(message),
+    ["violation_type_id"]
   );
 
   return (
@@ -381,10 +382,12 @@ function ViolationForm({ hostId, onDone, onCancel }: FormProps) {
       <div className="space-y-1.5">
         <Label htmlFor="violation-date">Tanggal</Label>
         <DatePicker id="violation-date" name="occurred_on" defaultValue={toDateInput()} max={toDateInput()} />
+        <FieldError>{errors.occurred_on}</FieldError>
       </div>
       <div className="space-y-1.5 sm:col-span-2">
         <Label htmlFor="violation-reason">Kejadiannya</Label>
         <input id="violation-reason" name="reason" maxLength={255} className={inputClass} />
+        <FieldError>{errors.reason}</FieldError>
       </div>
       <FormActions loading={loading} submitLabel="Catat" onCancel={onCancel} />
     </form>
@@ -423,11 +426,12 @@ function ComplaintForm({ hostId, onDone, onCancel }: FormProps) {
             </option>
           ))}
         </NativeSelect>
+        <FieldError>{errors.brand_id}</FieldError>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="complaint-points">Poin yang dipotong</Label>
         <input id="complaint-points" name="points" type="number" min={1} max={100} className={cn(inputClass, "tabular-nums")} />
-        <FieldHint>Kosongkan untuk memakai nilai bawaan.</FieldHint>
+        {errors.points ? <FieldError>{errors.points}</FieldError> : <FieldHint>Kosongkan untuk memakai nilai bawaan.</FieldHint>}
       </div>
       <div className="space-y-1.5 sm:col-span-2">
         <Label htmlFor="complaint-description">Keluhan dari brand</Label>
@@ -437,6 +441,7 @@ function ComplaintForm({ hostId, onDone, onCancel }: FormProps) {
       <div className="space-y-1.5">
         <Label htmlFor="complaint-date">Tanggal</Label>
         <DatePicker id="complaint-date" name="occurred_on" defaultValue={toDateInput()} max={toDateInput()} />
+        <FieldError>{errors.occurred_on}</FieldError>
       </div>
       <FormActions loading={loading} submitLabel="Catat" onCancel={onCancel} />
     </form>
@@ -469,6 +474,7 @@ function WarningForm({ hostId, onDone, onCancel }: FormProps) {
           <option value="2">SP2</option>
           <option value="3">SP3</option>
         </NativeSelect>
+        <FieldError>{errors.level}</FieldError>
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="warning-reason">Alasan</Label>

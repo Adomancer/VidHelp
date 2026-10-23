@@ -25,7 +25,8 @@ export default function ResetPasswordForm() {
         password: formValue(data, "password"),
         password_confirmation: formValue(data, "password_confirmation"),
       }),
-    ({ message }) => setDone(message)
+    ({ message }) => setDone(message),
+    ["email"]
   );
 
   if (!token || !email) {

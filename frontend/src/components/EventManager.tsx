@@ -728,7 +728,8 @@ function EventForm({ event, onDone, onCancel }: { event?: SpecialEvent; onDone: 
       };
       return event ? eventApi.update(token, event.id, payload) : eventApi.create(token, { ...payload, brand_id: formValue(data, "brand_id") });
     },
-    ({ message, event: saved }) => onDone(message, saved.id)
+    ({ message, event: saved }) => onDone(message, saved.id),
+    ["block_minutes"]
   );
   const errors = { ...serverErrors, ...checks };
 

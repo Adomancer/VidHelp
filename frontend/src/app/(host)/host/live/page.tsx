@@ -16,6 +16,7 @@ import { KnowledgeButton } from "@/components/BrandKnowledge";
 import Card from "@/components/Card";
 import DurationInput from "@/components/DurationInput";
 import EmptyState from "@/components/EmptyState";
+import { FieldError } from "@/components/FieldMessage";
 import ErrorState from "@/components/ErrorState";
 import FormAlert from "@/components/FormAlert";
 import { CardsSkeleton } from "@/components/Loading";
@@ -368,7 +369,8 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
       };
       return liveApi.report(token, attendance.id, input);
     },
-    (result) => act(async () => result)
+    (result) => act(async () => result),
+    ["duration_hours", "metrics"]
   );
 
   return (
@@ -411,8 +413,11 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
           rows={3}
           placeholder="Masalah atau gangguan selama live"
           defaultValue={report?.notes ?? ""}
+          maxLength={2000}
+          aria-invalid={errors.notes ? true : undefined}
           className={textareaClass}
         />
+        <FieldError>{errors.notes}</FieldError>
       </div>
       <div className="flex justify-end">
         <SubmitButton loading={loading} className="sm:w-auto">
