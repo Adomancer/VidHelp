@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BookOpen, Download, FileImage, FileSpreadsheet, FileText, Loader2, Trash2, Upload } from "lucide-react";
 import { errorMessage, fieldErrors, hostApi, knowledgeApi, saveObjectUrl, showInTab, type KnowledgeFile } from "@/lib/api";
+import { acceptOf, KNOWLEDGE_UPLOAD, uploadProblem } from "@/lib/files";
 import { formatDateTime } from "@/lib/format";
 import { richTextClass } from "@/lib/richText";
 import { useApiData } from "@/lib/useApiData";
@@ -20,8 +21,6 @@ import RichTextEditor from "./RichTextEditor";
 import { notify } from "./Toast";
 
 /** What the upload picker offers; the API refuses anything else (and files over 20 MB). */
-const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx";
-
 /**
  * A brand's product knowledge: the text, then the files the brand sent, or a note that there is
  * none yet. `fileUrl` loads one file as an object URL.
@@ -211,6 +210,11 @@ export function KnowledgeEditor({ brand, onClose }: { brand: { id: string; name:
     setUploadErrors([]);
     for (const [index, file] of files.entries()) {
       setUploading({ done: index, total: files.length });
+      const problem = uploadProblem(file, KNOWLEDGE_UPLOAD);
+      if (problem) {
+        failed.push(`${file.name}: ${problem}`);
+        continue;
+      }
       try {
         await knowledgeApi.upload(token, brand.id, file);
       } catch (caught) {
@@ -275,7 +279,7 @@ export function KnowledgeEditor({ brand, onClose }: { brand: { id: string; name:
                   <input
                     type="file"
                     multiple
-                    accept={ACCEPT}
+                    accept={acceptOf(KNOWLEDGE_UPLOAD)}
                     className="sr-only"
                     disabled={Boolean(uploading)}
                     onChange={(event) => {

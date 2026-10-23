@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Camera, Clock, Crown, LogOut, XCircle } from "lucide-react";
 import { errorMessage, hostApi, type MyProfile, type MyProfileChange } from "@/lib/api";
+import { acceptOf, PHOTO_UPLOAD, uploadProblem } from "@/lib/files";
 import { formatDate, formatTenure } from "@/lib/format";
 import { roleLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
@@ -99,10 +100,14 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function upload(file: File | undefined) {
+  async function upload(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    input.value = ""; // picking the same file again (after an error) must fire onChange again
     if (!file) return;
+    const problem = uploadProblem(file, PHOTO_UPLOAD);
+    setError(problem);
+    if (problem) return;
     setUploading(true);
-    setError(null);
     try {
       onUpdated(await hostApi.uploadPhoto(token, file));
       notify({ text: "Foto profil diperbarui" });
@@ -127,7 +132,7 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
             <Camera className="size-3.5" aria-hidden="true" />
           </span>
           <span className="sr-only">{uploading ? "Mengunggah foto…" : "Ganti foto profil"}</span>
-          <input type="file" accept="image/*" className="sr-only" disabled={uploading} onChange={(event) => upload(event.target.files?.[0])} />
+          <input type="file" accept={acceptOf(PHOTO_UPLOAD)} className="sr-only" disabled={uploading} onChange={(event) => upload(event.target)} />
         </label>
         <div className="min-w-0 space-y-1.5">
           <div>

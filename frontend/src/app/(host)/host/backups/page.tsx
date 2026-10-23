@@ -12,6 +12,7 @@ import {
   type BackupRequest,
   type BackupRequestType,
 } from "@/lib/api";
+import { acceptOf, LETTER_UPLOAD, uploadProblem } from "@/lib/files";
 import { formatDateTime, formatDuration, formatWindow } from "@/lib/format";
 import { textareaClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
@@ -307,11 +308,15 @@ function MineTab({ requests, act, onNew }: { requests?: BackupRequest[]; act: Ac
                     {backup.letter_status === "uploaded" ? "Ganti surat" : "Unggah surat"}
                     <input
                       type="file"
-                      accept="image/*,application/pdf"
+                      accept={acceptOf(LETTER_UPLOAD)}
                       className="sr-only"
                       onChange={(event) => {
                         const file = event.target.files?.[0];
-                        if (file) act(() => hostBackupApi.uploadLetter(token, backup.id, file));
+                        event.target.value = "";
+                        if (!file) return;
+                        const problem = uploadProblem(file, LETTER_UPLOAD);
+                        if (problem) notify({ text: problem, tone: "error" });
+                        else act(() => hostBackupApi.uploadLetter(token, backup.id, file));
                       }}
                     />
                   </label>
@@ -358,6 +363,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
   const [requestType, setRequestType] = useState<BackupRequestType>("open");
   const [pickedOccurrence, setPickedOccurrence] = useState("");
   const [hostIds, setHostIds] = useState<string[]>([]);
+  const [letterProblem, setLetterProblem] = useState<string | null>(null);
 
   const firstSlot = slots.data?.slots[0];
   const occurrence = pickedOccurrence || (firstSlot ? `${firstSlot.slot_id}|${firstSlot.date}` : "");
@@ -475,11 +481,17 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
             id="letter"
             name="letter"
             type="file"
-            accept="image/*,application/pdf"
+            accept={acceptOf(LETTER_UPLOAD)}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              const problem = file ? uploadProblem(file, LETTER_UPLOAD) : null;
+              if (problem) event.target.value = "";
+              setLetterProblem(problem);
+            }}
             className="block w-full rounded-lg border border-dashed border-input bg-muted/40 p-2 text-sm text-body file:mr-3 file:rounded-md file:border-0 file:bg-card file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:shadow-xs"
           />
-          {errors.letter ? (
-            <FieldError>{errors.letter}</FieldError>
+          {errors.letter || letterProblem ? (
+            <FieldError>{errors.letter ?? letterProblem}</FieldError>
           ) : (
             reasonType === "sick" &&
             settings && (
