@@ -195,6 +195,25 @@ export function fieldErrors(error: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(errors).map(([field, messages]) => [field, messages[0]]));
 }
 
+/**
+ * A failed request, split for a form: `fields` holds Laravel's per-field messages, and `message` what the
+ * form should say on top: the server's message when no field is to blame, or the first validation
+ * message for a key the form doesn't show next to a field (`shown` says which keys it does), so a
+ * failed save is never silent. `message` is null when the fields say it all.
+ */
+export function splitApiError(error: unknown, shown: (key: string) => boolean = () => true): { fields: Record<string, string>; message: string | null } {
+  const fields = fieldErrors(error);
+  const keys = Object.keys(fields);
+  if (keys.length === 0) return { fields, message: errorMessage(error) };
+  const hidden = keys.find((key) => !shown(key));
+  return { fields, message: hidden ? fields[hidden] : null };
+}
+
+/** For `splitApiError`: shown when the key (or its base, `ranges.0.start` → `ranges`) is one of `keys`. */
+export function shownKeys(...keys: string[]): (key: string) => boolean {
+  return (key) => keys.includes(key) || keys.includes(key.split(".")[0]);
+}
+
 /** The request gave up waiting (see `timeout`). */
 export function isTimeout(error: unknown): boolean {
   return error instanceof DOMException && error.name === "TimeoutError";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight, Megaphone, Search, Star } from "lucide-react";
-import { errorMessage, fieldErrors, operatorBackupApi, type BackupReason, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
+import { operatorBackupApi, shownKeys, splitApiError, type BackupReason, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
 import { toDateInput } from "@/lib/format";
 import { describeTimes, formatDayDate, upcomingDates } from "@/lib/schedule";
 import { inputSmClass, textareaClass } from "@/lib/ui";
@@ -84,8 +84,8 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
         undo: () => operatorBackupApi.cancel(token, request.id),
       });
     } catch (caught) {
-      const fields = fieldErrors(caught);
-      setError(fields.host_id ?? fields.backup_date ?? errorMessage(caught));
+      const { fields, message } = splitApiError(caught, shownKeys("host_id", "backup_date"));
+      setError(message ?? fields.host_id ?? fields.backup_date);
       setSaving(false);
     }
   }

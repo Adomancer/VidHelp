@@ -3,18 +3,7 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, CalendarClock, CalendarX2, ChevronRight, Clock, Moon, Plus, Ticket, Trash2 } from "lucide-react";
-import {
-  errorMessage,
-  fieldErrors,
-  scheduleApi,
-  type AvailabilityRange,
-  type BackupNeed,
-  type DayOfWeek,
-  type MyEventClaim,
-  type ReplacingEvent,
-  type ScheduleSlot,
-  type SlotBackupMarker,
-} from "@/lib/api";
+import { errorMessage, scheduleApi, shownKeys, splitApiError, type AvailabilityRange, type BackupNeed, type DayOfWeek, type MyEventClaim, type ReplacingEvent, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
 import { appDate, appMinutes, appMoment, DAYS, dayWord, formatClock, formatDate, isoWeekday, previousDay, toDateInput } from "@/lib/format";
 import { addDays, durationMinutes, formatDayDate, inEffectOn, toMinutes, weekStart } from "@/lib/schedule";
 import { inputSmClass } from "@/lib/ui";
@@ -578,7 +567,9 @@ function AvailabilityEditor() {
       setStatus(null);
       notify({ text: result.message });
     } catch (caught) {
-      setStatus({ text: errorMessage(caught), errors: fieldErrors(caught) });
+      // Range errors are marked on their rows; the text sums them up
+      const { fields, message } = splitApiError(caught, shownKeys("ranges"));
+      setStatus({ text: message ?? errorMessage(caught), errors: fields });
     } finally {
       setSaving(false);
     }

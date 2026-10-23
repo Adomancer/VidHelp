@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { errorMessage, fieldErrors } from "./api";
+import { splitApiError } from "./api";
 
 /**
  * True if the form shows the validation error for `key` next to a field: a named control in the form
@@ -44,11 +44,9 @@ export function useApiForm<T>(
     try {
       onSuccess(await submit(new FormData(form)), form);
     } catch (caught) {
-      const fields = fieldErrors(caught);
+      const { fields, message } = splitApiError(caught, (key) => shownInForm(form, key, shown));
       setErrors(fields);
-      const hidden = Object.keys(fields).find((key) => !shownInForm(form, key, shown));
-      if (Object.keys(fields).length === 0) setError(errorMessage(caught));
-      else if (hidden) setError(fields[hidden]);
+      setError(message);
     } finally {
       setLoading(false);
     }

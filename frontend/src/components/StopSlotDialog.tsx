@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { errorMessage, fieldErrors, scheduleApi, type ScheduleSlot } from "@/lib/api";
+import { scheduleApi, shownKeys, splitApiError, type ScheduleSlot } from "@/lib/api";
 import { toDateInput } from "@/lib/format";
 import { describeWeekly, formatLongDate, laterDate } from "@/lib/schedule";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,8 @@ export default function StopSlotDialog({ slot, week, onClose, onSaved }: StopSlo
             : scheduleApi.update(token, slot.id, { effective_to }),
       });
     } catch (caught) {
-      setError(fieldErrors(caught).from ?? errorMessage(caught));
+      const { fields, message } = splitApiError(caught, shownKeys("from"));
+      setError(message ?? fields.from);
       setSaving(false);
     }
   }

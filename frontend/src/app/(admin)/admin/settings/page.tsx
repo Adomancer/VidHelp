@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw } from "lucide-react";
-import { errorMessage, fieldErrors, settingsApi, type Setting, type SettingGroup, type SettingValue } from "@/lib/api";
+import { settingsApi, shownKeys, splitApiError, type Setting, type SettingGroup, type SettingValue } from "@/lib/api";
 import { TWO_FACTOR_SETUP_PATH } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { inputSmClass } from "@/lib/ui";
@@ -115,9 +115,9 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
       }
       onSaved(result.groups, result.message);
     } catch (caught) {
-      const fields = fieldErrors(caught);
+      const { fields, message } = splitApiError(caught, shownKeys(...all.map((setting) => setting.key)));
       setErrors(fields);
-      if (Object.keys(fields).length === 0) setError(errorMessage(caught));
+      setError(message);
     } finally {
       setSaving(false);
     }

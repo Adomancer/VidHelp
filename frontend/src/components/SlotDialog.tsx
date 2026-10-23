@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Moon } from "lucide-react";
-import { errorMessage, fieldErrors, scheduleApi, type BrandHost, type ScheduleSlot, type SlotConflict, type SlotInput } from "@/lib/api";
+import { scheduleApi, shownKeys, splitApiError, type BrandHost, type ScheduleSlot, type SlotConflict, type SlotInput } from "@/lib/api";
 import { DAYS, isoWeekday, nextDay, previousDay, toDateInput } from "@/lib/format";
 import {
   addDays,
@@ -231,9 +231,12 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
         });
       }
     } catch (caught) {
-      const fields = fieldErrors(caught);
+      const { fields, message } = splitApiError(
+        caught,
+        shownKeys("assignment_id", "day_of_week", "days_of_week", "start_time", "end_time", "apply_from", "effective_from", "effective_to")
+      );
       setErrors(fields);
-      if (Object.keys(fields).length === 0) setError(errorMessage(caught));
+      setError(message);
       setSaving(false);
     }
   }

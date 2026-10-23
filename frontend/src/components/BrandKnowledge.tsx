@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BookOpen, Download, FileImage, FileSpreadsheet, FileText, Loader2, Trash2, Upload } from "lucide-react";
-import { errorMessage, fieldErrors, hostApi, knowledgeApi, saveObjectUrl, showInTab, type KnowledgeFile } from "@/lib/api";
+import { errorMessage, hostApi, knowledgeApi, saveObjectUrl, showInTab, shownKeys, splitApiError, type KnowledgeFile } from "@/lib/api";
 import { acceptOf, KNOWLEDGE_UPLOAD, uploadProblem } from "@/lib/files";
 import { formatDateTime } from "@/lib/format";
 import { richTextClass } from "@/lib/richText";
@@ -197,7 +197,8 @@ export function KnowledgeEditor({ brand, onClose }: { brand: { id: string; name:
       setDraft(null);
       notify({ text: "Product knowledge disimpan" });
     } catch (caught) {
-      setTextError(fieldErrors(caught).product_knowledge ?? errorMessage(caught));
+      const { fields, message } = splitApiError(caught, shownKeys("product_knowledge"));
+      setTextError(message ?? fields.product_knowledge);
     } finally {
       setSaving(false);
     }
@@ -218,7 +219,8 @@ export function KnowledgeEditor({ brand, onClose }: { brand: { id: string; name:
       try {
         await knowledgeApi.upload(token, brand.id, file);
       } catch (caught) {
-        failed.push(`${file.name}: ${fieldErrors(caught).file ?? errorMessage(caught)}`);
+        const { fields, message } = splitApiError(caught, shownKeys("file"));
+        failed.push(`${file.name}: ${message ?? fields.file}`);
       }
     }
     setUploading(null);
