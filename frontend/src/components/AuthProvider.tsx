@@ -4,8 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { authApi, type AuthUser, type RoleName } from "@/lib/api";
+import { authApi, onSessionProblem, type AuthUser, type RoleName } from "@/lib/api";
 import { clearSession, hasAnyRole, homePathFor, loadSession, saveSession, TWO_FACTOR_SETUP_PATH } from "@/lib/auth";
+import { notify } from "./Toast";
 
 interface AuthContextValue {
   user: AuthUser;
@@ -71,6 +72,33 @@ export function RequireAuth({
       cancelled = true;
     };
   }, [router, queryClient, rolesKey, allowTwoFactorSetup]);
+
+  // The token can die while the page is open (password reset, account deactivated, signed out in another
+  // tab, 2FA reset by an admin). The first request that finds out ends the session here: no more cached
+  // data or polling with a dead token.
+  const sessionToken = session?.token;
+
+  useEffect(() => {
+    if (!sessionToken) return;
+    let ended = false;
+
+    return onSessionProblem(({ reason, token, message }) => {
+      if (ended || token !== sessionToken) return; // already handled, or a late answer for an earlier session
+
+      if (reason === "two-factor") {
+        if (!allowTwoFactorSetup) router.replace(TWO_FACTOR_SETUP_PATH);
+        return;
+      }
+
+      ended = true;
+      setSession(null);
+      clearSession();
+      queryClient.clear();
+      cacheToken = null;
+      notify({ text: message && message !== "Unauthenticated." ? message : "Sesi kamu sudah berakhir. Silakan masuk lagi.", tone: "error" });
+      router.replace("/login");
+    });
+  }, [router, queryClient, allowTwoFactorSetup, sessionToken]);
 
   const setUser = useCallback((user: AuthUser) => {
     setSession((current) => {

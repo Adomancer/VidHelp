@@ -20,6 +20,30 @@ export function onDataChanged(listener: (() => void) | null) {
 }
 
 /**
+ * Why a signed-in request was refused for the session as a whole: the token is gone (logged out,
+ * password reset, account deactivated/archived) or an admin must set up 2FA again.
+ */
+export type SessionProblem = { reason: "signed-out" | "two-factor"; token: string; message: string };
+
+let sessionListener: ((problem: SessionProblem) => void) | null = null;
+
+/** Be told when a signed-in request shows the session can't be used anymore (see `SessionProblem`). Returns the unsubscribe. */
+export function onSessionProblem(listener: (problem: SessionProblem) => void): () => void {
+  sessionListener = listener;
+  return () => {
+    if (sessionListener === listener) sessionListener = null;
+  };
+}
+
+/** 401: token unknown or revoked. 403 with `code`/`status`: the auth middleware refusing the user, not one action. */
+function sessionProblem(status: number, error: { message?: string; code?: string; status?: string }): SessionProblem["reason"] | null {
+  if (status === 401) return "signed-out";
+  if (status === 403 && error.code === "two_factor_setup_required") return "two-factor";
+  if (status === 403 && typeof error.status === "string" && error.status !== "active") return "signed-out";
+  return null;
+}
+
+/**
  * Send a request to the Laravel backend with auth token injection.
  * FormData bodies (file uploads) are sent as multipart; everything else as JSON.
  */
@@ -49,6 +73,8 @@ async function request(endpoint: string, options: FetchOptions = {}): Promise<Re
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    const problem = token ? sessionProblem(response.status, error) : null;
+    if (problem && token) sessionListener?.({ reason: problem, token, message: error.message ?? "" });
     throw new ApiError(response.status, error.message || "Permintaan ke server gagal", error);
   }
 
