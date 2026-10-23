@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
+import { headers } from "next/headers";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import QueryProvider from "@/components/QueryProvider";
 import { Toaster } from "@/components/ui/sonner";
@@ -18,11 +19,14 @@ export const metadata: Metadata = {
   description: "Platform manajemen agensi host live streaming",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Set by src/proxy.ts; the Content-Security-Policy only runs inline scripts carrying it
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="id" className={`${jakarta.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="min-h-full flex flex-col font-sans">
         <QueryProvider>
