@@ -129,8 +129,9 @@ class SettingsService
         ],
     ];
 
-    /** Settings any signed-in user may read (the numbers shown in help texts). */
+    /** Settings any signed-in user may read (the numbers shown in help texts, when check-in opens). */
     public const PUBLIC_KEYS = [
+        'attendance.check_in_opens_minutes',
         'backup.request_min_hours_before',
         'backup.direct_min_hosts',
         'backup.direct_max_hosts',

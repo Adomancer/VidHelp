@@ -1,10 +1,14 @@
 /** Check-in/out, live reports, and reviewing them. */
 
+import type { PublicSettings } from "./admin";
 import { api, type Message, type Paginated, post, query } from "./client";
 import type { HostWithUser } from "./hosts";
 
-/** Minutes before the start that check-in opens (matches the backend default). */
-export const CHECK_IN_OPENS_MINUTES = 60;
+/** When check-in opens for a session starting at `start` (an admin setting), or null until the settings have loaded. */
+export function checkInOpensAt(start: Date, settings: PublicSettings | undefined): Date | null {
+  const minutes = settings?.["attendance.check_in_opens_minutes"];
+  return minutes === undefined ? null : new Date(start.getTime() - minutes * 60_000);
+}
 
 export type ReportStatus = "submitted" | "flagged" | "approved" | "rejected";
 

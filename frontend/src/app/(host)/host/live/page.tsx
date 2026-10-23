@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Check, Clock, LogIn, LogOut, Radio, RefreshCw } from "lucide-react";
-import { CHECK_IN_OPENS_MINUTES, errorMessage, liveApi, type Attendance, type LiveReport, type LiveSession, type ReportInput } from "@/lib/api";
+import { checkInOpensAt, errorMessage, liveApi, settingsApi, type Attendance, type LiveReport, type LiveSession, type ReportInput } from "@/lib/api";
 import { formatClock, formatDateTime, formatWindow } from "@/lib/format";
 import { FLAG_REASONS, metricLabel, METRIC_LABELS } from "@/lib/reportFields";
 import { textareaClass } from "@/lib/ui";
@@ -157,9 +157,10 @@ function reportState(report: LiveReport | null): { label: string; tone: Tone } {
 
 function SessionCard({ session, metrics, act, now }: { session: LiveSession; metrics: string[]; act: Act; now: Date }) {
   const { token } = useAuth();
+  const settings = useApiData("public-settings", () => settingsApi.public(token)).data?.settings;
   const [busy, setBusy] = useState(false);
   const start = new Date(session.start_at);
-  const opensAt = new Date(start.getTime() - CHECK_IN_OPENS_MINUTES * 60_000);
+  const opensAt = checkInOpensAt(start, settings);
   const ended = new Date(session.end_at) <= now;
   const attendance = session.attendance;
   const state = sessionState(session, now);
@@ -208,7 +209,7 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
         !attendance &&
         (ended ? (
           <FormAlert tone="error">Kamu tidak check-in untuk sesi ini.</FormAlert>
-        ) : now < opensAt ? (
+        ) : !opensAt ? null : now < opensAt ? (
           <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-muted/50 px-4 py-3 text-sm">
             <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             <p className="text-body">

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, ArrowRight, CalendarDays, Flag, Layers, LogIn, LogOut, RefreshCw, Star, Ticket, Wallet } from "lucide-react";
-import { CHECK_IN_OPENS_MINUTES, dashboardApi, errorMessage, liveApi, type HostDashboard, type HostDashboardSession, type SessionState } from "@/lib/api";
+import { checkInOpensAt, dashboardApi, errorMessage, liveApi, settingsApi, type HostDashboard, type HostDashboardSession, type SessionState } from "@/lib/api";
 import { compactHours, compactRupiah, dayWord, formatClock, formatDuration, formatRupiah, formatShortDate, toDateInput } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { timeUntil, useNow } from "@/lib/useNow";
@@ -173,6 +173,7 @@ const focusStyles = {
 
 function NextUp({ sessions, now, onChanged, className }: { sessions: HostDashboardSession[]; now: Date; onChanged: () => void; className?: string }) {
   const { token } = useAuth();
+  const settings = useApiData("public-settings", () => settingsApi.public(token)).data?.settings;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const focus = focusOf(sessions, now);
@@ -211,8 +212,8 @@ function NextUp({ sessions, now, onChanged, className }: { sessions: HostDashboa
   const style = focusStyles[state];
   const start = new Date(session.start_at);
   const end = new Date(session.end_at);
-  const opensAt = new Date(start.getTime() - CHECK_IN_OPENS_MINUTES * 60_000);
-  const canCheckIn = state === "late" || (state === "upcoming" && opensAt <= now);
+  const opensAt = checkInOpensAt(start, settings);
+  const canCheckIn = state === "late" || (state === "upcoming" && opensAt !== null && opensAt <= now);
   const elapsed = Math.min(100, Math.max(0, ((now.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100));
   const later = sessions.find((candidate) => candidate !== session && candidate.start_at > session.start_at && stateNow(candidate, now) === "upcoming");
 
@@ -271,7 +272,7 @@ function NextUp({ sessions, now, onChanged, className }: { sessions: HostDashboa
                 <LogIn aria-hidden="true" />
                 {busy ? "Memproses…" : "Check-in sekarang"}
               </Button>
-            ) : dayWord(opensAt.toISOString(), now) === "Hari ini" ? (
+            ) : opensAt && dayWord(opensAt.toISOString(), now) === "Hari ini" ? (
               <span className="flex flex-1 items-center gap-1 rounded-lg border border-dashed border-border px-3 text-xs text-muted-foreground sm:flex-none">
                 Check-in dibuka <span className="font-medium text-body tabular-nums">{formatClock(opensAt)}</span>
               </span>

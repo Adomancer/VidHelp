@@ -91,6 +91,8 @@ export interface SettingGroup {
 
 /** Rule numbers shown in help texts, readable by every signed-in user. */
 export interface PublicSettings {
+  /** Check-in opens this many minutes before a session starts. */
+  "attendance.check_in_opens_minutes": number;
   "backup.request_min_hours_before": number;
   "backup.direct_min_hosts": number;
   "backup.direct_max_hosts": number;
