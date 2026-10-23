@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CalendarDays, Check, Clock, LogIn, LogOut, Radio, RefreshCw } from "lucide-react";
 import { checkInOpensAt, errorMessage, liveApi, settingsApi, type Attendance, type LiveReport, type LiveSession, type ReportInput } from "@/lib/api";
-import { formatClock, formatDateTime, formatWindow } from "@/lib/format";
+import { formatClock, formatDateTime, formatFullDay, formatWindow } from "@/lib/format";
 import { FLAG_REASONS, metricLabel, METRIC_LABELS } from "@/lib/reportFields";
 import { textareaClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
@@ -59,7 +59,7 @@ export default function HostLivePage() {
     <div className="space-y-6">
       <PageHeader
         title="Live"
-        description={now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long" })}
+        description={formatFullDay(now, false)}
         actions={
           <Button type="button" variant="outline" onClick={live.reload} disabled={live.loading}>
             <RefreshCw className={cn(live.loading && "animate-spin")} aria-hidden="true" />

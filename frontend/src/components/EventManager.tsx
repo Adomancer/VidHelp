@@ -6,7 +6,7 @@ import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, RotateCcw, Ticket, Trash2 } from "lucide-react";
 import { errorMessage, eventApi, operatorApi, scheduleApi, type BrandHost, type EventBlock, type EventInput, type EventListItem, type SpecialEvent } from "@/lib/api";
 import { groupByDay } from "@/lib/events";
-import { formatClock, formatDay, formatDuration, formatShortDate, toDateInput } from "@/lib/format";
+import { appDate, formatClock, formatDay, formatDuration, formatShortDate, toDateInput } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { useNow } from "@/lib/useNow";
@@ -371,7 +371,7 @@ function Summary({
   onDelete: () => void;
   refresh: () => Promise<unknown>;
 }) {
-  const today = toDateInput(now);
+  const today = appDate(now);
   const claimed = blocks.filter((block) => block.claim).length;
   const open = blocks.filter((block) => statusOf(block, now) === "open").length;
   const running = days.filter((day) => day <= today).length;

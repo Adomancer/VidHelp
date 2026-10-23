@@ -1,3 +1,35 @@
+/**
+ * The agency runs on WIB: the backend stores and compares times in Asia/Jakarta and slot times
+ * ("14:00") are WIB. Moments from the server (ISO, in UTC) are shown in WIB too, whatever the
+ * device's time zone, so a phone set to WITA shows the same hours as the schedule.
+ */
+export const APP_TIME_ZONE = "Asia/Jakarta";
+
+const appDateFormat = new Intl.DateTimeFormat("en-CA", { timeZone: APP_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const appTimeFormat = new Intl.DateTimeFormat("en-GB", { timeZone: APP_TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/** The WIB date ("YYYY-MM-DD") of a moment; today's by default. */
+export function appDate(moment: Date | string = new Date()): string {
+  return appDateFormat.format(new Date(moment));
+}
+
+/** The moment a WIB wall-clock time happens, e.g. a slot's "2026-10-06" + "14:00" (WIB is UTC+7 all year). */
+export function appMoment(date: string, time = "00:00"): Date {
+  return new Date(`${date}T${time.slice(0, 5)}:00+07:00`);
+}
+
+/** Minutes since WIB midnight of a moment, e.g. 14:30 → 870. */
+export function appMinutes(moment: Date | string = new Date()): number {
+  const [hours, minutes] = appTimeFormat.format(new Date(moment)).split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+/** True if this device's clock isn't on WIB right now (times on screen then differ from its own clock). */
+export function deviceOutsideAppTimeZone(): boolean {
+  const now = new Date();
+  return appMinutes(now) !== now.getHours() * 60 + now.getMinutes() || appDate(now) !== toDateInput(now);
+}
+
 const rupiah = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 });
 
 /** 15000 → "Rp 15.000" */
@@ -5,9 +37,14 @@ export function formatRupiah(value: string | number): string {
   return rupiah.format(Number(value));
 }
 
-/** "2026-09-28" → "28 Sep 2026" */
+/** "2026-09-28" (or a moment) → "28 Sep 2026" */
 export function formatDate(value: string): string {
-  return new Date(value).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: APP_TIME_ZONE });
+}
+
+/** Today (or `moment`) in full for page headers, e.g. "Jumat, 23 Oktober 2026" (WIB). */
+export function formatFullDay(moment: Date = new Date(), withYear = true): string {
+  return moment.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", ...(withYear && { year: "numeric" }), timeZone: APP_TIME_ZONE });
 }
 
 /** "1 Okt 2026 – 28 Okt 2026", or "1 Okt 2026 – sekarang" while a pay period still runs. */
@@ -36,13 +73,17 @@ export const DAYS = [
   { value: 7, short: "Min", long: "Minggu" },
 ] as const;
 
-/** ISO weekday (1 = Monday ... 7 = Sunday) of a local date. */
-export function isoWeekday(date: Date = new Date()): number {
+/** ISO weekday (1 = Monday ... 7 = Sunday) of a calendar date (local fields); today's in WIB by default. */
+export function isoWeekday(date: Date = new Date(`${appDate()}T00:00`)): number {
   return ((date.getDay() + 6) % 7) + 1;
 }
 
-/** Local date as "YYYY-MM-DD" (toISOString would shift it to UTC). */
-export function toDateInput(date: Date = new Date()): string {
+/**
+ * A calendar date (a Date built from local fields, e.g. a picked day or date arithmetic) as "YYYY-MM-DD";
+ * without one, today in WIB. For a moment from the server use `appDate`.
+ */
+export function toDateInput(date?: Date): string {
+  if (!date) return appDate();
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
@@ -74,24 +115,24 @@ export function carriedInto<T extends { day_of_week: number; crosses_midnight: b
   return slots.filter((slot) => slot.crosses_midnight && slot.day_of_week === previousDay(day));
 }
 
-/** "2026-10-06T07:00:00Z" → "Tue 6 Oct" (local time) */
+/** "2026-10-06T07:00:00Z" → "Sel, 6 Okt" (WIB) */
 export function formatDay(iso: string): string {
-  return new Date(iso).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short", timeZone: APP_TIME_ZONE });
 }
 
-/** "14:00" (local time), with a colon like slot times (id-ID would give "14.00") */
+/** "14:00" (WIB), with a colon like slot times (id-ID would give "14.00") */
 export function formatClock(value: string | Date): string {
-  return new Date(value).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":");
+  return new Date(value).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: APP_TIME_ZONE }).replace(".", ":");
 }
 
-/** "Tue 6 Oct, 14:00–16:00" or "Tue 6 Oct, 23:00 – Wed 02:00" */
+/** "Sel 6 Okt, 14:00–16:00" or "Sel 6 Okt, 23:00 – Rab 02:00" (WIB) */
 export function formatWindow(startIso: string, endIso: string): string {
-  const sameDay = new Date(startIso).toDateString() === new Date(endIso).toDateString();
-  const end = sameDay ? formatClock(endIso) : ` ${new Date(endIso).toLocaleDateString("id-ID", { weekday: "short" })} ${formatClock(endIso)}`;
+  const sameDay = appDate(startIso) === appDate(endIso);
+  const end = sameDay ? formatClock(endIso) : ` ${new Date(endIso).toLocaleDateString("id-ID", { weekday: "short", timeZone: APP_TIME_ZONE })} ${formatClock(endIso)}`;
   return `${formatDay(startIso)}, ${formatClock(startIso)}${sameDay ? "–" : " –"}${end}`;
 }
 
-/** "Tue 6 Oct, 14:00" (local time) */
+/** "Sel 6 Okt, 14:00" (WIB) */
 export function formatDateTime(iso: string): string {
   return `${formatDay(iso)}, ${formatClock(iso)}`;
 }
@@ -151,12 +192,11 @@ export function formatRelative(iso: string, now: Date = new Date()): string {
   return formatDateTime(iso);
 }
 
-/** "Hari ini", "Besok", or "Sel, 13 Okt" for a moment (ISO) or a date ("YYYY-MM-DD"). */
+/** "Hari ini", "Besok", or "Sel, 13 Okt" for a moment (ISO) or a date ("YYYY-MM-DD"), by the WIB calendar. */
 export function dayWord(value: string, now: Date = new Date()): string {
-  const day = new Date(value.length === 10 ? `${value}T00:00` : value);
-  const start = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const diff = Math.round((start(day) - start(now)) / 86_400_000);
+  const day = value.length === 10 ? value : appDate(value);
+  const diff = Math.round((Date.parse(`${day}T00:00Z`) - Date.parse(`${appDate(now)}T00:00Z`)) / 86_400_000);
   if (diff === 0) return "Hari ini";
   if (diff === 1) return "Besok";
-  return day.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
+  return new Date(`${day}T00:00`).toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
 }

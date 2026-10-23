@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { errorMessage, operatorBackupApi, scheduleApi, showInTab, type BackupCandidate, type BackupReason, type BackupRequest } from "@/lib/api";
-import { formatClock, formatDateTime, formatDay, formatDuration, formatTimeRange, formatWindow, isoWeekday, toDateInput } from "@/lib/format";
+import { APP_TIME_ZONE, formatClock, formatDateTime, formatDay, formatDuration, formatTimeRange, formatWindow, isoWeekday, toDateInput } from "@/lib/format";
 import { inputClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
@@ -646,11 +646,12 @@ function Recap({
 /** "Sab", "17", "Okt" in a tile, like a calendar page. */
 function DateTile({ iso }: { iso: string }) {
   const date = new Date(iso);
+  const part = (options: Intl.DateTimeFormatOptions) => date.toLocaleDateString("id-ID", { ...options, timeZone: APP_TIME_ZONE });
   return (
     <span className="flex w-14 shrink-0 flex-col items-center self-start rounded-lg border border-border bg-muted/40 py-1.5 leading-tight" aria-hidden="true">
-      <span className="text-[11px] font-medium text-muted-foreground uppercase">{date.toLocaleDateString("id-ID", { weekday: "short" })}</span>
-      <span className="text-xl font-semibold text-foreground tabular-nums">{date.getDate()}</span>
-      <span className="text-[11px] text-muted-foreground">{date.toLocaleDateString("id-ID", { month: "short" })}</span>
+      <span className="text-[11px] font-medium text-muted-foreground uppercase">{part({ weekday: "short" })}</span>
+      <span className="text-xl font-semibold text-foreground tabular-nums">{part({ day: "numeric" })}</span>
+      <span className="text-[11px] text-muted-foreground">{part({ month: "short" })}</span>
     </span>
   );
 }

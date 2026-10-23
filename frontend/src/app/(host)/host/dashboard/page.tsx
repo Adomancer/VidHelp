@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, ArrowRight, CalendarDays, Flag, Layers, LogIn, LogOut, RefreshCw, Star, Ticket, Wallet } from "lucide-react";
 import { checkInOpensAt, dashboardApi, errorMessage, liveApi, settingsApi, type HostDashboard, type HostDashboardSession, type SessionState } from "@/lib/api";
-import { compactHours, compactRupiah, dayWord, formatClock, formatDuration, formatRupiah, formatShortDate, toDateInput } from "@/lib/format";
+import { appDate, compactHours, compactRupiah, dayWord, formatClock, formatDuration, formatFullDay, formatRupiah, formatShortDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { timeUntil, useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
@@ -88,7 +88,7 @@ export default function HostDashboardPage() {
     <div className="flex flex-col gap-4">
       <PageHeader
         title={`Halo, ${user.name.split(" ")[0]}`}
-        description={now.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        description={formatFullDay(now)}
         actions={
           updatedAt && (
             <Button type="button" variant="outline" size="sm" onClick={reload} disabled={loading} className="text-muted-foreground">
@@ -459,7 +459,7 @@ function Week({ sessions, now, className }: { sessions: HostDashboardSession[]; 
   // One group per day it starts on, in order
   const days = new Map<string, HostDashboardSession[]>();
   for (const session of sessions) {
-    const day = toDateInput(new Date(session.start_at));
+    const day = appDate(session.start_at);
     days.set(day, [...(days.get(day) ?? []), session]);
   }
 

@@ -15,7 +15,7 @@ import {
   type ScheduleSlot,
   type SlotBackupMarker,
 } from "@/lib/api";
-import { DAYS, dayWord, formatClock, formatDate, isoWeekday, previousDay, toDateInput } from "@/lib/format";
+import { appDate, appMinutes, appMoment, DAYS, dayWord, formatClock, formatDate, isoWeekday, previousDay, toDateInput } from "@/lib/format";
 import { addDays, durationMinutes, formatDayDate, inEffectOn, toMinutes, weekStart } from "@/lib/schedule";
 import { inputSmClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
@@ -90,9 +90,8 @@ const live = (entry: Entry) => entry.kind === "own" || entry.kind === "cover" ||
 
 /** Minutes from 00:00 of `date` for a moment (ISO), held inside that day. */
 function minutesOn(iso: string, date: string): number {
-  const moment = new Date(iso);
-  if (toDateInput(moment) > date) return DAY_MINUTES;
-  return moment.getHours() * 60 + moment.getMinutes();
+  if (appDate(iso) > date) return DAY_MINUTES;
+  return appMinutes(iso);
 }
 
 /** 390 → "6j 30m" */
@@ -489,8 +488,8 @@ function DayDetail({ day }: { day: Day }) {
 /** The next few sessions I'm live, the first with a countdown. */
 function NextUp({ days }: { days: Day[] }) {
   const now = useNow(60_000);
-  const minutesNow = now.getHours() * 60 + now.getMinutes();
-  const today = toDateInput(now);
+  const minutesNow = appMinutes(now);
+  const today = appDate(now);
   const next = days
     .filter((day) => day.date >= today)
     .flatMap((day) => day.entries.filter((entry) => live(entry) && !entry.carried && (day.date > today || entry.end > minutesNow)))
@@ -503,7 +502,7 @@ function NextUp({ days }: { days: Day[] }) {
       ) : (
         <ol className="space-y-2.5">
           {next.map((entry, index) => {
-            const startsAt = new Date(`${entry.date}T${entry.from}`);
+            const startsAt = appMoment(entry.date, entry.from);
             const running = entry.date === today && entry.start <= minutesNow;
             return (
               <li key={entry.key} className={cn("flex items-start gap-3", index === 0 && "rounded-lg border border-primary/30 bg-primary/[0.05] p-3")}>

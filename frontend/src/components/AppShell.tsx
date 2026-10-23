@@ -30,6 +30,7 @@ import NavIcon from "./NavIcon";
 import NotificationBell from "./NotificationBell";
 import type { SidebarGroup, SidebarLink } from "./SidebarLayout";
 import ThemeToggle from "./ThemeToggle";
+import TimeZoneNote from "./TimeZoneNote";
 import UserAvatar from "./UserAvatar";
 import UserMenu, { type AccountLink } from "./UserMenu";
 
@@ -219,6 +220,7 @@ function ShellContent({ mobileNav, children }: { mobileNav: boolean; children: R
   return (
     <ViewTransition key={pathname} enter="page-enter" exit="page-exit" default="none">
       <div className={cn("mx-auto w-full max-w-screen-2xl flex-1 p-4 md:p-6 2xl:p-8", mobileNav && "pb-28 md:pb-6")}>
+        <TimeZoneNote />
         <Suspense fallback={<CardsSkeleton />}>{children}</Suspense>
       </div>
     </ViewTransition>

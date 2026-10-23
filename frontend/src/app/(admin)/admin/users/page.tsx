@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Archive, Ban, KeyRound, MoreHorizontal, Search, Trash2, UserPlus, Users } from "lucide-react";
 import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { adminApi, errorMessage, type AuthUser, type EraseReason, type RoleName, type UserStatus } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 import { roleLabel, statusLabel } from "@/lib/labels";
 import { inputClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
@@ -314,7 +315,7 @@ function UserCell({ user }: { user: AuthUser }) {
 
 function Signup({ user, inline = false }: { user: AuthUser; inline?: boolean }) {
   const source = user.signup_source === "admin_created" ? "oleh admin" : user.has_password ? "email" : "Google";
-  const date = new Date(user.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const date = formatDate(user.created_at);
   return inline ? (
     <span>
       Daftar {date} · {source}

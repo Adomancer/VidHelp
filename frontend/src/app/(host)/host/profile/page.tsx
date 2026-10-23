@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Camera, Clock, Crown, LogOut, XCircle } from "lucide-react";
 import { errorMessage, hostApi, type MyProfile, type MyProfileChange } from "@/lib/api";
 import { acceptOf, PHOTO_UPLOAD, uploadProblem } from "@/lib/files";
-import { formatDate, formatTenure } from "@/lib/format";
+import { APP_TIME_ZONE, formatDate, formatTenure } from "@/lib/format";
 import { roleLabel } from "@/lib/labels";
 import { useApiData } from "@/lib/useApiData";
 import { useNow } from "@/lib/useNow";
@@ -208,7 +208,7 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
   );
 }
 
-const sameDay = (iso: string) => new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+const sameDay = (iso: string) => new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: APP_TIME_ZONE });
 
 /**
  * Where my latest personal data change stands: waiting for an admin (with what I asked for),

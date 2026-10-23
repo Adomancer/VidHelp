@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CalendarDays, Check, Clock, PartyPopper, Timer } from "lucide-react";
 import { errorMessage, eventApi, type EventBlock, type HostEvent } from "@/lib/api";
 import { groupByDay } from "@/lib/events";
-import { formatDate, toDateInput } from "@/lib/format";
+import { appDate, formatClock, formatDate } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,10 +48,8 @@ function claimableBlocks(event: HostEvent): EventBlock[] {
   return event.my_claims >= event.max_slots_per_host ? [] : event.blocks.filter((block) => block.state === "free");
 }
 
-/** "14:00" (local time) */
-function clock(iso: string): string {
-  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }).replace(".", ":");
-}
+/** "14:00" (WIB) */
+const clock = formatClock;
 
 /** "Sen, 6 Okt" */
 function shortDay(date: string): string {
@@ -82,7 +80,7 @@ export default function EventClaimBoard({ events }: { events: HostEventsState })
     try {
       const { claim } = await eventApi.claim(token, event.id, block.start_at);
       show({
-        text: `Dapat! ${shortDay(toDateInput(new Date(block.start_at)))}, ${clock(block.start_at)}–${clock(block.end_at)} di ${event.name} jadi milikmu.`,
+        text: `Dapat! ${shortDay(appDate(block.start_at))}, ${clock(block.start_at)}–${clock(block.end_at)} di ${event.name} jadi milikmu.`,
         undo: async () => {
           try {
             await eventApi.cancelClaim(token, claim.id);
@@ -162,7 +160,7 @@ export default function EventClaimBoard({ events }: { events: HostEventsState })
           }
         >
           <p className="font-medium text-foreground">
-            {releasing.event.name}, {shortDay(toDateInput(new Date(releasing.block.start_at)))} {clock(releasing.block.start_at)}–
+            {releasing.event.name}, {shortDay(appDate(releasing.block.start_at))} {clock(releasing.block.start_at)}–
             {clock(releasing.block.end_at)}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">Host lain bisa langsung mengambilnya, dan belum tentu bisa kamu ambil lagi.</p>

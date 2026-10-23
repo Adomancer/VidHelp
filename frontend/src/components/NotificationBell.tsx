@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
 import { notificationApi, type AppNotification } from "@/lib/api";
-import { formatRelative } from "@/lib/format";
+import { APP_TIME_ZONE, formatRelative } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -105,7 +105,7 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
                 <span className="min-w-0 flex-1">
                   <span className={cn("block text-sm", notification.read_at ? "text-body" : "font-medium text-foreground")}>{notification.title}</span>
                   {notification.body && <span className="mt-0.5 block text-xs text-muted-foreground">{notification.body}</span>}
-                  <span className="mt-1 block text-[11px] text-faint" title={new Date(notification.created_at).toLocaleString("id-ID")}>
+                  <span className="mt-1 block text-[11px] text-faint" title={new Date(notification.created_at).toLocaleString("id-ID", { timeZone: APP_TIME_ZONE })}>
                     {formatRelative(notification.created_at)}
                   </span>
                 </span>
