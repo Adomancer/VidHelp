@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
+import ErrorState from "./ErrorState";
 import FormAlert from "./FormAlert";
 import StatusBadge from "./StatusBadge";
 import { notify } from "./Toast";
@@ -56,6 +57,13 @@ export default function DiscordConnect({ id, description = HOST_DESCRIPTION }: {
     }
   }
 
+  if (status.error && !status.data) {
+    return (
+      <Card id={id} title="Discord" description={description}>
+        <ErrorState message={status.error} onRetry={status.reload} />
+      </Card>
+    );
+  }
   if (!status.data || !status.data.available) return null;
   const link = status.data.link;
 

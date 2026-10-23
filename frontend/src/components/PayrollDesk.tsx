@@ -717,7 +717,14 @@ function PeriodDetail({ periodId, onChanged }: { periodId: string; onChanged: (t
                   type="button"
                   variant="ghost"
                   size="xs"
-                  onClick={() => act(() => payrollApi.removeAdjustment(token, adjustment.id))}
+                  onClick={() =>
+                    setConfirm({
+                      title: "Hapus penyesuaian?",
+                      body: `${adjustment.host.user.name}: ${adjustment.hours_added < 0 ? "−" : "+"}${formatDuration(Math.abs(adjustment.hours_added))}${adjustment.notes ? ` (${adjustment.notes})` : ""}. Jam di periode ini dihitung ulang tanpa penyesuaian ini.`,
+                      label: "Hapus",
+                      run: () => payrollApi.removeAdjustment(token, adjustment.id),
+                    })
+                  }
                   className="text-destructive hover:text-destructive max-md:h-10 max-md:px-3"
                 >
                   Hapus
@@ -895,7 +902,10 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
         notes: formValue(data, "notes"),
       }),
     ({ message }, form) => {
+      // The next entry starts from scratch: direction and time are state, not inputs form.reset() clears
       form.reset();
+      setDirection(1);
+      setHours(1);
       onDone(message);
     },
     ["hours_added", "sessions_added"]
@@ -910,7 +920,8 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
       )}
       <div className="space-y-1.5">
         <Label htmlFor={`adjust-host-${periodId}`}>Host</Label>
-        <NativeSelect id={`adjust-host-${periodId}`} name="host_id">
+        {hosts.error && <ErrorState message={hosts.error} onRetry={hosts.reload} />}
+        <NativeSelect id={`adjust-host-${periodId}`} name="host_id" disabled={!hosts.data}>
           {hosts.data?.hosts.map((host) => (
             <option key={host.host_id} value={host.host_id}>
               {host.name}
@@ -1157,6 +1168,7 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
         )}
         <div className="space-y-1.5">
           <Label htmlFor="advance-host">Host</Label>
+          {hosts.error && <ErrorState message={hosts.error} onRetry={hosts.reload} />}
           {/* Hundreds of hosts: type to find one; the hidden field sends the choice with the form */}
           <SearchableSelect
             id="advance-host"

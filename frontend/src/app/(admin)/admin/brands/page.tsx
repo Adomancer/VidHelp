@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { parseAsInteger, parseAsStringLiteral, useQueryState } from "nuqs";
 import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, Copy, Crown, Pencil, Plus, Search, Tag, X } from "lucide-react";
-import { adminHostsApi, fieldErrors, operatorApi, scheduleApi, type BrandInput, type BrandSummary } from "@/lib/api";
+import { adminHostsApi, errorMessage, fieldErrors, operatorApi, scheduleApi, type BrandInput, type BrandSummary } from "@/lib/api";
 import { formatDate, toDateInput } from "@/lib/format";
 import { htmlToText, richTextClass } from "@/lib/richText";
 import { inputClass } from "@/lib/ui";
@@ -725,8 +725,10 @@ function BrandForm({ brand, onSaved, onClose }: { brand: BrandSummary | null; on
       notifyCapsule(brand ? "Brand diperbarui" : "Brand ditambahkan", "success", TOAST_MS);
       onSaved();
     } catch (caught) {
-      setErrors(fieldErrors(caught));
-      notifyCapsule("Gagal menyimpan, coba lagi", "error", TOAST_MS);
+      const fields = fieldErrors(caught);
+      setErrors(fields);
+      // The server's reason (permission, conflict, offline…) unless the marked fields already say it
+      notifyCapsule(Object.keys(fields).length > 0 ? "Periksa isian yang ditandai" : errorMessage(caught), "error", TOAST_MS);
     } finally {
       setSaving(false);
     }

@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
 import Dialog from "./Dialog";
+import ErrorState from "./ErrorState";
 import FormAlert from "./FormAlert";
 import { notify } from "./Toast";
 import UserAvatar from "./UserAvatar";
@@ -43,6 +44,10 @@ export default function ProfileChangesPanel() {
     if (fromLink && list.length > 0) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [fromLink, list.length]);
 
+  // A failed load isn't "nothing to decide": say so, or pending changes would go unnoticed
+  if (changes.error && !changes.data) {
+    return <ErrorState message={`Permintaan perubahan data belum bisa dimuat. ${changes.error}`} onRetry={changes.reload} />;
+  }
   if (list.length === 0) return null;
 
   return (
