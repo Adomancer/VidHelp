@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { authApi } from "@/lib/api";
@@ -13,9 +13,13 @@ import SubmitButton from "./SubmitButton";
 /** Opened from the emailed link: /reset-password?token=...&email=... */
 export default function ResetPasswordForm() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
-  const email = searchParams.get("email") ?? "";
+  // Read once, then taken out of the address bar and history: the token resets the password until it expires
+  const [{ token, email }] = useState(() => ({ token: searchParams.get("token") ?? "", email: searchParams.get("email") ?? "" }));
   const [done, setDone] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   const { loading, errors, error, handleSubmit } = useApiForm(
     (data) =>

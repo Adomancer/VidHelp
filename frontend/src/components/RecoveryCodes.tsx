@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, Download, TriangleAlert } from "lucide-react";
+import { saveBlob } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 /** One-time recovery codes, shown once right after they're created. */
@@ -16,10 +17,7 @@ export default function RecoveryCodes({ codes }: { codes: string[] }) {
   }
 
   function download() {
-    const url = URL.createObjectURL(new Blob([`Kode pemulihan VidHelp\n\n${text}\n\nSetiap kode hanya bisa dipakai sekali.\n`], { type: "text/plain" }));
-    const link = Object.assign(document.createElement("a"), { href: url, download: "vidhelp-recovery-codes.txt" });
-    link.click();
-    URL.revokeObjectURL(url);
+    saveBlob(new Blob([`Kode pemulihan VidHelp\n\n${text}\n\nSetiap kode hanya bisa dipakai sekali.\n`], { type: "text/plain" }), "vidhelp-recovery-codes.txt");
   }
 
   return (

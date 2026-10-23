@@ -96,11 +96,20 @@ export async function apiFileUrl(endpoint: string, token: string): Promise<strin
 
 /** Download a protected file (e.g. an Excel export) and save it as `fileName`. */
 export async function downloadFile(endpoint: string, token: string, fileName: string): Promise<void> {
-  const url = await apiFileUrl(endpoint, token);
+  saveObjectUrl(await apiFileUrl(endpoint, token), fileName);
+}
+
+/** Save something made in the browser (e.g. recovery codes) as a file. */
+export function saveBlob(blob: Blob, fileName: string) {
+  saveObjectUrl(URL.createObjectURL(blob), fileName);
+}
+
+function saveObjectUrl(url: string, fileName: string) {
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
   link.click();
+  // Some browsers start the download after click() returns: revoking right away can cancel it
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
