@@ -64,7 +64,7 @@ const statusTones: Record<UserStatus, Tone> = {
   archived: "neutral",
 };
 
-type Confirm = { kind: "reset2fa" | "deactivate" | "archive"; user: AuthUser } | null;
+type Confirm = { kind: "reset2fa" | "deactivate" | "archive"; user: AuthUser } | { kind: "role"; user: AuthUser; role: RoleName } | null;
 
 export default function AdminUsersPage() {
   const { user: me, token } = useAuth();
@@ -188,7 +188,7 @@ export default function AdminUsersPage() {
                       <UserStatusBadge user={user} />
                     </TableCell>
                     <TableCell>
-                      <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} run={run} />
+                      <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} onConfirm={setConfirm} />
                     </TableCell>
                     <TableCell>
                       <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} />
@@ -208,7 +208,7 @@ export default function AdminUsersPage() {
                   </div>
                   <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                     <Signup user={user} inline />
-                    <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} run={run} />
+                    <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} onConfirm={setConfirm} />
                   </div>
                   <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} stretch />
                 </li>
@@ -244,6 +244,19 @@ export default function AdminUsersPage() {
         />
       )}
 
+      {confirm?.kind === "role" && (
+        <ConfirmDialog
+          title={`Jadikan ${confirm.user.name} ${roleLabel(confirm.role)}?`}
+          confirmLabel={`Jadikan ${roleLabel(confirm.role)}`}
+          destructive={staffRoles.includes(confirm.role)}
+          onConfirm={() => run(confirm.user.id, () => adminApi.setRole(token, confirm.user.id, confirm.role))}
+          onClose={() => setConfirm(null)}
+        >
+          {staffRoles.includes(confirm.role)
+            ? `${roleLabel(confirm.role)} bisa melihat KTP, rekening, dan penggajian semua host, serta mengelola semua akun. Pastikan ini orang yang tepat.`
+            : `Peran ${roleLabel(confirm.user.roles[0]?.name ?? "host")} diganti menjadi ${roleLabel(confirm.role)}; aksesnya ikut berubah saat ia memuat halaman berikutnya.`}
+        </ConfirmDialog>
+      )}
       {confirm?.kind === "reset2fa" && (
         <ConfirmDialog
           title={`Reset 2FA ${confirm.user.name}?`}
@@ -323,16 +336,23 @@ function UserStatusBadge({ user }: { user: AuthUser }) {
   );
 }
 
-function RoleSelect({ user, disabled, run }: { user: AuthUser; disabled: boolean; run: (userId: string, action: () => Promise<unknown>) => Promise<void> }) {
-  const { token } = useAuth();
+/** Roles that see every host's KTP, bank details and payroll. */
+const staffRoles: RoleName[] = ["admin", "finance"];
+
+/** Picking a role only asks first (arrow keys on a closed select change it without opening). */
+function RoleSelect({ user, disabled, onConfirm }: { user: AuthUser; disabled: boolean; onConfirm: (confirm: Confirm) => void }) {
+  const current = user.roles[0]?.name ?? "host";
   return (
     <NativeSelect
       small
       wrapperClassName="w-32"
-      value={user.roles[0]?.name ?? "host"}
+      value={current}
       disabled={disabled}
       aria-label={`Peran ${user.name}`}
-      onChange={(event) => run(user.id, () => adminApi.setRole(token, user.id, event.target.value as RoleName))}
+      onChange={(event) => {
+        const role = event.target.value as RoleName;
+        if (role !== current) onConfirm({ kind: "role", user, role });
+      }}
     >
       {roles.map((role) => (
         <option key={role} value={role}>
