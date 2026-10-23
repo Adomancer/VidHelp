@@ -52,6 +52,15 @@ class ProfileChangeRequest extends Model
     }
 
     /**
+     * Fingerprint of the requested values. An admin approves the version they looked at, so values
+     * the host changes after the admin opened the request are never applied unseen.
+     */
+    public function version(): string
+    {
+        return hash('sha256', json_encode($this->new_values ?? []));
+    }
+
+    /**
      * What the host asked for, as label/value lines; KTP and bank numbers masked unless `$full`.
      *
      * @return list<array{field: string, label: string, value: ?string}>

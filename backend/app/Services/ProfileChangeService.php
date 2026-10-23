@@ -46,8 +46,38 @@ class ProfileChangeService
      */
     public function submit(HostProfile $host, array $values): ProfileChangeRequest
     {
+        // Locked so an admin approving the pending request meanwhile can't miss these values
+        [$request, $pending] = DB::transaction(function () use ($host, $values) {
+            $pending = ProfileChangeRequest::where('host_id', $host->id)->where('status', 'pending')->latest()->lockForUpdate()->first();
+
+            return [$this->saveValues($host, $pending, $values), $pending];
+        });
+
+        if (! $pending) {
+            // Only which data changes, never the values (KTP, bank account)
+            $what = collect($request->lines())->pluck('label')->implode(', ');
+            $notice = Notice::make('profile_change_requested', "Perubahan data: {$host->user->name}")
+                ->body("{$what}. Setujui atau tolak di halaman Host.")
+                ->field('Host', $host->user->name)
+                ->field('Data yang diubah', $what, inline: false)
+                ->about($host->user)
+                ->link('/admin/hosts?changes=pending', 'Tinjau perubahan');
+
+            $this->notifier->toUsers($this->notifier->admins(), $notice, dm: true);
+            $this->notifier->toChannel('admin', $notice);
+        }
+
+        return $request;
+    }
+
+    /**
+     * Merge `$values` into the pending request (or a new one) and save it.
+     *
+     * @param  array<string, ?string>  $values
+     */
+    private function saveValues(HostProfile $host, ?ProfileChangeRequest $pending, array $values): ProfileChangeRequest
+    {
         $current = $this->current($host);
-        $pending = $this->pending($host);
         $changes = $pending?->new_values ?? [];
 
         foreach (array_intersect_key($values, ProfileChangeRequest::FIELDS) as $field => $value) {
@@ -69,31 +99,26 @@ class ProfileChangeService
         $request->new_values = $changes;
         $request->save();
 
-        if (! $pending) {
-            // Only which data changes, never the values (KTP, bank account)
-            $what = collect($request->lines())->pluck('label')->implode(', ');
-            $notice = Notice::make('profile_change_requested', "Perubahan data: {$host->user->name}")
-                ->body("{$what}. Setujui atau tolak di halaman Host.")
-                ->field('Host', $host->user->name)
-                ->field('Data yang diubah', $what, inline: false)
-                ->about($host->user)
-                ->link('/admin/hosts?changes=pending', 'Tinjau perubahan');
-
-            $this->notifier->toUsers($this->notifier->admins(), $notice, dm: true);
-            $this->notifier->toChannel('admin', $notice);
-        }
-
         return $request;
     }
 
-    /** Put the new values on the profile. */
-    public function approve(ProfileChangeRequest $request, User $by): void
+    /**
+     * Put the new values on the profile, if they are still the `$version` the admin reviewed
+     * (see ProfileChangeRequest::version()).
+     */
+    public function approve(ProfileChangeRequest $request, User $by, string $version): void
     {
-        $this->ensurePending($request);
         $host = $request->host()->with(['user', 'sensitiveData'])->firstOrFail();
-        $changes = $request->new_values ?? [];
 
-        DB::transaction(function () use ($request, $host, $changes, $by) {
+        $request = DB::transaction(function () use ($request, $host, $by, $version) {
+            $request = ProfileChangeRequest::whereKey($request->getKey())->lockForUpdate()->firstOrFail();
+            $this->ensurePending($request);
+
+            if (! hash_equals($request->version(), $version)) {
+                throw ValidationException::withMessages(['version' => ['Host mengubah permintaannya setelah kamu membukanya. Periksa data terbaru lalu setujui lagi.']]);
+            }
+
+            $changes = $request->new_values ?? [];
             if (array_key_exists('name', $changes) && $changes['name'] !== null) {
                 $host->user->update(['name' => $changes['name']]);
             }
@@ -106,6 +131,8 @@ class ProfileChangeService
             }
 
             $request->update(['status' => 'approved', 'reviewed_by' => $by->id, 'reviewed_at' => now()]);
+
+            return $request;
         });
 
         $this->notifier->toUsers($host->user, Notice::make('profile_change_approved', 'Perubahan data disetujui')
