@@ -105,7 +105,7 @@ export function AuthSessionProvider({ children }: { children: React.ReactNode })
         setState((current) => (current.status === "signed-in" ? { ...current, user: { ...current.user, two_factor_setup_required: true } } : current));
         return;
       }
-      end(problem.message && problem.message !== "Unauthenticated." ? problem.message : "Sesi kamu sudah berakhir. Silakan masuk lagi.");
+      end(problem.message || "Sesi kamu sudah berakhir. Silakan masuk lagi.");
     });
     const stopTabs = onTokenChangedElsewhere((newToken) => {
       if (newToken === token) return;

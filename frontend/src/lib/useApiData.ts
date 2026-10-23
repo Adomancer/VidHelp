@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { errorMessage } from "./api";
+import { errorMessage, withSignal } from "./api";
 
 interface ApiDataOptions {
   /** Load again every `ms` while the tab is visible. */
@@ -31,7 +31,8 @@ export function useApiData<T>(key: string, load: () => Promise<T>, { keepPreviou
   const queryClient = useQueryClient();
   const query = useQuery<T>({
     queryKey: [key],
-    queryFn: load,
+    // Requests stop when nothing shows this key anymore (page left, filter changed)
+    queryFn: ({ signal }) => withSignal(signal, load),
     placeholderData: (previous, previousQuery) => {
       const previousKey = String(previousQuery?.queryKey[0] ?? "");
       return keepPrevious === true || (typeof keepPrevious === "function" && keepPrevious(previousKey)) ? previous : undefined;

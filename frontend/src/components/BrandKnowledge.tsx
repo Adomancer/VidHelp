@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { BookOpen, Download, FileImage, FileSpreadsheet, FileText, Loader2, Trash2, Upload } from "lucide-react";
-import { errorMessage, fieldErrors, hostApi, knowledgeApi, type KnowledgeFile } from "@/lib/api";
+import { errorMessage, fieldErrors, hostApi, knowledgeApi, saveObjectUrl, showInTab, type KnowledgeFile } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { richTextClass } from "@/lib/richText";
 import { useApiData } from "@/lib/useApiData";
@@ -82,15 +82,8 @@ export function KnowledgeFiles({
     const tab = viewable(file) ? window.open("", "_blank") : null;
     try {
       const url = await fileUrl(file);
-      if (tab) {
-        tab.location.href = url;
-        return;
-      }
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.original_name;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (tab) showInTab(tab, url);
+      else saveObjectUrl(url, file.original_name);
     } catch (caught) {
       tab?.close();
       notify({ text: errorMessage(caught), tone: "error" });

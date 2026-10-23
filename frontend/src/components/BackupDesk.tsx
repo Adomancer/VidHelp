@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
-import { errorMessage, operatorBackupApi, scheduleApi, type BackupCandidate, type BackupReason, type BackupRequest } from "@/lib/api";
+import { errorMessage, operatorBackupApi, scheduleApi, showInTab, type BackupCandidate, type BackupReason, type BackupRequest } from "@/lib/api";
 import { formatClock, formatDateTime, formatDay, formatDuration, formatTimeRange, formatWindow, isoWeekday, toDateInput } from "@/lib/format";
 import { inputClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
@@ -747,7 +747,8 @@ function RequestDetail({ backup, act, onConfirm }: { backup: BackupRequest; act:
     const tab = window.open("", "_blank");
     try {
       const url = await operatorBackupApi.letterUrl(token, backup.id);
-      if (tab) tab.location.href = url;
+      if (tab) showInTab(tab, url);
+      else URL.revokeObjectURL(url);
     } catch (caught) {
       tab?.close();
       setLetterError(errorMessage(caught));

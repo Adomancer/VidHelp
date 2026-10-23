@@ -7,6 +7,50 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/a
 
 interface FetchOptions extends RequestInit {
   token?: string;
+  /** Give up after this many ms (default 30 s; longer for file downloads). */
+  timeout?: number;
+}
+
+const TIMEOUT_MS = 30_000;
+const FILE_TIMEOUT_MS = 120_000;
+
+let ambientSignal: AbortSignal | undefined;
+
+/**
+ * Run `start` with `signal` attached to the requests it sends right away (before its first await),
+ * e.g. so a page's requests stop when the page is left. `useApiData` wraps its loaders in this.
+ */
+export function withSignal<T>(signal: AbortSignal, start: () => T): T {
+  const previous = ambientSignal;
+  ambientSignal = signal;
+  try {
+    return start();
+  } finally {
+    ambientSignal = previous;
+  }
+}
+
+/** The caller's signal (if any) plus a timeout, so a hanging server can't keep a spinner going forever. */
+function requestSignal(signal: AbortSignal | null | undefined, timeout: number): AbortSignal {
+  const timer = AbortSignal.timeout(timeout);
+  return signal && typeof AbortSignal.any === "function" ? AbortSignal.any([signal, timer]) : signal ?? timer;
+}
+
+/** Laravel's own English messages (and model class names): not for users' eyes. */
+const FRAMEWORK_MESSAGE =
+  /^(No query results for model|The route .+ could not be found|This action is unauthorized|Unauthenticated|Too Many Attempts|Server Error|Not Found|Forbidden|Method Not Allowed|Service Unavailable|The \w+ method is not supported|CSRF token mismatch)/i;
+
+/** What to tell the user about a failed request: the server's own message when the app wrote it. */
+function messageFor(status: number, message: string | undefined): string {
+  // 500 can carry the exception text (APP_DEBUG); a deliberate 503 has its own message
+  if (status === 500 || (status > 500 && (!message || FRAMEWORK_MESSAGE.test(message)))) return "Terjadi kesalahan di server. Coba lagi nanti.";
+  if (message && !FRAMEWORK_MESSAGE.test(message)) return message;
+  if (status === 401) return "Sesi kamu sudah berakhir. Silakan masuk lagi.";
+  if (status === 403) return "Kamu tidak punya akses untuk ini.";
+  if (status === 404) return "Data tidak ditemukan atau sudah dihapus.";
+  if (status === 413) return "File terlalu besar.";
+  if (status === 429) return "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.";
+  return "Permintaan ke server gagal.";
 }
 
 let changeListener: (() => void) | null = null;
@@ -49,7 +93,7 @@ function sessionProblem(status: number, error: { message?: string; code?: string
  */
 
 async function request(endpoint: string, options: FetchOptions = {}): Promise<Response> {
-  const { token, headers, ...rest } = options;
+  const { token, headers, timeout = TIMEOUT_MS, signal, ...rest } = options;
 
   const defaultHeaders: Record<string, string> = {
     Accept: "application/json",
@@ -69,13 +113,15 @@ async function request(endpoint: string, options: FetchOptions = {}): Promise<Re
       ...headers,
     },
     ...rest,
+    signal: requestSignal(signal ?? ambientSignal, timeout),
   });
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
+    const message = messageFor(response.status, error.message);
     const problem = token ? sessionProblem(response.status, error) : null;
-    if (problem && token) sessionListener?.({ reason: problem, token, message: error.message ?? "" });
-    throw new ApiError(response.status, error.message || "Permintaan ke server gagal", error);
+    if (problem && token) sessionListener?.({ reason: problem, token, message });
+    throw new ApiError(response.status, message, error);
   }
 
   const method = (rest.method ?? "GET").toUpperCase();
@@ -91,7 +137,7 @@ export async function api<T = unknown>(endpoint: string, options: FetchOptions =
 
 /** Download a protected file (e.g. a KTP photo) as an object URL for <img src>. */
 export async function apiFileUrl(endpoint: string, token: string): Promise<string> {
-  return URL.createObjectURL(await (await request(endpoint, { token })).blob());
+  return URL.createObjectURL(await (await request(endpoint, { token, timeout: FILE_TIMEOUT_MS })).blob());
 }
 
 /** Download a protected file (e.g. an Excel export) and save it as `fileName`. */
@@ -104,7 +150,16 @@ export function saveBlob(blob: Blob, fileName: string) {
   saveObjectUrl(URL.createObjectURL(blob), fileName);
 }
 
-function saveObjectUrl(url: string, fileName: string) {
+/**
+ * Show a downloaded file (object URL) in a tab opened during the click (popup blockers). The URL is
+ * released after a minute: the tab has loaded it by then, and the page doesn't keep every file in memory.
+ */
+export function showInTab(tab: Window, url: string) {
+  tab.location.href = url;
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export function saveObjectUrl(url: string, fileName: string) {
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
@@ -135,9 +190,16 @@ export function fieldErrors(error: unknown): Record<string, string> {
   return Object.fromEntries(Object.entries(errors).map(([field, messages]) => [field, messages[0]]));
 }
 
+/** The request gave up waiting (see `timeout`). */
+export function isTimeout(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "TimeoutError";
+}
+
 /** A message to show the user for any failed request. */
 export function errorMessage(error: unknown): string {
-  return error instanceof ApiError ? error.message : "Tidak bisa terhubung ke server. Apakah backend sudah berjalan?";
+  if (error instanceof ApiError) return error.message;
+  if (isTimeout(error)) return "Server terlalu lama menjawab. Coba lagi sebentar lagi.";
+  return "Tidak bisa terhubung ke server. Periksa koneksi internet kamu.";
 }
 
 /** What most changes answer with, e.g. { message: "Brand disimpan" }. */
