@@ -156,7 +156,7 @@ export type AdminHostInput = Partial<Pick<HostProfile, "phone" | "guardian_phone
 export const hostApi = {
   profile: (token: string) => api<MyProfile>("/host/profile", { token }),
 
-  updateProfile: (token: string, data: { name?: string; phone?: string | null; guardian_phone?: string | null }) =>
+  updateProfile: (token: string, data: { name?: string | null; phone?: string | null; guardian_phone?: string | null }) =>
     put<MyProfile & Message>("/host/profile", token, data),
 
   uploadPhoto: (token: string, photo: File) => {

@@ -6,6 +6,7 @@ import { errorMessage, hostApi, type MyProfile, type MyProfileChange } from "@/l
 import { acceptOf, PHOTO_UPLOAD, uploadProblem } from "@/lib/files";
 import { APP_TIME_ZONE, formatDate, formatTenure } from "@/lib/format";
 import { roleLabel } from "@/lib/labels";
+import { changedPersonalFields } from "@/lib/profile";
 import { useApiData } from "@/lib/useApiData";
 import { useNow } from "@/lib/useNow";
 import { formValue, useApiForm } from "@/lib/useApiForm";
@@ -166,16 +167,7 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
   const { loading, errors, error, handleSubmit } = useApiForm(
     (form) => {
       if (!host) return hostApi.updateProfile(token, { name: formValue(form, "name") });
-
-      // Only what was edited here: sending an unchanged field would drop that field from a pending
-      // request (the server treats "same as saved" as "never mind"), e.g. a phone change sent earlier
-      // (compared as the fields show them: phone fields keep digits only)
-      const digits = (value: string | null) => (value ?? "").replace(/\D/g, "");
-      const saved = { name: data.user.name, phone: digits(host.phone), guardian_phone: digits(host.guardian_phone) };
-      const changed = (Object.keys(saved) as (keyof typeof saved)[])
-        .map((field) => [field, formValue(form, field).trim()] as const)
-        .filter(([field, value]) => value !== saved[field]);
-      return hostApi.updateProfile(token, Object.fromEntries(changed.map(([field, value]) => [field, value || null])));
+      return hostApi.updateProfile(token, changedPersonalFields(form, { name: data.user.name, host }));
     },
     (updated, form) => {
       // For hosts nothing changed yet: show the saved data again (what was sent is in the request card)
