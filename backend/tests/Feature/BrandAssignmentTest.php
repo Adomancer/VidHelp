@@ -132,6 +132,48 @@ class BrandAssignmentTest extends TestCase
             ->assertJsonPath('assignment.is_leader', false);
     }
 
+    public function test_inactive_hosts_cannot_be_assigned(): void
+    {
+        $host = $this->host();
+        $host->update(['status' => 'archived']);
+
+        $this->actingAs($this->operator)->postJson('/api/operator/assignments', [
+            'host_id' => $host->id, 'brand_id' => $this->brand()->id,
+        ])->assertJsonValidationErrors(['host_id' => 'Pilih host yang aktif.']);
+    }
+
+    public function test_banning_a_host_from_a_brand_gives_up_their_backups_there(): void
+    {
+        $brand = $this->brand();
+        $otherBrand = $this->brand();
+        $host = $this->host();
+        $banned = $host->assignments()->create(['brand_id' => $brand->id, 'status' => 'active']);
+        $elsewhere = $host->assignments()->create(['brand_id' => $otherBrand->id, 'status' => 'active']);
+        $requester = $this->host();
+        $start = today()->addWeek()->setTime(19, 0);
+        $backup = fn (Brand $on, HostProfile $for, ?HostProfile $cover) => BackupRequest::create([
+            'slot_id' => ScheduleSlot::create([
+                'assignment_id' => $for->assignments()->firstOrCreate(['brand_id' => $on->id], ['status' => 'active'])->id,
+                'day_of_week' => $start->dayOfWeekIso, 'start_time' => '19:00', 'end_time' => '21:00', 'effective_from' => today()->subMonth(),
+            ])->id,
+            'brand_id' => $on->id, 'requesting_host_id' => $for->id,
+            'backup_date' => $start->toDateString(), 'start_at' => $start, 'end_at' => $start->copy()->addHours(2),
+            'reason_type' => 'permit', 'status' => $cover ? 'filled' : 'open', 'filled_by_host_id' => $cover?->id,
+            'auto_fill_at' => $start->copy()->subMinutes(30),
+        ]);
+        $covering = $backup($brand, $requester, $host);         // they cover someone on the brand
+        $own = $backup($brand, $host, null);                    // they asked for a cover there
+        $coveringElsewhere = $backup($otherBrand, $requester, $host);
+
+        $this->actingAs($this->operator)->putJson("/api/operator/assignments/{$banned->id}", ['status' => 'banned'])->assertOk();
+
+        $this->assertSame('open', $covering->fresh()->status);
+        $this->assertNull($covering->fresh()->filled_by_host_id);
+        $this->assertSame('cancelled', $own->fresh()->status);
+        $this->assertSame('filled', $coveringElsewhere->fresh()->status);
+        $this->assertSame('active', $elsewhere->fresh()->status);
+    }
+
     public function test_host_list_filters_by_brand(): void
     {
         $brand = $this->brand();

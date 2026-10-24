@@ -167,8 +167,8 @@ class AccountService
     }
 
     /**
-     * Resigned host: end their weekly slots from today, cancel their own backup requests,
-     * give back covers and event blocks they took, and withdraw pending applications.
+     * Resigned host: end their weekly slots from today, and give up everything they still had
+     * coming (see releaseCommitments()).
      */
     private function takeOffSchedule(HostProfile $host): void
     {
@@ -178,13 +178,35 @@ class AccountService
             ->each(fn (ScheduleSlot $slot) => $slot->retire());
         $host->assignments()->where('status', 'active')->update(['status' => 'inactive']);
 
+        $this->releaseCommitments($host);
+    }
+
+    /**
+     * A host left or was banned from a brand (their slots there are already retired): give up
+     * what they still had coming on that brand.
+     */
+    public function takeOffBrand(HostProfile $host, string $brandId): void
+    {
+        $this->releaseCommitments($host, $brandId);
+    }
+
+    /**
+     * Cancel the host's own upcoming backup requests, give back covers and event blocks they
+     * took, and withdraw pending applications: everywhere, or only on `$brandId`.
+     */
+    private function releaseCommitments(HostProfile $host, ?string $brandId = null): void
+    {
+        $onBrand = fn ($q) => $q->when($brandId, fn ($q) => $q->where('brand_id', $brandId));
+
         BackupRequest::where('requesting_host_id', $host->id)
+            ->tap($onBrand)
             ->whereIn('status', ['open', 'pending', 'filled'])
             ->where('start_at', '>', now())
             ->get()
             ->each(fn (BackupRequest $request) => $this->backups->close($request, 'cancelled'));
 
         BackupRequest::where('filled_by_host_id', $host->id)
+            ->tap($onBrand)
             ->where('status', 'filled')
             ->where('start_at', '>', now())
             ->with(['filler.user', 'brand'])
@@ -193,6 +215,7 @@ class AccountService
 
         BackupApplication::where('applicant_host_id', $host->id)
             ->where('status', 'applied')
+            ->whereHas('request', $onBrand)
             ->with('request')
             ->get()
             ->each(fn (BackupApplication $application) => $this->backups->withdraw($application->request, $host));
@@ -200,6 +223,7 @@ class AccountService
         // Blocks they already checked in for stay (release() refuses them)
         EventSlotClaim::active()
             ->where('host_id', $host->id)
+            ->whereHas('event', $onBrand)
             ->where('start_at', '>', now())
             ->whereNotIn('id', Attendance::whereNotNull('event_claim_id')->select('event_claim_id'))
             ->get()
