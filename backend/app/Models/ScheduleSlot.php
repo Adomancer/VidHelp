@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,8 +13,6 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Carbon\CarbonImmutable;
-use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 
 /**
@@ -203,13 +203,19 @@ class ScheduleSlot extends Model
     /**
      * Stop the slot from a date on (default today). Slots that haven't started by then
      * are deleted; ones that already ran keep their history and end the day before.
+     * A slot that hasn't started but already has a check-in or a backup request is made
+     * inactive instead, so those rows (and the paid hours behind them) stay.
      */
     public function retire(?CarbonInterface $from = null): void
     {
         $from = Carbon::parse($from ?? today())->startOfDay();
 
         if ($this->effective_from->gte($from)) {
-            $this->delete();
+            if ($this->isUsed()) {
+                $this->update(['status' => 'inactive']);
+            } else {
+                $this->delete();
+            }
 
             return;
         }
@@ -217,6 +223,13 @@ class ScheduleSlot extends Model
         if ($this->effective_to === null || $this->effective_to->gte($from)) {
             $this->update(['effective_to' => $from->copy()->subDay()]);
         }
+    }
+
+    /** Someone checked in on it or asked for a backup on it (the database won't let it be deleted). */
+    public function isUsed(): bool
+    {
+        return Attendance::where('slot_id', $this->id)->exists()
+            || BackupRequest::where('slot_id', $this->id)->exists();
     }
 
     /** "14:30" or "14:30:00" → 870 */

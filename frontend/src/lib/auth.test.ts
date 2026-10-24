@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { fetchAnswering } from "@/test/setup";
-import { consumeOAuthState, createOAuthState, getToken, loadSession, saveSession } from "./auth";
+import { consumeOAuthState, getToken, loadSession, rememberOAuthState, saveSession } from "./auth";
 
 describe("OAuth state", () => {
-  it("accepts only the state created before leaving, once", () => {
-    const state = createOAuthState();
+  it("accepts only the state remembered before leaving, once", () => {
+    rememberOAuthState("first");
     expect(consumeOAuthState("someone-else")).toBe(false);
     // a wrong state still uses it up
-    expect(consumeOAuthState(state)).toBe(false);
+    expect(consumeOAuthState("first")).toBe(false);
 
-    const fresh = createOAuthState();
-    expect(consumeOAuthState(fresh)).toBe(true);
-    expect(consumeOAuthState(fresh)).toBe(false);
+    rememberOAuthState("fresh");
+    expect(consumeOAuthState("fresh")).toBe(true);
+    expect(consumeOAuthState("fresh")).toBe(false);
   });
 
   it("refuses a callback that never started here", () => {

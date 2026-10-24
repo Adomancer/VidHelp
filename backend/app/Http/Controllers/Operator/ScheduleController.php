@@ -9,6 +9,7 @@ use App\Models\BackupRequest;
 use App\Models\HostBrandAssignment;
 use App\Models\ScheduleSlot;
 use App\Models\SpecialEvent;
+use App\Services\BackupService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -21,6 +22,8 @@ class ScheduleController extends Controller
 {
     /** How long after saving a slot the change can still be taken back. */
     private const UNDO_MINUTES = 10;
+
+    public function __construct(private BackupService $backups) {}
 
     /**
      * Weekly slots in effect on a date (default today), filterable by brand or host.
@@ -173,14 +176,24 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Remove a slot from today (or `from`) on; past weeks keep their history.
+     * Remove a slot from today (or `from`) on; past weeks keep their history. Backups arranged
+     * for sessions from then on that haven't started are cancelled (the cover is told).
      */
     public function destroy(Request $request, ScheduleSlot $schedule): JsonResponse
     {
         $this->ensureCanChange($request, $schedule);
 
         $request->validate(['from' => 'nullable|date|after_or_equal:today']);
-        $schedule->retire($request->date('from'));
+        $from = ($request->date('from') ?? today())->startOfDay();
+
+        BackupRequest::where('slot_id', $schedule->id)
+            ->whereIn('status', ['pending', 'open', 'filled'])
+            ->whereDate('backup_date', '>=', $from)
+            ->where('start_at', '>', now())
+            ->get()
+            ->each(fn (BackupRequest $backup) => $this->backups->close($backup, 'cancelled'));
+
+        $schedule->retire($from);
 
         return response()->json(['message' => 'Slot dihapus']);
     }

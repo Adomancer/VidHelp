@@ -47,10 +47,10 @@ export default function DiscordConnect({ id, description = HOST_DESCRIPTION }: {
   async function connect() {
     setBusy(true);
     try {
-      const state = crypto.randomUUID();
+      const { url, state } = await discordApi.connectUrl(token);
       sessionStorage.setItem(DISCORD_STATE_KEY, state);
       sessionStorage.setItem(DISCORD_RETURN_KEY, `${window.location.pathname}${id ? `#${id}` : ""}`);
-      window.location.assign((await discordApi.connectUrl(token, state)).url);
+      window.location.assign(url);
     } catch (caught) {
       setError(errorMessage(caught));
       setBusy(false);

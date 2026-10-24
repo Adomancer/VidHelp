@@ -12,6 +12,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use RuntimeException;
 use Tests\TestCase;
 
 class AuthFlowTest extends TestCase
@@ -39,6 +40,88 @@ class AuthFlowTest extends TestCase
         $this->withToken($token)->postJson('/api/auth/logout')->assertOk();
 
         $this->assertSame(0, $user->tokens()->count());
+    }
+
+    public function test_wrong_passwords_lock_that_email_from_that_ip_for_a_while(): void
+    {
+        $user = User::factory()->create(['email' => 'host@vidhelp.com']);
+        $user->assignRole('host');
+
+        foreach (range(1, 5) as $attempt) {
+            $this->postJson('/api/auth/login', ['email' => 'host@vidhelp.com', 'password' => 'wrong'])
+                ->assertJsonValidationErrors(['email' => 'Email atau kata sandi salah.']);
+        }
+
+        // Even the right password waits, whatever the email's case
+        $this->postJson('/api/auth/login', ['email' => 'HOST@vidhelp.com', 'password' => 'password'])
+            ->assertJsonValidationErrors(['email' => 'Terlalu banyak percobaan masuk']);
+
+        $this->travel(2)->minutes();
+        $this->postJson('/api/auth/login', ['email' => 'host@vidhelp.com', 'password' => 'password'])->assertOk();
+    }
+
+    public function test_wrong_passwords_from_many_ips_lock_the_account(): void
+    {
+        $user = User::factory()->create(['email' => 'host@vidhelp.com']);
+        $user->assignRole('host');
+
+        foreach (range(1, 5) as $ip) {
+            foreach (range(1, 4) as $attempt) {
+                $this->withServerVariables(['REMOTE_ADDR' => "10.0.0.{$ip}"])
+                    ->postJson('/api/auth/login', ['email' => 'host@vidhelp.com', 'password' => 'wrong'])
+                    ->assertJsonValidationErrors(['email' => 'Email atau kata sandi salah.']);
+            }
+        }
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.99'])
+            ->postJson('/api/auth/login', ['email' => 'host@vidhelp.com', 'password' => 'password'])
+            ->assertJsonValidationErrors(['email' => 'Terlalu banyak percobaan masuk']);
+    }
+
+    public function test_a_correct_password_resets_the_count(): void
+    {
+        $user = User::factory()->create(['email' => 'host@vidhelp.com']);
+        $user->assignRole('host');
+
+        foreach (range(1, 2) as $round) {
+            foreach (range(1, 4) as $attempt) {
+                $this->postJson('/api/auth/login', ['email' => 'host@vidhelp.com', 'password' => 'wrong'])->assertJsonValidationErrors('email');
+            }
+            $this->postJson('/api/auth/login', ['email' => 'host@vidhelp.com', 'password' => 'password'])->assertOk();
+        }
+    }
+
+    public function test_seeding_the_first_admin_in_production_needs_its_password(): void
+    {
+        User::where('email', 'admin@vidhelp.com')->forceDelete();
+        $this->app->detectEnvironment(fn () => 'production');
+
+        foreach ([null, 'password'] as $password) {
+            config(['vidhelp.seed_admin.password' => $password]);
+            try {
+                $this->seedInProduction();
+                $this->fail('Seeded the first admin without a real password in production.');
+            } catch (RuntimeException $e) {
+                $this->assertStringContainsString('ADMIN_SEED_PASSWORD', $e->getMessage());
+            }
+        }
+        $this->assertNull(User::where('email', 'admin@vidhelp.com')->first());
+
+        config(['vidhelp.seed_admin.password' => 'a-long-secret-from-env']);
+        $this->seedInProduction();
+        $admin = User::where('email', 'admin@vidhelp.com')->firstOrFail();
+        $this->assertTrue(Hash::check('a-long-secret-from-env', $admin->password));
+        $this->assertTrue($admin->hasRole('admin'));
+
+        // Seeding again (e.g. after adding a role) doesn't need it anymore
+        config(['vidhelp.seed_admin.password' => null]);
+        $this->seedInProduction();
+    }
+
+    /** db:seed asks for confirmation in production; deploys pass --force. */
+    private function seedInProduction(): void
+    {
+        $this->artisan('db:seed', ['--class' => RoleSeeder::class, '--force' => true])->run();
     }
 
     public function test_token_stops_working_once_user_is_no_longer_active(): void

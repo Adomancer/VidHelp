@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { authApi } from "@/lib/api";
-import { createOAuthState } from "@/lib/auth";
+import { rememberOAuthState } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import FormAlert from "./FormAlert";
 
@@ -20,10 +20,9 @@ export default function GoogleButton({ label = "Lanjut dengan Google" }: { label
     setError(null);
 
     try {
-      const { url } = await authApi.googleRedirect();
-      const consentUrl = new URL(url);
-      consentUrl.searchParams.set("state", createOAuthState());
-      window.location.assign(consentUrl.toString());
+      const { url, state } = await authApi.googleRedirect();
+      rememberOAuthState(state);
+      window.location.assign(url);
     } catch {
       setError("Tidak bisa terhubung ke server. Apakah backend sudah berjalan?");
       setLoading(false);

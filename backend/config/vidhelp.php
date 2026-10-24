@@ -94,6 +94,25 @@ return [
         'challenge_attempts' => 5,
 
         'recovery_codes' => 8,
+
+        // Wrong codes one account may enter across sign-ins before the code step is blocked for a while
+        'user_attempts' => 10,
+        'user_decay_minutes' => 15,
+    ],
+
+    // Wrong passwords before signing in to that email is blocked for a while: from one IP, and in total
+    // (many IPs guessing one account). A correct password resets both.
+    'login' => [
+        'max_attempts' => 5,
+        'decay_minutes' => 1,
+        'account_max_attempts' => 20,
+        'account_decay_minutes' => 15,
+    ],
+
+    // The first admin, created by RoleSeeder. Production refuses to create it without a password here.
+    'seed_admin' => [
+        'email' => env('ADMIN_SEED_EMAIL', 'admin@vidhelp.com'),
+        'password' => env('ADMIN_SEED_PASSWORD'),
     ],
 
     // How long a sign-in lasts: at most `max_hours` after logging in, and it ends early after

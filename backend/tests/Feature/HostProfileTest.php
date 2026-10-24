@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AppNotification;
+use App\Models\AuditLog;
 use App\Models\HostRateCategory;
 use App\Models\ProfileChangeRequest;
 use App\Models\User;
@@ -11,6 +12,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -48,6 +50,43 @@ class HostProfileTest extends TestCase
     private function category(string $name): HostRateCategory
     {
         return HostRateCategory::where('name', $name)->firstOrFail();
+    }
+
+    public function test_changing_password_signs_out_every_other_device(): void
+    {
+        $user = $this->activeHost();
+        $phone = $user->issueToken();
+        $stolen = $user->issueToken();
+
+        $this->withToken($phone)->postJson('/api/host/profile/password', [
+            'current_password' => 'wrong', 'password' => 'new-password', 'password_confirmation' => 'new-password',
+        ])->assertUnprocessable();
+        $this->withToken($phone)->postJson('/api/host/profile/password', [
+            'current_password' => 'password', 'password' => 'new-password', 'password_confirmation' => 'new-password',
+        ])->assertOk();
+
+        $this->assertTrue(Hash::check('new-password', $user->fresh()->password));
+        $this->assertSame(1, $user->tokens()->count());
+        $this->assertSame(1, AuditLog::where('action', 'password_changed')->where('target_id', $user->id)->count());
+        $this->app['auth']->forgetGuards();
+        $this->withToken($stolen)->getJson('/api/host/profile')->assertUnauthorized();
+        $this->app['auth']->forgetGuards();
+        $this->withToken($phone)->getJson('/api/host/profile')->assertOk();
+    }
+
+    public function test_guessing_the_current_password_is_throttled(): void
+    {
+        $token = $this->activeHost()->issueToken();
+
+        foreach (range(1, 5) as $attempt) {
+            $this->withToken($token)->postJson('/api/host/profile/password', [
+                'current_password' => "guess-{$attempt}", 'password' => 'new-password', 'password_confirmation' => 'new-password',
+            ])->assertUnprocessable();
+        }
+
+        $this->withToken($token)->postJson('/api/host/profile/password', [
+            'current_password' => 'password', 'password' => 'new-password', 'password_confirmation' => 'new-password',
+        ])->assertTooManyRequests();
     }
 
     public function test_approving_a_host_creates_their_profile_on_the_lowest_level(): void

@@ -85,10 +85,10 @@ export const authApi = {
   changePassword: (token: string, data: { current_password?: string; password: string; password_confirmation: string }) =>
     post("/host/profile/password", token, data),
 
-  googleRedirect: () => api<{ url: string }>("/auth/google/redirect"),
+  googleRedirect: () => api<{ url: string; state: string }>("/auth/google/redirect"),
 
-  /** Exchange the authorization code Google redirected back with. */
-  googleCallback: (code: string) => api<AuthSession | PendingSignup | TwoFactorChallenge>(`/auth/google/callback${query({ code })}`),
+  /** Exchange the authorization code Google redirected back with (and the backend's `state`, checked once). */
+  googleCallback: (code: string, state: string) => api<AuthSession | PendingSignup | TwoFactorChallenge>(`/auth/google/callback${query({ code, state })}`),
 };
 
 export interface TwoFactorStatus {

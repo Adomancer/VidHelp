@@ -38,7 +38,7 @@ async function finish(token: string, params: URLSearchParams): Promise<string | 
   if (!expected || expected !== params.get("state")) return "Link ini sudah kedaluwarsa. Silakan coba lagi dari profil kamu.";
 
   try {
-    await discordApi.link(token, code);
+    await discordApi.link(token, code, expected);
     return null;
   } catch (caught) {
     return errorMessage(caught);

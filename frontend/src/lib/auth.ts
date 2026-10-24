@@ -79,13 +79,12 @@ export function homePathFor(user: AuthUser): string {
 | Google OAuth state (CSRF protection for the redirect round-trip)
 |--------------------------------------------------------------------------
 */
-export function createOAuthState(): string {
-  const state = crypto.randomUUID();
+/** Keep the backend's `state` for the consent screen this tab is leaving for (the backend checks it again). */
+export function rememberOAuthState(state: string): void {
   sessionStorage.setItem(OAUTH_STATE_KEY, state);
-  return state;
 }
 
-/** True if `state` matches the one we created before leaving for Google. Single use. */
+/** True if `state` matches the one remembered before leaving for Google. Single use. */
 export function consumeOAuthState(state: string | null): boolean {
   const expected = sessionStorage.getItem(OAUTH_STATE_KEY);
   sessionStorage.removeItem(OAUTH_STATE_KEY);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Host;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\HostProfile;
 use App\Models\ProfileChangeRequest;
 use App\Models\User;
@@ -12,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class ProfileController extends Controller
 {
@@ -162,6 +164,13 @@ class ProfileController extends Controller
         $user->update([
             'password' => Hash::make($request->password),
         ]);
+
+        // Changing the password is how someone locks out whoever else has their account: sign out everywhere else
+        $current = $user->currentAccessToken();
+        $user->tokens()
+            ->when($current instanceof PersonalAccessToken, fn ($q) => $q->whereKeyNot($current->getKey()))
+            ->delete();
+        AuditLog::record('password_changed', $user, actor: $user);
 
         return response()->json(['message' => 'Kata sandi berhasil diganti']);
     }

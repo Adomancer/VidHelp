@@ -10,13 +10,17 @@ use App\Services\Notifier;
 use App\Services\TwoFactorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     use SignsUserIn;
+
+    /** A bcrypt hash (cost 12, like real passwords) that no password matches. */
+    private const DUMMY_HASH = '$2y$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
     /**
      * Register a new user.
@@ -57,14 +61,35 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
+        // Tries are limited per email from one IP, and per email in total (many IPs, one account). Each
+        // try counts before the password is checked, so tries sent at once can't all get through; a
+        // right password resets both.
+        $email = Str::lower($request->email);
+        $limits = [
+            "login:{$email}|{$request->ip()}" => [config('vidhelp.login.max_attempts'), config('vidhelp.login.decay_minutes')],
+            "login:{$email}" => [config('vidhelp.login.account_max_attempts'), config('vidhelp.login.account_decay_minutes')],
+        ];
+        foreach ($limits as $key => [$maxAttempts, $decayMinutes]) {
+            if (RateLimiter::increment($key, $decayMinutes * 60) > $maxAttempts) {
+                throw ValidationException::withMessages([
+                    'email' => ['Terlalu banyak percobaan masuk. Coba lagi dalam '.max(1, (int) ceil(RateLimiter::availableIn($key) / 60)).' menit.'],
+                ]);
+            }
+        }
+
         $user = User::where('email', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        // Checked against a dummy hash when there is no password, so an unknown email takes as long to answer
+        if (! Hash::check($request->password, $user?->password ?? self::DUMMY_HASH) || ! $user) {
             AuditLog::record('login_failed', $user, new: ['email' => $request->email, 'method' => 'password']);
 
             throw ValidationException::withMessages([
                 'email' => ['Email atau kata sandi salah.'],
             ]);
+        }
+
+        foreach (array_keys($limits) as $key) {
+            RateLimiter::clear($key);
         }
 
         if ($reason = $user->loginBlockedReason()) {

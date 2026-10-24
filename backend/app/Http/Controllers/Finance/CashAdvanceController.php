@@ -94,11 +94,7 @@ class CashAdvanceController extends Controller
      */
     public function destroy(CashAdvance $advance): JsonResponse
     {
-        if ($advance->installments()->where('status', '!=', 'scheduled')->exists()) {
-            return response()->json(['message' => 'Sebagian kasbon ini sudah dibayar; tidak bisa dihapus lagi.'], 422);
-        }
-
-        $advance->delete();
+        $this->payroll->deleteAdvance($advance);
 
         return response()->json(['message' => 'Kasbon dihapus']);
     }

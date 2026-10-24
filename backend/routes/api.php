@@ -322,7 +322,7 @@ Route::middleware(['auth:sanctum', 'active', 'two_factor'])->group(function () {
         // My Profile
         Route::get('/profile', [ProfileController::class, 'show']);
         Route::put('/profile', [ProfileController::class, 'update']);
-        Route::post('/profile/password', [ProfileController::class, 'changePassword']);
+        Route::post('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:5,1');
         Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
         Route::put('/profile/sensitive', [ProfileController::class, 'updateSensitive']);
         Route::post('/profile/changes/{change}/cancel', [ProfileController::class, 'cancelChange']);

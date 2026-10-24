@@ -2,13 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Attendance;
 use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\HostBrandAssignment;
+use App\Models\LiveReport;
 use App\Models\ScheduleSlot;
 use App\Models\User;
+use App\Models\WorkSession;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -190,6 +194,73 @@ class ScheduleTest extends TestCase
         $this->actingAs($this->operator)->deleteJson("/api/operator/schedules/{$id}")->assertOk();
 
         $this->assertNull(ScheduleSlot::find($id));
+    }
+
+    public function test_removing_a_slot_someone_already_went_live_on_keeps_the_paid_hours(): void
+    {
+        // Added today, worked today, removed today
+        $assignment = $this->assignment($this->brand());
+        $slot = ScheduleSlot::find($this->addSlot($assignment, today()->dayOfWeekIso, '08:00', '10:00')->json('slot.id'));
+        $date = today()->toDateString();
+        $attendance = Attendance::create([
+            'host_id' => $assignment->host_id, 'slot_id' => $slot->id, 'brand_id' => $assignment->brand_id, 'session_date' => $date,
+            'scheduled_start_at' => "{$date} 08:00", 'scheduled_end_at' => "{$date} 10:00",
+            'check_in_at' => "{$date} 08:00", 'check_out_at' => "{$date} 10:00", 'report_due_at' => "{$date} 23:59",
+        ]);
+        $report = LiveReport::create([
+            'attendance_id' => $attendance->id, 'host_id' => $assignment->host_id, 'brand_id' => $assignment->brand_id,
+            'session_count' => 1, 'duration_hours' => 2, 'status' => 'approved', 'submitted_at' => now(),
+        ]);
+        $session = WorkSession::create([
+            'live_report_id' => $report->id, 'host_id' => $assignment->host_id, 'brand_id' => $assignment->brand_id,
+            'session_date' => $date, 'start_at' => "{$date} 08:00", 'end_at' => "{$date} 10:00", 'duration_hours' => 2,
+        ]);
+
+        $this->actingAs($this->operator)->deleteJson("/api/operator/schedules/{$slot->id}")->assertOk();
+
+        $this->assertSame('inactive', $slot->fresh()->status);
+        $this->assertNotNull($attendance->fresh());
+        $this->assertNotNull($report->fresh());
+        $this->assertNotNull($session->fresh());
+    }
+
+    public function test_removing_a_future_slot_with_a_backup_cancels_the_backup_and_keeps_its_record(): void
+    {
+        $assignment = $this->assignment($this->brand());
+        $cover = $this->assignment($this->brand());
+        $slot = ScheduleSlot::find($this->addSlot($assignment, 1, '14:00', '16:00', [
+            'effective_from' => today()->addWeek()->toDateString(),
+        ])->json('slot.id'));
+        $start = today()->addWeeks(2)->startOfWeek()->setTime(14, 0);
+        $backup = BackupRequest::create([
+            'slot_id' => $slot->id, 'brand_id' => $assignment->brand_id, 'requesting_host_id' => $assignment->host_id,
+            'backup_date' => $start->toDateString(), 'start_at' => $start, 'end_at' => $start->copy()->addHours(2),
+            'reason_type' => 'permit', 'request_type' => 'open', 'status' => 'filled', 'filled_by_host_id' => $cover->host_id,
+            'auto_fill_at' => $start->copy()->subMinutes(30),
+        ]);
+
+        $this->actingAs($this->operator)->deleteJson("/api/operator/schedules/{$slot->id}")->assertOk();
+
+        $this->assertSame('inactive', $slot->fresh()->status);
+        $this->assertSame('cancelled', $backup->fresh()->status);
+        $this->assertNull($backup->fresh()->filled_by_host_id);
+    }
+
+    public function test_the_database_refuses_to_delete_a_slot_with_a_check_in(): void
+    {
+        $assignment = $this->assignment($this->brand());
+        $slot = ScheduleSlot::create([
+            'assignment_id' => $assignment->id, 'day_of_week' => 1, 'start_time' => '14:00', 'end_time' => '15:00',
+            'effective_from' => today(),
+        ]);
+        Attendance::create([
+            'host_id' => $assignment->host_id, 'slot_id' => $slot->id, 'brand_id' => $assignment->brand_id, 'session_date' => today(),
+            'scheduled_start_at' => today()->setTime(14, 0), 'scheduled_end_at' => today()->setTime(15, 0), 'check_in_at' => today()->setTime(14, 0),
+            'report_due_at' => today()->setTime(23, 59),
+        ]);
+
+        $this->expectException(QueryException::class);
+        $slot->delete();
     }
 
     public function test_stopping_a_slot_from_a_later_date(): void

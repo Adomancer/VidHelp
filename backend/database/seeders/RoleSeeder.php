@@ -5,12 +5,16 @@ namespace Database\Seeders;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class RoleSeeder extends Seeder
 {
+    /** The first admin's password outside production when ADMIN_SEED_PASSWORD is empty. */
+    private const DEV_PASSWORD = 'password';
+
     /**
      * Seed the roles, permissions, and a default admin user.
      */
@@ -71,20 +75,33 @@ class RoleSeeder extends Seeder
             'view-own-ratings',
         ]);
 
-        // Create default admin user
-        $adminUser = User::firstOrCreate(
-            ['email' => 'admin@vidhelp.com'],
-            [
+        // Create the first admin. In production its password must come from ADMIN_SEED_PASSWORD:
+        // with a well-known default anyone could sign in and enrol their own authenticator first.
+        $email = config('vidhelp.seed_admin.email');
+        $password = config('vidhelp.seed_admin.password');
+        $adminUser = User::where('email', $email)->first();
+
+        if (! $adminUser) {
+            if (app()->isProduction() && (blank($password) || $password === self::DEV_PASSWORD)) {
+                throw new RuntimeException('Set ADMIN_SEED_PASSWORD (not "'.self::DEV_PASSWORD.'") before seeding in production.');
+            }
+
+            $adminUser = User::create([
                 'name' => 'Admin',
-                'password' => Hash::make('password'),
+                'email' => $email,
+                'password' => Hash::make(filled($password) ? $password : self::DEV_PASSWORD),
                 'email_verified_at' => now(),
                 'status' => 'active',
                 'signup_source' => 'admin_created',
-            ]
-        );
+            ]);
+        }
         $adminUser->assignRole('admin');
 
         $this->command->info('Roles, permissions, and default admin seeded successfully!');
-        $this->command->info('Default admin: admin@vidhelp.com / password');
+        if ($adminUser->wasRecentlyCreated) {
+            $this->command->info(filled($password) ? "Default admin: {$email} (password from ADMIN_SEED_PASSWORD)" : "Default admin: {$email} / ".self::DEV_PASSWORD);
+        } elseif (app()->isProduction() && Hash::check(self::DEV_PASSWORD, (string) $adminUser->password)) {
+            $this->command->error("{$email} still has the development password. Change it now.");
+        }
     }
 }

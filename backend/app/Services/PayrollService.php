@@ -92,20 +92,72 @@ class PayrollService
     /**
      * Put an approved work session in its period, or the next open one if that period is already
      * locked; the period closes if that reaches the target.
+     *
+     * The period row is locked as requestPayment() locks it, so a session can't join a period
+     * whose pay is being snapshotted without it (it would be neither paid nor carried over).
      */
     public function assign(WorkSession $session): void
     {
         $brand = $session->brand;
-        $period = $this->periodFor($brand, $session->session_date);
 
-        while ($period?->isLocked()) {
-            $period = $this->nextPeriod($period) ?? $this->openPeriod($brand);
-        }
+        $period = DB::transaction(function () use ($session, $brand) {
+            $period = $this->periodFor($brand, $session->session_date);
+
+            while ($period) {
+                $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
+                if (! $period->isLocked()) {
+                    break;
+                }
+                $period = $this->nextPeriod($period) ?? $this->openPeriod($brand);
+            }
+
+            if ($period) {
+                $session->update(['payment_period_id' => $period->id]);
+            }
+
+            return $period;
+        });
 
         if ($period) {
-            $session->update(['payment_period_id' => $period->id]);
             $this->closeIfTargetReached($period);
         }
+    }
+
+    /**
+     * Add or remove hours/sessions for a host in a period whose pay isn't requested yet.
+     *
+     * @param  array{host_id: string, sessions_added: int|string, hours_added: float|string, notes: string}  $attributes
+     */
+    public function addAdjustment(PaymentPeriod $period, array $attributes, User $by): HourAdjustment
+    {
+        return DB::transaction(function () use ($period, $attributes, $by) {
+            $period = $this->lockOpen($period);
+
+            return $period->adjustments()->create([
+                ...$attributes,
+                'hours_added' => round((float) $attributes['hours_added'], 2),
+                'created_by' => $by->id,
+            ]);
+        });
+    }
+
+    public function removeAdjustment(HourAdjustment $adjustment): void
+    {
+        DB::transaction(function () use ($adjustment) {
+            $this->lockOpen($adjustment->period);
+            $adjustment->delete();
+        });
+    }
+
+    /** Lock the period against requestPayment(), refusing one whose pay is already snapshotted. */
+    private function lockOpen(PaymentPeriod $period): PaymentPeriod
+    {
+        $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
+        if ($period->isLocked()) {
+            throw ValidationException::withMessages(['period' => ['Periode ini terkunci; pembayaran sudah diajukan.']]);
+        }
+
+        return $period;
     }
 
     /** Sessions approved before the brand had a payroll start date, oldest first so periods fill in order. */
@@ -667,8 +719,9 @@ class PayrollService
             $period->paymentRequest?->update(['status' => 'paid', 'paid_at' => now(), 'payment_reference' => $reference]);
             $period->update(['status' => 'paid']);
 
-            // Hosts whose hours all carried over (or who only have backups paid by another host) get no slip
-            return $period->items()->where('hours', '>', 0)->get()->map(function ($item) use ($period) {
+            // Hosts whose hours all carried over (or who only have backups paid by another host) get no slip.
+            // By host, so two periods paid at once lock the hosts' kasbon in the same order (no deadlock).
+            return $period->items()->where('hours', '>', 0)->orderBy('host_id')->get()->map(function ($item) use ($period) {
                 $slip = SalarySlip::create([
                     'host_id' => $item->host_id,
                     'payment_period_id' => $period->id,
@@ -703,6 +756,7 @@ class PayrollService
     /**
      * Take the next installment of each of the host's open kasbon (oldest first) if the slip covers it.
      * An installment that doesn't fit waits for the next slip; it is counted and listed on this slip as skipped.
+     * The kasbon are locked, so slips from two brands paid at once can't both take the same installment.
      *
      * @return array{0: float, 1: list<array{type: string, seq: int, installment_count: int, amount: float}>}
      */
@@ -715,10 +769,12 @@ class PayrollService
         $advances = CashAdvance::where('host_id', $slip->host_id)
             ->whereIn('status', ['unpaid', 'in_progress'])
             ->orderBy('requested_at')
+            ->orderBy('id')
+            ->lockForUpdate()
             ->get();
 
         foreach ($advances as $advance) {
-            $installment = $advance->installments()->where('status', 'scheduled')->first();
+            $installment = $advance->installments()->where('status', 'scheduled')->orderBy('seq')->lockForUpdate()->first();
             if (! $installment) {
                 continue;
             }
@@ -888,6 +944,22 @@ class PayrollService
             ]);
 
             return $advance->load('installments');
+        });
+    }
+
+    /**
+     * Remove a kasbon recorded by mistake, as long as nothing was paid back yet. Locked so it
+     * can't disappear while a slip is taking its installment.
+     */
+    public function deleteAdvance(CashAdvance $advance): void
+    {
+        DB::transaction(function () use ($advance) {
+            $advance = CashAdvance::lockForUpdate()->findOrFail($advance->id);
+            if ($advance->installments()->where('status', '!=', 'scheduled')->exists()) {
+                throw ValidationException::withMessages(['advance' => ['Sebagian kasbon ini sudah dibayar; tidak bisa dihapus lagi.']]);
+            }
+
+            $advance->delete();
         });
     }
 

@@ -22,16 +22,17 @@ type Outcome =
  */
 async function finishGoogleLogin(params: URLSearchParams): Promise<Outcome> {
   const code = params.get("code");
+  const state = params.get("state");
 
   if (params.get("error") || !code) {
     return { kind: "error", message: "Masuk dengan Google dibatalkan." };
   }
-  if (!consumeOAuthState(params.get("state"))) {
+  if (!state || !consumeOAuthState(state)) {
     return { kind: "error", message: "Link masuk ini sudah kedaluwarsa. Silakan coba lagi." };
   }
 
   try {
-    const response = await authApi.googleCallback(code);
+    const response = await authApi.googleCallback(code, state);
 
     if ("two_factor" in response) {
       return { kind: "two-factor", challengeToken: response.challenge_token };

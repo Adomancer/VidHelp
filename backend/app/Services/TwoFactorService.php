@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -208,12 +209,14 @@ class TwoFactorService
     public function startChallenge(User $user, string $method, string $tokenName): string
     {
         $challenge = Str::random(64);
+        $expires = now()->addMinutes(config('vidhelp.two_factor.challenge_minutes'));
         Cache::put($this->challengeKey($challenge), [
             'user_id' => $user->id,
             'method' => $method,
             'token_name' => $tokenName,
-            'attempts' => 0,
-        ], now()->addMinutes(config('vidhelp.two_factor.challenge_minutes')));
+        ], $expires);
+        // A counter of its own, so codes sent at the same time are all counted
+        Cache::put($this->challengeKey($challenge).':attempts', 0, $expires);
 
         return $challenge;
     }
@@ -239,22 +242,37 @@ class TwoFactorService
             throw ValidationException::withMessages(['challenge_token' => [$reason]]);
         }
 
+        // Each try is counted before the code is checked, so codes sent at the same time can't all be
+        // checked before the count catches up. Also per account, across sign-ins (someone with the
+        // password could keep starting new ones); a right code gives its try back there.
+        $userKey = "two-factor:{$user->id}";
+        if (RateLimiter::increment($userKey, config('vidhelp.two_factor.user_decay_minutes') * 60) > config('vidhelp.two_factor.user_attempts')) {
+            $minutes = max(1, (int) ceil(RateLimiter::availableIn($userKey) / 60));
+            throw ValidationException::withMessages(['challenge_token' => ["Terlalu banyak kode salah. Coba lagi dalam {$minutes} menit."]]);
+        }
+
+        $maxAttempts = config('vidhelp.two_factor.challenge_attempts');
+        $attempts = Cache::increment($key.':attempts');
+        if ($attempts === false || $attempts > $maxAttempts) {
+            $this->endChallenge($key);
+            throw ValidationException::withMessages(['challenge_token' => ['Terlalu banyak kode salah. Silakan masuk lagi.']]);
+        }
+
         if (! $this->verify($user, $code, $recoveryCode)) {
-            $attempts = $pending['attempts'] + 1;
             AuditLog::record('two_factor_failed', $user, new: ['method' => $pending['method'], 'attempt' => $attempts], actor: $user);
 
-            if ($attempts >= config('vidhelp.two_factor.challenge_attempts')) {
-                Cache::forget($key);
+            if ($attempts >= $maxAttempts) {
+                $this->endChallenge($key);
                 throw ValidationException::withMessages(['challenge_token' => ['Terlalu banyak kode salah. Silakan masuk lagi.']]);
             }
 
-            Cache::put($key, ['attempts' => $attempts] + $pending, now()->addMinutes(config('vidhelp.two_factor.challenge_minutes')));
             throw ValidationException::withMessages([
                 filled($code) ? 'code' : 'recovery_code' => [filled($code) ? 'Kode itu salah.' : 'Kode pemulihan itu salah atau sudah pernah dipakai.'],
             ]);
         }
 
-        Cache::forget($key);
+        RateLimiter::decrement($userKey, config('vidhelp.two_factor.user_decay_minutes') * 60);
+        $this->endChallenge($key);
 
         return ['user' => $user, 'method' => $pending['method'], 'token_name' => $pending['token_name']];
     }
@@ -304,5 +322,11 @@ class TwoFactorService
     private function challengeKey(string $challenge): string
     {
         return 'two-factor-challenge:'.hash('sha256', $challenge);
+    }
+
+    private function endChallenge(string $key): void
+    {
+        Cache::forget($key);
+        Cache::forget($key.':attempts');
     }
 }

@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Testing\TestResponse;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use RuntimeException;
@@ -35,6 +37,14 @@ class GoogleAuthTest extends TestCase
         Socialite::shouldReceive('driver->stateless->user')->andReturn($googleUser);
     }
 
+    /** Google sends the browser back with the code and the state redirect() handed out. */
+    private function googleCallback(string $code = 'abc'): TestResponse
+    {
+        Cache::put('google-oauth-state:the-state', true, now()->addMinutes(10));
+
+        return $this->getJson("/api/auth/google/callback?code={$code}&state=the-state");
+    }
+
     public function test_redirect_returns_google_consent_url(): void
     {
         config(['services.google.client_id' => 'test-client', 'services.google.redirect' => 'http://localhost:3000/auth/google/callback']);
@@ -42,13 +52,57 @@ class GoogleAuthTest extends TestCase
         $response = $this->getJson('/api/auth/google/redirect')->assertOk();
 
         $this->assertStringStartsWith('https://accounts.google.com/o/oauth2/auth', $response->json('url'));
+        $this->assertNotEmpty($response->json('state'));
+        $this->assertStringContainsString('state='.$response->json('state'), $response->json('url'));
+    }
+
+    public function test_callback_needs_the_state_the_redirect_handed_out_once(): void
+    {
+        $this->fakeGoogleUser();
+
+        // A code from a sign-in someone else started (login CSRF)
+        $this->getJson('/api/auth/google/callback?code=abc&state=made-up')->assertUnauthorized();
+        $this->getJson('/api/auth/google/callback?code=abc')->assertUnauthorized();
+
+        $this->googleCallback()->assertStatus(202);
+        $this->getJson('/api/auth/google/callback?code=abc&state=the-state')->assertUnauthorized();
+    }
+
+    public function test_google_login_drops_the_password_chosen_at_an_unverified_sign_up(): void
+    {
+        // Someone signed up with the owner's email and a password of their own, and got approved
+        $user = User::factory()->create(['email' => 'host@gmail.com', 'email_verified_at' => null, 'signup_source' => 'self_register']);
+        $user->assignRole('host');
+        $theirToken = $user->createToken('auth-token')->plainTextToken;
+        $this->fakeGoogleUser();
+
+        $this->googleCallback()->assertOk();
+
+        $user->refresh();
+        $this->assertNull($user->password);
+        $this->assertNotNull($user->email_verified_at);
+        $this->assertSame(1, $user->tokens()->count()); // only the Google sign-in's
+        $this->postJson('/api/auth/login', ['email' => 'host@gmail.com', 'password' => 'password'])->assertJsonValidationErrors('email');
+        $this->app['auth']->forgetGuards();
+        $this->withToken($theirToken)->getJson('/api/auth/me')->assertUnauthorized();
+    }
+
+    public function test_google_login_keeps_the_password_of_an_account_an_admin_created(): void
+    {
+        $user = User::factory()->create(['email' => 'host@gmail.com', 'email_verified_at' => null, 'signup_source' => 'admin_created']);
+        $user->assignRole('host');
+        $this->fakeGoogleUser();
+
+        $this->googleCallback()->assertOk();
+
+        $this->assertNotNull($user->fresh()->password);
     }
 
     public function test_first_google_login_registers_a_pending_host_without_a_token(): void
     {
         $this->fakeGoogleUser();
 
-        $this->getJson('/api/auth/google/callback?code=abc')
+        $this->googleCallback()
             ->assertStatus(202)
             ->assertJson(['status' => 'pending'])
             ->assertJsonMissing(['token']);
@@ -66,7 +120,7 @@ class GoogleAuthTest extends TestCase
         User::factory()->pending()->create(['email' => 'host@gmail.com', 'google_id' => 'google-123']);
         $this->fakeGoogleUser();
 
-        $this->getJson('/api/auth/google/callback?code=abc')
+        $this->googleCallback()
             ->assertForbidden()
             ->assertJson(['status' => 'pending']);
     }
@@ -86,7 +140,7 @@ class GoogleAuthTest extends TestCase
 
         $this->fakeGoogleUser();
 
-        $response = $this->getJson('/api/auth/google/callback?code=abc')
+        $response = $this->googleCallback()
             ->assertOk()
             ->assertJsonPath('user.roles.0.name', 'host');
 
@@ -99,7 +153,7 @@ class GoogleAuthTest extends TestCase
         $admin = User::where('email', 'admin@vidhelp.com')->firstOrFail();
         $this->fakeGoogleUser('admin@vidhelp.com');
 
-        $this->getJson('/api/auth/google/callback?code=abc')
+        $this->googleCallback()
             ->assertOk()
             ->assertJsonPath('user.roles.0.name', 'admin');
 
@@ -111,7 +165,7 @@ class GoogleAuthTest extends TestCase
     {
         $this->fakeGoogleUser(verified: false);
 
-        $this->getJson('/api/auth/google/callback?code=abc')->assertForbidden();
+        $this->googleCallback()->assertForbidden();
 
         $this->assertDatabaseMissing('users', ['email' => 'host@gmail.com']);
     }
@@ -120,7 +174,7 @@ class GoogleAuthTest extends TestCase
     {
         Socialite::shouldReceive('driver->stateless->user')->andThrow(new RuntimeException('invalid_grant'));
 
-        $this->getJson('/api/auth/google/callback?code=bad')->assertUnauthorized();
+        $this->googleCallback('bad')->assertUnauthorized();
     }
 
     public function test_email_registration_is_pending_and_cannot_log_in(): void

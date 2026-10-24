@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Totp;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -147,14 +148,38 @@ class TwoFactorTest extends TestCase
             ->assertJsonValidationErrors('challenge_token');
     }
 
+    public function test_starting_new_sign_ins_does_not_give_more_guesses(): void
+    {
+        [$secret] = $this->enableFor($this->admin);
+
+        // Two sign-ins' worth of wrong codes (a minute apart, past the per-IP limit of the auth routes)
+        foreach (range(1, 2) as $ignored) {
+            $challenge = $this->login()->json('challenge_token');
+            foreach (range(1, 5) as $ignored) {
+                $this->postJson('/api/auth/two-factor-challenge', ['challenge_token' => $challenge, 'code' => '000000'])->assertUnprocessable();
+            }
+            $this->travel(61)->seconds();
+        }
+
+        $challenge = $this->login()->json('challenge_token');
+        $this->postJson('/api/auth/two-factor-challenge', ['challenge_token' => $challenge, 'code' => $this->nextCode($secret)])
+            ->assertJsonValidationErrors(['challenge_token' => 'Coba lagi dalam']);
+
+        $this->travel(15)->minutes();
+        $challenge = $this->login()->json('challenge_token');
+        $this->postJson('/api/auth/two-factor-challenge', ['challenge_token' => $challenge, 'code' => $this->nextCode($secret)])
+            ->assertOk()->assertJsonStructure(['token']);
+    }
+
     public function test_google_login_also_asks_admins_for_a_code(): void
     {
         $this->enableFor($this->admin);
         $googleUser = (new SocialiteUser)->map(['id' => 'google-1', 'name' => 'Admin', 'email' => 'boss@vidhelp.com']);
         $googleUser->user = ['email_verified' => true];
         Socialite::shouldReceive('driver->stateless->user')->andReturn($googleUser);
+        Cache::put('google-oauth-state:the-state', true, now()->addMinutes(10));
 
-        $this->getJson('/api/auth/google/callback?code=abc')
+        $this->getJson('/api/auth/google/callback?code=abc&state=the-state')
             ->assertOk()
             ->assertJson(['two_factor' => true])
             ->assertJsonMissingPath('token');

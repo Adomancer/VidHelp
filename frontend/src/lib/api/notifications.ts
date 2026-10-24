@@ -42,8 +42,8 @@ export interface DiscordStatus {
 
 export const discordApi = {
   status: (token: string) => api<DiscordStatus>("/discord", { token }),
-  connectUrl: (token: string, state: string) => api<{ url: string }>(`/discord/connect-url${query({ state })}`, { token }),
-  link: (token: string, code: string) => post<{ link: DiscordLink } & Message>("/discord/link", token, { code }),
+  connectUrl: (token: string) => api<{ url: string; state: string }>("/discord/connect-url", { token }),
+  link: (token: string, code: string, state: string) => post<{ link: DiscordLink } & Message>("/discord/link", token, { code, state }),
   unlink: (token: string) => del("/discord/link", token),
   test: (token: string) => post("/discord/test", token, undefined, { invalidates: false }),
   preferences: (token: string, muted: string[]) => put<{ link: DiscordLink } & Message>("/discord/preferences", token, { muted }),

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AppNotification;
 use App\Models\Attendance;
+use App\Models\AuditLog;
 use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\DiscordLink;
@@ -93,6 +94,12 @@ class NotificationTest extends TestCase
     private function link(User $user, string $discordId, array $muted = []): DiscordLink
     {
         return DiscordLink::create(['user_id' => $user->id, 'discord_user_id' => $discordId, 'muted_categories' => $muted, 'linked_at' => now()]);
+    }
+
+    /** The state "Connect Discord" hands this user for the consent page. */
+    private function connectState(User $user): string
+    {
+        return $this->actingAs($user)->getJson('/api/discord/connect-url')->assertOk()->json('state');
     }
 
     /** The messages posted to a Discord channel (a server channel or "dm-<user>"). */
@@ -324,11 +331,12 @@ class NotificationTest extends TestCase
         $user = $this->other->user;
 
         $this->actingAs($user)->getJson('/api/discord')->assertJsonPath('available', true)->assertJsonPath('link', null);
-        $this->assertStringStartsWith('https://discord.com/oauth2/authorize?', $this->actingAs($user)->getJson('/api/discord/connect-url?state=abc')->json('url'));
+        $consent = $this->actingAs($user)->getJson('/api/discord/connect-url')->assertOk();
+        $this->assertStringStartsWith('https://discord.com/oauth2/authorize?', $consent->json('url'));
+        $this->assertStringContainsString('scope=identify+guilds.join', $consent->json('url'));
+        $this->assertStringContainsString('state='.$consent->json('state'), $consent->json('url'));
 
-        $this->assertStringContainsString('scope=identify+guilds.join', $this->actingAs($user)->getJson('/api/discord/connect-url?state=abc')->json('url'));
-
-        $this->actingAs($user)->postJson('/api/discord/link', ['code' => 'the-code'])->assertOk()
+        $this->actingAs($user)->postJson('/api/discord/link', ['code' => 'the-code', 'state' => $consent->json('state')])->assertOk()
             ->assertJsonPath('link.discord_username', 'Samuel')
             ->assertJsonPath('link.muted', [])
             ->assertJsonPath('link.in_guild', true);
@@ -341,10 +349,33 @@ class NotificationTest extends TestCase
         $this->assertStringStartsWith('🔔 Halo ', $this->posted('dm-777')->sole()['embeds'][0]['title']);
 
         // The same Discord account can't be linked to a second VidHelp user
-        $this->actingAs($this->requester->user)->postJson('/api/discord/link', ['code' => 'the-code'])->assertJsonValidationErrors('code');
+        $this->actingAs($this->requester->user)->postJson('/api/discord/link', ['code' => 'the-code', 'state' => $this->connectState($this->requester->user)])->assertJsonValidationErrors('code');
 
         $this->actingAs($user)->deleteJson('/api/discord/link')->assertOk();
         $this->assertSame(0, DiscordLink::count());
+    }
+
+    public function test_linking_discord_needs_this_users_state_once(): void
+    {
+        $this->discord();
+        Http::fake([
+            'discord.com/api/oauth2/token' => Http::response(['access_token' => 'user-token']),
+            'discord.com/api/v10/users/@me' => Http::response(['id' => '777', 'username' => 'attacker']),
+        ]);
+        $victim = $this->other->user;
+
+        // The attacker's own consent page and code, finished in the victim's browser
+        $attackerState = $this->connectState($this->requester->user);
+        $this->actingAs($victim)->postJson('/api/discord/link', ['code' => 'the-code', 'state' => $attackerState])->assertJsonValidationErrors('code');
+        $this->actingAs($victim)->postJson('/api/discord/link', ['code' => 'the-code'])->assertJsonValidationErrors('state');
+        Http::assertNothingSent();
+
+        $state = $this->connectState($victim);
+        $this->actingAs($victim)->postJson('/api/discord/link', ['code' => 'the-code', 'state' => $state])->assertOk();
+        $this->actingAs($victim)->postJson('/api/discord/link', ['code' => 'the-code', 'state' => $state])->assertJsonValidationErrors('code');
+
+        $this->assertSame(1, DiscordLink::count());
+        $this->assertSame(1, AuditLog::where('action', 'discord_linked')->where('target_id', $victim->id)->count());
     }
 
     public function test_muted_categories_skip_the_dm_but_critical_ones_still_come(): void
@@ -376,7 +407,7 @@ class NotificationTest extends TestCase
             'discord.com/api/v10/users/@me' => Http::response(['id' => '888', 'username' => 'boss']),
         ]);
 
-        $this->actingAs($this->admin)->postJson('/api/discord/link', ['code' => 'the-code'])->assertOk()->assertJsonPath('link.muted', ['admin']);
+        $this->actingAs($this->admin)->postJson('/api/discord/link', ['code' => 'the-code', 'state' => $this->connectState($this->admin)])->assertOk()->assertJsonPath('link.muted', ['admin']);
         $this->actingAs($this->admin)->getJson('/api/discord')->assertJsonPath('categories.0.key', 'payroll');
         $this->actingAs($this->admin)->putJson('/api/discord/preferences', ['muted' => []])->assertOk()->assertJsonPath('link.muted', []);
 

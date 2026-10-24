@@ -132,8 +132,6 @@ class PayrollController extends Controller
      */
     public function storeAdjustment(Request $request, PaymentPeriod $period): JsonResponse
     {
-        $this->ensureOpen($period);
-
         $validated = $request->validate([
             'host_id' => 'required|exists:host_profiles,id',
             'sessions_added' => 'required|integer|between:-50,50',
@@ -144,20 +142,14 @@ class PayrollController extends Controller
             throw ValidationException::withMessages(['hours_added' => ['Tambah atau kurangi jam atau sesi.']]);
         }
 
-        $adjustment = $period->adjustments()->create([
-            ...$validated,
-            'hours_added' => round((float) $validated['hours_added'], 2),
-            'created_by' => $request->user()->id,
-        ]);
+        $adjustment = $this->payroll->addAdjustment($period, $validated, $request->user());
 
         return response()->json(['adjustment' => $adjustment, 'message' => 'Penyesuaian ditambahkan'], 201);
     }
 
     public function destroyAdjustment(HourAdjustment $adjustment): JsonResponse
     {
-        $this->ensureOpen($adjustment->period);
-
-        $adjustment->delete();
+        $this->payroll->removeAdjustment($adjustment);
 
         return response()->json(['message' => 'Penyesuaian dihapus']);
     }
@@ -251,12 +243,5 @@ class PayrollController extends Controller
     public function slip(SalarySlip $slip): JsonResponse
     {
         return response()->json(['slip' => $this->payroll->slipDetail($slip)]);
-    }
-
-    private function ensureOpen(PaymentPeriod $period): void
-    {
-        if ($period->isLocked()) {
-            throw ValidationException::withMessages(['period' => ['Periode ini terkunci; pembayaran sudah diajukan.']]);
-        }
     }
 }
