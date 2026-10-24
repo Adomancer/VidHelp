@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\AuditLog;
 use App\Models\BackupRequest;
+use App\Models\Brand;
 use App\Models\HostBrandAssignment;
+use App\Models\HostProfile;
 use App\Models\ScheduleSlot;
 use App\Models\SpecialEvent;
 use App\Services\BackupService;
@@ -169,8 +171,10 @@ class ScheduleController extends Controller
         }
 
         $schedule->fill($this->validated($request, $schedule));
-        $this->ensureNoConflicts($schedule);
-        $schedule->save();
+        DB::transaction(function () use ($schedule) {
+            $this->ensureNoConflicts($schedule);
+            $schedule->save();
+        });
 
         return response()->json(['slot' => $this->load($schedule), 'message' => 'Slot diperbarui']);
     }
@@ -334,8 +338,14 @@ class ScheduleController extends Controller
         return isset($validated['days_of_week']) ? collect($validated['days_of_week'])->map(fn ($day) => (int) $day)->sort()->values()->all() : null;
     }
 
+    /** Call inside a transaction: locks the brand and the host until it commits. */
     private function ensureNoConflicts(ScheduleSlot $slot): void
     {
+        // Two slots saved at once for the same brand or host wait here, so the second sees the first
+        $assignment = $slot->assignment;
+        Brand::whereKey($assignment->brand_id)->lockForUpdate()->first();
+        HostProfile::whereKey($assignment->host_id)->lockForUpdate()->first();
+
         $clash = $slot->conflicts()->first();
 
         if ($clash) {

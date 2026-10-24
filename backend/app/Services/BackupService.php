@@ -13,7 +13,9 @@ use Carbon\CarbonInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Backup rules: opening a request (to everyone or to named hosts), who may cover it,
@@ -81,14 +83,7 @@ class BackupService
             ]]);
         }
 
-        $duplicate = BackupRequest::where('slot_id', $slot->id)
-            ->whereDate('backup_date', $backup->backup_date)
-            ->whereIn('status', ['pending', 'open', 'filled'])
-            ->exists();
-        if ($duplicate) {
-            throw ValidationException::withMessages(['backup_date' => ['Sudah ada permintaan backup untuk slot ini di tanggal itu.']]);
-        }
-
+        $this->ensureNoActiveRequest($slot, $backup);
         $nominees = $this->checkNominees($backup, $nomineeIds);
 
         $backup->fill([
@@ -98,14 +93,27 @@ class BackupService
             'status' => 'open',
         ]);
 
-        DB::transaction(function () use ($backup, $nominees, $letter, $by) {
-            $backup->save();
-            $nominees->each(fn (HostProfile $host) => $backup->nominees()->create(['nominee_host_id' => $host->id]));
+        // Stored before the transaction and removed again if it rolls back, so no letter is left without its request
+        $letterPath = $letter?->store('backup-letters', 'local');
+        try {
+            DB::transaction(function () use ($slot, $backup, $nominees, $letter, $letterPath, $by) {
+                // One active request per slot and date: two sent at once wait here, and the second sees the first
+                ScheduleSlot::whereKey($slot->id)->lockForUpdate()->first();
+                $this->ensureNoActiveRequest($slot, $backup);
 
-            if ($letter) {
-                $this->attachLetter($backup, $letter, $by);
+                $backup->save();
+                $nominees->each(fn (HostProfile $host) => $backup->nominees()->create(['nominee_host_id' => $host->id]));
+
+                if ($letter) {
+                    $this->recordLetter($backup, $letter, $letterPath, $by);
+                }
+            });
+        } catch (Throwable $e) {
+            if ($letterPath) {
+                Storage::disk('local')->delete($letterPath);
             }
-        });
+            throw $e;
+        }
 
         if ($announce) {
             $this->announceOpen($backup);
@@ -147,11 +155,34 @@ class BackupService
         return $hosts;
     }
 
-    /** Store a sick letter (or other proof) for the request. */
+    private function ensureNoActiveRequest(ScheduleSlot $slot, BackupRequest $backup): void
+    {
+        $duplicate = BackupRequest::where('slot_id', $slot->id)
+            ->whereDate('backup_date', $backup->backup_date)
+            ->whereIn('status', ['pending', 'open', 'filled'])
+            ->exists();
+        if ($duplicate) {
+            throw ValidationException::withMessages(['backup_date' => ['Sudah ada permintaan backup untuk slot ini di tanggal itu.']]);
+        }
+    }
+
+    /** Store a sick letter (or other proof) for the request; the file is removed again if saving it fails. */
     public function attachLetter(BackupRequest $backup, UploadedFile $file, User $by): void
     {
+        $path = $file->store('backup-letters', 'local');
+
+        try {
+            DB::transaction(fn () => $this->recordLetter($backup, $file, $path, $by));
+        } catch (Throwable $e) {
+            Storage::disk('local')->delete($path);
+            throw $e;
+        }
+    }
+
+    private function recordLetter(BackupRequest $backup, UploadedFile $file, string $path, User $by): void
+    {
         $backup->attachments()->create([
-            'file_path' => $file->store('backup-letters', 'local'),
+            'file_path' => $path,
             'original_name' => $file->getClientOriginalName(),
             'mime_type' => $file->getMimeType(),
             'size_kb' => (int) ceil($file->getSize() / 1024),

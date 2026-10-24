@@ -21,8 +21,10 @@ use App\Services\PayrollService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -147,6 +149,23 @@ class PayrollTest extends TestCase
     private function period(string $start): PaymentPeriod
     {
         return PaymentPeriod::where('brand_id', $this->brand->id)->whereDate('period_start', $start)->firstOrFail();
+    }
+
+    public function test_hosts_brands_and_users_with_pay_history_cannot_be_deleted(): void
+    {
+        $this->workSession($this->host, '2026-10-04', 3);
+
+        foreach ([$this->host, $this->brand, $this->host->user] as $record) {
+            try {
+                DB::transaction(fn () => $record instanceof User ? $record->forceDelete() : $record->delete());
+                $this->fail(class_basename($record).' with pay history was deleted.');
+            } catch (QueryException) {
+                // refused by the database
+            }
+        }
+
+        $this->assertSame(1, WorkSession::where('host_id', $this->host->id)->count());
+        $this->assertSame(1, PaymentPeriod::where('brand_id', $this->brand->id)->count());
     }
 
     public function test_period_runs_until_the_target_then_the_next_starts(): void

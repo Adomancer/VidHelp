@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AppNotification;
+use App\Models\Attachment;
 use App\Models\BackupApplication;
 use App\Models\BackupQuota;
 use App\Models\BackupRequest;
@@ -17,6 +18,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Tests\TestCase;
 
 class BackupTest extends TestCase
@@ -524,6 +526,27 @@ class BackupTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('request.letter_status', 'uploaded')
             ->assertJsonCount(2, 'request.nominees');
+    }
+
+    public function test_a_request_that_fails_to_save_leaves_no_sick_letter_behind(): void
+    {
+        Storage::fake('local');
+        $saving = false;
+        Attachment::creating(function () use (&$saving) {
+            $saving = true;
+            throw new RuntimeException('Database went away');
+        });
+
+        $this->actingAs($this->requester->user)->post('/api/host/backups', [
+            'slot_id' => $this->slot->id,
+            'backup_date' => self::TUESDAY,
+            'reason_type' => 'sick',
+            'letter' => UploadedFile::fake()->create('surat-dokter.pdf', 100, 'application/pdf'),
+        ], ['Accept' => 'application/json'])->assertServerError();
+
+        $this->assertTrue($saving);
+        $this->assertSame(0, BackupRequest::count());
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
     public function test_operator_requests_on_behalf_and_it_opens_immediately(): void
