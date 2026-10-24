@@ -13,6 +13,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class VerifyDiscordSignature
 {
+    /** How old (or how far ahead) a request's timestamp may be. */
+    private const MAX_AGE_SECONDS = 300;
+
     public function handle(Request $request, Closure $next): Response
     {
         abort_unless(function_exists('sodium_crypto_sign_verify_detached'), 500, 'Aktifkan ekstensi PHP sodium (extension=sodium di php.ini).');
@@ -21,9 +24,10 @@ class VerifyDiscordSignature
         $signature = (string) $request->header('X-Signature-Ed25519');
         $timestamp = (string) $request->header('X-Signature-Timestamp');
 
+        // A signed request caught on the way can't be sent again later
         $valid = strlen($key) === 64 && ctype_xdigit($key)
             && strlen($signature) === 128 && ctype_xdigit($signature)
-            && $timestamp !== ''
+            && ctype_digit($timestamp) && abs(now()->getTimestamp() - (int) $timestamp) <= self::MAX_AGE_SECONDS
             && sodium_crypto_sign_verify_detached(hex2bin($signature), $timestamp.$request->getContent(), hex2bin($key));
 
         abort_unless($valid, 401, 'Invalid request signature');

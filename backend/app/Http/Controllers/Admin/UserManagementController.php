@@ -23,6 +23,13 @@ class UserManagementController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // An unknown role would make Spatie throw (500) instead of answering 422
+        $request->validate([
+            'role' => 'nullable|in:'.self::ROLES,
+            'status' => 'nullable|in:pending,active,inactive,archived',
+            'search' => 'nullable|string|max:100',
+        ]);
+
         $users = User::with('roles')
             ->when($request->role, fn ($q, $role) => $q->role($role))
             ->when($request->status, fn ($q, $status) => $q->where('status', $status))

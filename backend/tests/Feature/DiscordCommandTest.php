@@ -92,10 +92,10 @@ class DiscordCommandTest extends TestCase
     }
 
     /** Post an interaction signed like Discord does. */
-    private function interact(array $interaction, ?string $signature = null): TestResponse
+    private function interact(array $interaction, ?string $signature = null, ?int $sentAt = null): TestResponse
     {
         $body = json_encode($interaction);
-        $timestamp = (string) now()->getTimestamp();
+        $timestamp = (string) ($sentAt ?? now()->getTimestamp());
 
         return $this->call('POST', '/api/discord/interactions', server: [
             'CONTENT_TYPE' => 'application/json',
@@ -140,6 +140,14 @@ class DiscordCommandTest extends TestCase
         $this->postJson('/api/discord/interactions', ['type' => 1])->assertUnauthorized();
 
         $this->interact(['type' => 1])->assertOk()->assertExactJson(['type' => 1]);
+    }
+
+    public function test_a_signed_request_sent_again_later_is_refused(): void
+    {
+        $this->interact(['type' => 1], sentAt: now()->subMinutes(10)->getTimestamp())->assertUnauthorized();
+        $this->interact(['type' => 1], sentAt: now()->addMinutes(10)->getTimestamp())->assertUnauthorized();
+
+        $this->interact(['type' => 1], sentAt: now()->subMinutes(4)->getTimestamp())->assertOk();
     }
 
     public function test_unlinked_discord_users_are_told_to_connect_first(): void

@@ -109,6 +109,13 @@ return [
         'account_decay_minutes' => 15,
     ],
 
+    // Public sign-up: accounts one IP may create per hour, and how often admins get a Discord
+    // DM / #admin-alerts post about new sign-ups (every sign-up still shows in the bell)
+    'signup' => [
+        'per_ip_per_hour' => 10,
+        'alert_every_minutes' => 60,
+    ],
+
     // The first admin, created by RoleSeeder. Production refuses to create it without a password here.
     'seed_admin' => [
         'email' => env('ADMIN_SEED_EMAIL', 'admin@vidhelp.com'),

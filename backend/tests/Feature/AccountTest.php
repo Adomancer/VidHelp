@@ -84,6 +84,14 @@ class AccountTest extends TestCase
         ])->assertJsonValidationErrors(['email', 'password', 'role']);
     }
 
+    public function test_user_list_refuses_unknown_filters_instead_of_failing(): void
+    {
+        $this->actingAs($this->admin)->getJson('/api/admin/users?role=boss')->assertJsonValidationErrors('role');
+        $this->actingAs($this->admin)->getJson('/api/admin/users?status=deleted')->assertJsonValidationErrors('status');
+
+        $this->actingAs($this->admin)->getJson('/api/admin/users?role=admin')->assertOk()->assertJsonPath('data.0.email', 'admin@vidhelp.com');
+    }
+
     public function test_admins_cannot_change_their_own_role_or_archive_themselves(): void
     {
         $this->actingAs($this->admin)->putJson("/api/admin/users/{$this->admin->id}", ['role' => 'host'])

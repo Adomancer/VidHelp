@@ -3,7 +3,9 @@
 namespace App\Exceptions;
 
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 /**
  * Discord answered with an error. `permanent` errors (bad request, no access, unknown
@@ -28,6 +30,21 @@ class DiscordException extends RuntimeException
             $response->status(),
             is_int($code) ? $code : null,
         );
+    }
+
+    /**
+     * What an admin may see about a failed Discord call: Discord's own status and message, or
+     * a generic line for anything else (connection errors can carry URLs and internals; logged).
+     */
+    public static function describe(Throwable $e): string
+    {
+        if ($e instanceof self) {
+            return Str::limit($e->getMessage(), 200);
+        }
+
+        report($e);
+
+        return 'Tidak bisa menghubungi Discord. Detailnya ada di log server.';
     }
 
     public function permanent(): bool

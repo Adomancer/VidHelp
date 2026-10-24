@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AppNotification;
+use App\Models\AuditLog;
 use App\Models\DiscordLink;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -162,7 +163,35 @@ class AuthFlowTest extends TestCase
 
         $this->assertTrue(Hash::check('new-secret-1', $user->fresh()->password));
         $this->assertSame(0, $user->tokens()->count()); // signed out everywhere
+        $this->assertSame(1, AuditLog::where('action', 'password_reset')->where('target_id', $user->id)->count());
         Http::assertNothingSent(); // no Discord linked, no DM
+    }
+
+    public function test_one_ip_can_only_sign_up_so_often(): void
+    {
+        foreach (range(1, 10) as $i) {
+            $this->postJson('/api/auth/register', [
+                'name' => "Host {$i}", 'email' => "host{$i}@mail.com", 'password' => 'secret123', 'password_confirmation' => 'secret123',
+            ])->assertCreated();
+            // Past the per-minute limit of the auth routes; the sign-up limit is per hour
+            if ($i % 5 === 0) {
+                $this->travel(61)->seconds();
+            }
+        }
+
+        $this->postJson('/api/auth/register', [
+            'name' => 'Host 11', 'email' => 'host11@mail.com', 'password' => 'secret123', 'password_confirmation' => 'secret123',
+        ])->assertTooManyRequests()->assertJson(['message' => 'Terlalu banyak pendaftaran dari jaringan ini. Coba lagi nanti.']);
+        $this->assertDatabaseMissing('users', ['email' => 'host11@mail.com']);
+    }
+
+    public function test_only_the_frontend_may_call_the_api_from_a_browser(): void
+    {
+        $this->getJson('/api/auth/google/redirect', ['Origin' => 'http://localhost:3000'])
+            ->assertHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+        // Answered with the frontend's origin (not "*" or theirs), so the browser refuses the response
+        $this->getJson('/api/auth/google/redirect', ['Origin' => 'https://evil.example'])
+            ->assertHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
     }
 
     public function test_password_reset_link_also_goes_to_a_linked_discord_dm_and_is_never_stored(): void

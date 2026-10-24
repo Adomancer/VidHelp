@@ -7,6 +7,7 @@ use App\Models\AppNotification;
 use App\Models\DiscordLink;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -22,9 +23,7 @@ class Notifier
     /** Minutes to wait after the n-th failed attempt before trying again. */
     private const BACKOFF_MINUTES = [1 => 2, 2 => 10];
 
-    public function __construct(private DiscordClient $discord)
-    {
-    }
+    public function __construct(private DiscordClient $discord) {}
 
     /**
      * In-app notification for each user; with `$dm`, also a Discord DM to those who linked
@@ -79,9 +78,16 @@ class Notifier
         ]));
     }
 
-    /** Someone signed up (email or Google) and waits for approval. */
+    /**
+     * Someone signed up (email or Google) and waits for approval. Every sign-up shows in the bell;
+     * the Discord DM and #admin-alerts post go out at most once per vidhelp.signup.alert_every_minutes,
+     * so a flood of sign-ups can't flood Discord.
+     */
     public function signupPending(User $user): void
     {
+        $minutes = config('vidhelp.signup.alert_every_minutes');
+        $alert = Cache::add('signup-pending-alert', true, now()->addMinutes($minutes));
+
         $notice = Notice::make('signup_pending', "Pendaftar baru: {$user->name}")
             ->body("{$user->email} menunggu persetujuan.")
             ->field('Nama', $user->name)
@@ -90,6 +96,13 @@ class Notifier
             ->about($user)
             ->link('/admin/users', 'Tinjau pendaftar');
 
+        if (! $alert) {
+            $this->toUsers($this->admins(), $notice);
+
+            return;
+        }
+
+        $notice->field('Berikutnya', "Pendaftar lain dalam {$minutes} menit ke depan hanya muncul di lonceng.");
         $this->toUsers($this->admins(), $notice, dm: true);
         $this->toChannel('admin', $notice);
     }
@@ -284,9 +297,7 @@ class Notifier
 
             return null;
         } catch (Throwable $e) {
-            report($e);
-
-            return 'Discord menolak pesannya: '.Str::limit($e->getMessage(), 200).'. Pastikan bot ada di server dan boleh mengirim pesan di channel ini.';
+            return 'Discord menolak pesannya: '.DiscordException::describe($e).'. Pastikan bot ada di server dan boleh mengirim pesan di channel ini.';
         }
     }
 

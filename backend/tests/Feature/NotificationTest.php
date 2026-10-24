@@ -134,6 +134,28 @@ class NotificationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_a_burst_of_signups_reaches_discord_once_an_hour(): void
+    {
+        $this->discord();
+        $this->link($this->admin, 'd-admin');
+        $signUp = fn (string $name) => $this->postJson('/api/auth/register', [
+            'name' => $name, 'email' => strtolower($name).'@host.com', 'password' => 'secret123', 'password_confirmation' => 'secret123',
+        ])->assertCreated();
+
+        $signUp('Nina');
+        $signUp('Rina');
+        $signUp('Tina');
+
+        // Each one in the bell; one DM and one channel post
+        $this->assertSame(3, AppNotification::where('user_id', $this->admin->id)->where('channel', 'web')->where('type', 'signup_pending')->count());
+        $this->assertCount(1, $this->posted('dm-d-admin'));
+        $this->assertCount(1, $this->posted('chan-admin'));
+
+        $this->travel(61)->minutes();
+        $signUp('Vina');
+        $this->assertCount(2, $this->posted('dm-d-admin'));
+    }
+
     public function test_opened_backup_goes_to_other_hosts_and_the_backup_channel(): void
     {
         $this->discord();

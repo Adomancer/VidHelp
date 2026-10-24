@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exceptions\DiscordException;
 use App\Http\Controllers\Controller;
 use App\Models\AppNotification;
 use App\Models\DiscordLink;
@@ -125,7 +126,7 @@ class NotificationDeliveryController extends Controller
         try {
             $preview->send($channelId, $data['type']);
         } catch (Throwable $e) {
-            return response()->json(['message' => 'Discord menolak contoh ini: '.$e->getMessage()], 422);
+            return response()->json(['message' => 'Discord menolak contoh ini: '.DiscordException::describe($e)], 422);
         }
 
         return response()->json(['message' => 'Terkirim']);
@@ -183,7 +184,7 @@ class NotificationDeliveryController extends Controller
         try {
             return ['set' => true, 'ok' => true, 'error' => null, ...$details($fetch())];
         } catch (Throwable $e) {
-            return ['set' => true, 'ok' => false, 'error' => $e->getMessage()];
+            return ['set' => true, 'ok' => false, 'error' => DiscordException::describe($e)];
         }
     }
 }

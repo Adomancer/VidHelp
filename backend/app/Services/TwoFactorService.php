@@ -123,40 +123,43 @@ class TwoFactorService
 
     /**
      * Check an app code or a recovery code for a user who has 2FA on. A recovery code
-     * works once; an app code can't be replayed.
+     * works once; an app code can't be replayed. The row is locked, so the same code sent
+     * twice at once is only accepted once.
      */
     public function verify(User $user, ?string $code, ?string $recoveryCode): bool
     {
-        $record = $this->record($user);
-        if (! $record?->is_enabled) {
-            return false;
-        }
-
-        if (filled($code)) {
-            $step = Totp::verify($record->secret_key_encrypted, $code, $record->last_used_step);
-            if ($step === null) {
+        return DB::transaction(function () use ($user, $code, $recoveryCode) {
+            $record = TwoFactorAuth::where('user_id', $user->id)->lockForUpdate()->first();
+            if (! $record?->is_enabled) {
                 return false;
             }
-            $record->update(['last_used_step' => $step]);
 
-            return true;
-        }
+            if (filled($code)) {
+                $step = Totp::verify($record->secret_key_encrypted, $code, $record->last_used_step);
+                if ($step === null) {
+                    return false;
+                }
+                $record->update(['last_used_step' => $step]);
 
-        if (filled($recoveryCode)) {
-            $typed = self::normalizeRecoveryCode($recoveryCode);
-            $hashes = $record->recovery_codes_hash ?? [];
-            foreach ($hashes as $index => $hash) {
-                if (Hash::check($typed, $hash)) {
-                    unset($hashes[$index]);
-                    $record->update(['recovery_codes_hash' => array_values($hashes)]);
-                    AuditLog::record('recovery_code_used', $user, new: ['codes_left' => count($hashes)], actor: $user);
+                return true;
+            }
 
-                    return true;
+            if (filled($recoveryCode)) {
+                $typed = self::normalizeRecoveryCode($recoveryCode);
+                $hashes = $record->recovery_codes_hash ?? [];
+                foreach ($hashes as $index => $hash) {
+                    if (Hash::check($typed, $hash)) {
+                        unset($hashes[$index]);
+                        $record->update(['recovery_codes_hash' => array_values($hashes)]);
+                        AuditLog::record('recovery_code_used', $user, new: ['codes_left' => count($hashes)], actor: $user);
+
+                        return true;
+                    }
                 }
             }
-        }
 
-        return false;
+            return false;
+        });
     }
 
     /**
