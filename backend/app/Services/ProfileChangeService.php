@@ -111,8 +111,7 @@ class ProfileChangeService
         $host = $request->host()->with(['user', 'sensitiveData'])->firstOrFail();
 
         $request = DB::transaction(function () use ($request, $host, $by, $version) {
-            $request = ProfileChangeRequest::whereKey($request->getKey())->lockForUpdate()->firstOrFail();
-            $this->ensurePending($request);
+            $request = $this->lockPending($request);
 
             if (! hash_equals($request->version(), $version)) {
                 throw ValidationException::withMessages(['version' => ['Host mengubah permintaannya setelah kamu membukanya. Periksa data terbaru lalu setujui lagi.']]);
@@ -144,8 +143,12 @@ class ProfileChangeService
 
     public function reject(ProfileChangeRequest $request, User $by, string $note): void
     {
-        $this->ensurePending($request);
-        $request->update(['status' => 'rejected', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
+        $request = DB::transaction(function () use ($request, $by, $note) {
+            $request = $this->lockPending($request);
+            $request->update(['status' => 'rejected', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
+
+            return $request;
+        });
 
         $this->notifier->toUsers($request->host->user, Notice::make('profile_change_rejected', 'Perubahan data ditolak')
             ->body($note)
@@ -158,14 +161,20 @@ class ProfileChangeService
     /** The host takes their request back. */
     public function cancel(ProfileChangeRequest $request): void
     {
-        $this->ensurePending($request);
-        $request->update(['status' => 'cancelled']);
+        DB::transaction(fn () => $this->lockPending($request)->update(['status' => 'cancelled']));
     }
 
-    private function ensurePending(ProfileChangeRequest $request): void
+    /**
+     * Call inside a transaction. Approve, reject and cancel lock the request first, so one
+     * deciding at the same time as another sees it is no longer pending.
+     */
+    private function lockPending(ProfileChangeRequest $request): ProfileChangeRequest
     {
+        $request = ProfileChangeRequest::whereKey($request->getKey())->lockForUpdate()->firstOrFail();
         if ($request->status !== 'pending') {
             throw ValidationException::withMessages(['request' => ['Permintaan ini sudah diputuskan atau dibatalkan.']]);
         }
+
+        return $request;
     }
 }

@@ -251,6 +251,20 @@ class HostProfileTest extends TestCase
         $this->assertSame('2222222222', $host->hostProfile->fresh()->sensitiveData->bank_account);
     }
 
+    public function test_an_approved_change_cannot_be_rejected_or_cancelled_afterwards(): void
+    {
+        $host = $this->activeHost();
+        $this->actingAs($host)->putJson('/api/host/profile/sensitive', ['bank_name' => 'BCA', 'bank_account' => '1234567890'])->assertOk();
+        $id = ProfileChangeRequest::sole()->id;
+        $this->approve($host);
+
+        $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$id}/reject", ['note' => 'Salah'])->assertJsonValidationErrors('request');
+        $this->actingAs($host)->postJson("/api/host/profile/changes/{$id}/cancel")->assertJsonValidationErrors('request');
+
+        $this->assertSame('approved', ProfileChangeRequest::sole()->status);
+        $this->assertSame('1234567890', $host->hostProfile->fresh()->sensitiveData->bank_account);
+    }
+
     public function test_host_can_cancel_only_their_own_pending_request(): void
     {
         $host = $this->activeHost();
