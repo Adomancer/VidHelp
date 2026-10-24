@@ -42,6 +42,10 @@ return [
 
         // Checking in more than this many minutes after the start counts as late (the "Telat" violation)
         'late_after_minutes' => (int) env('ATTENDANCE_LATE_AFTER_MINUTES', 10),
+
+        // Check-out closes this many minutes after the scheduled end (a live may run over). Later,
+        // the report goes to an operator as "no check-out"; approved hours can't exceed this either.
+        'check_out_closes_minutes' => (int) env('ATTENDANCE_CHECK_OUT_CLOSES_MINUTES', 60),
     ],
 
     // Reminders sent by `notifications:send-reminders` (in-app and Discord DM). 0 turns one off.

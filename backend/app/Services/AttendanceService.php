@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Attendance;
+use App\Models\AuditLog;
 use App\Models\BackupRequest;
 use App\Models\EventSlotClaim;
 use App\Models\HostProfile;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Models\WorkSession;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -200,28 +202,42 @@ class AttendanceService
             throw ValidationException::withMessages(['session' => ['Kamu sudah check-in untuk sesi ini.']]);
         }
 
-        $attendance = Attendance::create([
-            'host_id' => $host->id,
-            'slot_id' => $slotId,
-            'backup_request_id' => $backupRequestId,
-            'event_claim_id' => $eventClaimId,
-            'brand_id' => $brandId,
-            'session_date' => $date,
-            'scheduled_start_at' => $start,
-            'scheduled_end_at' => $end,
-            'check_in_at' => now(),
-            'report_due_at' => now()->addHours(config('vidhelp.attendance.report_due_hours')),
-        ]);
+        try {
+            $attendance = Attendance::create([
+                'host_id' => $host->id,
+                'slot_id' => $slotId,
+                'backup_request_id' => $backupRequestId,
+                'event_claim_id' => $eventClaimId,
+                'brand_id' => $brandId,
+                'session_date' => $date,
+                'scheduled_start_at' => $start,
+                'scheduled_end_at' => $end,
+                'check_in_at' => now(),
+                'report_due_at' => now()->addHours(config('vidhelp.attendance.report_due_hours')),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // A double tap: the other request checked in first
+            throw ValidationException::withMessages(['session' => ['Kamu sudah check-in untuk sesi ini.']]);
+        }
 
         $this->points->penalizeLateCheckIn($attendance);
 
         return $attendance;
     }
 
+    /**
+     * Check out, until check_out_closes_minutes after the scheduled end. Checking out a day later
+     * would make an unattended session look attended and let its report auto-approve.
+     */
     public function checkOut(Attendance $attendance): Attendance
     {
         if ($attendance->check_out_at) {
             throw ValidationException::withMessages(['session' => ['Kamu sudah check-out.']]);
+        }
+
+        $closesAt = $attendance->scheduled_end_at->copy()->addMinutes(config('vidhelp.attendance.check_out_closes_minutes'));
+        if (now()->gt($closesAt)) {
+            throw ValidationException::withMessages(['session' => ['Batas check-out sudah lewat (jam '.$closesAt->format('H:i').'). Kirim laporanmu; operator akan meninjaunya.']]);
         }
 
         $attendance->update(['check_out_at' => now()]);
@@ -234,13 +250,15 @@ class AttendanceService
      */
     public function submitReport(Attendance $attendance, array $data): LiveReport
     {
-        $report = $attendance->report;
+        return DB::transaction(function () use ($attendance, $data) {
+            // A double tap waits here and then sees the first report
+            Attendance::whereKey($attendance->id)->lockForUpdate()->first();
+            $report = LiveReport::where('attendance_id', $attendance->id)->first();
 
-        if ($report && in_array($report->status, ['approved', 'rejected'])) {
-            throw ValidationException::withMessages(['report' => ['Laporan ini sudah '.($report->status === 'approved' ? 'disetujui' : 'ditolak').'.']]);
-        }
+            if ($report && in_array($report->status, ['approved', 'rejected'])) {
+                throw ValidationException::withMessages(['report' => ['Laporan ini sudah '.($report->status === 'approved' ? 'disetujui' : 'ditolak').'.']]);
+            }
 
-        return DB::transaction(function () use ($attendance, $report, $data) {
             $report ??= new LiveReport([
                 'attendance_id' => $attendance->id,
                 'host_id' => $attendance->host_id,
@@ -302,17 +320,25 @@ class AttendanceService
     }
 
     /**
-     * Operator/admin accepts a flagged report, optionally with corrected hours.
+     * Operator/admin accepts a flagged report, optionally with corrected hours. A rejected report
+     * can still be approved (a mistake); that reversal is written to the audit log.
      */
     public function approve(LiveReport $report, User $by, float $hours, ?string $note): LiveReport
     {
-        if ($report->status === 'approved') {
-            throw ValidationException::withMessages(['report' => ['Laporan ini sudah disetujui.']]);
-        }
-
         return DB::transaction(function () use ($report, $by, $hours, $note) {
+            // Two operators deciding at once: the second waits and sees the first decision
+            $report = LiveReport::with('attendance')->lockForUpdate()->findOrFail($report->id);
+            if ($report->status === 'approved') {
+                throw ValidationException::withMessages(['report' => ['Laporan ini sudah disetujui.']]);
+            }
+
+            $wasRejected = $report->status === 'rejected';
             $report->update(['status' => 'approved', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
             $this->createWorkSession($report, $report->attendance, $hours);
+
+            if ($wasRejected) {
+                AuditLog::record('report_reversed', $report, old: ['status' => 'rejected'], new: ['status' => 'approved', 'duration_hours' => $hours], actor: $by);
+            }
 
             return $report;
         });
@@ -320,11 +346,16 @@ class AttendanceService
 
     public function reject(LiveReport $report, User $by, string $note): LiveReport
     {
-        if ($report->status === 'approved') {
-            throw ValidationException::withMessages(['report' => ['Laporan yang sudah disetujui tidak bisa ditolak.']]);
-        }
+        $report = DB::transaction(function () use ($report, $by, $note) {
+            $report = LiveReport::lockForUpdate()->findOrFail($report->id);
+            if ($report->status === 'approved') {
+                throw ValidationException::withMessages(['report' => ['Laporan yang sudah disetujui tidak bisa ditolak.']]);
+            }
 
-        $report->update(['status' => 'rejected', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
+            $report->update(['status' => 'rejected', 'reviewed_by' => $by->id, 'reviewed_at' => now(), 'review_note' => $note]);
+
+            return $report;
+        });
 
         $attendance = $report->attendance;
         $this->notifier->toUsers($report->host->user, Notice::make('report_rejected', 'Laporan live kamu ditolak')

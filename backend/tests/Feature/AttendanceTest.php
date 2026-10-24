@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Attendance;
+use App\Models\AuditLog;
 use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\HostBrandAssignment;
@@ -210,6 +211,24 @@ class AttendanceTest extends TestCase
         $this->report($attendance)->assertJsonPath('report.flag_reasons', ['no_check_out']);
     }
 
+    public function test_check_out_closes_an_hour_after_the_session(): void
+    {
+        $this->travelTo(CarbonImmutable::parse(self::TUESDAY.' 14:00'));
+        $attendance = Attendance::findOrFail($this->checkIn()->json('attendance.id'));
+
+        // The next day: too late to make the session look attended
+        $this->travelTo(CarbonImmutable::parse('2026-10-07 09:00'));
+        $this->actingAs($this->host->user)->postJson("/api/host/live/{$attendance->id}/check-out")
+            ->assertJsonValidationErrors(['session' => 'Batas check-out sudah lewat (jam 17:00)']);
+        $this->assertNull($attendance->fresh()->check_out_at);
+        $this->report($attendance)->assertJsonPath('report.status', 'flagged')->assertJsonPath('report.flag_reasons', ['no_check_out']);
+    }
+
+    public function test_a_live_running_over_can_still_check_out(): void
+    {
+        $this->assertNotNull($this->attended('16:45')->check_out_at);
+    }
+
     public function test_late_report_stays_flagged_late_after_resubmitting(): void
     {
         $attendance = $this->attended();
@@ -235,6 +254,38 @@ class AttendanceTest extends TestCase
         $this->assertSame('approved', $report->fresh()->status);
         $this->assertSame($this->admin->id, $report->fresh()->reviewed_by);
         $this->assertSame(2.0, WorkSession::firstOrFail()->duration_hours);
+    }
+
+    public function test_approved_hours_must_fit_the_session(): void
+    {
+        $report = LiveReport::findOrFail($this->report($this->attended(), 3.5)->json('report.id'));
+
+        // 2-hour session: more than 3 hours (or nothing) is a typo
+        foreach ([0, 20] as $hours) {
+            $this->actingAs($this->admin)->postJson("/api/operator/reports/{$report->id}/approve", ['duration_hours' => $hours])
+                ->assertJsonValidationErrors('duration_hours');
+        }
+        // Approving as reported (3,5 hours) isn't allowed either
+        $this->actingAs($this->admin)->postJson("/api/operator/reports/{$report->id}/approve")
+            ->assertJsonValidationErrors(['duration_hours' => 'paling lama 3 jam']);
+        $this->assertSame(0, WorkSession::count());
+
+        $this->actingAs($this->admin)->postJson("/api/operator/reports/{$report->id}/approve", ['duration_hours' => 2.5])->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/operator/reports/{$report->id}/approve", ['duration_hours' => 2.5])
+            ->assertJsonValidationErrors('report');
+        $this->assertSame(1, WorkSession::count());
+    }
+
+    public function test_approving_a_rejected_report_is_recorded_as_a_reversal(): void
+    {
+        $report = LiveReport::findOrFail($this->report($this->attended(), 3)->json('report.id'));
+        $this->actingAs($this->admin)->postJson("/api/operator/reports/{$report->id}/reject", ['review_note' => 'No live found'])->assertOk();
+
+        $this->actingAs($this->admin)->postJson("/api/operator/reports/{$report->id}/approve", ['duration_hours' => 2])->assertOk();
+
+        $this->assertSame(1, AuditLog::where('action', 'report_reversed')->where('target_id', $report->id)->count());
+        $this->actingAs($this->admin)->postJson("/api/operator/reports/{$report->id}/reject", ['review_note' => 'Oops'])
+            ->assertJsonValidationErrors('report');
     }
 
     public function test_rejected_report_pays_nothing_and_is_final(): void

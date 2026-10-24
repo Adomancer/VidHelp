@@ -9,6 +9,7 @@ use App\Services\AttendanceService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ReportController extends Controller
 {
@@ -80,16 +81,20 @@ class ReportController extends Controller
     public function approve(Request $request, LiveReport $report): JsonResponse
     {
         $validated = $request->validate([
-            'duration_hours' => 'nullable|numeric|min:0|max:24',
+            'duration_hours' => 'nullable|numeric|gt:0|max:24',
             'review_note' => 'nullable|string|max:255',
         ]);
 
-        $this->attendance->approve(
-            $report->load('attendance'),
-            $request->user(),
-            round((float) ($validated['duration_hours'] ?? $report->duration_hours), 2),
-            $validated['review_note'] ?? null,
-        );
+        // Paid hours: at most the schedule plus the time check-out stays open (a typo like 20 for 2,0 would be paid)
+        $report->load('attendance');
+        $hours = round((float) ($validated['duration_hours'] ?? $report->duration_hours), 2);
+        $maxHours = round($report->attendance->scheduledHours() + config('vidhelp.attendance.check_out_closes_minutes') / 60, 2);
+        if ($hours <= 0 || $hours > $maxHours) {
+            $label = rtrim(rtrim(number_format($maxHours, 2, ',', ''), '0'), ',');
+            throw ValidationException::withMessages(['duration_hours' => ["Durasi harus lebih dari 0 dan paling lama {$label} jam untuk sesi ini."]]);
+        }
+
+        $this->attendance->approve($report, $request->user(), $hours, $validated['review_note'] ?? null);
 
         return response()->json(['message' => 'Laporan disetujui']);
     }
