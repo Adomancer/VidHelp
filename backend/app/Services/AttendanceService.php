@@ -21,9 +21,7 @@ use Illuminate\Validation\ValidationException;
  */
 class AttendanceService
 {
-    public function __construct(private EventCalendar $events, private PayrollService $payroll, private PointService $points, private Notifier $notifier)
-    {
-    }
+    public function __construct(private EventCalendar $events, private PayrollService $payroll, private PointService $points, private Notifier $notifier) {}
 
     /**
      * The host's session occurrences between two moments: their own slots (minus ones
@@ -36,13 +34,16 @@ class AttendanceService
     {
         $slots = ScheduleSlot::query()
             ->with('assignment.brand:id,name')
-            ->where('status', 'active')
+            // From the day before: an overnight slot from then can still be running at `$from`
+            ->activeDuring(CarbonImmutable::parse($from)->subDay()->toDateString(), CarbonImmutable::parse($to)->toDateString())
             ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
             ->get();
 
-        // My occurrences that another host covers
+        // My occurrences in this window that another host covers
         $coveredByOthers = BackupRequest::where('requesting_host_id', $host->id)
             ->where('status', 'filled')
+            ->where('end_at', '>', $from)
+            ->where('start_at', '<', $to)
             ->with('filler.user')
             ->get()
             ->keyBy(fn (BackupRequest $backup) => $backup->slot_id.'|'.$backup->backup_date->toDateString());
@@ -236,7 +237,7 @@ class AttendanceService
         $report = $attendance->report;
 
         if ($report && in_array($report->status, ['approved', 'rejected'])) {
-            throw ValidationException::withMessages(['report' => ["Laporan ini sudah ".($report->status === 'approved' ? 'disetujui' : 'ditolak').'.']]);
+            throw ValidationException::withMessages(['report' => ['Laporan ini sudah '.($report->status === 'approved' ? 'disetujui' : 'ditolak').'.']]);
         }
 
         return DB::transaction(function () use ($attendance, $report, $data) {
@@ -385,8 +386,8 @@ class AttendanceService
             ->field('Sesi', Notice::window($attendance->scheduled_start_at, $attendance->scheduled_end_at), inline: false)
             ->field('Check-in', $attendance->check_in_at->format('H:i'))
             ->field('Check-out', $attendance->check_out_at?->format('H:i') ?? 'Tidak check-out')
-            ->field('Alasan', implode("
-", array_map(fn (string $reason) => "• {$reason}", $reasons)), inline: false)
+            ->field('Alasan', implode('
+', array_map(fn (string $reason) => "• {$reason}", $reasons)), inline: false)
             ->about($host)
             ->link('/operator/reports', 'Cek laporan');
 

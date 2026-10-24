@@ -16,9 +16,7 @@ use Illuminate\Support\Collection;
  */
 class HostCalendar
 {
-    public function __construct(private EventCalendar $events)
-    {
-    }
+    public function __construct(private EventCalendar $events) {}
 
     /**
      * Why the host is busy at some point between `$start` and `$end`, or null if free.
@@ -47,7 +45,7 @@ class HostCalendar
     ): Collection {
         $slots = ScheduleSlot::query()
             ->with('assignment.brand:id,name')
-            ->where('status', 'active')
+            ->activeDuring(...$this->slotDays($from, $to))
             ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
             ->get();
 
@@ -92,7 +90,7 @@ class HostCalendar
     {
         $slots = ScheduleSlot::query()
             ->with('assignment.host.user')
-            ->where('status', 'active')
+            ->activeDuring(...$this->slotDays($from, $to))
             ->whereHas('assignment', fn ($q) => $q->where('brand_id', $brandId)->where('status', 'active'))
             ->get();
 
@@ -107,6 +105,17 @@ class HostCalendar
     public function reasonIn(Collection $intervals, CarbonInterface $start, CarbonInterface $end): ?string
     {
         return $intervals->first(fn (array $interval) => $interval['start']->lt($end) && $interval['end']->gt($start))['reason'] ?? null;
+    }
+
+    /**
+     * The days whose slots can run between two moments, for ScheduleSlot::activeDuring(): from the
+     * day before (an overnight slot from then can still be running at `$from`).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function slotDays(CarbonInterface $from, CarbonInterface $to): array
+    {
+        return [CarbonImmutable::parse($from)->subDay()->toDateString(), CarbonImmutable::parse($to)->toDateString()];
     }
 
     /**

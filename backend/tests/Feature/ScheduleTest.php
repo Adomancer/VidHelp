@@ -172,6 +172,41 @@ class ScheduleTest extends TestCase
             ->assertJsonPath('slot.end_time', '16:00');
     }
 
+    public function test_editing_a_running_slot_keeps_its_past_weeks_even_without_a_date(): void
+    {
+        $slot = ScheduleSlot::create([
+            'assignment_id' => $this->assignment($this->brand())->id,
+            'day_of_week' => 1, 'start_time' => '14:00', 'end_time' => '15:00',
+            'effective_from' => today()->subMonth(),
+        ]);
+
+        $response = $this->actingAs($this->operator)->putJson("/api/operator/schedules/{$slot->id}", ['end_time' => '16:00'])
+            ->assertOk()
+            ->assertJsonPath('slot.end_time', '16:00')
+            ->assertJsonPath('slot.effective_from', today()->toDateString());
+
+        $slot->refresh();
+        $this->assertSame('15:00', $slot->end_time);
+        $this->assertTrue($slot->effective_to->isYesterday());
+        $this->assertSame($slot->id, $response->json('previous.id'));
+    }
+
+    public function test_editing_only_the_end_date_of_a_running_slot_changes_it_in_place(): void
+    {
+        $slot = ScheduleSlot::create([
+            'assignment_id' => $this->assignment($this->brand())->id,
+            'day_of_week' => 1, 'start_time' => '14:00', 'end_time' => '15:00',
+            'effective_from' => today()->subMonth(),
+        ]);
+
+        $this->actingAs($this->operator)->putJson("/api/operator/schedules/{$slot->id}", [
+            'start_time' => '14:00', 'end_time' => '15:00', 'effective_to' => today()->addMonth()->toDateString(),
+        ])->assertOk()->assertJsonPath('slot.id', $slot->id);
+
+        $this->assertSame(1, ScheduleSlot::count());
+        $this->assertSame(today()->addMonth()->toDateString(), $slot->fresh()->effective_to->toDateString());
+    }
+
     public function test_removing_a_running_slot_keeps_its_history(): void
     {
         $slot = ScheduleSlot::create([

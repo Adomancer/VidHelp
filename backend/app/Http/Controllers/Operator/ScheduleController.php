@@ -157,20 +157,25 @@ class ScheduleController extends Controller
 
     /**
      * Edit times, day, host or period. Locked slots are admin-only.
-     * With `apply_from` after the slot started, the weeks before stay as they were.
+     * With `apply_from` after the slot started, the weeks before stay as they were. A slot that
+     * already ran keeps its past weeks anyway: changing its host, day or times applies from today.
      */
     public function update(Request $request, ScheduleSlot $schedule): JsonResponse
     {
         $this->ensureCanChange($request, $schedule);
 
         $request->validate(['apply_from' => 'nullable|date|after_or_equal:today']);
-        $applyFrom = $request->date('apply_from')?->startOfDay();
+        $validated = $this->validated($request, $schedule);
+        $applyFrom = $request->date('apply_from')?->startOfDay()
+            ?? ($schedule->effective_from->lt(today()) && $this->changesSessions($validated, $schedule)
+                ? max(today(), Carbon::parse($validated['effective_from'] ?? today())->startOfDay())
+                : null);
 
         if ($applyFrom && $applyFrom->gt($schedule->effective_from)) {
             return $this->continueFrom($request, $schedule, $applyFrom);
         }
 
-        $schedule->fill($this->validated($request, $schedule));
+        $schedule->fill($validated);
         DB::transaction(function () use ($schedule) {
             $this->ensureNoConflicts($schedule);
             $schedule->save();
@@ -336,6 +341,18 @@ class ScheduleController extends Controller
         ]);
 
         return isset($validated['days_of_week']) ? collect($validated['days_of_week'])->map(fn ($day) => (int) $day)->sort()->values()->all() : null;
+    }
+
+    /** Whether the edit changes who goes live, on which day or when (what past sessions were derived from). */
+    private function changesSessions(array $validated, ScheduleSlot $slot): bool
+    {
+        foreach (['assignment_id', 'day_of_week', 'start_time', 'end_time'] as $field) {
+            if (array_key_exists($field, $validated) && (string) $validated[$field] !== (string) $slot->{$field}) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Call inside a transaction: locks the brand and the host until it commits. */
