@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\DiscordLink;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -74,11 +76,17 @@ class GoogleAuthTest extends TestCase
         $user = User::factory()->create(['email' => 'host@gmail.com', 'email_verified_at' => null, 'signup_source' => 'self_register']);
         $user->assignRole('host');
         $theirToken = $user->createToken('auth-token')->plainTextToken;
+        // ...linked their own Discord (reset links go there) and asked for a reset link
+        DiscordLink::create(['user_id' => $user->id, 'discord_user_id' => 'theirs', 'linked_at' => now()]);
+        $this->postJson('/api/auth/forgot-password', ['email' => 'host@gmail.com'])->assertOk();
+        $this->assertSame(1, DB::table('password_reset_tokens')->count());
         $this->fakeGoogleUser();
 
         $this->googleCallback()->assertOk();
 
         $user->refresh();
+        $this->assertSame(0, DiscordLink::count());
+        $this->assertSame(0, DB::table('password_reset_tokens')->count());
         $this->assertNull($user->password);
         $this->assertNotNull($user->email_verified_at);
         $this->assertSame(1, $user->tokens()->count()); // only the Google sign-in's

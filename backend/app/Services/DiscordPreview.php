@@ -106,6 +106,10 @@ class DiscordPreview
                 ->field('Data yang diubah', 'Nomor rekening', inline: false)->field('Ditolak oleh', 'Admin')
                 ->field('Catatan', 'Rekening tidak sesuai nama.', inline: false)
                 ->link('/host/profile', 'Perbaiki data'),
+            Notice::make('discord_linked', 'Discord terhubung ke akunmu')
+                ->body('Discord Samuel sekarang menerima notifikasi dan link atur ulang kata sandi akunmu. Kalau bukan kamu yang menghubungkannya, putuskan Discord itu dan ganti kata sandimu.')
+                ->field('Discord', 'Samuel')
+                ->link('/host/profile', 'Buka pengaturan akun'),
 
             Notice::make('report_flagged', "Laporan perlu dicek: {$requester}")
                 ->body("{$brand}, {$start->translatedFormat('D j M H:i')}: dikirim terlambat, waktu lebih singkat dari jadwal.")

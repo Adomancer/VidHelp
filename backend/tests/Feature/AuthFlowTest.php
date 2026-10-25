@@ -222,6 +222,32 @@ class AuthFlowTest extends TestCase
         $this->assertSame(0, AppNotification::count());
     }
 
+    public function test_no_reset_dm_to_a_discord_linked_before_the_email_was_proven(): void
+    {
+        Notification::fake();
+        config(['services.discord.bot_token' => 'test-token']);
+        Http::fake();
+        // Linked by whoever signed up with this email, before its owner signed in with Google
+        $user = User::factory()->create(['email' => 'host@vidhelp.com', 'signup_source' => 'self_register', 'email_verified_at' => now()]);
+        DiscordLink::create(['user_id' => $user->id, 'discord_user_id' => 'd-1', 'linked_at' => now()->subDay()]);
+
+        $this->postJson('/api/auth/forgot-password', ['email' => 'host@vidhelp.com'])->assertOk();
+
+        Notification::assertSentTo($user, ResetPassword::class);
+        Http::assertNothingSent();
+    }
+
+    public function test_changing_the_password_says_which_discord_still_gets_reset_links(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole('host');
+        DiscordLink::create(['user_id' => $user->id, 'discord_user_id' => 'd-1', 'discord_username' => 'Samuel', 'linked_at' => now()]);
+
+        $this->actingAs($user)->postJson('/api/host/profile/password', [
+            'current_password' => 'password', 'password' => 'new-password', 'password_confirmation' => 'new-password',
+        ])->assertOk()->assertJsonPath('message', fn (string $message) => str_contains($message, 'Discord Samuel masih terhubung'));
+    }
+
     public function test_forgot_password_does_not_reveal_unknown_emails(): void
     {
         $this->postJson('/api/auth/forgot-password', ['email' => 'nobody@vidhelp.com'])->assertOk();

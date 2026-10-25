@@ -172,6 +172,11 @@ class ProfileController extends Controller
             ->delete();
         AuditLog::record('password_changed', $user, actor: $user);
 
-        return response()->json(['message' => 'Kata sandi berhasil diganti']);
+        // A linked Discord stays linked and still gets reset links: say which one, in case it isn't theirs
+        $discord = $user->discordLink?->discord_username;
+
+        return response()->json(['message' => $discord
+            ? "Kata sandi berhasil diganti. Discord {$discord} masih terhubung dan menerima link atur ulang kata sandi. Putuskan kalau itu bukan Discord-mu."
+            : 'Kata sandi berhasil diganti']);
     }
 }

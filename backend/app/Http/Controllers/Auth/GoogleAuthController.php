@@ -10,6 +10,7 @@ use App\Services\Notifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Throwable;
@@ -93,11 +94,14 @@ class GoogleAuthController extends Controller
         }
 
         // Anyone can sign up with someone else's email (it isn't verified). When the owner of that
-        // email signs in with Google, the password chosen at sign-up stops working.
+        // email signs in with Google, the password chosen at sign-up stops working, and so does the
+        // Discord linked by whoever signed up (reset links go out by Discord DM).
         if ($user->signup_source === 'self_register' && $user->email_verified_at === null && $user->password !== null) {
             $user->forceFill(['password' => null])->save();
             $user->tokens()->delete();
-            AuditLog::record('unverified_password_removed', $user, new: ['method' => 'google'], actor: $user);
+            $discordUnlinked = (bool) $user->discordLink()->delete();
+            Password::deleteToken($user);
+            AuditLog::record('unverified_password_removed', $user, new: ['method' => 'google', 'discord_unlinked' => $discordUnlinked], actor: $user);
         }
 
         // Link Google to an account that was created by email/password or by an admin

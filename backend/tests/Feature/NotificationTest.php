@@ -400,6 +400,25 @@ class NotificationTest extends TestCase
         $this->assertSame(1, AuditLog::where('action', 'discord_linked')->where('target_id', $victim->id)->count());
     }
 
+    public function test_linking_discord_tells_the_user_and_the_discord_it_replaced(): void
+    {
+        $user = $this->other->user;
+        $this->link($user, '555');
+        $this->discord();
+        Http::fake([
+            'discord.com/api/oauth2/token' => Http::response(['access_token' => 'user-token']),
+            'discord.com/api/v10/users/@me' => Http::response(['id' => '777', 'username' => 'someone']),
+        ]);
+
+        $this->actingAs($user)->postJson('/api/discord/link', ['code' => 'the-code', 'state' => $this->connectState($user)])->assertOk();
+
+        $notice = $this->web($user, 'discord_linked');
+        $this->assertStringContainsString('Discord someone', $notice->body);
+        $this->assertSame('/host/profile', $notice->link);
+        $this->assertStringContainsString('tidak lagi terhubung', $this->posted('dm-555')->sole()['embeds'][0]['title']);
+        $this->assertCount(0, $this->posted('dm-777'));
+    }
+
     public function test_muted_categories_skip_the_dm_but_critical_ones_still_come(): void
     {
         $this->link($this->requester->user, '555', muted: ['points']);

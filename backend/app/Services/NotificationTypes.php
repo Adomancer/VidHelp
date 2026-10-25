@@ -41,6 +41,7 @@ final class NotificationTypes
         'profile_change_requested' => ['admin', '📝', self::PURPLE],
         'profile_change_approved' => ['account', '✅', self::GREEN],
         'profile_change_rejected' => ['account', '❌', self::RED],
+        'discord_linked' => ['account', '🔗', self::BLUE],
 
         'report_flagged' => ['admin', '🚩', self::YELLOW],
         'report_rejected' => ['report', '❌', self::RED],

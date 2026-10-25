@@ -213,11 +213,18 @@ class Notifier
     /**
      * DM a password reset link to a user who linked Discord, after the response. It goes straight
      * to Discord and is never stored (no bell, no delivery row): the link opens their account.
+     * Not to a Discord linked to a self sign-up before its email was proven (by a Google sign-in):
+     * whoever signed up with someone else's email linked it.
      */
     public function passwordResetDm(User $user, string $path): void
     {
         $link = $user->discordLink;
         if (! $link || ! $this->discord->configured()) {
+            return;
+        }
+
+        $linkedAt = $link->linked_at ?? $link->created_at;
+        if ($user->signup_source === 'self_register' && $user->email_verified_at && $linkedAt->lt($user->email_verified_at)) {
             return;
         }
 
@@ -234,6 +241,45 @@ class Notifier
         $discordUserId = $link->discord_user_id;
         $message = DiscordMessage::for($notice);
         dispatch(static fn () => app(self::class)->sendDm($discordUserId, $message))->afterResponse();
+    }
+
+    /**
+     * A Discord was linked to this account: tell them in the bell, and DM the Discord it replaced,
+     * so linking someone else's Discord (it receives password reset links) doesn't go unseen.
+     */
+    public function discordLinked(User $user, DiscordLink $link, ?string $previousDiscordUserId): void
+    {
+        $path = $this->accountPath($user);
+        $this->toUsers($user, Notice::make('discord_linked', 'Discord terhubung ke akunmu')
+            ->body("Discord {$link->discord_username} sekarang menerima notifikasi dan link atur ulang kata sandi akunmu. Kalau bukan kamu yang menghubungkannya, putuskan Discord itu dan ganti kata sandimu.")
+            ->field('Discord', $link->discord_username)
+            ->link($path, 'Buka pengaturan akun'));
+
+        if (! $previousDiscordUserId || $previousDiscordUserId === $link->discord_user_id || ! $this->discord->configured()) {
+            return;
+        }
+
+        $notice = new AppNotification([
+            'type' => 'discord_linked',
+            'title' => 'Discord ini tidak lagi terhubung ke VidHelp',
+            'body' => "Akun VidHelp {$user->email} sekarang terhubung ke Discord {$link->discord_username}. Kalau bukan kamu yang menggantinya, masuk ke VidHelp, putuskan Discord itu, dan ganti kata sandimu.",
+            'link' => $path,
+            'payload' => ['buttons' => [['label' => 'Buka pengaturan akun', 'path' => $path]]],
+        ]);
+        $notice->created_at = now();
+
+        $message = DiscordMessage::for($notice);
+        dispatch(static fn () => app(self::class)->sendDm($previousDiscordUserId, $message))->afterResponse();
+    }
+
+    /** Where this user manages their Discord link. */
+    private function accountPath(User $user): string
+    {
+        return match (true) {
+            $user->hasAnyRole(['admin', 'finance']) => '/admin/security',
+            $user->hasRole('operator') => '/operator/account',
+            default => '/host/profile',
+        };
     }
 
     /** One DM without a delivery row: a failure is only logged, not retried. */

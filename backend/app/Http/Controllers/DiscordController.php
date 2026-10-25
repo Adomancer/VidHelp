@@ -59,7 +59,7 @@ class DiscordController extends Controller
      * the agency server so the bot can DM them. Staff start with staff alerts muted (they
      * also go to #admin-alerts).
      */
-    public function link(Request $request): JsonResponse
+    public function link(Request $request, Notifier $notifier): JsonResponse
     {
         $request->validate(['code' => 'required|string|max:200', 'state' => 'required|string|max:100']);
         $user = $request->user();
@@ -103,6 +103,7 @@ class DiscordController extends Controller
         $user->setRelation('discordLink', $link);
         Cache::forget($this->guildCacheKey($link));
         AuditLog::record('discord_linked', $user, new: ['discord_user_id' => $discordUser['id'], 'discord_username' => $link->discord_username], actor: $user);
+        $notifier->discordLinked($user, $link, $existing?->discord_user_id);
 
         return response()->json(['link' => $this->linkData($link), 'message' => 'Discord terhubung']);
     }
