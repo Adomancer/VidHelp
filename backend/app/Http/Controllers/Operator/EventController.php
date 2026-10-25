@@ -13,9 +13,7 @@ use Illuminate\Validation\Rule;
 
 class EventController extends Controller
 {
-    public function __construct(private EventService $events)
-    {
-    }
+    public function __construct(private EventService $events) {}
 
     /**
      * Events that are running, upcoming, or ended in the last 30 days. Events cancelled before

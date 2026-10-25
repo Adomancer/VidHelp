@@ -11,9 +11,7 @@ use Illuminate\Http\Request;
 
 class PerformanceController extends Controller
 {
-    public function __construct(private PointService $points)
-    {
-    }
+    public function __construct(private PointService $points) {}
 
     /**
      * My points this period (and what was deducted), my SPs and my monthly ratings.

@@ -6,7 +6,6 @@ use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
-use App\Models\HostRateCategory;
 use App\Models\PaymentPeriod;
 use App\Models\ScheduleSlot;
 use App\Models\User;
