@@ -164,6 +164,9 @@ class PayrollTest extends TestCase
             }
         }
 
+        // Including through the attendance → live report → work session chain (MySQL let that cascade through)
+        $this->assertSame(1, Attendance::where('host_id', $this->host->id)->count());
+        $this->assertSame(1, LiveReport::where('host_id', $this->host->id)->count());
         $this->assertSame(1, WorkSession::where('host_id', $this->host->id)->count());
         $this->assertSame(1, PaymentPeriod::where('brand_id', $this->brand->id)->count());
     }
