@@ -266,7 +266,7 @@ class BackupController extends Controller
      */
     private function started(BackupRequest $backup): bool
     {
-        return $backup->start_at->isPast() || Attendance::where('backup_request_id', $backup->id)->exists();
+        return $backup->start_at->isPast() || Attendance::where('backup_request_id', $backup->id)->whereNull('event_claim_id')->exists();
     }
 
     /**

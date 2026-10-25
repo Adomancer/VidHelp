@@ -167,8 +167,9 @@ class AttendanceService
                 ->with('event')
                 ->first() ?? throw ValidationException::withMessages(['session' => ['Blok event ini bukan milikmu.']]);
 
-            [$slotId, $brandId, $date, $start, $end] = [
-                null, $claim->event->brand_id, $claim->start_at->toDateString(), $claim->start_at, $claim->end_at,
+            // An event block is never a backup: a backup id sent with it would mark someone's backup as started
+            [$slotId, $backupRequestId, $brandId, $date, $start, $end] = [
+                null, null, $claim->event->brand_id, $claim->start_at->toDateString(), $claim->start_at, $claim->end_at,
             ];
         } elseif ($backupRequestId) {
             $backup = BackupRequest::whereKey($backupRequestId)

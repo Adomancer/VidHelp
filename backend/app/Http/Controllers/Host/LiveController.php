@@ -43,7 +43,7 @@ class LiveController extends Controller
         $validated = $request->validate([
             'slot_id' => 'required_without:event_claim_id|nullable|uuid',
             'date' => 'required_without:event_claim_id|nullable|date_format:Y-m-d',
-            'backup_request_id' => 'nullable|uuid',
+            'backup_request_id' => 'nullable|uuid|prohibits:event_claim_id',
             'event_claim_id' => 'nullable|uuid',
         ]);
 

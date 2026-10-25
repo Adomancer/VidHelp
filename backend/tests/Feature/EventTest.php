@@ -16,6 +16,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class EventTest extends TestCase
@@ -213,8 +214,11 @@ class EventTest extends TestCase
             ->assertJsonPath('sessions.0.event_claim_id', $claimId)
             ->assertJsonPath('sessions.0.event_name', 'PD 10.10');
 
-        $attendanceId = $this->actingAs($this->other->user)->postJson('/api/host/live/check-in', ['event_claim_id' => $claimId])
-            ->assertCreated()->json('attendance.id');
+        // An event block isn't a backup: someone else's backup id can't ride along
+        $this->actingAs($this->other->user)->postJson('/api/host/live/check-in', ['event_claim_id' => $claimId, 'backup_request_id' => (string) Str::uuid()])
+            ->assertJsonValidationErrors('backup_request_id');
+        $attendanceId = $this->actingAs($this->other->user)->postJson('/api/host/live/check-in', ['event_claim_id' => $claimId, 'backup_request_id' => null])
+            ->assertCreated()->assertJsonPath('attendance.backup_request_id', null)->json('attendance.id');
         $this->actingAs($this->other->user)->postJson('/api/host/live/check-in', ['event_claim_id' => $claimId])
             ->assertJsonValidationErrors('session');
 
