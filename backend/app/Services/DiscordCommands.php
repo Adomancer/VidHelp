@@ -182,13 +182,15 @@ class DiscordCommands
     /** Other hosts' upcoming backups this host can apply for (or already did), the ones naming them first. */
     private function backupNeeds(HostProfile $host): array
     {
-        $needs = BackupRequest::whereIn('status', ['open', 'pending'])
+        $requests = BackupRequest::whereIn('status', ['open', 'pending'])
             ->where('start_at', '>', now())
             ->where('requesting_host_id', '!=', $host->id)
             ->with(['brand:id,name', 'requester.user', 'nominees', 'applications' => fn ($q) => $q->where('applicant_host_id', $host->id)->where('status', 'applied')])
             ->orderBy('start_at')
-            ->get()
-            ->filter(fn (BackupRequest $backup) => $backup->applications->isNotEmpty() || $this->backups->ineligibleReason($host, $backup) === null)
+            ->get();
+        $context = $this->backups->coverContext(collect([$host]), $requests);
+        $needs = $requests
+            ->filter(fn (BackupRequest $backup) => $backup->applications->isNotEmpty() || $this->backups->ineligibleReason($host, $backup, $context) === null)
             ->sortByDesc(fn (BackupRequest $backup) => $backup->nominees->contains('nominee_host_id', $host->id))
             ->values();
 

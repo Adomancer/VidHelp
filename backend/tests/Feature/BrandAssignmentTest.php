@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\BackupRequest;
 use App\Models\Brand;
 use App\Models\HostProfile;
@@ -227,17 +228,33 @@ class BrandAssignmentTest extends TestCase
         $this->assertSame(1, $this->xlsxValue($sheets['Ringkasan'], 'Total host'));
 
         $hosts = $this->xlsxTable($sheets['Daftar Host'], 'No');
+        // Guardians' numbers are someone else's personal data: not in an operator's file
         $this->assertSame(
-            ['No', 'Nama', 'Email', 'No. HP', 'No. HP wali', 'Status', 'Level tarif', 'Tarif per jam', 'Tanggal bergabung', 'Masa kerja (bulan)', 'Brand aktif', 'Leader di'],
+            ['No', 'Nama', 'Email', 'No. HP', 'Status', 'Level tarif', 'Tarif per jam', 'Tanggal bergabung', 'Masa kerja (bulan)', 'Brand aktif', 'Leader di'],
             $hosts[0],
         );
         $this->assertCount(2, $hosts);
         $this->assertSame($assigned->user->email, $hosts[1][2]);
         $this->assertSame('08123456789', $hosts[1][3]);
-        $this->assertSame('Aktif', $hosts[1][5]);
+        $this->assertSame('Aktif', $hosts[1][4]);
         // The banned assignment (Emina) isn't an active brand
+        $this->assertSame('Wardah', $hosts[1][9]);
         $this->assertSame('Wardah', $hosts[1][10]);
-        $this->assertSame('Wardah', $hosts[1][11]);
+        $this->assertDatabaseHas('audit_logs', ['user_id' => $this->operator->id, 'action' => 'hosts_exported']);
+    }
+
+    public function test_admin_host_export_has_guardians_numbers_and_is_audited(): void
+    {
+        $this->host()->update(['guardian_phone' => '08987654321']);
+
+        $hosts = $this->xlsxTable($this->xlsxSheets($this->actingAs($this->admin)->get('/api/operator/hosts/export')->assertOk())['Daftar Host'], 'No');
+
+        $this->assertSame('No. HP wali', $hosts[0][4]);
+        $this->assertSame('08987654321', $hosts[1][4]);
+        $log = AuditLog::where('action', 'hosts_exported')->firstOrFail();
+        $this->assertSame($this->admin->id, $log->user_id);
+        $this->assertSame(1, $log->new_value['count']);
+        $this->assertTrue($log->new_value['guardian_phones']);
     }
 
     public function test_host_export_writes_formula_like_names_as_plain_text(): void

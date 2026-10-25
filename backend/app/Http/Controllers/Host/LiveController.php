@@ -11,9 +11,7 @@ use Illuminate\Http\Request;
 
 class LiveController extends Controller
 {
-    public function __construct(private AttendanceService $attendance)
-    {
-    }
+    public function __construct(private AttendanceService $attendance) {}
 
     /**
      * My sessions from yesterday to tomorrow (check in/out, write report), plus

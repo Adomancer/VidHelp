@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attendance;
 use App\Models\BackupApplication;
 use App\Models\BackupRequest;
 use App\Models\HostProfile;
@@ -12,7 +13,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackupController extends Controller
@@ -137,9 +137,12 @@ class BackupController extends Controller
      */
     public function applicants(BackupRequest $backup): JsonResponse
     {
+        $applications = $this->backups->rankedApplicants($backup);
+        $context = $this->backups->coverContext($applications->pluck('applicant'), collect([$backup]));
+
         return response()->json([
-            'applicants' => $this->backups->rankedApplicants($backup)
-                ->map(fn (BackupApplication $application) => $this->backups->candidate($application->applicant, $backup) + [
+            'applicants' => $applications
+                ->map(fn (BackupApplication $application) => $this->backups->candidate($application->applicant, $backup, $context) + [
                     'applied_at' => $application->created_at,
                 ]),
         ]);
@@ -184,27 +187,17 @@ class BackupController extends Controller
         ]);
 
         $slot = ScheduleSlot::with('assignment')->findOrFail($validated['slot_id']);
-        $cover = isset($validated['host_id']) ? HostProfile::with('user')->findOrFail($validated['host_id']) : null;
+        $reason = ['reason_type' => $validated['reason_type'], 'reason' => $validated['reason'] ?? null];
 
-        // Check the cover first, so a request isn't left behind when they can't take it
-        if ($cover && $reason = $this->backups->coverReason($cover, $this->backups->draft($slot, $validated['backup_date']))) {
-            throw ValidationException::withMessages(['host_id' => [$reason]]);
-        }
-
-        $backup = $this->backups->create(
-            $slot,
-            $validated['backup_date'],
-            ['reason_type' => $validated['reason_type'], 'reason' => $validated['reason'] ?? null],
-            $request->user(),
-            byStaff: true,
-            announce: $cover === null,
-        );
-
-        if ($cover) {
-            $backup = $this->backups->fill($backup, $cover, $request->user())->load('filler.user');
+        // With a cover, the request and its cover are saved together (or not at all)
+        if (isset($validated['host_id'])) {
+            $cover = HostProfile::with('user')->findOrFail($validated['host_id']);
+            $backup = $this->backups->createFilled($slot, $validated['backup_date'], $reason, $request->user(), $cover)->load('filler.user');
 
             return response()->json(['request' => $backup, 'message' => 'Host pengganti disetujui'], 201);
         }
+
+        $backup = $this->backups->create($slot, $validated['backup_date'], $reason, $request->user(), byStaff: true);
 
         return response()->json(['request' => $backup, 'message' => 'Permintaan backup dibuka'], 201);
     }
@@ -228,6 +221,9 @@ class BackupController extends Controller
     {
         if (! in_array($backup->status, ['pending', 'open', 'filled'])) {
             return response()->json(['message' => 'Permintaan ini sudah ditutup.'], 422);
+        }
+        if ($this->started($backup)) {
+            return response()->json(['message' => 'Sesi ini sudah dimulai, jadi permintaannya tidak bisa dibatalkan lagi.'], 422);
         }
 
         $this->backups->close($backup, 'cancelled');
@@ -255,10 +251,22 @@ class BackupController extends Controller
         if ($backup->status !== 'filled') {
             return response()->json(['message' => 'Belum ada yang ditunjuk untuk backup ini.'], 422);
         }
+        if ($this->started($backup)) {
+            return response()->json(['message' => 'Sesi ini sudah dimulai, jadi penggantinya tidak bisa dilepas lagi.'], 422);
+        }
 
         $this->backups->unfill($backup, 'rejected');
 
         return response()->json(['message' => 'Pengganti dilepas. Backup dibuka lagi.']);
+    }
+
+    /**
+     * Whether the session has started or been checked in for: its cover then stays (their
+     * hours, pay, quota and access to the brand's material depend on it).
+     */
+    private function started(BackupRequest $backup): bool
+    {
+        return $backup->start_at->isPast() || Attendance::where('backup_request_id', $backup->id)->exists();
     }
 
     /**

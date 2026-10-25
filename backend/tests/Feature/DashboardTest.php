@@ -20,6 +20,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DashboardTest extends TestCase
@@ -105,6 +106,30 @@ class DashboardTest extends TestCase
         $this->assertSame(['done', 'missed', 'live', 'late', 'upcoming'], array_column($today['sessions'], 'state'));
         $this->assertSame(['done' => 1, 'missed' => 1, 'live' => 1, 'late' => 1, 'upcoming' => 1], $today['counts']);
         $this->assertSame('Glow', $today['sessions'][0]['brand']['name']);
+    }
+
+    public function test_admin_dashboard_takes_the_same_number_of_queries_however_many_hosts(): void
+    {
+        $queries = function () {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($this->admin)->getJson('/api/admin/dashboard')->assertOk();
+            DB::disableQueryLog();
+
+            return count(DB::getQueryLog());
+        };
+
+        [$first, $firstSlot] = $this->hostWithSlot('08:00', '10:00');
+        $this->attend($first, $firstSlot, '07:55', '10:00');
+        $queries();
+        $before = $queries();
+        foreach (['10:00', '12:00', '16:00', '18:00'] as $start) {
+            [$host, $slot] = $this->hostWithSlot($start, CarbonImmutable::parse($start)->addHours(2)->format('H:i'));
+            $this->attend($host, $slot, $start);
+        }
+
+        $this->assertSame($before, $queries());
+        $this->assertCount(5, $this->actingAs($this->admin)->getJson('/api/admin/dashboard')->json('today.sessions'));
     }
 
     public function test_brand_progress_hours_gmv_and_pay_this_period(): void

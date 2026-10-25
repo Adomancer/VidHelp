@@ -35,7 +35,8 @@ class DemoSeederTest extends TestCase
         $kopi = PaymentPeriod::whereHas('brand', fn ($q) => $q->where('name', 'Kopi Nusantara'))->orderBy('period_start')->pluck('status')->all();
         $this->assertSame(['paid', 'paid'], array_slice($kopi, 0, 2));
         $this->assertSame('in_progress', end($kopi));
-        $this->assertSame([], array_diff(array_slice($kopi, 2, -1), ['waiting_payment']));
+        // Older closed ones may already be requested (paid only once the request is over a week old)
+        $this->assertSame([], array_diff(array_slice($kopi, 2, -1), ['waiting_payment', 'requested']));
         $this->assertSame(1, PointLog::where('source', 'late_check_in')->count());
         $this->assertGreaterThan(0, SalarySlip::count());
         $this->assertSame(1, LiveReport::where('status', 'flagged')->count());

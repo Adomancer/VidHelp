@@ -87,15 +87,18 @@ class PayrollController extends Controller
             default => $query->orderByDesc('period_start'),
         };
 
-        $periods = $query->orderBy($brandName)
-            ->paginate(self::PERIODS_PER_PAGE)
-            ->through(function (PaymentPeriod $period) {
-                ['hosts' => $hosts, 'summary' => $summary] = $this->payroll->breakdown($period);
+        $page = $query->orderBy($brandName)->paginate(self::PERIODS_PER_PAGE);
+        // Locked periods from their snapshot in one query; only running ones are worked out live
+        $summaries = $this->payroll->summaries($page->getCollection());
+
+        $periods = $page
+            ->through(function (PaymentPeriod $period) use ($summaries) {
+                ['hosts' => $hosts, 'summary' => $summary] = $summaries[$period->id];
 
                 return [
                     ...$period->toArray(),
                     ...$summary,
-                    'hosts' => $hosts->count(),
+                    'hosts' => $hosts,
                     // Waiting on the brand since the request, on the PIC since the target closed it
                     'waiting_since' => match ($period->status) {
                         'requested' => $period->paymentRequest?->requested_at,

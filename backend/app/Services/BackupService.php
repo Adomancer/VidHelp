@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BackupApplication;
 use App\Models\BackupQuota;
 use App\Models\BackupRequest;
+use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
 use App\Models\ScheduleSlot;
 use App\Models\User;
@@ -146,8 +147,9 @@ class BackupService
             throw ValidationException::withMessages(['host_ids' => ['Salah satu host yang dipilih tidak ditemukan.']]);
         }
 
+        $context = $this->coverContext($hosts, collect([$backup]));
         foreach ($hosts as $host) {
-            if ($reason = $this->coverReason($host, $backup)) {
+            if ($reason = $this->coverReason($host, $backup, $context)) {
                 throw ValidationException::withMessages(['host_ids' => ["{$host->user->name} tidak bisa menggantikan: {$reason}"]]);
             }
         }
@@ -166,16 +168,37 @@ class BackupService
         }
     }
 
-    /** Store a sick letter (or other proof) for the request; the file is removed again if saving it fails. */
+    /**
+     * Store a sick letter for the request; the file is removed again if saving it fails. Only for
+     * sick requests still in play, and at most backup.letter_max_files per request.
+     */
     public function attachLetter(BackupRequest $backup, UploadedFile $file, User $by): void
     {
+        $this->ensureTakesLetters($backup);
         $path = $file->store('backup-letters', 'local');
 
         try {
-            DB::transaction(fn () => $this->recordLetter($backup, $file, $path, $by));
+            DB::transaction(function () use ($backup, $file, $path, $by) {
+                // Uploads at the same time wait here, so the second counts the first
+                $backup = BackupRequest::lockForUpdate()->findOrFail($backup->id);
+                $this->ensureTakesLetters($backup);
+                $this->recordLetter($backup, $file, $path, $by);
+            });
         } catch (Throwable $e) {
             Storage::disk('local')->delete($path);
             throw $e;
+        }
+    }
+
+    private function ensureTakesLetters(BackupRequest $backup): void
+    {
+        if ($backup->reason_type !== 'sick' || ! in_array($backup->status, ['pending', 'open', 'filled'], true)) {
+            throw ValidationException::withMessages(['letter' => ['Surat hanya bisa diunggah untuk permintaan sakit yang masih berjalan.']]);
+        }
+
+        $max = config('vidhelp.backup.letter_max_files');
+        if ($backup->attachments()->count() >= $max) {
+            throw ValidationException::withMessages(['letter' => ["Maksimal {$max} file surat untuk satu permintaan."]]);
         }
     }
 
@@ -196,26 +219,31 @@ class BackupService
     }
 
     /**
-     * Why a host can't apply to this request themselves, or null if they can.
+     * Why a host can't apply to this request themselves, or null if they can. Pass a
+     * coverContext() when checking many requests or hosts.
      */
-    public function ineligibleReason(HostProfile $host, BackupRequest $request): ?string
+    public function ineligibleReason(HostProfile $host, BackupRequest $request, ?CoverContext $context = null): ?string
     {
         if ($request->request_type === 'direct' && $host->id !== $request->requesting_host_id && ! $request->isNominated($host)) {
             return "Hanya host yang diminta {$request->requester->user->name} yang bisa mengambil ini.";
         }
 
         // An admin's "no" sticks: no applying again (an admin can still assign them directly)
-        if ($request->exists && $request->applications()->where('applicant_host_id', $host->id)->where('status', 'rejected')->exists()) {
+        $rejected = $context
+            ? $context->wasRejected($request->getKey(), $host->id)
+            : $request->exists && $request->applications()->where('applicant_host_id', $host->id)->where('status', 'rejected')->exists();
+        if ($rejected) {
             return 'Admin sudah menolak tawaranmu untuk backup ini.';
         }
 
-        return $this->coverReason($host, $request);
+        return $this->coverReason($host, $request, $context);
     }
 
     /**
      * Why a host can't cover this request at all (also when an admin assigns them), or null if they can.
+     * Pass a coverContext() when checking many requests or hosts.
      */
-    public function coverReason(HostProfile $host, BackupRequest $request): ?string
+    public function coverReason(HostProfile $host, BackupRequest $request, ?CoverContext $context = null): ?string
     {
         if ($host->id === $request->requesting_host_id) {
             return 'Ini permintaanmu sendiri.';
@@ -225,22 +253,64 @@ class BackupService
             return 'Host ini tidak aktif.';
         }
 
-        if ($host->assignments()->where('brand_id', $request->brand_id)->where('status', 'banned')->exists()) {
+        $banned = $context
+            ? $context->hasAssignment($host->id, $request->brand_id, 'banned')
+            : $host->assignments()->where('brand_id', $request->brand_id)->where('status', 'banned')->exists();
+        if ($banned) {
             return "Diblokir dari {$request->brand->name}.";
         }
 
-        if ($busy = $this->busyReason($host, $request->start_at, $request->end_at, $request)) {
+        $busy = $context
+            ? $this->calendar->reasonIn($context->intervalsOf($host->id, $request->getKey()), $request->start_at, $request->end_at)
+            : $this->busyReason($host, $request->start_at, $request->end_at, $request);
+        if ($busy) {
             return $busy;
         }
 
-        if (! $this->isSameBrand($host, $request)) {
-            $quota = BackupQuota::peek($host->id, $request->quotaMonth());
+        if (! $this->isSameBrand($host, $request, $context)) {
+            $quota = $this->quota($host, $request, $context);
             if ($quota->isFull()) {
-                return "Kuota backup lintas brand bulan ini sudah habis ({$quota->quota_used}/{$quota->quota_max}).";
+                return $this->quotaFullMessage($quota);
             }
         }
 
         return null;
+    }
+
+    /**
+     * Everything coverReason() reads for these hosts and requests, in a fixed number of queries.
+     *
+     * @param  Collection<int, HostProfile>  $hosts
+     * @param  Collection<int, BackupRequest>  $requests
+     */
+    public function coverContext(Collection $hosts, Collection $requests): CoverContext
+    {
+        $hostIds = $hosts->pluck('id')->unique()->values()->all();
+        $requestIds = $requests->filter(fn (BackupRequest $request) => $request->exists)->pluck('id')->all();
+
+        return new CoverContext(
+            assignments: HostBrandAssignment::whereIn('host_id', $hostIds)->get(['host_id', 'brand_id', 'status'])->groupBy('host_id'),
+            quotas: BackupQuota::whereIn('host_id', $hostIds)
+                ->whereIn('month_year', $requests->map(fn (BackupRequest $request) => $request->quotaMonth())->unique()->values()->all())
+                ->get()
+                ->keyBy(fn (BackupQuota $quota) => "{$quota->host_id}|{$quota->month_year}"),
+            intervals: $requests->isEmpty() ? collect() : $this->calendar->hostsIntervals($hostIds, $requests->min('start_at'), $requests->max('end_at')),
+            rejected: $requestIds === [] ? collect() : BackupApplication::whereIn('backup_request_id', $requestIds)
+                ->whereIn('applicant_host_id', $hostIds)
+                ->where('status', 'rejected')
+                ->get(['backup_request_id', 'applicant_host_id'])
+                ->mapWithKeys(fn (BackupApplication $application) => ["{$application->backup_request_id}|{$application->applicant_host_id}" => true]),
+        );
+    }
+
+    private function quota(HostProfile $host, BackupRequest $request, ?CoverContext $context = null): BackupQuota
+    {
+        return $context ? $context->quota($host->id, $request->quotaMonth()) : BackupQuota::peek($host->id, $request->quotaMonth());
+    }
+
+    private function quotaFullMessage(BackupQuota $quota): string
+    {
+        return "Kuota backup lintas brand bulan ini sudah habis ({$quota->quota_used}/{$quota->quota_max}).";
     }
 
     /**
@@ -251,9 +321,11 @@ class BackupService
         return $this->calendar->busyReason($host, $start, $end, exceptBackupId: $except?->getKey());
     }
 
-    public function isSameBrand(HostProfile $host, BackupRequest $request): bool
+    public function isSameBrand(HostProfile $host, BackupRequest $request, ?CoverContext $context = null): bool
     {
-        return $host->assignments()->where('brand_id', $request->brand_id)->where('status', 'active')->exists();
+        return $context
+            ? $context->hasAssignment($host->id, $request->brand_id, 'active')
+            : $host->assignments()->where('brand_id', $request->brand_id)->where('status', 'active')->exists();
     }
 
     /**
@@ -263,28 +335,31 @@ class BackupService
      */
     public function candidates(BackupRequest $request): Collection
     {
-        return HostProfile::query()
+        $hosts = HostProfile::query()
             ->where('status', 'active')
             ->whereKeyNot($request->requesting_host_id)
             ->whereHas('user', fn ($q) => $q->where('status', 'active'))
             ->with(['user', 'latestRating'])
-            ->get()
-            ->map(fn (HostProfile $host) => $this->candidate($host, $request))
+            ->get();
+        $context = $this->coverContext($hosts, collect([$request]));
+
+        return $hosts
+            ->map(fn (HostProfile $host) => $this->candidate($host, $request, $context))
             ->sortBy([['eligible', 'desc'], ['same_brand', 'desc'], ['name', 'asc']])
             ->values();
     }
 
     /** One host as a possible cover. */
-    public function candidate(HostProfile $host, BackupRequest $request): array
+    public function candidate(HostProfile $host, BackupRequest $request, ?CoverContext $context = null): array
     {
-        $reason = $this->coverReason($host, $request);
-        $quota = BackupQuota::peek($host->id, $request->quotaMonth());
+        $reason = $this->coverReason($host, $request, $context);
+        $quota = $this->quota($host, $request, $context);
 
         return [
             'host_id' => $host->id,
             'name' => $host->user->name,
             'avatar_url' => $host->user->avatar_url,
-            'same_brand' => $this->isSameBrand($host, $request),
+            'same_brand' => $this->isSameBrand($host, $request, $context),
             'rating' => $host->latestRating?->rating,
             'eligible' => $reason === null,
             'ineligible_reason' => $reason,
@@ -422,13 +497,21 @@ class BackupService
         // Unrated hosts rank below every rated one
         $rating = fn (BackupApplication $application) => $application->applicant->latestRating?->rating ?? -1;
 
-        return $request->applications()
+        $applications = $request->applications()
             ->with(['applicant.user', 'applicant.latestRating'])
             ->where('status', 'applied')
-            ->get()
+            ->get();
+        $sameBrand = HostBrandAssignment::where('brand_id', $request->brand_id)
+            ->where('status', 'active')
+            ->whereIn('host_id', $applications->pluck('applicant_host_id'))
+            ->pluck('host_id')
+            ->flip();
+        $isSameBrand = fn (BackupApplication $application) => $sameBrand->has($application->applicant_host_id);
+
+        return $applications
             ->sortBy([
                 fn (BackupApplication $a, BackupApplication $b) => $rating($b) <=> $rating($a),
-                fn (BackupApplication $a, BackupApplication $b) => $this->isSameBrand($b->applicant, $request) <=> $this->isSameBrand($a->applicant, $request),
+                fn (BackupApplication $a, BackupApplication $b) => $isSameBrand($b) <=> $isSameBrand($a),
                 fn (BackupApplication $a, BackupApplication $b) => $a->created_at <=> $b->created_at,
             ])
             ->values();
@@ -443,40 +526,77 @@ class BackupService
         $filled = DB::transaction(function () use ($request, $host, $by) {
             $request = BackupRequest::lockForUpdate()->findOrFail($request->id);
 
-            if (! in_array($request->status, ['open', 'pending'], true)) {
-                throw ValidationException::withMessages(['host_id' => ['Backup ini tidak sedang dibuka.']]);
-            }
-            if ($reason = $this->coverReason($host, $request)) {
-                throw ValidationException::withMessages(['host_id' => [$reason]]);
-            }
-
-            $crossBrand = ! $this->isSameBrand($host, $request);
-            if ($crossBrand) {
-                BackupQuota::for($host->id, $request->quotaMonth())->increment('quota_used');
-            }
-
-            $request->applications()->updateOrCreate(
-                ['applicant_host_id' => $host->id],
-                ['status' => 'approved', 'decided_at' => now()]
-            );
-
-            $request->update([
-                'status' => 'filled',
-                'filled_by_host_id' => $host->id,
-                'filled_at' => now(),
-                'approved_by' => $by?->id,
-                'approved_at' => now(),
-                'auto_filled' => $by === null,
-                'counts_toward_quota' => $crossBrand,
-            ]);
-
-            return $request;
+            return $this->assignCover($request, $host, $by);
         });
 
         $this->announceFilled($filled, $host);
         $this->announceNotPicked($filled);
 
         return $filled;
+    }
+
+    /**
+     * Staff open a request on a host's behalf with its cover picked straight away: both
+     * happen or neither, so a request is never left on the board unannounced.
+     *
+     * @param  array{reason_type: string, reason: ?string}  $reason
+     */
+    public function createFilled(ScheduleSlot $slot, string $date, array $reason, User $by, HostProfile $cover): BackupRequest
+    {
+        $filled = DB::transaction(function () use ($slot, $date, $reason, $by, $cover) {
+            // The cover first, so this waits for (and then sees) any other cover decided for them right now
+            HostProfile::lockForUpdate()->findOrFail($cover->id);
+            $backup = $this->create($slot, $date, $reason, $by, byStaff: true, announce: false);
+
+            return $this->assignCover(BackupRequest::lockForUpdate()->findOrFail($backup->id), $cover, $by);
+        });
+
+        $this->announceFilled($filled, $cover);
+
+        return $filled;
+    }
+
+    /** The cover's checks and bookkeeping; runs in a transaction with the request locked. */
+    private function assignCover(BackupRequest $request, HostProfile $host, ?User $by): BackupRequest
+    {
+        if (! in_array($request->status, ['open', 'pending'], true)) {
+            throw ValidationException::withMessages(['host_id' => ['Backup ini tidak sedang dibuka.']]);
+        }
+
+        // One decision per host at a time: two covers (or a cover and an event block) for the same
+        // host wait here, so the second sees the first's schedule and quota
+        $host = HostProfile::with('user')->lockForUpdate()->findOrFail($host->id);
+
+        if ($reason = $this->coverReason($host, $request)) {
+            throw ValidationException::withMessages(['host_id' => [$reason]]);
+        }
+
+        $crossBrand = ! $this->isSameBrand($host, $request);
+        if ($crossBrand) {
+            $quota = BackupQuota::for($host->id, $request->quotaMonth());
+            $quota = BackupQuota::whereKey($quota->id)->lockForUpdate()->first();
+            if ($quota->isFull()) {
+                throw ValidationException::withMessages(['host_id' => [$this->quotaFullMessage($quota)]]);
+            }
+            $quota->increment('quota_used');
+        }
+
+        $request->applications()->updateOrCreate(
+            ['applicant_host_id' => $host->id],
+            ['status' => 'approved', 'decided_at' => now()]
+        );
+
+        $request->update([
+            'status' => 'filled',
+            'filled_by_host_id' => $host->id,
+            'filled_at' => now(),
+            'approved_by' => $by?->id,
+            'approved_at' => now(),
+            'auto_filled' => $by === null,
+            'counts_toward_quota' => $crossBrand,
+        ]);
+
+        return $request;
     }
 
     /**

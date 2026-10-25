@@ -95,9 +95,12 @@ class PayController extends Controller
             ->flatMap(function (Brand $brand) {
                 $this->payroll->openPeriod($brand);
 
-                return $brand->paymentPeriods()->with('paymentRequest.requester:id,name')->orderByDesc('period_start')->limit(4)->get()
-                    ->map(function (PaymentPeriod $period) use ($brand) {
-                        $summary = $this->payroll->breakdown($period)['summary'];
+                $periods = $brand->paymentPeriods()->with('paymentRequest.requester:id,name')->orderByDesc('period_start')->limit(4)->get();
+                $summaries = $this->payroll->summaries($periods);
+
+                return $periods
+                    ->map(function (PaymentPeriod $period) use ($brand, $summaries) {
+                        $summary = $summaries[$period->id]['summary'];
                         $open = ! $period->isLocked();
 
                         return [

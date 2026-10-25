@@ -7,6 +7,7 @@ use App\Models\HostRating;
 use App\Models\PointLog;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -19,15 +20,30 @@ class RatingService
      */
     public function suggested(HostProfile $host, string $monthYear): float
     {
+        return $this->suggestions([$host->id], $monthYear)->get($host->id);
+    }
+
+    /**
+     * The suggestion for several hosts in one query, by host id.
+     *
+     * @param  list<string>  $hostIds
+     * @return Collection<string, float>
+     */
+    public function suggestions(array $hostIds, string $monthYear): Collection
+    {
         $month = CarbonImmutable::parse("{$monthYear}-01");
 
-        $impact = (float) PointLog::counting()
+        $impacts = $hostIds === [] ? collect() : PointLog::counting()
             ->join('violation_types', 'violation_types.id', '=', 'point_logs.violation_type_id')
-            ->where('point_logs.host_id', $host->id)
+            ->whereIn('point_logs.host_id', $hostIds)
             ->whereBetween('point_logs.occurred_on', [$month->toDateString(), $month->endOfMonth()->toDateString()])
-            ->sum('violation_types.rating_impact');
+            ->groupBy('point_logs.host_id')
+            ->selectRaw('point_logs.host_id, sum(violation_types.rating_impact) as impact')
+            ->pluck('impact', 'host_id');
 
-        return round(max(config('vidhelp.rating.min'), config('vidhelp.rating.max') - $impact), 1);
+        return collect($hostIds)->mapWithKeys(fn (string $id) => [
+            $id => round(max(config('vidhelp.rating.min'), config('vidhelp.rating.max') - (float) ($impacts[$id] ?? 0)), 1),
+        ]);
     }
 
     /**
@@ -40,25 +56,30 @@ class RatingService
     {
         $rated = HostRating::where('month_year', $monthYear)->select('host_id');
 
-        return DB::transaction(fn () => HostProfile::query()
-            ->where('status', 'active')
-            ->whereHas('user', fn ($q) => $q->where('status', 'active'))
-            ->when($brandId, fn ($q) => $q->whereHas('assignments', fn ($q) => $q->where('brand_id', $brandId)->where('status', 'active')))
-            ->whereNotIn('id', $rated)
-            ->get()
-            ->map(fn (HostProfile $host) => [$host, $this->suggested($host, $monthYear)])
-            ->filter(fn (array $pair) => ! $withoutDeductionsOnly || $pair[1] >= config('vidhelp.rating.max'))
-            ->each(fn (array $pair) => $this->rate($pair[0], $monthYear, $pair[1], null, $by))
-            ->count());
+        return DB::transaction(function () use ($rated, $brandId, $monthYear, $withoutDeductionsOnly, $by) {
+            $hosts = HostProfile::query()
+                ->where('status', 'active')
+                ->whereHas('user', fn ($q) => $q->where('status', 'active'))
+                ->when($brandId, fn ($q) => $q->whereHas('assignments', fn ($q) => $q->where('brand_id', $brandId)->where('status', 'active')))
+                ->whereNotIn('id', $rated)
+                ->get();
+            $suggestions = $this->suggestions($hosts->pluck('id')->all(), $monthYear);
+
+            return $hosts
+                ->filter(fn (HostProfile $host) => ! $withoutDeductionsOnly || $suggestions[$host->id] >= config('vidhelp.rating.max'))
+                ->each(fn (HostProfile $host) => $this->rate($host, $monthYear, $suggestions[$host->id], null, $by, suggested: $suggestions[$host->id]))
+                ->count();
+        });
     }
 
-    public function rate(HostProfile $host, string $monthYear, float $rating, ?string $note, User $by): HostRating
+    /** `$suggested` when it was worked out already (rating many hosts at once). */
+    public function rate(HostProfile $host, string $monthYear, float $rating, ?string $note, User $by, ?float $suggested = null): HostRating
     {
         return HostRating::updateOrCreate(
             ['host_id' => $host->id, 'month_year' => $monthYear],
             [
                 'rating' => round($rating, 1),
-                'suggested_rating' => $this->suggested($host, $monthYear),
+                'suggested_rating' => $suggested ?? $this->suggested($host, $monthYear),
                 'note' => $note,
                 'rated_by' => $by->id,
             ]

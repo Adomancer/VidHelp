@@ -75,18 +75,28 @@ class PayrollService
             return $open;
         }
 
-        // Hours the brand couldn't absorb last period count toward this one
-        $previous = PaymentPeriod::where('brand_id', $brand->id)->orderByDesc('period_end')->first();
+        return DB::transaction(function () use ($brand) {
+            // One brand at a time: two approvals starting its next period at once wait here, and
+            // the second finds (reading as committed now) the period the first started
+            Brand::whereKey($brand->id)->lockForUpdate()->first();
+            $open = PaymentPeriod::where('brand_id', $brand->id)->whereNull('period_end')->lockForUpdate()->first();
+            if ($open) {
+                return $open;
+            }
 
-        return PaymentPeriod::create([
-            'brand_id' => $brand->id,
-            'period_start' => $previous
-                ? CarbonImmutable::parse($previous->period_end->toDateString())->addDay()->toDateString()
-                : $brand->payroll_start_date->toDateString(),
-            'target_hours' => $brand->target_hours_per_period,
-            'carried_in_hours' => $previous?->isLocked() ? $previous->carried_out_hours : 0,
-            'status' => 'in_progress',
-        ]);
+            // Hours the brand couldn't absorb last period count toward this one
+            $previous = PaymentPeriod::where('brand_id', $brand->id)->orderByDesc('period_end')->lockForUpdate()->first();
+
+            return PaymentPeriod::create([
+                'brand_id' => $brand->id,
+                'period_start' => $previous
+                    ? CarbonImmutable::parse($previous->period_end->toDateString())->addDay()->toDateString()
+                    : $brand->payroll_start_date->toDateString(),
+                'target_hours' => $brand->target_hours_per_period,
+                'carried_in_hours' => $previous?->isLocked() ? $previous->carried_out_hours : 0,
+                'status' => 'in_progress',
+            ]);
+        });
     }
 
     /**
@@ -185,15 +195,24 @@ class PayrollService
             return false;
         }
 
-        $summary = $this->breakdown($period)['summary'];
-        if ($period->target_hours > $summary['carried_in_hours'] + $summary['worked_hours']) {
-            return false;
-        }
+        return DB::transaction(function () use ($period) {
+            // Checked again under the lock: two approvals reaching the target at once close it
+            // (and tell the PIC and admins) only once
+            $period = PaymentPeriod::lockForUpdate()->findOrFail($period->id);
+            if ($period->status !== 'in_progress') {
+                return false;
+            }
 
-        $lastSession = $period->workSessions()->max('session_date');
-        $this->close($period, $lastSession ? CarbonImmutable::parse($lastSession) : CarbonImmutable::today(), null);
+            $summary = $this->breakdown($period)['summary'];
+            if ($period->target_hours > $summary['carried_in_hours'] + $summary['worked_hours']) {
+                return false;
+            }
 
-        return true;
+            $lastSession = $period->workSessions()->max('session_date');
+            $this->close($period, $lastSession ? CarbonImmutable::parse($lastSession) : CarbonImmutable::today(), null);
+
+            return true;
+        });
     }
 
     /**
@@ -342,6 +361,43 @@ class PayrollService
             'target_hours' => $period->target_hours,
             'total_amount' => round($hosts->sum('amount')),
         ]];
+    }
+
+    /**
+     * breakdown()'s summary and host count for a list of periods: the locked ones from their
+     * snapshot in one query, only the running ones worked out live.
+     *
+     * @param  Collection<int, PaymentPeriod>  $periods
+     * @return Collection<string, array{summary: array, hosts: int}>
+     */
+    public function summaries(Collection $periods): Collection
+    {
+        $locked = $periods->filter(fn (PaymentPeriod $period) => $period->isLocked());
+        $items = $locked->isEmpty() ? collect() : PaymentItem::whereIn('payment_period_id', $locked->pluck('id'))
+            ->groupBy('payment_period_id')
+            ->selectRaw('payment_period_id, count(*) as hosts, sum(amount) as total_amount')
+            ->get()
+            ->keyBy('payment_period_id');
+
+        return $periods->mapWithKeys(function (PaymentPeriod $period) use ($items) {
+            if (! $period->isLocked()) {
+                ['hosts' => $hosts, 'summary' => $summary] = $this->breakdown($period);
+
+                return [$period->id => ['summary' => $summary, 'hosts' => $hosts->count()]];
+            }
+
+            $snapshot = $items->get($period->id);
+
+            return [$period->id => ['hosts' => (int) ($snapshot?->hosts ?? 0), 'summary' => [
+                'worked_hours' => $period->worked_hours,
+                'host_paid_hours' => $period->host_paid_hours,
+                'carried_in_hours' => $period->carried_in_hours,
+                'achieved_hours' => $period->achieved_hours,
+                'carried_out_hours' => $period->carried_out_hours,
+                'target_hours' => $period->target_hours,
+                'total_amount' => round((float) ($snapshot?->total_amount ?? 0)),
+            ]]];
+        });
     }
 
     /**

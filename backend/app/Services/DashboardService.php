@@ -139,8 +139,9 @@ class DashboardService
             ->where('requesting_host_id', '!=', $host->id)
             ->whereDoesntHave('applications', fn ($q) => $q->where('applicant_host_id', $host->id)->where('status', 'applied'))
             ->with(['brand:id,name', 'requester.user', 'nominees'])
-            ->get()
-            ->filter(fn (BackupRequest $backup) => $this->backups->ineligibleReason($host, $backup) === null);
+            ->get();
+        $context = $this->backups->coverContext(collect([$host]), $chances);
+        $chances = $chances->filter(fn (BackupRequest $backup) => $this->backups->ineligibleReason($host, $backup, $context) === null);
 
         return [
             'count' => $chances->count(),
@@ -229,8 +230,10 @@ class DashboardService
             ->whereHas('assignments', fn ($q) => $q->where('status', 'active'))
             ->get();
 
+        $everyone = $this->attendance->sessionsForHosts($hosts, $from, $to);
+
         $sessions = $hosts
-            ->flatMap(fn (HostProfile $host) => $this->attendance->sessions($host, $from, $to)
+            ->flatMap(fn (HostProfile $host) => $everyone->get($host->id)
                 ->reject(fn (array $session) => $session['role'] === 'off')
                 ->map(fn (array $session) => [
                     'host' => ['id' => $host->id, 'name' => $host->user->name],
@@ -302,7 +305,7 @@ class DashboardService
             ->all();
     }
 
-    /** Sum of GMV on approved live reports for sessions inside the period. */
+    /** Sum of GMV on approved live reports for sessions inside the period, added up in the database. */
     private function gmv(Brand $brand, PaymentPeriod $period): float
     {
         return (float) LiveReport::where('brand_id', $brand->id)
@@ -311,8 +314,7 @@ class DashboardService
                 $period->period_start->toDateString(),
                 ($period->period_end ?? today())->toDateString(),
             ]))
-            ->get(['metrics'])
-            ->sum(fn (LiveReport $report) => (float) ($report->metrics['gmv'] ?? 0));
+            ->sum('metrics->gmv');
     }
 
     /**

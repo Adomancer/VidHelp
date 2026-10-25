@@ -8,14 +8,14 @@ use App\Models\EventSlotClaim;
 use App\Models\HostProfile;
 use App\Models\SpecialEvent;
 use App\Services\EventService;
+use App\Services\HostCalendar;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class EventController extends Controller
 {
-    public function __construct(private EventService $events)
-    {
-    }
+    public function __construct(private EventService $events, private HostCalendar $calendar) {}
 
     /**
      * Running and upcoming events of my brands, with every block and whether I can claim it.
@@ -28,16 +28,25 @@ class EventController extends Controller
 
         $events = SpecialEvent::query()
             ->with('brand:id,name')
+            ->withCount(['claims as my_claims' => fn ($q) => $q->active()->where('host_id', $host->id)])
             ->where('status', 'active')
             ->whereIn('brand_id', $brandIds)
             ->whereDate('end_date', '>=', today()->subDay())
             ->orderBy('start_date')
-            ->get()
-            ->map(fn (SpecialEvent $event) => [
-                ...$event->toArray(),
-                'my_claims' => EventSlotClaim::active()->where('event_id', $event->id)->where('host_id', $host->id)->count(),
-                'blocks' => $this->events->blocks($event, $host),
-            ]);
+            ->get();
+
+        // When I'm busy, worked out once for the days of every event (from the first one's opening
+        // to two days after the last one's last day: hours may run past midnight)
+        $busy = $events->isEmpty() ? collect() : $this->calendar->hostIntervals(
+            $host,
+            CarbonImmutable::parse($events->min('start_date'))->startOfDay(),
+            CarbonImmutable::parse($events->max('end_date'))->addDays(2)->startOfDay(),
+        );
+
+        $events = $events->map(fn (SpecialEvent $event) => [
+            ...$event->toArray(),
+            'blocks' => $this->events->blocks($event, $host, $busy),
+        ]);
 
         return response()->json([
             'events' => $events,

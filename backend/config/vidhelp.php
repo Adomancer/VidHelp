@@ -28,6 +28,9 @@ return [
 
         // Sick letter is due this many hours after the slot starts
         'sick_letter_grace_hours' => (int) env('BACKUP_SICK_LETTER_GRACE_HOURS', 24),
+
+        // Files a host may upload as the sick letter of one request
+        'letter_max_files' => (int) env('BACKUP_LETTER_MAX_FILES', 5),
     ],
 
     'attendance' => [

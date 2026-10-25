@@ -15,9 +15,7 @@ use Illuminate\Http\Request;
  */
 class PointAdminController extends Controller
 {
-    public function __construct(private PointService $points)
-    {
-    }
+    public function __construct(private PointService $points) {}
 
     public function voidLog(Request $request, PointLog $log): JsonResponse
     {

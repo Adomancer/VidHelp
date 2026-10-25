@@ -8,6 +8,7 @@ use App\Models\HostProfile;
 use App\Models\SpecialEvent;
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -16,9 +17,7 @@ use Illuminate\Validation\ValidationException;
  */
 class EventService
 {
-    public function __construct(private HostCalendar $calendar, private Notifier $notifier)
-    {
-    }
+    public function __construct(private HostCalendar $calendar, private Notifier $notifier) {}
 
     public function create(array $attributes, User $by): SpecialEvent
     {
@@ -152,10 +151,12 @@ class EventService
     /**
      * Every block with who holds it. With a host `$viewer`, also whether they can claim it:
      * mine | taken | past | unavailable (brand's regular schedule) | busy (the host) | free.
+     * `$viewerBusy`: the viewer's HostCalendar::hostIntervals() over (at least) the event's
+     * hours, when it was loaded once for several events.
      *
      * @return list<array<string, mixed>>
      */
-    public function blocks(SpecialEvent $event, ?HostProfile $viewer = null): array
+    public function blocks(SpecialEvent $event, ?HostProfile $viewer = null, ?Collection $viewerBusy = null): array
     {
         $blocks = $event->blocks();
         if ($blocks === []) {
@@ -168,7 +169,7 @@ class EventService
         $from = $blocks[0][0];
         $to = end($blocks)[1];
         $brandBusy = $event->open_full_schedule ? collect() : $this->calendar->brandIntervals($event->brand_id, $from, $to);
-        $hostBusy = $viewer ? $this->calendar->hostIntervals($viewer, $from, $to) : collect();
+        $hostBusy = $viewer ? ($viewerBusy ?? $this->calendar->hostIntervals($viewer, $from, $to)) : collect();
 
         return array_map(function (array $block) use ($claims, $brandBusy, $hostBusy, $viewer) {
             [$start, $end] = $block;
@@ -216,7 +217,19 @@ class EventService
                 $this->fail('Event ini sudah dibatalkan.');
             }
 
-            [$blockStart, $blockEnd] = $event->blockAt($start) ?? $this->fail("Itu bukan salah satu blok event ini.");
+            // One schedule decision per host at a time (event blocks and backup covers alike), so a
+            // block claimed at the same time in another event or a cover is seen by the second
+            $host = HostProfile::with('user')->lockForUpdate()->findOrFail($host->id);
+
+            // Also when staff assign the block: only an active host who isn't banned from the brand
+            if ($host->status !== 'active' || $host->user->status !== 'active') {
+                $this->fail('Host ini tidak aktif.');
+            }
+            if ($host->assignments()->where('brand_id', $event->brand_id)->where('status', 'banned')->exists()) {
+                $this->fail("Host ini diblokir dari {$event->brand->name}.");
+            }
+
+            [$blockStart, $blockEnd] = $event->blockAt($start) ?? $this->fail('Itu bukan salah satu blok event ini.');
 
             if (($asManager ? $blockEnd : $blockStart)->lte(now())) {
                 $this->fail($asManager ? 'Blok ini sudah selesai.' : 'Blok ini sudah dimulai.');

@@ -14,7 +14,6 @@ use App\Services\Excel\Column;
 use App\Services\Excel\ExcelReport;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**

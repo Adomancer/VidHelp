@@ -51,6 +51,7 @@ trait Auditable
         foreach (array_diff($keys, $skip) as $key) {
             if (in_array($key, $this->getHidden(), true) || $this->hasCast($key, ['encrypted', 'encrypted:array', 'encrypted:json'])) {
                 $values[$key] = '[hidden]';
+
                 continue;
             }
 

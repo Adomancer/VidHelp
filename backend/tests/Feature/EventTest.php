@@ -258,6 +258,41 @@ class EventTest extends TestCase
         $this->assertSame(2, EventSlotClaim::active()->where('host_id', $this->regular->id)->count());
     }
 
+    public function test_operator_cannot_give_a_block_to_an_inactive_or_banned_host(): void
+    {
+        $event = $this->event();
+        $assign = fn (HostProfile $host) => $this->actingAs($this->operator)->postJson("/api/operator/events/{$event->id}/assign", [
+            'start_at' => '2026-10-09 10:00', 'host_id' => $host->id,
+        ]);
+
+        $this->other->update(['status' => 'archived']);
+        $assign($this->other)->assertJsonPath('errors.start_at.0', 'Host ini tidak aktif.');
+
+        $banned = $this->host($this->brandB);
+        HostBrandAssignment::create(['host_id' => $banned->id, 'brand_id' => $this->brandA->id, 'status' => 'banned']);
+        $assign($banned)->assertJsonPath('errors.start_at.0', 'Host ini diblokir dari Brand A.');
+
+        $this->assertSame(0, EventSlotClaim::count());
+    }
+
+    public function test_host_events_count_my_blocks_and_share_when_i_am_busy(): void
+    {
+        HostBrandAssignment::create(['host_id' => $this->other->id, 'brand_id' => $this->brandB->id, 'status' => 'active']);
+        $first = $this->event();
+        $second = $this->event(['brand_id' => $this->brandB->id, 'name' => 'Brand B PD']); // same days and hours
+        $this->claim($this->other, $first, '2026-10-09 10:00')->assertCreated();
+        $this->claim($this->other, $first, '2026-10-10 12:00')->assertCreated();
+
+        $events = collect($this->actingAs($this->other->user)->getJson('/api/host/events')->assertOk()->json('events'))->keyBy('name');
+
+        $this->assertSame(2, $events['PD 10.10']['my_claims']);
+        $this->assertSame('mine', $events['PD 10.10']['blocks'][0]['state']);
+        $this->assertSame(0, $events['Brand B PD']['my_claims']);
+        $this->assertSame('busy', $events['Brand B PD']['blocks'][0]['state']); // my block in PD 10.10
+        $this->assertSame('free', $events['Brand B PD']['blocks'][1]['state']);
+        $this->claim($this->other, $second, '2026-10-09 10:00')->assertJsonValidationErrors('start_at');
+    }
+
     private function edit(SpecialEvent $event, array $changes)
     {
         return $this->actingAs($this->operator)->putJson("/api/operator/events/{$event->id}", $changes);

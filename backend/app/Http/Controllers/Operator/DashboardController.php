@@ -8,7 +8,6 @@ use App\Models\LiveReport;
 use App\Models\ScheduleSlot;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {

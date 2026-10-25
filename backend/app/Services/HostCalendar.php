@@ -43,42 +43,65 @@ class HostCalendar
         ?string $exceptBackupId = null,
         ?string $exceptClaimId = null,
     ): Collection {
-        $slots = ScheduleSlot::query()
+        return $this->hostsIntervals([$host->id], $from, $to)
+            ->get($host->id)
+            ->reject(fn (array $interval) => ($exceptBackupId !== null && ($interval['backup_id'] ?? null) === $exceptBackupId)
+                || ($exceptClaimId !== null && ($interval['claim_id'] ?? null) === $exceptClaimId))
+            ->values();
+    }
+
+    /**
+     * The same for several hosts in three queries, by host id: their slots, the backups they
+     * cover (with `backup_id`) and their event blocks (with `claim_id`).
+     *
+     * @param  list<string>  $hostIds
+     * @return Collection<string, Collection<int, array{start: CarbonImmutable, end: CarbonImmutable, reason: string}>>
+     */
+    public function hostsIntervals(array $hostIds, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        $byHost = collect($hostIds)->mapWithKeys(fn (string $id) => [$id => collect()]);
+        if ($hostIds === []) {
+            return $byHost;
+        }
+
+        ScheduleSlot::query()
             ->with('assignment.brand:id,name')
             ->activeDuring(...$this->slotDays($from, $to))
-            ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
-            ->get();
-
-        $intervals = $this->slotIntervals($slots, $from, $to, fn (ScheduleSlot $slot) => "Live di {$slot->assignment->brand->name} ({$slot->label()}).");
+            ->whereHas('assignment', fn ($q) => $q->whereIn('host_id', $hostIds)->where('status', 'active'))
+            ->get()
+            ->groupBy(fn (ScheduleSlot $slot) => $slot->assignment->host_id)
+            ->each(fn (Collection $slots, string $hostId) => $byHost->put($hostId, $this->slotIntervals(
+                $slots, $from, $to, fn (ScheduleSlot $slot) => "Live di {$slot->assignment->brand->name} ({$slot->label()})."
+            )));
 
         BackupRequest::query()
             ->with('brand:id,name')
             ->where('status', 'filled')
-            ->where('filled_by_host_id', $host->id)
-            ->when($exceptBackupId, fn ($q) => $q->whereKeyNot($exceptBackupId))
+            ->whereIn('filled_by_host_id', $hostIds)
             ->where('start_at', '<', $to)
             ->where('end_at', '>', $from)
             ->get()
-            ->each(fn (BackupRequest $cover) => $intervals->push([
+            ->each(fn (BackupRequest $cover) => $byHost->get($cover->filled_by_host_id)->push([
                 'start' => CarbonImmutable::parse($cover->start_at),
                 'end' => CarbonImmutable::parse($cover->end_at),
                 'reason' => "Sudah menggantikan di {$cover->brand->name} pada waktu itu.",
+                'backup_id' => $cover->id,
             ]));
 
         EventSlotClaim::active()
             ->with('event:id,name')
-            ->where('host_id', $host->id)
-            ->when($exceptClaimId, fn ($q) => $q->whereKeyNot($exceptClaimId))
+            ->whereIn('host_id', $hostIds)
             ->where('start_at', '<', $to)
             ->where('end_at', '>', $from)
             ->get()
-            ->each(fn (EventSlotClaim $claim) => $intervals->push([
+            ->each(fn (EventSlotClaim $claim) => $byHost->get($claim->host_id)->push([
                 'start' => CarbonImmutable::parse($claim->start_at),
                 'end' => CarbonImmutable::parse($claim->end_at),
                 'reason' => "Sudah mengambil blok {$claim->event->name} pada waktu itu.",
+                'claim_id' => $claim->id,
             ]));
 
-        return $intervals;
+        return $byHost;
     }
 
     /**

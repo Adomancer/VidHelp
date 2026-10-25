@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Models\Attachment;
 use App\Models\BackupApplication;
 use App\Models\BackupRequest;
 use App\Models\Brand;
+use App\Models\BrandComplaint;
 use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
 use App\Models\HostRating;
@@ -20,6 +20,7 @@ use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\ViolationTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class PointsTest extends TestCase
@@ -118,7 +119,9 @@ class PointsTest extends TestCase
 
     public function test_points_reset_in_the_next_three_month_period(): void
     {
-        $this->violation(['points' => 30, 'occurred_on' => '2026-09-30'])->assertCreated(); // Q3
+        $this->travelTo(CarbonImmutable::parse('2026-09-30 10:00'));
+        $this->violation(['points' => 30])->assertCreated(); // Q3, recorded while it runs
+        $this->travelTo(CarbonImmutable::parse('2026-10-05 10:00'));
         $this->violation(['points' => 10])->assertCreated(); // Q4
 
         $this->assertSame(90, $this->points());
@@ -195,10 +198,8 @@ class PointsTest extends TestCase
     {
         $missing = $this->filledBackup($this->newHost(), 'sick');
         $onTime = $this->filledBackup($this->newHost(), 'sick', '2026-10-06 18:00', '2026-10-06 20:00');
-        Attachment::create([
-            'owner_type' => 'backup_request', 'owner_id' => $onTime->id, 'file_path' => 'x.pdf',
-            'mime_type' => 'application/pdf', 'size_kb' => 1,
-        ]);
+        // Uploaded on time; the file itself is gone (e.g. the account was erased since), which doesn't make it late
+        $onTime->update(['letter_uploaded_at' => '2026-10-06 21:00']);
 
         $this->travelTo(CarbonImmutable::parse('2026-10-08 12:00')); // both letters are past due
         $this->artisan('points:apply-penalties')->assertSuccessful();
@@ -466,5 +467,64 @@ class PointsTest extends TestCase
         }
 
         return $backup;
+    }
+
+    public function test_violations_can_only_be_dated_in_the_running_points_period(): void
+    {
+        // Q4 runs from 1 Oct; 30 Sep belongs to the closed Q3
+        $this->violation(['occurred_on' => '2026-09-30'])
+            ->assertJsonValidationErrors(['occurred_on' => 'Tanggal kejadian harus di periode poin yang berjalan (sejak 1 Okt 2026).']);
+        $this->actingAs($this->operator)->postJson('/api/operator/points/complaints', [
+            'host_id' => $this->host->id, 'brand_id' => $this->brand->id, 'description' => 'Old complaint', 'occurred_on' => '2026-07-15',
+        ])->assertJsonValidationErrors('occurred_on');
+
+        $this->violation(['occurred_on' => '2026-10-01'])->assertCreated();
+        $this->assertSame(0, PointLog::whereDate('period_start', '2026-07-01')->count());
+        $this->assertSame(0, BrandComplaint::count());
+    }
+
+    public function test_points_are_only_deducted_from_active_hosts(): void
+    {
+        $this->host->update(['status' => 'inactive']);
+
+        $this->violation()->assertJsonValidationErrors(['host_id' => 'Pilih host yang masih aktif.']);
+        $this->actingAs($this->operator)->postJson('/api/operator/points/complaints', [
+            'host_id' => $this->host->id, 'brand_id' => $this->brand->id, 'description' => 'Late start',
+        ])->assertJsonValidationErrors('host_id');
+
+        $this->assertSame(0, PointLog::count());
+        $this->assertSame(0, BrandComplaint::count());
+    }
+
+    public function test_voiding_twice_is_refused_and_the_balance_counts_every_change(): void
+    {
+        $first = $this->violation(['points' => 10])->json('log.id');
+        $this->violation(['points' => 5]);
+
+        $this->actingAs($this->admin)->postJson("/api/admin/points/logs/{$first}/void")->assertOk();
+        $this->actingAs($this->admin)->postJson("/api/admin/points/logs/{$first}/void")->assertUnprocessable();
+
+        $this->assertSame(95, $this->points());
+    }
+
+    public function test_rating_rows_take_the_same_number_of_queries_however_many_hosts(): void
+    {
+        $queries = function () {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($this->admin)->getJson('/api/admin/ratings?month=2026-10')->assertOk();
+            DB::disableQueryLog();
+
+            return count(DB::getQueryLog());
+        };
+
+        $this->violation();
+        $queries();
+        $before = $queries();
+        foreach (range(1, 5) as $i) {
+            $this->violation(['host_id' => $this->newHost()->id]);
+        }
+
+        $this->assertSame($before, $queries());
     }
 }

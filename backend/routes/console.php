@@ -34,35 +34,38 @@ Artisan::command('backups:auto-process', function (BackupService $backups) {
     $this->info("Auto-picked a cover for {$filled} request(s).");
 })->purpose('Pick the best applicant for backup requests about to start that nobody decided on');
 
-Schedule::command('backups:auto-process')->everyMinute();
+// The jobs below change data: a run waits out one still going (withoutOverlapping, the lock
+// expiring after the minutes given if a run dies), and with several servers only one runs it
+// (onOneServer: needs a shared cache store with locks, e.g. CACHE_STORE=database or redis)
+Schedule::command('backups:auto-process')->everyMinute()->withoutOverlapping(10)->onOneServer();
 
 Artisan::command('points:apply-penalties', function (PointService $points) {
     $penalized = $points->penalizeLateSickLetters();
     $this->info("Deducted points for {$penalized} late or missing sick letter(s).");
 })->purpose('Deduct points for sick letters that were missing or late');
 
-Schedule::command('points:apply-penalties')->everyTenMinutes();
+Schedule::command('points:apply-penalties')->everyTenMinutes()->withoutOverlapping(30)->onOneServer();
 
 Artisan::command('payroll:roll-periods', function (PayrollService $payroll) {
     $closed = $payroll->rollPeriods();
     $this->info("{$closed} period(s) reached their target and wait for payment.");
 })->purpose('Open each brand\'s running pay period and close it if its target is reached');
 
-Schedule::command('payroll:roll-periods')->dailyAt('00:05');
+Schedule::command('payroll:roll-periods')->dailyAt('00:05')->withoutOverlapping(60)->onOneServer();
 
 Artisan::command('notifications:retry-discord', function (Notifier $notifier) {
     $retried = $notifier->retry();
     $this->info("Retried {$retried} Discord message(s).");
 })->purpose('Resend Discord messages that failed or were never sent');
 
-Schedule::command('notifications:retry-discord')->everyFiveMinutes();
+Schedule::command('notifications:retry-discord')->everyFiveMinutes()->withoutOverlapping(30)->onOneServer();
 
 Artisan::command('notifications:send-reminders', function (ReminderService $reminders) {
     $sent = $reminders->send();
     $this->info("Sent {$sent} reminder(s).");
 })->purpose('Remind hosts of sessions, live reports and sick letters, and staff of backup decisions, before they are due');
 
-Schedule::command('notifications:send-reminders')->everyFiveMinutes();
+Schedule::command('notifications:send-reminders')->everyFiveMinutes()->withoutOverlapping(30)->onOneServer();
 
 Artisan::command('discord:preview {to=backups : backups, admin, or the email of a user who linked Discord} {--only=* : Only these types, e.g. --only=backup_opened}', function (DiscordPreview $preview) {
     $to = $this->argument('to');

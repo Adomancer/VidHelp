@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Brand;
+use App\Models\ProfileChangeRequest;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,7 +58,7 @@ class AuditLogTest extends TestCase
         ])->assertOk();
         $this->actingAs($host)->putJson('/api/host/profile/sensitive', ['ktp_number' => '3201234567890001', 'bank_account' => '1234567890'])
             ->assertOk();
-        $change = \App\Models\ProfileChangeRequest::sole();
+        $change = ProfileChangeRequest::sole();
         $this->actingAs($this->admin)->postJson("/api/admin/profile-changes/{$change->id}/approve", ['version' => $change->version()])->assertOk();
         $this->assertSame('[hidden]', AuditLog::where(['action' => 'create', 'target_table' => 'profile_change_requests'])->sole()->new_value['new_values']);
 

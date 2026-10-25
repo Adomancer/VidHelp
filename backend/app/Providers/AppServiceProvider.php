@@ -10,6 +10,7 @@ use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -31,6 +32,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Every api/* error is rendered as JSON, so debug mode would hand stack traces and SQL to
+        // any client: never in production, whatever APP_DEBUG says
+        if ($this->app->isProduction() && config('app.debug')) {
+            config(['app.debug' => false]);
+            Log::critical('APP_DEBUG is true in production; it was turned off for this request. Set APP_DEBUG=false in .env.');
+        }
+
         // Admin-edited business rules (Settings page) override config/vidhelp.php
         $this->app->make(SettingsService::class)->apply();
 

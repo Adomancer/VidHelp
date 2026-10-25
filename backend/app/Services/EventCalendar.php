@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\SpecialEvent;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 
 /**
  * Which days a brand's regular schedule is replaced by a special event
@@ -11,7 +12,7 @@ use Carbon\CarbonInterface;
  */
 class EventCalendar
 {
-    /** @var array<string, \Illuminate\Support\Collection<int, SpecialEvent>> */
+    /** @var array<string, Collection<int, SpecialEvent>> */
     private array $fullEvents = [];
 
     /**
