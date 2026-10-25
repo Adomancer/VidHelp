@@ -193,6 +193,44 @@ class PayrollTest extends TestCase
         $this->assertSame($first->id, $this->workSession($this->host, '2026-10-03', 1)->payment_period_id);
     }
 
+    public function test_a_period_reaching_its_target_from_two_places_closes_once(): void
+    {
+        $this->makeLeader($this->host);
+        $this->workSession($this->host, '2026-10-02', 4);
+        $stale = $this->period('2026-10-01'); // as a second approval read it, still running
+        $this->workSession($this->host, '2026-10-03', 7); // the first closes it
+
+        $this->assertFalse(app(PayrollService::class)->closeIfTargetReached($stale));
+
+        $this->assertSame(1, AppNotification::where('user_id', $this->host->user_id)->where('type', 'period_ready')->count());
+        $this->assertSame(2, PaymentPeriod::where('brand_id', $this->brand->id)->count());
+        $this->assertSame($this->period('2026-10-04')->id, app(PayrollService::class)->openPeriod($this->brand)->id);
+    }
+
+    public function test_period_list_takes_the_same_number_of_queries_however_many_paid_periods(): void
+    {
+        $queries = function () {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($this->finance)->getJson('/api/finance/payroll/periods')->assertOk();
+            DB::disableQueryLog();
+
+            return count(DB::getQueryLog());
+        };
+
+        $this->lockedPay($this->brandPeriod('Kopi', 'paid', ['period_end' => '2026-09-20']), '2026-09-22 09:00', 200000, '2026-09-25 09:00');
+        $queries();
+        $before = $queries();
+        foreach (['Teh', 'Susu', 'Roti'] as $name) {
+            $this->lockedPay($this->brandPeriod($name, 'paid', ['period_end' => '2026-09-20']), '2026-09-22 09:00', 100000, '2026-09-25 09:00');
+        }
+
+        $this->assertSame($before, $queries());
+        $periods = collect($this->actingAs($this->finance)->getJson('/api/finance/payroll/periods?status=paid')->json('data'))->keyBy('brand.name');
+        $this->assertEquals(200000, $periods['Kopi']['total_amount']);
+        $this->assertSame(1, $periods['Kopi']['hosts']);
+    }
+
     public function test_setting_a_payroll_start_date_picks_up_earlier_sessions(): void
     {
         $brandB = Brand::create(['name' => 'Brand B', 'target_hours_per_period' => 10]);
