@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AppNotification;
 use App\Models\Attendance;
 use App\Models\BackupRequest;
 use App\Models\HostProfile;
@@ -43,37 +44,50 @@ class ReminderService
             ->with('user.discordLink')
             ->get();
 
-        foreach ($hosts as $host) {
-            $sessions = $this->attendance->sessions($host, $now->subMinutes(self::STARTED_WITHIN_MINUTES), $now->addMinutes($minutes));
+        // Everyone's sessions in one go, then the reminders already sent for them in one query
+        $due = $this->attendance->sessionsForHosts($hosts, $now->subMinutes(self::STARTED_WITHIN_MINUTES), $now->addMinutes($minutes))
+            ->flatMap(fn ($sessions, string $hostId) => $sessions
+                ->reject(fn (array $session) => $session['role'] === 'off' || $session['attendance']
+                    || CarbonImmutable::parse($session['start_at'])->lt($now->subMinutes(self::STARTED_WITHIN_MINUTES)))
+                ->map(function (array $session) use ($hostId, $now) {
+                    $started = CarbonImmutable::parse($session['start_at'])->lte($now);
+                    $id = ($session['event_claim_id'] ?? null) ?: "{$session['slot_id']}:{$session['date']}";
 
-            foreach ($sessions as $session) {
-                $start = CarbonImmutable::parse($session['start_at']);
-                if ($session['role'] === 'off' || $session['attendance'] || $start->lt($now->subMinutes(self::STARTED_WITHIN_MINUTES))) {
-                    continue;
-                }
+                    return [...$session, 'host_id' => $hostId, 'started' => $started, 'key' => ($started ? 'no_check_in:' : 'live_soon:').$id];
+                }));
+        $sentBefore = $due->isEmpty() ? collect() : AppNotification::whereIn('dedupe_key', $due->pluck('key')->unique()->values())
+            ->whereIn('user_id', $hosts->pluck('user_id'))
+            ->get(['user_id', 'dedupe_key'])
+            ->mapWithKeys(fn (AppNotification $notification) => ["{$notification->user_id}|{$notification->dedupe_key}" => true]);
+        $hosts = $hosts->keyBy('id');
 
-                $started = $start->lte($now);
-                $id = ($session['event_claim_id'] ?? null) ?: "{$session['slot_id']}:{$session['date']}";
-                $brand = $session['brand']['name'];
-
-                $notice = Notice::make($started ? 'reminder_check_in' : 'reminder_live_soon', $started
-                    ? "Kamu belum check-in di {$brand}"
-                    : "Live di {$brand} mulai pukul {$start->format('H:i')}")
-                    ->key(($started ? 'no_check_in:' : 'live_soon:').$id)
-                    ->body($started
-                        ? "Sesi sudah mulai pukul {$start->format('H:i')}. Check-in lebih dari ".config('vidhelp.attendance.late_after_minutes').' menit setelah mulai dihitung telat.'
-                        : 'Jangan lupa check-in. Check-in dibuka '.config('vidhelp.attendance.check_in_opens_minutes').' menit sebelum mulai.')
-                    ->brand($brand)
-                    ->field('Waktu', Notice::window($start, CarbonImmutable::parse($session['end_at'])), inline: false)
-                    ->field('Sesi', match ($session['role']) {
-                        'cover' => "Menggantikan {$session['covered_for']}",
-                        'event' => "Event {$session['event_name']}",
-                        default => 'Jadwal rutin',
-                    })
-                    ->link('/host/live', 'Check-in sekarang');
-
-                $sent += $this->notifier->toUsers($host->user, $notice, dm: true);
+        foreach ($due as $session) {
+            $host = $hosts[$session['host_id']];
+            if ($sentBefore->has("{$host->user_id}|{$session['key']}")) {
+                continue;
             }
+
+            $start = CarbonImmutable::parse($session['start_at']);
+            $started = $session['started'];
+            $brand = $session['brand']['name'];
+
+            $notice = Notice::make($started ? 'reminder_check_in' : 'reminder_live_soon', $started
+                ? "Kamu belum check-in di {$brand}"
+                : "Live di {$brand} mulai pukul {$start->format('H:i')}")
+                ->key($session['key'])
+                ->body($started
+                    ? "Sesi sudah mulai pukul {$start->format('H:i')}. Check-in lebih dari ".config('vidhelp.attendance.late_after_minutes').' menit setelah mulai dihitung telat.'
+                    : 'Jangan lupa check-in. Check-in dibuka '.config('vidhelp.attendance.check_in_opens_minutes').' menit sebelum mulai.')
+                ->brand($brand)
+                ->field('Waktu', Notice::window($start, CarbonImmutable::parse($session['end_at'])), inline: false)
+                ->field('Sesi', match ($session['role']) {
+                    'cover' => "Menggantikan {$session['covered_for']}",
+                    'event' => "Event {$session['event_name']}",
+                    default => 'Jadwal rutin',
+                })
+                ->link('/host/live', 'Check-in sekarang');
+
+            $sent += $this->notifier->toUsers($host->user, $notice, dm: true);
         }
 
         return $sent;

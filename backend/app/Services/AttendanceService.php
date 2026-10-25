@@ -34,15 +34,34 @@ class AttendanceService
      */
     public function sessions(HostProfile $host, CarbonInterface $from, CarbonInterface $to): Collection
     {
+        return $this->sessionsForHosts(collect([$host]), $from, $to)->get($host->id);
+    }
+
+    /**
+     * sessions() for several hosts in five queries (slots, covered occurrences, attendances,
+     * covers, event blocks), by host id, e.g. everyone's sessions today.
+     *
+     * @param  Collection<int, HostProfile>  $hosts
+     * @return Collection<string, Collection<int, array>>
+     */
+    public function sessionsForHosts(Collection $hosts, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        $hostIds = $hosts->pluck('id')->unique()->values()->all();
+        $byHost = collect($hostIds)->mapWithKeys(fn (string $id) => [$id => collect()]);
+        if ($hostIds === []) {
+            return $byHost;
+        }
+
         $slots = ScheduleSlot::query()
             ->with('assignment.brand:id,name')
             // From the day before: an overnight slot from then can still be running at `$from`
             ->activeDuring(CarbonImmutable::parse($from)->subDay()->toDateString(), CarbonImmutable::parse($to)->toDateString())
-            ->whereHas('assignment', fn ($q) => $q->where('host_id', $host->id)->where('status', 'active'))
-            ->get();
+            ->whereHas('assignment', fn ($q) => $q->whereIn('host_id', $hostIds)->where('status', 'active'))
+            ->get()
+            ->groupBy(fn (ScheduleSlot $slot) => $slot->assignment->host_id);
 
-        // My occurrences in this window that another host covers
-        $coveredByOthers = BackupRequest::where('requesting_host_id', $host->id)
+        // Their occurrences in this window that another host covers (a slot belongs to one host)
+        $coveredByOthers = BackupRequest::whereIn('requesting_host_id', $hostIds)
             ->where('status', 'filled')
             ->where('end_at', '>', $from)
             ->where('start_at', '<', $to)
@@ -50,51 +69,51 @@ class AttendanceService
             ->get()
             ->keyBy(fn (BackupRequest $backup) => $backup->slot_id.'|'.$backup->backup_date->toDateString());
 
-        $attendances = Attendance::where('host_id', $host->id)
-            ->where('scheduled_end_at', '>', $from->copy()->subDay())
+        $attendances = Attendance::whereIn('host_id', $hostIds)
+            ->where('scheduled_end_at', '>', CarbonImmutable::parse($from)->subDay())
             ->with('report')
             ->get()
-            ->keyBy(fn (Attendance $attendance) => $this->attendanceKey($attendance));
-
-        $sessions = collect();
+            ->groupBy('host_id')
+            ->map(fn (Collection $group) => $group->keyBy(fn (Attendance $attendance) => $this->attendanceKey($attendance)));
+        $attendanceOf = fn (string $hostId, string $key) => $attendances->get($hostId)?->get($key);
 
         for ($day = CarbonImmutable::parse($from)->subDay()->startOfDay(); $day->lte($to); $day = $day->addDay()) {
-            foreach ($slots as $slot) {
-                if (! $slot->runsOn($day) || $this->events->replacing($slot->assignment->brand_id, $day)) {
-                    continue;
+            foreach ($slots as $hostId => $hostSlots) {
+                foreach ($hostSlots as $slot) {
+                    if (! $slot->runsOn($day) || $this->events->replacing($slot->assignment->brand_id, $day)) {
+                        continue;
+                    }
+
+                    [$start, $end] = $slot->occurrenceOn($day);
+                    if ($end->lte($from) || $start->gte($to)) {
+                        continue;
+                    }
+
+                    $key = $slot->id.'|'.$day->toDateString();
+                    $cover = $coveredByOthers->get($key);
+
+                    $byHost->get($hostId)->push([
+                        'slot_id' => $slot->id,
+                        'date' => $day->toDateString(),
+                        'backup_request_id' => null,
+                        'brand' => $slot->assignment->brand->only('id', 'name'),
+                        'start_at' => $start,
+                        'end_at' => $end,
+                        'role' => $cover ? 'off' : 'own',
+                        'covered_by' => $cover?->filler?->user->name,
+                        'attendance' => $attendanceOf($hostId, $key),
+                    ]);
                 }
-
-                [$start, $end] = $slot->occurrenceOn($day);
-                if ($end->lte($from) || $start->gte($to)) {
-                    continue;
-                }
-
-                $key = $slot->id.'|'.$day->toDateString();
-                $cover = $coveredByOthers->get($key);
-
-                $sessions->push([
-                    'slot_id' => $slot->id,
-                    'date' => $day->toDateString(),
-                    'backup_request_id' => null,
-                    'brand' => $slot->assignment->brand->only('id', 'name'),
-                    'start_at' => $start,
-                    'end_at' => $end,
-                    'role' => $cover ? 'off' : 'own',
-                    'covered_by' => $cover?->filler?->user->name,
-                    'attendance' => $attendances->get($key),
-                ]);
             }
         }
 
-        $covers = BackupRequest::where('filled_by_host_id', $host->id)
+        BackupRequest::whereIn('filled_by_host_id', $hostIds)
             ->where('status', 'filled')
             ->where('end_at', '>', $from)
             ->where('start_at', '<', $to)
             ->with(['brand:id,name', 'requester.user'])
-            ->get();
-
-        foreach ($covers as $backup) {
-            $sessions->push([
+            ->get()
+            ->each(fn (BackupRequest $backup) => $byHost->get($backup->filled_by_host_id)->push([
                 'slot_id' => $backup->slot_id,
                 'date' => $backup->backup_date->toDateString(),
                 'backup_request_id' => $backup->id,
@@ -103,19 +122,16 @@ class AttendanceService
                 'end_at' => $backup->end_at,
                 'role' => 'cover',
                 'covered_for' => $backup->requester->user->name,
-                'attendance' => $attendances->get($backup->slot_id.'|'.$backup->backup_date->toDateString()),
-            ]);
-        }
+                'attendance' => $attendanceOf($backup->filled_by_host_id, $backup->slot_id.'|'.$backup->backup_date->toDateString()),
+            ]));
 
-        $claims = EventSlotClaim::active()
-            ->where('host_id', $host->id)
+        EventSlotClaim::active()
+            ->whereIn('host_id', $hostIds)
             ->where('end_at', '>', $from)
             ->where('start_at', '<', $to)
             ->with('event.brand:id,name')
-            ->get();
-
-        foreach ($claims as $claim) {
-            $sessions->push([
+            ->get()
+            ->each(fn (EventSlotClaim $claim) => $byHost->get($claim->host_id)->push([
                 'slot_id' => null,
                 'date' => $claim->start_at->toDateString(),
                 'backup_request_id' => null,
@@ -125,11 +141,10 @@ class AttendanceService
                 'start_at' => $claim->start_at,
                 'end_at' => $claim->end_at,
                 'role' => 'event',
-                'attendance' => $attendances->get('event|'.$claim->id),
-            ]);
-        }
+                'attendance' => $attendanceOf($claim->host_id, 'event|'.$claim->id),
+            ]));
 
-        return $sessions->sortBy('start_at')->values();
+        return $byHost->map(fn (Collection $sessions) => $sessions->sortBy('start_at')->values());
     }
 
     private function attendanceKey(Attendance $attendance): string

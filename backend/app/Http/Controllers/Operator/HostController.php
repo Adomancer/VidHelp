@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Operator;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Brand;
 use App\Models\HostBrandAssignment;
 use App\Models\HostProfile;
@@ -30,11 +31,13 @@ class HostController extends Controller
 
     /**
      * The same list (same filters, every page) as an Excel report: a summary (status, brands,
-     * rate levels) and the full host list. No KTP/bank data.
+     * rate levels) and the full host list. No KTP/bank data; guardians' numbers (someone else's
+     * personal data) only for admins. Every export is written to the audit log.
      */
     public function export(Request $request): BinaryFileResponse
     {
         $hosts = $this->filtered($request)->with('rateCategory')->get();
+        $withGuardians = $request->user()->hasAnyRole(['admin', 'finance']);
         $brand = $request->brand_id ? Brand::find($request->brand_id) : null;
         $filters = collect([
             $brand ? "Brand {$brand->name}" : 'Semua brand',
@@ -78,7 +81,7 @@ class HostController extends Controller
                 Column::text('Nama', 24),
                 Column::text('Email', 28),
                 Column::text('No. HP', 16),
-                Column::text('No. HP wali', 16),
+                ...($withGuardians ? [Column::text('No. HP wali', 16)] : []),
                 Column::status('Status', self::STATUS_TONES, 13),
                 Column::text('Level tarif', 16),
                 Column::rupiah('Tarif per jam', 16, summed: false),
@@ -92,7 +95,7 @@ class HostController extends Controller
                 $host->user->name,
                 $host->user->email,
                 $host->phone,
-                $host->guardian_phone,
+                ...($withGuardians ? [$host->guardian_phone] : []),
                 self::STATUS[$host->status] ?? $host->status,
                 $host->rateCategory?->name.($host->rate_category_overridden ? ' (manual)' : ''),
                 $host->rateCategory?->rate_per_hour,
@@ -103,6 +106,8 @@ class HostController extends Controller
             ]),
             totals: false,
         );
+
+        AuditLog::record('hosts_exported', new: ['filters' => $filters, 'count' => $hosts->count(), 'guardian_phones' => $withGuardians]);
 
         return $report->download('hosts-'.today()->toDateString().'.xlsx');
     }
