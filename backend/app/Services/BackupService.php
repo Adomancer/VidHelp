@@ -147,10 +147,12 @@ class BackupService
             throw ValidationException::withMessages(['host_ids' => ['Salah satu host yang dipilih tidak ditemukan.']]);
         }
 
+        // Other hosts' reasons (banned, quota, their schedule) are theirs, as in candidates()
         $context = $this->coverContext($hosts, collect([$backup]));
         foreach ($hosts as $host) {
             if ($reason = $this->coverReason($host, $backup, $context)) {
-                throw ValidationException::withMessages(['host_ids' => ["{$host->user->name} tidak bisa menggantikan: {$reason}"]]);
+                $message = $host->id === $backup->requesting_host_id ? $reason : "{$host->user->name} tidak tersedia.";
+                throw ValidationException::withMessages(['host_ids' => [$message]]);
             }
         }
 

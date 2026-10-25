@@ -341,9 +341,33 @@ class BackupTest extends TestCase
 
         $this->slotFor($this->otherBrand->assignments()->first(), 2, '15:00', '17:00');
         $direct([$this->sameBrand->id, $this->otherBrand->id])
-            ->assertJsonValidationErrors(['host_ids' => "{$this->otherBrand->user->name} tidak bisa menggantikan: Live di Brand B"]);
+            ->assertJsonValidationErrors(['host_ids' => "{$this->otherBrand->user->name} tidak tersedia."]);
 
         $this->assertSame(0, BackupRequest::count());
+    }
+
+    public function test_my_requests_show_other_hosts_by_name_only(): void
+    {
+        $nominee = $this->host();
+        $nominee->update(['phone' => '0811111', 'guardian_phone' => '0822222']);
+        $this->assign($nominee, $this->brandB);
+
+        $created = $this->request(['request_type' => 'direct', 'host_ids' => [$this->sameBrand->id, $nominee->id]])->assertCreated();
+        BackupRequest::findOrFail($created->json('request.id'))->update(['filled_by_host_id' => $nominee->id]);
+        $listed = $this->actingAs($this->requester->user)->getJson('/api/host/backups')->assertOk();
+
+        foreach ([[$created, 'request'], [$listed, 'requests.0']] as [$response, $path]) {
+            $hosts = collect($response->json("{$path}.nominees"))->pluck('host');
+            $this->assertEqualsCanonicalizing([$this->sameBrand->user->name, $nominee->user->name], $hosts->pluck('user.name')->all());
+            foreach ($hosts as $host) {
+                $this->assertSame(['id', 'user_id', 'user'], array_keys($host));
+                $this->assertArrayNotHasKey('email', $host['user']);
+            }
+        }
+        $listed->assertJsonPath('requests.0.filler.user.name', $nominee->user->name)
+            ->assertJsonMissingPath('requests.0.filler.phone')
+            ->assertJsonMissingPath('requests.0.filler.guardian_phone')
+            ->assertJsonMissingPath('requests.0.filler.user.email');
     }
 
     public function test_only_nominees_can_apply_to_a_direct_request(): void

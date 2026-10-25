@@ -16,6 +16,12 @@ use Illuminate\Validation\ValidationException;
 
 class BackupController extends Controller
 {
+    /** The cover and the hosts I asked, by name and photo only: their contact details are theirs. */
+    private const OTHER_HOSTS = [
+        'filler:id,user_id', 'filler.user:id,name,avatar',
+        'nominees:id,backup_request_id,nominee_host_id', 'nominees.host:id,user_id', 'nominees.host.user:id,name,avatar',
+    ];
+
     public function __construct(private BackupService $backups, private EventCalendar $events) {}
 
     /**
@@ -27,7 +33,7 @@ class BackupController extends Controller
 
         return response()->json([
             'requests' => BackupRequest::where('requesting_host_id', $host->id)
-                ->with(['brand:id,name', 'filler.user', 'attachments', 'nominees.host.user'])
+                ->with(['brand:id,name', 'attachments', ...self::OTHER_HOSTS])
                 ->latest('start_at')
                 ->limit(30)
                 ->get(),
@@ -179,7 +185,7 @@ class BackupController extends Controller
             ? 'Backup diajukan. Host yang kamu pilih sudah diminta untuk menggantikan.'
             : 'Backup diajukan. Host lain sekarang bisa mendaftar.';
 
-        return response()->json(['request' => $backup->load(['brand:id,name', 'attachments', 'nominees.host.user']), 'message' => $message], 201);
+        return response()->json(['request' => $backup->load(['brand:id,name', 'attachments', ...self::OTHER_HOSTS]), 'message' => $message], 201);
     }
 
     /**
