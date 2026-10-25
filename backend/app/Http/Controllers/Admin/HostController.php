@@ -46,6 +46,6 @@ class HostController extends Controller
         $host->load(['user.roles', 'rateCategory', 'sensitiveData', 'assignments.brand']);
         $host->sensitiveData?->makeVisible(['ktp_number', 'bank_account']);
 
-        return $host;
+        return $host->makeVisible('guardian_phone');
     }
 }

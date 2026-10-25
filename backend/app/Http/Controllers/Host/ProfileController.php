@@ -118,7 +118,7 @@ class ProfileController extends Controller
                 'rateCategory',
                 'sensitiveData',
                 'assignments' => fn ($q) => $q->where('status', 'active')->with('brand:id,name,is_obs'),
-            ]),
+            ])->makeVisible('guardian_phone'),
             'profile_change' => $latest ? [
                 'id' => $latest->id,
                 'status' => $latest->status,

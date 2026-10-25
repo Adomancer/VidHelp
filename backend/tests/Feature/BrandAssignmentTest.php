@@ -243,6 +243,21 @@ class BrandAssignmentTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['user_id' => $this->operator->id, 'action' => 'hosts_exported']);
     }
 
+    public function test_operators_never_get_guardians_numbers(): void
+    {
+        $host = $this->host();
+        $host->update(['phone' => '08123456789', 'guardian_phone' => '08987654321']);
+
+        $this->actingAs($this->operator)->getJson('/api/operator/hosts')
+            ->assertOk()
+            ->assertJsonPath('data.0.phone', '08123456789')
+            ->assertJsonMissingPath('data.0.guardian_phone');
+
+        // Admins see it on the host, and the host on their own profile
+        $this->actingAs($this->admin)->getJson("/api/admin/hosts/{$host->id}")->assertJsonPath('host.guardian_phone', '08987654321');
+        $this->actingAs($host->user)->getJson('/api/host/profile')->assertJsonPath('host_profile.guardian_phone', '08987654321');
+    }
+
     public function test_admin_host_export_has_guardians_numbers_and_is_audited(): void
     {
         $this->host()->update(['guardian_phone' => '08987654321']);

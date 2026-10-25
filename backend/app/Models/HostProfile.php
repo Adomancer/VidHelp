@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'user_id', 'rate_category_id', 'rate_category_overridden',
     'phone', 'guardian_phone', 'join_date', 'status',
 ])]
+// A guardian's number is someone else's personal data: only admins and the host themselves see it
+#[Hidden(['guardian_phone'])]
 class HostProfile extends Model
 {
     use Auditable, HasUuids;
