@@ -15,14 +15,13 @@ use App\Services\PointService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PointController extends Controller
 {
-    public function __construct(private PointService $points)
-    {
-    }
+    public function __construct(private PointService $points) {}
 
     /**
      * The current points period as an Excel report: summary, every host's balance and SP level,
@@ -262,12 +261,12 @@ class PointController extends Controller
     public function storeViolation(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'host_id' => 'required|exists:host_profiles,id',
+            'host_id' => $this->activeHostRule(),
             'violation_type_id' => ['required', Rule::exists('violation_types', 'id')->where('is_active', true)],
             'points' => 'nullable|integer|min:1|max:100',
             'reason' => 'nullable|string|max:255',
-            'occurred_on' => 'nullable|date|before_or_equal:today',
-        ]);
+            'occurred_on' => $this->occurredOnRule(),
+        ], $this->occurredOnMessages());
 
         $log = $this->points->deduct(
             HostProfile::findOrFail($validated['host_id']),
@@ -289,40 +288,74 @@ class PointController extends Controller
     public function storeComplaint(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'host_id' => 'required|exists:host_profiles,id',
+            'host_id' => $this->activeHostRule(),
             'brand_id' => 'required|exists:brands,id',
             'description' => 'required|string|max:2000',
             'points' => 'nullable|integer|min:1|max:100',
-            'occurred_on' => 'nullable|date|before_or_equal:today',
-        ]);
+            'occurred_on' => $this->occurredOnRule(),
+        ], $this->occurredOnMessages());
 
         $host = HostProfile::findOrFail($validated['host_id']);
-        $complaint = BrandComplaint::create([
-            'host_id' => $host->id,
-            'brand_id' => $validated['brand_id'],
-            'description' => $validated['description'],
-            'recorded_by' => $request->user()->id,
-        ]);
-
         $type = ViolationType::forCode(ViolationType::BRAND_COMPLAINT);
-        if (! $type) {
+
+        // The complaint and its deduction are saved together, or neither
+        [$complaint, $log] = DB::transaction(function () use ($host, $validated, $type, $request) {
+            $complaint = BrandComplaint::create([
+                'host_id' => $host->id,
+                'brand_id' => $validated['brand_id'],
+                'description' => $validated['description'],
+                'recorded_by' => $request->user()->id,
+            ]);
+
+            $log = $type ? $this->points->deduct(
+                $host,
+                $type,
+                'brand_complaint',
+                $validated['description'],
+                $request->user(),
+                $validated['points'] ?? null,
+                ['brand_complaint_id' => $complaint->id, 'occurred_on' => $validated['occurred_on'] ?? today()->toDateString()],
+            ) : null;
+
+            return [$complaint, $log];
+        });
+
+        if (! $log) {
             return response()->json([
                 'complaint' => $complaint,
                 'message' => 'Komplain dicatat (penalti komplain brand sedang dimatikan).',
             ], 201);
         }
 
-        $log = $this->points->deduct(
-            $host,
-            $type,
-            'brand_complaint',
-            $validated['description'],
-            $request->user(),
-            $validated['points'] ?? null,
-            ['brand_complaint_id' => $complaint->id, 'occurred_on' => $validated['occurred_on'] ?? today()->toDateString()],
-        );
-
         return $this->recorded($log, 'Komplain dicatat');
+    }
+
+    /** Points can only be deducted from active hosts. */
+    private function activeHostRule(): array
+    {
+        return ['required', Rule::exists('host_profiles', 'id')->where('status', 'active')];
+    }
+
+    /**
+     * A violation happened in the points period running now (up to today): older periods are
+     * closed, so their balance and SPs don't change any more.
+     */
+    private function occurredOnRule(): array
+    {
+        [$start] = $this->points->periodFor(today());
+
+        return ['nullable', 'date', 'before_or_equal:today', 'after_or_equal:'.$start->toDateString()];
+    }
+
+    private function occurredOnMessages(): array
+    {
+        [$start] = $this->points->periodFor(today());
+
+        return [
+            'host_id.exists' => 'Pilih host yang masih aktif.',
+            'occurred_on.after_or_equal' => "Tanggal kejadian harus di periode poin yang berjalan (sejak {$start->locale('id')->translatedFormat('j M Y')}).",
+            'occurred_on.before_or_equal' => 'Tanggal kejadian tidak boleh di masa depan.',
+        ];
     }
 
     private function recorded(PointLog $log, string $message): JsonResponse

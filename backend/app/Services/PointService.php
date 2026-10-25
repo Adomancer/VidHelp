@@ -22,9 +22,7 @@ use Illuminate\Validation\ValidationException;
  */
 class PointService
 {
-    public function __construct(private Notifier $notifier)
-    {
-    }
+    public function __construct(private Notifier $notifier) {}
 
     /**
      * The points period that contains a date, e.g. 2026-11-15 → [2026-10-01, 2026-12-31].
@@ -84,6 +82,9 @@ class PointService
             $occurred = CarbonImmutable::parse($attributes['occurred_on'] ?? today());
             [$start] = $this->periodFor($occurred);
 
+            // One change per host and period at a time, so none is left out of the balance
+            $this->lockBalance($host, $start);
+
             $log = PointLog::create([
                 ...$attributes,
                 'host_id' => $host->id,
@@ -107,15 +108,18 @@ class PointService
     }
 
     /**
-     * Opening points plus every counting change, kept between 0 and the opening points.
+     * Opening points plus every counting change, kept between 0 and the opening points. Call it in
+     * a transaction: the balance is locked and the changes are read as committed right now (also
+     * when the transaction read the logs earlier), so two changes at once both count.
      */
     public function recalculate(HostProfile $host, CarbonInterface|string $periodStart): PointBalance
     {
-        $balance = $this->balance($host, $periodStart);
+        $balance = $this->lockBalance($host, $periodStart);
 
         $change = (int) PointLog::counting()
             ->where('host_id', $host->id)
             ->whereDate('period_start', $balance->period_start)
+            ->lockForUpdate()
             ->sum('points_change');
 
         $balance->update([
@@ -125,18 +129,29 @@ class PointService
         return $balance;
     }
 
+    /** The balance row of the period starting `$periodStart`, locked until the transaction ends. */
+    private function lockBalance(HostProfile $host, CarbonInterface|string $periodStart): PointBalance
+    {
+        $balance = $this->balance($host, $periodStart);
+
+        return PointBalance::whereKey($balance->id)->lockForUpdate()->firstOrFail();
+    }
+
     /**
      * Cancel a log entered by mistake. SPs it triggered stay until an admin voids them too.
      */
     public function void(PointLog $log, User $by): PointBalance
     {
-        if ($log->voided_at) {
-            throw ValidationException::withMessages(['log' => ['Catatan ini sudah dibatalkan.']]);
-        }
+        return DB::transaction(function () use ($log, $by) {
+            $log = PointLog::lockForUpdate()->findOrFail($log->id);
+            if ($log->voided_at) {
+                throw ValidationException::withMessages(['log' => ['Catatan ini sudah dibatalkan.']]);
+            }
 
-        $log->update(['voided_at' => now(), 'voided_by' => $by->id]);
+            $log->update(['voided_at' => now(), 'voided_by' => $by->id]);
 
-        return $this->recalculate($log->host, $log->period_start);
+            return $this->recalculate($log->host, $log->period_start);
+        });
     }
 
     /** SP level a points total has reached (0 = none). */
@@ -158,7 +173,8 @@ class PointService
     private function issueWarningIfDue(HostProfile $host, PointBalance $balance, PointLog $log): ?WarningLetter
     {
         $reached = $this->levelFor($balance->current_points);
-        $issued = $this->currentLevel($host, $balance->period_start);
+        // Read as committed now (the balance lock keeps two changes from issuing it twice)
+        $issued = $this->currentLevel($host, $balance->period_start, forUpdate: true);
 
         if ($reached <= $issued) {
             return null;
@@ -177,13 +193,14 @@ class PointService
     }
 
     /** Highest SP level issued (and not voided) in the period of `$date`. */
-    public function currentLevel(HostProfile $host, CarbonInterface|string|null $date = null): int
+    public function currentLevel(HostProfile $host, CarbonInterface|string|null $date = null, bool $forUpdate = false): int
     {
         [$start] = $this->periodFor($date ?? today());
 
         return (int) WarningLetter::counting()
             ->where('host_id', $host->id)
             ->whereDate('period_start', $start)
+            ->when($forUpdate, fn ($q) => $q->lockForUpdate())
             ->max('level');
     }
 
@@ -312,14 +329,21 @@ class PointService
             ->whereIn('status', ['pending', 'open', 'filled'])
             ->where('letter_penalty_applied', false)
             ->where('start_at', '<=', now()->subHours(config('vidhelp.backup.sick_letter_grace_hours')))
-            ->with(['attachments', 'requester', 'brand'])
+            ->with(['requester', 'brand'])
             ->get();
 
         foreach ($overdue as $request) {
-            $letter = $request->attachments->sortBy('created_at')->first();
-            $late = ! $letter || $letter->created_at->gt($request->letter_due_at);
+            // letter_uploaded_at, like who pays the cover (BackupRequest::coverPaidBy): it stays when
+            // an erased account's files are removed, so an on-time letter is never punished later
+            $late = ! $request->letter_uploaded_at || $request->letter_uploaded_at->gt($request->letter_due_at);
 
-            if ($late && $type) {
+            $penalized += DB::transaction(function () use ($request, $late, $type) {
+                // Claimed first, so a second run at the same time doesn't deduct it again
+                $claimed = BackupRequest::whereKey($request->id)->where('letter_penalty_applied', false)->update(['letter_penalty_applied' => true]);
+                if (! $claimed || ! $late || ! $type) {
+                    return 0;
+                }
+
                 $this->deduct(
                     $request->requester,
                     $type,
@@ -328,10 +352,9 @@ class PointService
                     null,
                     extra: ['occurred_on' => $request->letter_due_at->toDateString()],
                 );
-                $penalized++;
-            }
 
-            $request->update(['letter_penalty_applied' => true]);
+                return 1;
+            });
         }
 
         return $penalized;

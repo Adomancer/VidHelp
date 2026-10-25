@@ -266,20 +266,23 @@ class RatingController extends Controller
             ->whereBetween('occurred_on', [$first->toDateString(), $first->endOfMonth()->toDateString()])
             ->selectRaw('host_id, count(*) as total')->groupBy('host_id')->pluck('total', 'host_id');
 
-        return HostProfile::query()
+        $hosts = HostProfile::query()
             ->where('status', 'active')
             ->whereHas('user', fn ($q) => $q->where('status', 'active'))
             ->with(['user', 'assignments' => fn ($q) => $q->where('status', 'active')
                 ->whereHas('brand', fn ($q) => $q->where('status', 'active'))
                 ->with('brand:id,name')])
-            ->get()
+            ->get();
+        $suggestions = $this->ratings->suggestions($hosts->pluck('id')->all(), $month);
+
+        return $hosts
             ->map(fn (HostProfile $host) => [
                 'host_id' => $host->id,
                 'name' => $host->user->name,
                 'avatar_url' => $host->user->avatar_url,
                 'brands' => $host->assignments->map(fn ($assignment) => $assignment->brand->only('id', 'name'))->sortBy('name')->values(),
                 'violations' => (int) ($violations[$host->id] ?? 0),
-                'suggested' => $this->ratings->suggested($host, $month),
+                'suggested' => $suggestions[$host->id],
                 'rating' => $ratings->get($host->id),
             ])
             ->sortBy('name')
