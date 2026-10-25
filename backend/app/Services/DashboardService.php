@@ -139,8 +139,9 @@ class DashboardService
             ->where('requesting_host_id', '!=', $host->id)
             ->whereDoesntHave('applications', fn ($q) => $q->where('applicant_host_id', $host->id)->where('status', 'applied'))
             ->with(['brand:id,name', 'requester.user', 'nominees'])
-            ->get()
-            ->filter(fn (BackupRequest $backup) => $this->backups->ineligibleReason($host, $backup) === null);
+            ->get();
+        $context = $this->backups->coverContext(collect([$host]), $chances);
+        $chances = $chances->filter(fn (BackupRequest $backup) => $this->backups->ineligibleReason($host, $backup, $context) === null);
 
         return [
             'count' => $chances->count(),

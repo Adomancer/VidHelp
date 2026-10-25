@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AppNotification;
 use App\Models\Attachment;
+use App\Models\Attendance;
 use App\Models\BackupApplication;
 use App\Models\BackupQuota;
 use App\Models\BackupRequest;
@@ -17,6 +18,7 @@ use Database\Seeders\HostRateCategorySeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Tests\TestCase;
@@ -700,5 +702,116 @@ class BackupTest extends TestCase
             ->assertJsonPath('auto_filled', 1)
             ->assertJsonPath('top_covers.0.name', $this->sameBrand->user->name)
             ->assertJsonPath('top_covers.0.count', 2);
+    }
+
+    public function test_admin_assigning_a_cross_brand_cover_checks_their_quota_again(): void
+    {
+        $backup = $this->openRequest();
+        $this->apply($this->otherBrand, $backup)->assertOk();
+        $this->useQuota($this->otherBrand, 3); // used up elsewhere since applying
+
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->otherBrand->id])
+            ->assertJsonPath('errors.host_id.0', 'Kuota backup lintas brand bulan ini sudah habis (3/3).');
+
+        $this->assertSame('pending', $backup->fresh()->status);
+        $this->assertSame(3, BackupQuota::where('host_id', $this->otherBrand->id)->value('quota_used'));
+    }
+
+    public function test_operator_cannot_cancel_or_release_a_cover_once_the_session_started(): void
+    {
+        $backup = $this->openRequest();
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->otherBrand->id])->assertOk();
+
+        $this->travelTo(CarbonImmutable::parse(self::TUESDAY.' 14:05'));
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/unassign")->assertUnprocessable();
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/cancel")->assertUnprocessable();
+
+        $backup->refresh();
+        $this->assertSame('filled', $backup->status);
+        $this->assertSame($this->otherBrand->id, $backup->filled_by_host_id);
+        $this->assertSame(1, BackupQuota::where('host_id', $this->otherBrand->id)->value('quota_used'));
+        $this->assertFalse(AppNotification::where('type', 'backup_opened')->where('title', 'like', 'Butuh backup lagi%')->exists());
+    }
+
+    public function test_operator_cannot_release_a_cover_who_already_checked_in(): void
+    {
+        $backup = $this->openRequest();
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/assign", ['host_id' => $this->sameBrand->id])->assertOk();
+        Attendance::create([
+            'host_id' => $this->sameBrand->id, 'backup_request_id' => $backup->id, 'brand_id' => $this->brandA->id,
+            'session_date' => self::TUESDAY, 'scheduled_start_at' => self::TUESDAY.' 14:00', 'scheduled_end_at' => self::TUESDAY.' 16:00',
+            'check_in_at' => self::TUESDAY.' 13:55', 'report_due_at' => self::TUESDAY.' 23:59',
+        ]);
+
+        $this->actingAs($this->admin)->postJson("/api/operator/backups/{$backup->id}/unassign")->assertUnprocessable();
+        $this->assertSame('filled', $backup->fresh()->status);
+    }
+
+    public function test_sick_letters_only_for_sick_requests_in_play_and_a_few_files_each(): void
+    {
+        Storage::fake('local');
+        config(['vidhelp.backup.letter_max_files' => 2]);
+        $upload = fn (BackupRequest $backup) => $this->actingAs($this->requester->user)->post("/api/host/backups/{$backup->id}/letter", [
+            'letter' => UploadedFile::fake()->create('surat-dokter.pdf', 100, 'application/pdf'),
+        ], ['Accept' => 'application/json']);
+
+        $permit = $this->openRequest();
+        $upload($permit)->assertJsonValidationErrors('letter');
+
+        $sick = $this->openRequest(['backup_date' => '2026-10-13', 'reason_type' => 'sick']);
+        $upload($sick)->assertOk();
+        $upload($sick)->assertOk();
+        $upload($sick)->assertJsonValidationErrors('letter');
+
+        $this->actingAs($this->requester->user)->postJson("/api/host/backups/{$sick->id}/cancel")->assertOk();
+        $upload($sick)->assertJsonValidationErrors('letter');
+
+        $this->assertSame(2, Attachment::count());
+        $this->assertCount(2, Storage::disk('local')->allFiles('backup-letters'));
+    }
+
+    public function test_operator_request_with_a_cover_who_cannot_take_it_leaves_nothing_behind(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operator');
+        $this->useQuota($this->otherBrand, 3);
+
+        $this->actingAs($operator)->postJson('/api/operator/backups', [
+            'slot_id' => $this->slot->id, 'backup_date' => self::TUESDAY, 'reason_type' => 'sick', 'host_id' => $this->otherBrand->id,
+        ])->assertJsonPath('errors.host_id.0', 'Kuota backup lintas brand bulan ini sudah habis (3/3).');
+
+        $this->assertSame(0, BackupRequest::count());
+        $this->assertFalse(AppNotification::whereIn('type', ['backup_opened', 'backup_picked'])->exists());
+    }
+
+    public function test_cover_lists_take_the_same_number_of_queries_however_many_hosts_and_requests(): void
+    {
+        $backup = $this->openRequest();
+        $queries = function () use ($backup) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $this->actingAs($this->admin)->getJson("/api/operator/backups/{$backup->id}/candidates")->assertOk();
+            $this->actingAs($this->otherBrand->user)->getJson('/api/host/backups/needs')->assertOk();
+            DB::disableQueryLog();
+
+            return count(DB::getQueryLog());
+        };
+
+        // A candidate with a slot that day, and a first run for the one-off auth queries
+        $this->slotFor(HostBrandAssignment::where('host_id', $this->sameBrand->id)->firstOrFail(), 2, '08:00', '09:00');
+        $queries();
+        $before = $queries();
+
+        // Five more hosts, each with their own slot and request on the board
+        foreach (range(1, 5) as $hour) {
+            $host = $this->host();
+            $slot = $this->slotFor($this->assign($host, $this->brandB), 3, sprintf('%02d:00', 8 + $hour), sprintf('%02d:00', 9 + $hour));
+            $this->actingAs($host->user)->postJson('/api/host/backups', [
+                'slot_id' => $slot->id, 'backup_date' => '2026-10-07', 'reason_type' => 'permit',
+            ])->assertCreated();
+        }
+
+        $this->assertSame($before, $queries());
+        $this->actingAs($this->otherBrand->user)->getJson('/api/host/backups/needs')->assertJsonCount(6, 'needs');
     }
 }

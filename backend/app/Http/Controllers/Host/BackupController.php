@@ -50,21 +50,24 @@ class BackupController extends Controller
     {
         $host = $this->host($request);
 
-        $needs = BackupRequest::whereIn('status', ['open', 'pending'])
+        $requests = BackupRequest::whereIn('status', ['open', 'pending'])
             ->where('start_at', '>', now())
             ->where('requesting_host_id', '!=', $host->id)
             ->with(['brand:id,name', 'requester.user', 'nominees.host.user', 'applications' => fn ($q) => $q->where('applicant_host_id', $host->id)])
             ->orderBy('start_at')
-            ->get()
-            ->map(function (BackupRequest $backup) use ($host) {
+            ->get();
+        $context = $this->backups->coverContext(collect([$host]), $requests);
+
+        $needs = $requests
+            ->map(function (BackupRequest $backup) use ($host, $context) {
                 $mine = $backup->applications->first();
 
                 return [
                     ...$backup->publicSummary(),
                     'asked_me' => $backup->nominees->contains('nominee_host_id', $host->id),
-                    'same_brand' => $this->backups->isSameBrand($host, $backup),
+                    'same_brand' => $this->backups->isSameBrand($host, $backup, $context),
                     'my_application' => $mine?->only('id', 'status'),
-                    'ineligible_reason' => $mine?->status === 'applied' ? null : $this->backups->ineligibleReason($host, $backup),
+                    'ineligible_reason' => $mine?->status === 'applied' ? null : $this->backups->ineligibleReason($host, $backup, $context),
                 ];
             })
             ->sortByDesc('asked_me')
