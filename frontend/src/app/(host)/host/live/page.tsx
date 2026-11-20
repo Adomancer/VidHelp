@@ -19,6 +19,7 @@ import EmptyState from "@/components/EmptyState";
 import { FieldError } from "@/components/FieldMessage";
 import ErrorState from "@/components/ErrorState";
 import FormAlert from "@/components/FormAlert";
+import { FormGrid } from "@/components/FormGrid";
 import { CardsSkeleton } from "@/components/Loading";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge, { type Tone } from "@/components/StatusBadge";
@@ -231,7 +232,7 @@ function SessionCard({ session, metrics, act, now }: { session: LiveSession; met
             </p>
           </div>
         ) : (
-          <Button type="button" variant="success" size="lg" className="w-full" disabled={busy} onClick={() => run(() => liveApi.checkIn(token, session))}>
+          <Button type="button" size="lg" className="w-full" disabled={busy} onClick={() => run(() => liveApi.checkIn(token, session))}>
             <LogIn aria-hidden="true" />
             {busy ? "Memproses…" : "Check-in sekarang"}
           </Button>
@@ -296,9 +297,9 @@ function Progress({ attendance }: { attendance: Attendance | null }) {
             <div className="flex w-full items-center">
               <span
                 className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-semibold transition-colors",
+                  "flex size-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-semibold transition-colors duration-150",
                   step.failed
-                    ? "border-destructive bg-destructive text-white"
+                    ? "text-destructive-solid-foreground border-destructive-solid bg-destructive-solid"
                     : step.done
                       ? "border-primary bg-primary text-primary-foreground"
                       : current
@@ -338,7 +339,7 @@ function ReportSection({ attendance, metrics, act }: { attendance: Attendance; m
     return (
       <FormAlert tone="info">
         <p>Laporan terkirim. Operator akan mengeceknya.</p>
-        <Button type="button" variant="link" className="mt-1 h-auto p-0 text-info" onClick={() => setEditing(true)}>
+        <Button type="button" variant="link" className="mt-1 h-auto min-h-11 p-0 py-2 text-info md:min-h-0 md:py-0" onClick={() => setEditing(true)}>
           Ubah laporan
         </Button>
       </FormAlert>
@@ -349,7 +350,7 @@ function ReportSection({ attendance, metrics, act }: { attendance: Attendance; m
     return (
       <FormAlert tone="warning">
         <p>Operator akan mengecek: {(report.flag_reasons ?? []).map((reason) => FLAG_REASONS[reason] ?? reason).join(", ")}.</p>
-        <Button type="button" variant="link" className="mt-1 h-auto p-0 text-warning" onClick={() => setEditing(true)}>
+        <Button type="button" variant="link" className="mt-1 h-auto min-h-11 p-0 py-2 text-warning md:min-h-0 md:py-0" onClick={() => setEditing(true)}>
           Perbaiki dan kirim ulang
         </Button>
       </FormAlert>
@@ -400,7 +401,7 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
       {error && <FormAlert tone="error">{error}</FormAlert>}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <FormGrid>
         <DurationInput label="Durasi live" hours={hours} onChange={setHours} error={errors.duration_hours} />
         <TextField
           label="Jumlah sesi live"
@@ -426,7 +427,7 @@ function ReportForm({ attendance, metrics, act }: { attendance: Attendance; metr
             error={errors[`metrics.${key}`]}
           />
         ))}
-      </div>
+      </FormGrid>
       <div className="space-y-1.5">
         <Label htmlFor={id("notes")}>
           Catatan <span className="font-normal text-muted-foreground">(opsional)</span>

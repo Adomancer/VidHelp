@@ -68,7 +68,7 @@ export default function CommandMenu({ links, hostSearchPath }: CommandMenuProps)
         variant="outline"
         onClick={() => setOpen(true)}
         aria-label="Cari halaman atau host"
-        className="h-9 w-9 justify-center gap-2 px-0 text-muted-foreground shadow-none md:w-56 md:justify-start md:px-3 lg:w-64"
+        className="size-11 justify-center gap-2 px-0 text-muted-foreground shadow-none md:h-9 md:w-56 md:justify-start md:px-3 lg:w-64"
       >
         <Search aria-hidden="true" />
         <span className="hidden flex-1 text-left font-normal md:inline">Cari…</span>

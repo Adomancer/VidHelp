@@ -21,7 +21,7 @@ export default function RecoveryCodes({ codes }: { codes: string[] }) {
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-warning/30 bg-warning/5 p-4">
+    <div className="space-y-3 rounded-xl border border-warning/30 bg-warning-subtle p-4">
       <p className="flex gap-2 text-sm text-warning">
         <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
         <span>

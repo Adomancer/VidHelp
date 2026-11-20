@@ -7,12 +7,13 @@ import { errorMessage, reportApi, type Attendance, type ReportCounts, type Revie
 import { compactHours, dayWord, formatClock, formatDateTime, formatDay, formatDuration, toDateInput } from "@/lib/format";
 import { FLAG_REASONS, formatMetric, metricLabel } from "@/lib/reportFields";
 import { addDays } from "@/lib/schedule";
-import { inputClass, inputSmClass } from "@/lib/ui";
+import { inputSmClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "./AuthProvider";
+import { TableFilterDrawer } from "./data-table";
 import DatePicker from "./DatePicker";
 import Dialog from "./Dialog";
 import DurationInput from "./DurationInput";
@@ -20,6 +21,7 @@ import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
 import FormAlert from "./FormAlert";
 import { RefreshBar } from "./Loading";
+import SearchInput from "./SearchInput";
 import StatusBadge, { type Tone } from "./StatusBadge";
 import { notify } from "./Toast";
 import ToggleGroup, { ShortLabel } from "./ToggleGroup";
@@ -165,18 +167,24 @@ export default function ReportReview({ className }: { className?: string }) {
           value={tab}
           onChange={selectTab}
         />
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <DayFilter value={date} onChange={(next) => void setUrlState({ date: next || null, page: null, report: null })} />
-          <div className="relative sm:w-64">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => type(event.target.value)}
-              placeholder="Cari host atau brand…"
-              aria-label="Cari host atau brand"
-              className={cn(inputClass, "pl-9")}
-            />
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:block">
+            <DayFilter value={date} onChange={(next) => void setUrlState({ date: next || null, page: null, report: null })} />
+          </div>
+          <SearchInput
+            value={query}
+            onChange={type}
+            placeholder="Cari host atau brand…"
+            aria-label="Cari host atau brand"
+            className="min-w-0 flex-1 sm:w-64 sm:flex-none"
+          />
+          <div className="sm:hidden">
+            <TableFilterDrawer title="Filter laporan" activeCount={date ? 1 : 0} onReset={() => void setUrlState({ date: null, page: null, report: null })}>
+              <div className="space-y-1.5">
+                <p className="text-sm font-medium text-foreground">Tanggal sesi</p>
+                <DayFilter value={date} onChange={(next) => void setUrlState({ date: next || null, page: null, report: null })} />
+              </div>
+            </TableFilterDrawer>
           </div>
         </div>
       </div>
@@ -191,7 +199,7 @@ export default function ReportReview({ className }: { className?: string }) {
         )}
       >
         {/* The list: scrolls inside its card on laptops, a page at a time */}
-        <section className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+        <section className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
           <RefreshBar active={result.loading && Boolean(data)} />
           {data && data.total > 0 && (
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2 text-xs text-muted-foreground">
@@ -243,7 +251,7 @@ export default function ReportReview({ className }: { className?: string }) {
 
         {/* The open report beside the list, from lg */}
         {showsReports && (
-          <section className="hidden min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs lg:flex dark:shadow-none">
+          <section className="hidden min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card lg:flex">
             {open ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="min-h-0 flex-1 overflow-y-auto p-5">
@@ -284,7 +292,7 @@ function TabLabel({ tab, counts }: { tab: Tab; counts?: ReportCounts }) {
         <span
           className={cn(
             "rounded-full px-1.5 text-[11px] leading-[18px] font-semibold tabular-nums",
-            tab === "flagged" ? "bg-warning/15 text-warning" : "bg-destructive/10 text-destructive"
+            tab === "flagged" ? "bg-warning-subtle text-warning" : "bg-destructive-subtle text-destructive"
           )}
         >
           {count > 999 ? "999+" : count}
@@ -369,29 +377,13 @@ function Pager({
         {from}–{to} dari {total}
       </span>
       <div className="flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="max-md:size-10"
-          aria-label="Halaman sebelumnya"
-          disabled={page <= 1}
-          onClick={() => onChange(page - 1)}
-        >
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Halaman sebelumnya" disabled={page <= 1} onClick={() => onChange(page - 1)}>
           <ChevronLeft aria-hidden="true" />
         </Button>
         <span className="tabular-nums">
           {page} / {lastPage}
         </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="max-md:size-10"
-          aria-label="Halaman berikutnya"
-          disabled={page >= lastPage}
-          onClick={() => onChange(page + 1)}
-        >
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Halaman berikutnya" disabled={page >= lastPage} onClick={() => onChange(page + 1)}>
           <ChevronRight aria-hidden="true" />
         </Button>
       </div>
@@ -429,7 +421,7 @@ function ReportRow({ report, active, onOpen }: { report: ReviewReport; active: b
         onClick={onOpen}
         aria-current={active || undefined}
         className={cn(
-          "flex w-full gap-3 border-l-2 px-4 py-2.5 text-left transition-colors outline-none focus-visible:bg-muted/60",
+          "flex w-full gap-3 border-l-2 px-4 py-2.5 text-left transition-colors duration-150 outline-none focus-visible:bg-muted/60",
           active ? "border-l-primary bg-primary/[0.06]" : "border-l-transparent hover:bg-muted/40"
         )}
       >
@@ -641,7 +633,7 @@ function Decision({
               onClick={() => setHours(preset.hours)}
               aria-pressed={hours === preset.hours}
               className={cn(
-                "inline-flex h-9 items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:h-7 md:px-2.5",
+                "inline-flex h-11 items-center gap-1 rounded-full border px-3 text-xs font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:h-8 md:px-2.5",
                 hours === preset.hours ? "border-primary/50 bg-primary/10 text-foreground" : "border-border text-body hover:bg-muted"
               )}
             >
@@ -673,7 +665,6 @@ function Decision({
           </Button>
           <Button
             type="button"
-            variant="success"
             size="sm"
             disabled={busy}
             onClick={() => run(() => reportApi.approve(token, report.id, { duration_hours: hours, review_note: note || null }))}

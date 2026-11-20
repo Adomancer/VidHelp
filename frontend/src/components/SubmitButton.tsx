@@ -8,7 +8,7 @@ interface SubmitButtonProps {
   /** Full width by default (forms on phones); pass e.g. "w-auto" to size it to its label. */
   className?: string;
   size?: "default" | "lg";
-  variant?: "default" | "danger" | "success";
+  variant?: "default" | "danger";
   disabled?: boolean;
 }
 

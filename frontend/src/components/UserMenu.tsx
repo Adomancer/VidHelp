@@ -42,7 +42,7 @@ export default function UserMenu({ links = [] }: { links?: AccountLink[] }) {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton size="lg" tooltip={user.name} className="data-open:bg-sidebar-accent">
+            <SidebarMenuButton size="lg" tooltip={user.name} className="transition-colors duration-150 data-open:bg-sidebar-accent">
               <UserAvatar size="size-8 text-xs" />
               <span className="grid min-w-0 flex-1 text-left leading-tight">
                 <span className="truncate text-sm font-medium text-sidebar-accent-foreground">{user.name}</span>

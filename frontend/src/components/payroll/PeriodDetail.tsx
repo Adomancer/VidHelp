@@ -20,11 +20,13 @@ import DurationInput from "../DurationInput";
 import ErrorState from "../ErrorState";
 import { FieldError } from "../FieldMessage";
 import FormAlert from "../FormAlert";
+import { FormFieldFull, FormGrid } from "../FormGrid";
 import { CardsSkeleton } from "../Loading";
 import { NativeSelect } from "../SelectField";
 import StatusBadge from "../StatusBadge";
 import SubmitButton from "../SubmitButton";
 import ToggleGroup, { ShortLabel } from "../ToggleGroup";
+import { useTableDensity } from "../data-table";
 import { type Confirm, useCanManageFinance } from "./shared";
 
 /**
@@ -35,7 +37,6 @@ const hostPayColumns: ColumnDef<HostPayRow>[] = [
   {
     accessorKey: "name",
     header: "Host",
-    meta: { headClassName: "px-5 py-2.5 md:px-6", cellClassName: "px-5 py-2.5 md:px-6" },
     cell: ({ row: { original: host } }) => (
       <>
         <span className="font-medium text-foreground">{host.name}</span>
@@ -47,21 +48,21 @@ const hostPayColumns: ColumnDef<HostPayRow>[] = [
       </>
     ),
   },
-  { accessorKey: "session_count", header: "Sesi", meta: { align: "right", headClassName: "px-3 py-2.5", cellClassName: "px-3 py-2.5" } },
+  { accessorKey: "session_count", header: "Sesi", meta: { align: "right" } },
   {
     accessorKey: "worked_hours",
     header: "Kerja",
     meta: {
       align: "right",
-      headClassName: "hidden px-3 py-2.5 sm:table-cell",
-      cellClassName: "hidden px-3 py-2.5 whitespace-nowrap text-muted-foreground sm:table-cell",
+      headClassName: "hidden sm:table-cell",
+      cellClassName: "hidden whitespace-nowrap text-muted-foreground sm:table-cell",
     },
     cell: ({ row }) => formatDuration(row.original.worked_hours),
   },
   {
     accessorKey: "hours",
     header: "Dibayar",
-    meta: { align: "right", headClassName: "px-3 py-2.5", cellClassName: "px-3 py-2.5 whitespace-nowrap" },
+    meta: { align: "right", cellClassName: "whitespace-nowrap" },
     cell: ({ row: { original: host } }) => (
       <>
         {formatDuration(host.hours)}
@@ -75,15 +76,15 @@ const hostPayColumns: ColumnDef<HostPayRow>[] = [
     header: "Tarif",
     meta: {
       align: "right",
-      headClassName: "hidden px-3 py-2.5 sm:table-cell",
-      cellClassName: "hidden px-3 py-2.5 whitespace-nowrap text-muted-foreground sm:table-cell",
+      headClassName: "hidden sm:table-cell",
+      cellClassName: "hidden whitespace-nowrap text-muted-foreground sm:table-cell",
     },
     cell: ({ row }) => formatRupiah(row.original.rate_per_hour),
   },
   {
     accessorKey: "amount",
     header: "Gaji",
-    meta: { align: "right", headClassName: "px-5 py-2.5 md:px-6", cellClassName: "px-5 py-2.5 whitespace-nowrap md:px-6" },
+    meta: { align: "right", cellClassName: "whitespace-nowrap" },
     cell: ({ row: { original: host } }) => (
       <>
         <span className="font-medium text-foreground">{formatRupiah(host.amount)}</span>
@@ -100,6 +101,7 @@ export function PeriodDetail({ periodId, onChanged }: { periodId: string; onChan
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [paying, setPaying] = useState(false);
   const [reference, setReference] = useState("");
+  const [density] = useTableDensity();
   const slipsPath = "/admin/payroll/slips";
 
   async function act(action: () => Promise<{ message: string }>) {
@@ -177,7 +179,7 @@ export function PeriodDetail({ periodId, onChanged }: { periodId: string; onChan
               </Button>
             )}
             {canManage && period.status === "requested" && (
-              <Button type="button" variant="success" onClick={() => setPaying(true)}>
+              <Button type="button" onClick={() => setPaying(true)}>
                 <Wallet aria-hidden="true" />
                 Tandai lunas
               </Button>
@@ -283,6 +285,10 @@ export function PeriodDetail({ periodId, onChanged }: { periodId: string; onChan
             columns={hostPayColumns}
             data={hosts}
             getRowId={(host) => host.host_id}
+            density={density}
+            stickyHeader
+            stickyFirstColumn
+            maxHeightClassName="max-h-96"
             headerClassName="border-y"
             rowClassName={() => "text-body"}
             renderMobile={(host) => (
@@ -335,7 +341,7 @@ export function PeriodDetail({ periodId, onChanged }: { periodId: string; onChan
                       run: () => payrollApi.removeAdjustment(token, adjustment.id),
                     })
                   }
-                  className="text-destructive hover:text-destructive max-md:h-10 max-md:px-3"
+                  className="text-destructive hover:text-destructive max-md:h-11 max-md:px-3"
                 >
                   Hapus
                 </Button>
@@ -353,7 +359,7 @@ export function PeriodDetail({ periodId, onChanged }: { periodId: string; onChan
               <li key={slip.id}>
                 <Link
                   href={`${slipsPath}/${slip.id}`}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50 md:px-6"
+                  className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 text-sm transition-colors duration-150 outline-none hover:bg-muted/50 focus-visible:bg-muted/50 md:px-6"
                 >
                   <span className="min-w-32 flex-1 font-medium text-foreground">{slip.host?.user.name}</span>
                   <span className="text-muted-foreground tabular-nums">
@@ -522,66 +528,68 @@ function AdjustmentForm({ periodId, brandId, onDone }: { periodId: string; brand
   );
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4 border-t border-border pt-4 sm:grid-cols-2" noValidate>
-      {error && (
-        <div className="sm:col-span-2">
-          <FormAlert tone="error">{error}</FormAlert>
+    <form onSubmit={handleSubmit} noValidate>
+      <FormGrid className="border-t border-border pt-4">
+        {error && (
+          <FormFieldFull>
+            <FormAlert tone="error">{error}</FormAlert>
+          </FormFieldFull>
+        )}
+        <div className="space-y-1.5">
+          <Label htmlFor={`adjust-host-${periodId}`}>Host</Label>
+          {hosts.error && <ErrorState message={hosts.error} onRetry={hosts.reload} />}
+          <NativeSelect id={`adjust-host-${periodId}`} name="host_id" disabled={!hosts.data}>
+            {hosts.data?.hosts.map((host) => (
+              <option key={host.host_id} value={host.host_id}>
+                {host.name}
+              </option>
+            ))}
+          </NativeSelect>
+          <FieldError>{errors.host_id}</FieldError>
         </div>
-      )}
-      <div className="space-y-1.5">
-        <Label htmlFor={`adjust-host-${periodId}`}>Host</Label>
-        {hosts.error && <ErrorState message={hosts.error} onRetry={hosts.reload} />}
-        <NativeSelect id={`adjust-host-${periodId}`} name="host_id" disabled={!hosts.data}>
-          {hosts.data?.hosts.map((host) => (
-            <option key={host.host_id} value={host.host_id}>
-              {host.name}
-            </option>
-          ))}
-        </NativeSelect>
-        <FieldError>{errors.host_id}</FieldError>
-      </div>
-      <div className="space-y-1.5">
-        <p className="text-sm font-medium text-foreground">Tambah atau kurangi</p>
-        <ToggleGroup
-          label="Tambah atau kurangi"
-          options={
-            [
-              { value: "1", label: <ShortLabel short="Tambah" full="Tambah waktu" /> },
-              { value: "-1", label: <ShortLabel short="Kurangi" full="Kurangi waktu" /> },
-            ] as const
-          }
-          value={String(direction) as "1" | "-1"}
-          onChange={(value) => setDirection(Number(value) as 1 | -1)}
-          className="grid w-full grid-cols-2"
-        />
-      </div>
-      <DurationInput label="Waktu" hours={hours} onChange={setHours} error={errors.hours_added} />
-      <div className="space-y-1.5">
-        <Label htmlFor={`adjust-sessions-${periodId}`}>
-          Sesi <span className="font-normal text-muted-foreground">(opsional)</span>
-        </Label>
-        <input
-          id={`adjust-sessions-${periodId}`}
-          name="sessions"
-          type="number"
-          min={0}
-          max={50}
-          defaultValue={0}
-          className={cn(inputClass, "w-28 tabular-nums")}
-        />
-        <FieldError>{errors.sessions_added}</FieldError>
-      </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label htmlFor={`adjust-notes-${periodId}`}>Alasan</Label>
-        <input id={`adjust-notes-${periodId}`} name="notes" maxLength={255} className={inputClass} />
-        <FieldError>{errors.notes}</FieldError>
-      </div>
-      <div className="flex justify-end sm:col-span-2">
-        <SubmitButton loading={loading} size="default" className="sm:w-auto">
-          <Plus aria-hidden="true" />
-          Simpan penyesuaian
-        </SubmitButton>
-      </div>
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-foreground">Tambah atau kurangi</p>
+          <ToggleGroup
+            label="Tambah atau kurangi"
+            options={
+              [
+                { value: "1", label: <ShortLabel short="Tambah" full="Tambah waktu" /> },
+                { value: "-1", label: <ShortLabel short="Kurangi" full="Kurangi waktu" /> },
+              ] as const
+            }
+            value={String(direction) as "1" | "-1"}
+            onChange={(value) => setDirection(Number(value) as 1 | -1)}
+            className="grid w-full grid-cols-2"
+          />
+        </div>
+        <DurationInput label="Waktu" hours={hours} onChange={setHours} error={errors.hours_added} />
+        <div className="space-y-1.5">
+          <Label htmlFor={`adjust-sessions-${periodId}`}>
+            Sesi <span className="font-normal text-muted-foreground">(opsional)</span>
+          </Label>
+          <input
+            id={`adjust-sessions-${periodId}`}
+            name="sessions"
+            type="number"
+            min={0}
+            max={50}
+            defaultValue={0}
+            className={cn(inputClass, "w-28 tabular-nums")}
+          />
+          <FieldError>{errors.sessions_added}</FieldError>
+        </div>
+        <FormFieldFull className="space-y-1.5">
+          <Label htmlFor={`adjust-notes-${periodId}`}>Alasan</Label>
+          <input id={`adjust-notes-${periodId}`} name="notes" maxLength={255} className={inputClass} />
+          <FieldError>{errors.notes}</FieldError>
+        </FormFieldFull>
+        <FormFieldFull className="flex justify-end">
+          <SubmitButton loading={loading} size="default" className="sm:w-auto">
+            <Plus aria-hidden="true" />
+            Simpan penyesuaian
+          </SubmitButton>
+        </FormFieldFull>
+      </FormGrid>
     </form>
   );
 }

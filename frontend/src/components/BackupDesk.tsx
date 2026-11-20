@@ -1,27 +1,28 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, FileWarning, Hourglass, Inbox, Plus, Search, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { CheckCircle2, FileWarning, Hourglass, Inbox, Plus, Search } from "lucide-react";
 import { parseAsStringLiteral, useQueryState } from "nuqs";
 import { errorMessage, operatorBackupApi, type BackupReason, type BackupRequest } from "@/lib/api";
-import { formatClock, formatDay, formatWindow } from "@/lib/format";
-import { inputClass } from "@/lib/ui";
+import { formatWindow } from "@/lib/format";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "./AuthProvider";
-import { BackupStatusBadge, reasonLabels } from "./BackupBadges";
+import { reasonLabels } from "./BackupBadges";
 import ConfirmDialog from "./ConfirmDialog";
+import DataTable from "./DataTable";
 import Dialog from "./Dialog";
 import EmptyState from "./EmptyState";
-import ErrorState from "./ErrorState";
 import FormAlert from "./FormAlert";
-import { ListSkeleton } from "./Loading";
 import PageHeader from "./PageHeader";
+import Pagination from "./Pagination";
+import SearchInput from "./SearchInput";
 import { notify } from "./Toast";
-import UserAvatar from "./UserAvatar";
-import { BackupRow } from "./backups/BackupRow";
+import ToggleGroup, { ShortLabel } from "./ToggleGroup";
+import { DensityToggle, useTableDensity } from "./data-table";
+import { BackupMobileCard, createBackupColumns } from "./backups/BackupRow";
 import { OnBehalfForm } from "./backups/OnBehalfForm";
 import { RequestDetail } from "./backups/RequestDetail";
 import { Recap, StartingSoon, Stat } from "./backups/SideCards";
@@ -85,15 +86,15 @@ export default function BackupDesk() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
+  const [density, setDensity] = useTableDensity();
   const [pageState, setPage] = useState(1);
   const [openId, setOpenId] = useState<string | null>(null);
   const wide = useMediaQuery("(min-width: 1440px)");
   const [toolbarRef, toolbarHeight] = useHeight<HTMLDivElement>();
-  const [headRef, headHeight] = useHeight<HTMLTableSectionElement>();
   const [footerRef, footerHeight] = useHeight<HTMLDivElement>();
   const [soonRef, soonHeight] = useHeight<HTMLElement>();
   const [recapRef, recapHeight] = useHeight<HTMLDivElement>();
-  const heights = { toolbar: toolbarHeight, head: headHeight, footer: footerHeight, soon: soonHeight, recap: recapHeight };
+  const heights = { toolbar: toolbarHeight, footer: footerHeight, soon: soonHeight, recap: recapHeight };
 
   // The upcoming tabs at once (cached): the counts and the "starts soon" list need them all
   const lists: Record<Exclude<Tab, "closed">, ReturnType<typeof useApiData<{ requests: BackupRequest[]; total: number }>>> = {
@@ -103,8 +104,10 @@ export default function BackupDesk() {
   };
   // History grows forever: paged and searched on the server, loaded once its tab is open
   const [closedSearch, setClosedSearch] = useState("");
-  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(debounce.current), []);
+  useEffect(() => {
+    const timer = setTimeout(() => setClosedSearch(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
   const closedPage = tab === "closed" ? pageState : 1;
   const closed = useApiData(
     `operator-backups-closed|${closedPage}|${closedSearch}`,
@@ -124,8 +127,10 @@ export default function BackupDesk() {
 
   // Beside the side column, a page holds as many rows as fit down to the end of "Ringkasan
   // riwayat" (measured at their natural height, so the two columns end on the same line)
+  const rowHeight = density === "compact" ? 48 : ROW_HEIGHT;
+  const headerHeight = 44;
   const sideHeight = heights.soon + 16 + heights.recap + 2;
-  const fits = Math.floor((sideHeight - heights.toolbar - heights.head - heights.footer - 2) / ROW_HEIGHT);
+  const fits = Math.floor((sideHeight - heights.toolbar - headerHeight - heights.footer - 2) / rowHeight);
   const serverPaged = tab === "closed";
   const pageSize = serverPaged ? CLOSED_PAGE_SIZE : wide && heights.soon > 0 && heights.recap > 0 ? Math.max(4, fits) : STACKED_PAGE_SIZE;
   const total = (serverPaged ? closed.data?.total : list?.length) ?? 0;
@@ -133,11 +138,11 @@ export default function BackupDesk() {
   const page = Math.min(pageState, lastPage);
   const rows = (serverPaged ? list : list?.slice((page - 1) * pageSize, page * pageSize)) ?? [];
 
+  const columns = createBackupColumns(tab, (backup) => setOpenId(backup.id));
+
   function changeSearch(next: string) {
     setSearch(next);
     setPage(1);
-    clearTimeout(debounce.current);
-    debounce.current = setTimeout(() => setClosedSearch(next.trim()), 300);
   }
 
   function chooseTab(next: Tab) {
@@ -170,7 +175,7 @@ export default function BackupDesk() {
         title="Backup"
         description="Host memasang permintaan di papan backup; setujui pendaftar terbaik, atau tunjuk pengganti sendiri saat darurat."
         actions={
-          <Button type="button" size="lg" onClick={() => setCreating(true)}>
+          <Button type="button" onClick={() => setCreating(true)}>
             <Plus aria-hidden="true" />
             Ajukan untuk host
           </Button>
@@ -217,179 +222,96 @@ export default function BackupDesk() {
       </div>
 
       <div className="grid gap-6 min-[1440px]:grid-cols-[minmax(0,1fr)_22rem]">
-        <section className="@container flex min-w-0 flex-col rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+        <section className="@container flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
           <div ref={toolbarRef} className="flex flex-col gap-3 border-b border-border p-4 @[58rem]:flex-row @[58rem]:items-center @[58rem]:justify-between">
-            <div
-              role="radiogroup"
-              aria-label="Status backup"
-              className="grid max-w-full [scrollbar-width:none] grid-cols-2 gap-1 overflow-x-auto rounded-lg bg-muted p-1 @xl:flex"
-            >
-              {tabs.map((option) => {
-                const selected = tab === option.value;
-                const total = count(option.value);
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => chooseTab(option.value)}
-                    className={cn(
-                      "flex h-9 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 @xl:shrink-0 @xl:px-3",
-                      selected ? "bg-card text-foreground shadow-xs ring-1 ring-foreground/5 dark:bg-secondary" : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <span aria-hidden="true" className="truncate @xl:hidden">
-                      {option.short}
+            <ToggleGroup
+              label="Status backup"
+              grid
+              value={tab}
+              onChange={chooseTab}
+              options={tabs.map((option) => {
+                const optionTotal = count(option.value);
+                return {
+                  value: option.value,
+                  label: (
+                    <span className="inline-flex items-center justify-center gap-1.5">
+                      <ShortLabel short={option.short} full={option.label} />
+                      {optionTotal !== undefined && option.value !== "closed" && (
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 text-[11px] leading-[18px] font-semibold tabular-nums",
+                            optionTotal > 0 && option.value === "pending" ? "bg-warning-subtle text-warning" : "bg-foreground/5 text-muted-foreground"
+                          )}
+                        >
+                          {optionTotal}
+                        </span>
+                      )}
                     </span>
-                    <span className="sr-only @xl:not-sr-only">{option.label}</span>
-                    {total !== undefined && option.value !== "closed" && (
-                      <span
-                        className={cn(
-                          "min-w-5 rounded-full px-1.5 text-center text-xs tabular-nums",
-                          total > 0 && option.value === "pending" ? "bg-warning/15 text-warning" : "bg-foreground/5 text-muted-foreground"
-                        )}
-                      >
-                        {total}
-                      </span>
-                    )}
-                  </button>
-                );
+                  ),
+                };
               })}
-            </div>
-            <div className="relative @[58rem]:w-72">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <input
-                type="search"
+            />
+
+            <div className="flex items-center gap-2">
+              <SearchInput
                 value={search}
-                onChange={(change) => changeSearch(change.target.value)}
+                onChange={changeSearch}
                 placeholder="Cari host, brand, atau alasan…"
                 aria-label="Cari permintaan backup"
-                className={cn(inputClass, "pr-9 pl-9 [&::-webkit-search-cancel-button]:hidden")}
+                className="min-w-0 flex-1 @[58rem]:w-64 @[58rem]:flex-none"
               />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => changeSearch("")}
-                  aria-label="Hapus pencarian"
-                  className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground md:right-2 md:size-6"
-                >
-                  <X className="size-3.5" aria-hidden="true" />
-                </button>
-              )}
+              <DensityToggle density={density} onChange={setDensity} className="hidden md:inline-flex" />
             </div>
           </div>
 
-          {(error || current.error) && (
-            <div className="space-y-3 border-b border-border p-4">
-              {error && <FormAlert tone="error">{error}</FormAlert>}
-              {current.error && <ErrorState message={current.error} onRetry={current.reload} />}
+          {error && (
+            <div className="border-b border-border p-4">
+              <FormAlert tone="error">{error}</FormAlert>
             </div>
           )}
 
-          <div className={cn("flex-1 transition-opacity", current.loading && list && "opacity-60")}>
-            {!list && !current.error && (
-              <div className="p-4">
-                <ListSkeleton rows={5} />
-              </div>
-            )}
-
-            {list?.length === 0 && (
-              <EmptyState
-                icon={Inbox}
-                title={search ? "Tidak ada yang cocok" : "Tidak ada data"}
-                description={search ? `Tidak ada permintaan dengan "${search}" di tab ini.` : emptyText[tab]}
-                action={
-                  tab !== "closed" && !search ? (
-                    <Button type="button" variant="outline" onClick={() => setCreating(true)}>
-                      <Plus aria-hidden="true" />
-                      Ajukan untuk host
-                    </Button>
-                  ) : undefined
-                }
-              />
-            )}
-
-            {list && list.length > 0 && (
-              <>
-                {/* Phones: one line per request */}
-                <ul className="divide-y divide-border md:hidden">
-                  {rows.map((backup) => (
-                    <li key={backup.id}>
-                      <button
-                        type="button"
-                        onClick={() => setOpenId(backup.id)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:bg-muted/50 active:bg-muted/50"
-                      >
-                        {backup.requester && <UserAvatar user={backup.requester.user} size="size-9 text-xs" />}
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-foreground">{backup.requester?.user.name}</span>
-                          <span className="block truncate text-xs text-muted-foreground tabular-nums">
-                            {formatDay(backup.start_at)} · {formatClock(backup.start_at)}–{formatClock(backup.end_at)} · {backup.brand.name}
-                          </span>
-                          <span className="mt-1 block">
-                            <BackupStatusBadge status={backup.status} />
-                          </span>
-                        </span>
-                        <ChevronRight className="size-4 shrink-0 text-faint" aria-hidden="true" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-
-                <table className="hidden w-full text-sm md:table">
-                  <thead ref={headRef} className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
-                    <tr>
-                      <th scope="col" className="px-4 py-2.5 font-medium">
-                        Jadwal
-                      </th>
-                      <th scope="col" className="px-3 py-2.5 font-medium">
-                        Host
-                      </th>
-                      <th scope="col" className="hidden px-3 py-2.5 font-medium lg:table-cell">
-                        Alasan
-                      </th>
-                      <th scope="col" className="px-3 py-2.5 font-medium">
-                        {tab === "filled" ? "Pengganti" : "Pendaftar / pengganti"}
-                      </th>
-                      <th scope="col" className="hidden px-3 py-2.5 font-medium xl:table-cell">
-                        Surat sakit
-                      </th>
-                      <th scope="col" className="px-3 py-2.5 font-medium">
-                        Status
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-right font-medium">
-                        Aksi
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {rows.map((backup) => (
-                      <BackupRow key={backup.id} backup={backup} onOpen={() => setOpenId(backup.id)} />
-                    ))}
-                  </tbody>
-                </table>
-              </>
-            )}
+          <div className={cn("flex-1", current.error && rows.length === 0 && "p-4")}>
+            <DataTable<BackupRequest>
+              columns={columns}
+              data={rows}
+              getRowId={(row) => row.id}
+              density={density}
+              stickyHeader
+              stickyFirstColumn
+              maxHeightClassName="max-h-none"
+              loading={!list && !current.error}
+              reloading={current.loading && Boolean(list)}
+              error={current.error}
+              onRetry={current.reload}
+              onRowClick={(backup) => setOpenId(backup.id)}
+              rowOpensDialog
+              rowClassName={(backup) => (new Date(backup.end_at) <= new Date() ? "text-muted-foreground" : undefined)}
+              renderMobile={(backup) => <BackupMobileCard backup={backup} onOpen={() => setOpenId(backup.id)} />}
+              empty={
+                <EmptyState
+                  icon={Inbox}
+                  title={search ? "Tidak ada yang cocok" : "Tidak ada data"}
+                  description={search ? `Tidak ada permintaan dengan "${search}" di tab ini.` : emptyText[tab]}
+                  action={
+                    tab !== "closed" && !search ? (
+                      <Button type="button" variant="outline" onClick={() => setCreating(true)}>
+                        <Plus aria-hidden="true" />
+                        Ajukan untuk host
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              }
+              className="rounded-none border-0 shadow-none"
+            />
           </div>
 
-          <div ref={footerRef} className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
-            <p className="text-xs text-muted-foreground tabular-nums">
-              {total > 0 ? `Menampilkan ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} dari ${total} permintaan` : "Tidak ada permintaan"}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                <ChevronLeft aria-hidden="true" />
-                Sebelumnya
-              </Button>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {page} / {lastPage}
-              </span>
-              <Button type="button" variant="outline" size="sm" disabled={page >= lastPage} onClick={() => setPage(page + 1)}>
-                Berikutnya
-                <ChevronRight aria-hidden="true" />
-              </Button>
-            </div>
+          <div ref={footerRef} className="border-t border-border px-4 py-3">
+            {lastPage > 1 ? (
+              <Pagination page={page} lastPage={lastPage} total={total} unit="permintaan" pageSize={pageSize} onChange={setPage} />
+            ) : (
+              <p className="text-xs text-muted-foreground tabular-nums">{total > 0 ? `Menampilkan ${total} permintaan` : "Tidak ada permintaan"}</p>
+            )}
           </div>
         </section>
 

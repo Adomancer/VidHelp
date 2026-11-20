@@ -17,7 +17,9 @@ interface EmptyStateProps {
 export default function EmptyState({ icon: Icon = Inbox, title, description, action, className, compact = false }: EmptyStateProps) {
   return (
     <div className={cn("flex flex-col items-center justify-center text-center", compact ? "gap-2 px-4 py-6" : "gap-3 px-6 py-12", className)}>
-      <span className={cn("flex items-center justify-center rounded-full bg-muted text-muted-foreground", compact ? "size-9" : "size-11")}>
+      <span
+        className={cn("flex items-center justify-center rounded-full border border-border/60 bg-muted text-muted-foreground", compact ? "size-9" : "size-11")}
+      >
         <Icon className={compact ? "size-4" : "size-5"} aria-hidden="true" />
       </span>
       <div className="space-y-1">

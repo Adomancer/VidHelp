@@ -17,6 +17,7 @@ import DigitsField from "@/components/DigitsField";
 import DiscordConnect from "@/components/DiscordConnect";
 import ErrorState from "@/components/ErrorState";
 import FormAlert from "@/components/FormAlert";
+import { FormGrid } from "@/components/FormGrid";
 import { CardsSkeleton } from "@/components/Loading";
 import PageHeader from "@/components/PageHeader";
 import PasswordForm from "@/components/PasswordForm";
@@ -64,7 +65,7 @@ export default function HostProfilePage() {
                 <li key={section.id}>
                   <a
                     href={`#${section.id}`}
-                    className="block rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                    className="block rounded-md px-3 py-2 text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                   >
                     {section.label}
                   </a>
@@ -122,11 +123,11 @@ function HeaderCard({ host, onUpdated }: { host: HostProfileData | null; onUpdat
   return (
     <Card>
       <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
-        <label className="group relative shrink-0 cursor-pointer rounded-full focus-within:ring-3 focus-within:ring-ring/50" title="Ganti foto">
+        <label className="group relative shrink-0 cursor-pointer rounded-full focus-within:ring-2 focus-within:ring-ring/50" title="Ganti foto">
           <UserAvatar size="size-20 text-2xl" />
           <span
             className={cn(
-              "absolute right-0 bottom-0 flex size-7 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-xs transition-transform group-hover:scale-105",
+              "absolute right-0 bottom-0 flex size-7 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground shadow-card transition-transform duration-150 group-hover:scale-105",
               uploading && "animate-pulse"
             )}
           >
@@ -184,7 +185,7 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
 
         <TextField label="Nama lengkap" name="name" defaultValue={data.user.name} autoComplete="name" required error={errors.name} />
         {host && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <FormGrid>
             <DigitsField
               label="No. HP (WhatsApp)"
               name="phone"
@@ -202,7 +203,7 @@ function PersonalForm({ data, onUpdated }: { data: MyProfile; onUpdated: (profil
               placeholder="08…"
               error={errors.guardian_phone}
             />
-          </div>
+          </FormGrid>
         )}
 
         <div className="flex justify-end">
@@ -257,7 +258,7 @@ function ChangeStatus({ change, onUpdated }: { change: MyProfileChange; onUpdate
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning-subtle text-warning">
             <Clock className="size-5" aria-hidden="true" />
           </span>
           <div className="min-w-0">
@@ -348,7 +349,7 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
           placeholder={current?.ktp_number_masked ?? "16 digit"}
           error={errors.ktp_number}
         />
-        <div className="grid gap-4 sm:grid-cols-2">
+        <FormGrid>
           <TextField label="Bank" name="bank_name" placeholder={current?.bank_name ?? "mis. BCA"} error={errors.bank_name} />
           <DigitsField
             label="Nomor rekening"
@@ -357,7 +358,7 @@ function IdentityForm({ host, onUpdated }: { host: HostProfileData; onUpdated: (
             placeholder={current?.bank_account_masked ?? "Hanya angka"}
             error={errors.bank_account}
           />
-        </div>
+        </FormGrid>
         <TextField
           label="Nama pemilik rekening"
           name="account_holder_name"

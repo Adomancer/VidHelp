@@ -17,7 +17,7 @@ export default function DashboardTile({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn("flex min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-xs xl:min-h-0 dark:shadow-none", className)}>
+    <section className={cn("flex min-w-0 flex-col rounded-xl border border-border bg-card p-4 shadow-card xl:min-h-0", className)}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="truncate text-sm font-semibold tracking-tight text-foreground">{title}</h2>
@@ -26,10 +26,10 @@ export default function DashboardTile({
         {link && (
           <Link
             href={link.href}
-            className="group inline-flex shrink-0 items-center gap-1 rounded-md text-xs font-medium text-brand outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="group inline-flex shrink-0 items-center gap-1 rounded-md text-xs font-medium text-brand transition-colors duration-150 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             {link.label}
-            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            <ArrowRight className="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5" aria-hidden="true" />
           </Link>
         )}
       </div>
@@ -51,7 +51,7 @@ export function TileScroll({ label, className, children }: { label: string; clas
         role="region"
         aria-label={label}
         tabIndex={0}
-        className="no-scrollbar min-h-0 flex-1 scroll-fade overflow-y-auto overscroll-contain outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
+        className="no-scrollbar min-h-0 flex-1 scroll-fade overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
       >
         {children}
       </div>

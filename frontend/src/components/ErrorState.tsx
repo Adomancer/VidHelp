@@ -9,7 +9,10 @@ export default function ErrorState({ message, onRetry, className }: { message: s
   return (
     <div
       role="alert"
-      className={cn("flex flex-wrap items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive", className)}
+      className={cn(
+        "flex flex-wrap items-center gap-3 rounded-xl border border-destructive/25 bg-destructive-subtle px-4 py-3 text-sm text-destructive",
+        className
+      )}
     >
       <CircleAlert className="size-4 shrink-0" aria-hidden="true" />
       <p className="min-w-0 flex-1">{message}</p>

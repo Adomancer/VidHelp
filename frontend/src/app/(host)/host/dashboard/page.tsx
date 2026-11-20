@@ -165,8 +165,8 @@ function focusOf(sessions: HostDashboardSession[], now: Date): { session: HostDa
 }
 
 const focusStyles = {
-  live: { eyebrow: "Sedang live", tone: "text-success", frame: "border-success/40 bg-success/5" },
-  late: { eyebrow: "Kamu belum check-in", tone: "text-warning", frame: "border-warning/40 bg-warning/5" },
+  live: { eyebrow: "Sedang live", tone: "text-success", frame: "border-success/35 bg-success-subtle" },
+  late: { eyebrow: "Kamu belum check-in", tone: "text-warning", frame: "border-warning/35 bg-warning-subtle" },
   upcoming: { eyebrow: "Sesi berikutnya", tone: "text-brand", frame: "" },
 };
 
@@ -180,7 +180,7 @@ function NextUp({ sessions, onChanged, className }: { sessions: HostDashboardSes
 
   if (!focus) {
     return (
-      <section className={cn("flex rounded-xl border border-border bg-card shadow-xs dark:shadow-none", className)}>
+      <section className={cn("flex rounded-xl border border-border bg-card shadow-card", className)}>
         <EmptyState
           compact
           icon={CalendarDays}
@@ -230,16 +230,11 @@ function NextUp({ sessions, onChanged, className }: { sessions: HostDashboardSes
   }
 
   return (
-    <section className={cn("flex min-w-0 flex-col rounded-xl border border-border bg-card p-5 shadow-xs dark:shadow-none", style.frame, className)}>
+    <section className={cn("flex min-w-0 flex-col rounded-xl border border-border bg-card p-5 shadow-card", style.frame, className)}>
       <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className={cn("flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase", style.tone)}>
-            {state === "live" && (
-              <span className="relative flex size-2" aria-hidden="true">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
-                <span className="relative inline-flex size-2 rounded-full bg-success" />
-              </span>
-            )}
+            {state === "live" && <span className="inline-flex size-2 rounded-full bg-success" aria-hidden="true" />}
             {style.eyebrow}
             {state === "upcoming" && <span className="font-medium tracking-normal text-muted-foreground normal-case">· {dayWord(session.start_at, now)}</span>}
           </p>
@@ -268,12 +263,12 @@ function NextUp({ sessions, onChanged, className }: { sessions: HostDashboardSes
                 </Link>
               </Button>
             ) : canCheckIn ? (
-              <Button type="button" variant="success" size="sm" className="flex-1 sm:flex-none" disabled={busy} onClick={checkIn}>
+              <Button type="button" size="sm" className="flex-1 sm:flex-none" disabled={busy} onClick={checkIn}>
                 <LogIn aria-hidden="true" />
                 {busy ? "Memproses…" : "Check-in sekarang"}
               </Button>
             ) : opensAt && dayWord(opensAt.toISOString(), now) === "Hari ini" ? (
-              <span className="flex flex-1 items-center gap-1 rounded-lg border border-dashed border-border px-3 text-xs text-muted-foreground sm:flex-none">
+              <span className="flex min-h-11 flex-1 items-center gap-1 rounded-lg border border-dashed border-border px-3 text-xs text-muted-foreground sm:flex-none md:min-h-8">
                 Check-in dibuka <span className="font-medium text-body tabular-nums">{formatClock(opensAt)}</span>
               </span>
             ) : (
@@ -343,12 +338,12 @@ function Todo({ items }: { items: TodoItem[] }) {
           <li key={item.key}>
             <Link
               href={item.href}
-              className="group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors outline-none hover:bg-muted focus-visible:bg-muted"
+              className="group flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors duration-150 outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 md:min-h-0"
             >
               <span
                 className={cn(
                   "flex size-7 shrink-0 items-center justify-center rounded-md",
-                  item.urgent ? "bg-destructive/10 text-destructive" : item.count ? "bg-warning/12 text-warning" : "bg-muted text-muted-foreground"
+                  item.urgent ? "bg-destructive-subtle text-destructive" : item.count ? "bg-warning-subtle text-warning" : "bg-muted text-muted-foreground"
                 )}
               >
                 <NavIcon name={item.icon} className="size-3.5" />
@@ -592,7 +587,7 @@ function ChanceRow({
     <li>
       <Link
         href={href}
-        className="group flex items-center gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors outline-none hover:border-input hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="group flex min-h-11 items-center gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors duration-150 outline-none hover:border-input hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50"
       >
         <span
           className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", some ? "bg-primary/10 text-brand" : "bg-muted text-muted-foreground")}

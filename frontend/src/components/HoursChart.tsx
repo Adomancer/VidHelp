@@ -62,12 +62,12 @@ export default function HoursChart({ days, className }: { days: { date: string; 
               >
                 {day.hours > 0 && (
                   <div
-                    className="w-full max-w-6 rounded-t-[4px] bg-chart-1 transition-opacity group-hover:opacity-80"
+                    className="w-full max-w-6 rounded-t-[4px] bg-chart-1 transition-opacity duration-150 group-hover:opacity-80"
                     style={{ height: `${(day.hours / top) * 100}%` }}
                   />
                 )}
                 <div
-                  className={`pointer-events-none absolute bottom-full mb-1.5 ${tooltipSide} z-10 rounded-md bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground shadow-md ring-1 ring-foreground/10 group-hover:block ${tapped === day.date ? "block" : "hidden"}`}
+                  className={`pointer-events-none absolute bottom-full mb-1.5 ${tooltipSide} z-10 rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground shadow-popover group-hover:block ${tapped === day.date ? "block" : "hidden"}`}
                 >
                   <span className="block text-muted-foreground">{label.full}</span>
                   <span className="block font-medium text-foreground tabular-nums">

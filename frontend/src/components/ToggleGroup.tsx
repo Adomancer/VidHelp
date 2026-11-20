@@ -70,7 +70,7 @@ export default function ToggleGroup<T extends string>({ options, value, onChange
       {pill && (
         <span
           aria-hidden="true"
-          className="absolute rounded-md bg-card shadow-xs ring-1 ring-foreground/5 transition-all duration-200 ease-out dark:bg-secondary"
+          className="absolute rounded-md bg-card shadow-card ring-1 ring-border/60 transition-all duration-150 ease-out dark:bg-secondary"
           style={{ left: pill.left, top: pill.top, width: pill.width, height: pill.height }}
         />
       )}
@@ -86,7 +86,7 @@ export default function ToggleGroup<T extends string>({ options, value, onChange
             data-active={active}
             onClick={() => onChange(option.value)}
             className={cn(
-              "relative z-10 h-8 shrink-0 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              "relative z-10 h-11 shrink-0 rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:h-8",
               fill && "min-w-0 flex-1 px-2 sm:flex-none sm:px-3",
               grid && "min-w-0 px-2 sm:px-3",
               active ? "text-foreground" : "text-muted-foreground hover:text-foreground"

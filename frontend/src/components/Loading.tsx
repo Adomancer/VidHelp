@@ -35,16 +35,44 @@ export function CardsSkeleton({ count = 3, className }: { count?: number; classN
 }
 
 /** Placeholder table rows while they load. */
-export function TableSkeleton({ rows = 6, columns = 4 }: { rows?: number; columns?: number }) {
+export function TableSkeleton({
+  rows = 6,
+  columns = 4,
+  density = "comfortable",
+  mobileCards = false,
+}: {
+  rows?: number;
+  columns?: number;
+  density?: "comfortable" | "compact";
+  mobileCards?: boolean;
+}) {
+  const rowPadding = density === "compact" ? "py-2" : "py-3.5";
+
   return (
-    <div className="divide-y divide-border" aria-busy="true" aria-label="Memuat">
-      {Array.from({ length: rows }, (_, row) => (
-        <div key={row} className="flex items-center gap-4 px-4 py-3.5">
-          {Array.from({ length: columns }, (_, column) => (
-            <Skeleton key={column} className={cn("h-3.5", column === 0 ? "w-1/4" : "flex-1")} />
+    <div aria-busy="true" aria-label="Memuat">
+      <div className={cn("divide-y divide-border", mobileCards && "hidden md:block")}>
+        {Array.from({ length: rows }, (_, row) => (
+          <div key={row} className={cn("flex items-center gap-4 px-4", rowPadding)}>
+            {Array.from({ length: columns }, (_, column) => (
+              <Skeleton key={column} className={cn("h-3.5", column === 0 ? "w-1/4" : "flex-1")} />
+            ))}
+          </div>
+        ))}
+      </div>
+      {mobileCards && (
+        <div className="divide-y divide-border md:hidden">
+          {Array.from({ length: Math.min(rows, 4) }, (_, row) => (
+            <div key={row} className="space-y-2.5 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-4 w-2/5" />
+                <Skeleton className="h-5 w-16 rounded-md" />
+              </div>
+              <Skeleton className="h-3 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
           ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

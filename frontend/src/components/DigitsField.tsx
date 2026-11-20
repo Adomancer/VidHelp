@@ -54,6 +54,7 @@ export default function DigitsField({ label, name, defaultValue, error, maxLengt
   }
 
   const invalid = Boolean(error) || warning;
+  const messageId = warning ? `${name}-warning` : error ? `${name}-error` : undefined;
 
   return (
     <div className="space-y-1.5">
@@ -75,7 +76,7 @@ export default function DigitsField({ label, name, defaultValue, error, maxLengt
         value={value}
         onChange={(event) => change(event.target.value)}
         aria-invalid={invalid ? true : undefined}
-        aria-describedby={warning ? `${name}-warning` : undefined}
+        aria-describedby={messageId}
         className={cn(inputClass, "tabular-nums", className)}
         {...props}
       />
@@ -84,7 +85,7 @@ export default function DigitsField({ label, name, defaultValue, error, maxLengt
           <TriangleAlert className="size-3.5 shrink-0" aria-hidden="true" /> {label} hanya boleh diisi angka (0–9).
         </p>
       )}
-      {!warning && <FieldError>{error}</FieldError>}
+      {!warning && <FieldError id={messageId}>{error}</FieldError>}
     </div>
   );
 }

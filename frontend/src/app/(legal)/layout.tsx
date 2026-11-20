@@ -8,7 +8,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
       <header className="border-b">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
           <Link href="/login" className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-[#5750f1] text-sm font-bold text-white">V</span>
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">V</span>
             <span className="font-semibold tracking-tight">VidHelp</span>
           </Link>
           <ThemeToggle />

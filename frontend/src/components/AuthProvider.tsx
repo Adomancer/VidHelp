@@ -162,7 +162,7 @@ export function useAuth(): AuthContextValue {
 function FullScreenLoader() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background" aria-busy="true">
-      <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-xs">V</span>
+      <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-base font-bold text-primary-foreground shadow-card">V</span>
       <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label="Memuat" />
     </div>
   );

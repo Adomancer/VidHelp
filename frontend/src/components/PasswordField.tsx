@@ -34,7 +34,7 @@ export default function PasswordField({ label, name, error, hint, labelAside, id
           type={visible ? "text" : "password"}
           aria-invalid={error ? true : undefined}
           aria-describedby={messageId}
-          className="pr-10"
+          className="pr-12 md:pr-10"
           {...props}
         />
         <button
@@ -42,7 +42,7 @@ export default function PasswordField({ label, name, error, hint, labelAside, id
           onClick={() => setVisible(!visible)}
           aria-label={visible ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
           aria-pressed={visible}
-          className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 md:size-7"
+          className="absolute top-1/2 right-0 flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:right-1 md:size-7"
         >
           {visible ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
         </button>

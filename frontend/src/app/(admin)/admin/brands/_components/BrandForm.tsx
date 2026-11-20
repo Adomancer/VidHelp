@@ -8,12 +8,12 @@ import { cn } from "@/lib/utils";
 import DatePicker from "@/components/DatePicker";
 import Dialog from "@/components/Dialog";
 import { FieldError, FieldHint } from "@/components/FieldMessage";
+import { FormFieldFull, FormGrid } from "@/components/FormGrid";
 import SelectField from "@/components/SelectField";
-import { notifyCapsule } from "@/components/Toast";
+import { notify } from "@/components/Toast";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { TOAST_MS } from "./shared";
 
 const DEFAULT_TARGET = 720;
 
@@ -56,13 +56,13 @@ export function BrandForm({ brand, onSaved, onClose }: { brand: BrandSummary | n
     setSaving(true);
     try {
       await (brand ? adminHostsApi.updateBrand(token, brand.id, input) : adminHostsApi.createBrand(token, input));
-      notifyCapsule(brand ? "Brand diperbarui" : "Brand ditambahkan", "success", TOAST_MS);
+      notify({ text: brand ? "Brand diperbarui" : "Brand ditambahkan" });
       onSaved();
     } catch (caught) {
       const { fields, message } = splitApiError(caught, shownKeys("name", "target_hours_per_period"));
       setErrors(fields);
       // The server's reason (permission, conflict, offline…) unless the marked fields already say it
-      notifyCapsule(message ?? "Periksa isian yang ditandai", "error", TOAST_MS);
+      notify({ text: message ?? "Periksa isian yang ditandai", tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -76,82 +76,86 @@ export function BrandForm({ brand, onSaved, onClose }: { brand: BrandSummary | n
       dirty={dirty && !saving}
       footer={
         <>
-          <Button type="button" variant="outline" size="lg" onClick={onClose} disabled={saving}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             Batal
           </Button>
-          <Button type="submit" form="brand-form" size="lg" disabled={saving}>
+          <Button type="submit" form="brand-form" disabled={saving}>
             {saving ? "Menyimpan…" : "Simpan"}
           </Button>
         </>
       }
     >
-      <form id="brand-form" onSubmit={submit} onChange={() => setDirty(true)} className="grid gap-4 sm:grid-cols-2" noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="name">
-            Nama <span className="text-destructive">*</span>
-          </Label>
-          <input
-            id="name"
-            name="name"
-            defaultValue={brand?.name}
-            maxLength={80}
-            aria-invalid={errors.name ? true : undefined}
-            aria-describedby={errors.name ? "name-error" : undefined}
-            className={inputClass}
-          />
-          <FieldError id="name-error">{errors.name}</FieldError>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="target_hours_per_period">Target jam per periode</Label>
-          <input
-            id="target_hours_per_period"
-            name="target_hours_per_period"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={10000}
-            placeholder={String(DEFAULT_TARGET)}
-            defaultValue={brand?.target_hours_per_period}
-            aria-invalid={errors.target_hours_per_period ? true : undefined}
-            className={cn(inputClass, "tabular-nums")}
-          />
-          {errors.target_hours_per_period ? (
-            <FieldError>{errors.target_hours_per_period}</FieldError>
-          ) : (
-            <FieldHint>720 jam ≈ 1 bulan. Dikosongkan = 720.</FieldHint>
+      <form id="brand-form" onSubmit={submit} onChange={() => setDirty(true)} noValidate>
+        <FormGrid>
+          <div className="space-y-1.5">
+            <Label htmlFor="name">
+              Nama <span className="text-destructive">*</span>
+            </Label>
+            <input
+              id="name"
+              name="name"
+              defaultValue={brand?.name}
+              maxLength={80}
+              aria-invalid={errors.name ? true : undefined}
+              aria-describedby={errors.name ? "name-error" : undefined}
+              className={inputClass}
+            />
+            <FieldError id="name-error">{errors.name}</FieldError>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="target_hours_per_period">Target jam per periode</Label>
+            <input
+              id="target_hours_per_period"
+              name="target_hours_per_period"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={10000}
+              placeholder={String(DEFAULT_TARGET)}
+              defaultValue={brand?.target_hours_per_period}
+              aria-invalid={errors.target_hours_per_period ? true : undefined}
+              className={cn(inputClass, "tabular-nums")}
+            />
+            {errors.target_hours_per_period ? (
+              <FieldError>{errors.target_hours_per_period}</FieldError>
+            ) : (
+              <FieldHint>720 jam ≈ 1 bulan. Dikosongkan = 720.</FieldHint>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="payroll_start_date">Mulai penggajian</Label>
+            <DatePicker
+              id="payroll_start_date"
+              name="payroll_start_date"
+              defaultValue={brand?.payroll_start_date?.slice(0, 10)}
+              onChange={() => setDirty(true)}
+              clearable
+              placeholder="Belum dimulai"
+              aria-invalid={errors.payroll_start_date ? true : undefined}
+            />
+            {errors.payroll_start_date ? <FieldError>{errors.payroll_start_date}</FieldError> : <FieldHint>Opsional. Awal periode pertama.</FieldHint>}
+          </div>
+          {brand && (
+            <SelectField
+              label="Status"
+              name="status"
+              defaultValue={brand.status}
+              options={[
+                { value: "active", label: "Aktif" },
+                { value: "inactive", label: "Nonaktif" },
+              ]}
+            />
           )}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="payroll_start_date">Mulai penggajian</Label>
-          <DatePicker
-            id="payroll_start_date"
-            name="payroll_start_date"
-            defaultValue={brand?.payroll_start_date?.slice(0, 10)}
-            onChange={() => setDirty(true)}
-            clearable
-            placeholder="Belum dimulai"
-            aria-invalid={errors.payroll_start_date ? true : undefined}
-          />
-          {errors.payroll_start_date ? <FieldError>{errors.payroll_start_date}</FieldError> : <FieldHint>Opsional. Awal periode pertama.</FieldHint>}
-        </div>
-        {brand && (
-          <SelectField
-            label="Status"
-            name="status"
-            defaultValue={brand.status}
-            options={[
-              { value: "active", label: "Aktif" },
-              { value: "inactive", label: "Nonaktif" },
-            ]}
-          />
-        )}
-        <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3 text-sm text-body transition-colors hover:bg-muted/40 has-checked:border-primary/50 has-checked:bg-primary/5 sm:col-span-2">
-          <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="size-4 accent-primary" />
-          <span>
-            <span className="block font-medium text-foreground">Brand OBS</span>
-            <span className="block text-xs text-muted-foreground">Live brand ini memakai OBS.</span>
-          </span>
-        </label>
+          <FormFieldFull>
+            <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3 text-sm text-body transition-colors duration-150 hover:bg-muted/40 has-checked:border-primary/50 has-checked:bg-primary/5">
+              <input type="checkbox" name="is_obs" defaultChecked={brand?.is_obs} className="size-4 accent-primary" />
+              <span>
+                <span className="block font-medium text-foreground">Brand OBS</span>
+                <span className="block text-xs text-muted-foreground">Live brand ini memakai OBS.</span>
+              </span>
+            </label>
+          </FormFieldFull>
+        </FormGrid>
       </form>
     </Dialog>
   );

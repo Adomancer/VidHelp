@@ -28,8 +28,8 @@ export default function RegisterForm() {
 
   if (done) {
     return (
-      <div className="space-y-5 rounded-xl border border-border bg-card p-6 text-center shadow-xs">
-        <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-success/10 text-success">
+      <div className="space-y-5 rounded-xl border border-border bg-card p-6 text-center shadow-card">
+        <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-success-subtle text-success">
           <MailCheck className="size-5" aria-hidden="true" />
         </span>
         <p className="text-sm text-body">{done}</p>

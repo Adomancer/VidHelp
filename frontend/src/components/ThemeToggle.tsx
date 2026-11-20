@@ -62,8 +62,8 @@ export function ThemeSwitcher({ className }: { className?: string }) {
             aria-checked={selected}
             onClick={() => setThemeMode(option.value)}
             className={cn(
-              "flex h-9 items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-              selected ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+              "flex h-11 items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:h-9",
+              selected ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <option.icon className="size-3.5" aria-hidden="true" />

@@ -31,7 +31,7 @@ export default function PointsMeter({ points, opening, thresholds }: { points: n
         aria-valuenow={points}
         aria-label="Poin periode ini"
       >
-        <div className={`h-full rounded-full transition-[width] duration-500 ease-out ${tone}`} style={{ width: pct(points) }} />
+        <div className={`h-full rounded-full transition-[width] duration-200 ease-out ${tone}`} style={{ width: pct(points) }} />
         {Object.entries(thresholds).map(([level, threshold]) => (
           <div
             key={level}

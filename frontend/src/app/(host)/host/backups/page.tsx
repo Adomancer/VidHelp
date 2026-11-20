@@ -31,7 +31,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const TABS = ["needs", "mine"] as const;
 type Act = (action: () => Promise<{ message: string }>) => Promise<void>;
@@ -76,25 +75,40 @@ export default function HostBackupsPage() {
       {error && <FormAlert tone="error">{error}</FormAlert>}
       {(mine.error || needs.error) && <ErrorState message={(mine.error ?? needs.error)!} onRetry={() => (mine.reload(), needs.reload())} />}
 
-      <Tabs value={tab} onValueChange={(value) => void setTab(value as (typeof TABS)[number])} className="gap-5">
-        <TabsList className="h-10 w-full sm:w-fit">
-          <TabsTrigger value="needs" className="px-3">
-            Butuh pengganti
-            {needs.data && needs.data.needs.length > 0 && <CountPill>{needs.data.needs.length}</CountPill>}
-          </TabsTrigger>
-          <TabsTrigger value="mine" className="px-3">
-            Permintaan saya
-            {openRequests > 0 && <CountPill>{openRequests}</CountPill>}
-          </TabsTrigger>
-        </TabsList>
+      <div className="space-y-5">
+        <ToggleGroup
+          label="Tampilan backup"
+          fill
+          value={tab}
+          onChange={(value) => void setTab(value)}
+          options={[
+            {
+              value: "needs",
+              label: (
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <span>Butuh pengganti</span>
+                  {needs.data && needs.data.needs.length > 0 && <CountPill>{needs.data.needs.length}</CountPill>}
+                </span>
+              ),
+            },
+            {
+              value: "mine",
+              label: (
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <span>Permintaan saya</span>
+                  {openRequests > 0 && <CountPill>{openRequests}</CountPill>}
+                </span>
+              ),
+            },
+          ]}
+        />
 
-        <TabsContent value="needs">
+        {tab === "needs" ? (
           <NeedsTab covers={mine.data?.covers ?? []} needs={needs.data?.needs} quota={mine.data?.quota} act={act} />
-        </TabsContent>
-        <TabsContent value="mine">
+        ) : (
           <MineTab requests={mine.data?.requests} act={act} onNew={() => setFormOpen(true)} />
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
 
       {formOpen && (
         <RequestForm
@@ -112,7 +126,7 @@ export default function HostBackupsPage() {
 }
 
 function CountPill({ children }: { children: React.ReactNode }) {
-  return <span className="ml-1 rounded-full bg-primary/12 px-1.5 text-[11px] font-semibold text-brand tabular-nums">{children}</span>;
+  return <span className="rounded-full bg-primary/12 px-1.5 text-[11px] font-semibold text-brand tabular-nums">{children}</span>;
 }
 
 function NeedsTab({ covers, needs, quota, act }: { covers: BackupNeed[]; needs?: BackupNeed[]; quota?: { quota_used: number; quota_max: number }; act: Act }) {
@@ -134,10 +148,7 @@ function NeedsTab({ covers, needs, quota, act }: { covers: BackupNeed[]; needs?:
           {needs?.map((need) => {
             const applied = need.my_application?.status === "applied";
             return (
-              <li
-                key={need.id}
-                className={cn("space-y-3 rounded-xl border bg-card p-4 shadow-xs dark:shadow-none", need.asked_me ? "border-primary/40" : "border-border")}
-              >
+              <li key={need.id} className={cn("space-y-3 rounded-xl border bg-card p-4 shadow-card", need.asked_me ? "border-primary/40" : "border-border")}>
                 {need.asked_me && <StatusBadge tone="brand">{need.requester_name} meminta kamu</StatusBadge>}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -181,7 +192,13 @@ function NeedsTab({ covers, needs, quota, act }: { covers: BackupNeed[]; needs?:
                   <p className="text-xs text-body tabular-nums">{formatWindow(cover.start_at, cover.end_at)}</p>
                   <p className="text-xs text-muted-foreground">untuk {cover.requester_name}</p>
                   {new Date(cover.start_at) > new Date() && (
-                    <Button type="button" variant="link" size="xs" onClick={() => setDropping(cover)} className="h-auto p-0 text-destructive">
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="xs"
+                      onClick={() => setDropping(cover)}
+                      className="h-auto min-h-11 p-0 py-2 text-destructive md:min-h-0 md:py-0"
+                    >
                       Saya tidak bisa
                     </Button>
                   )}
@@ -252,7 +269,7 @@ function MineTab({ requests, act, onNew }: { requests?: BackupRequest[]; act: Ac
     <>
       <ul className="grid gap-3 lg:grid-cols-2">
         {requests.map((backup) => (
-          <li key={backup.id} className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-xs dark:shadow-none">
+          <li key={backup.id} className="space-y-3 rounded-xl border border-border bg-card p-4 shadow-card">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-medium text-foreground">{backup.brand.name}</p>
@@ -473,7 +490,7 @@ function RequestForm({ onDone, onCancel }: { onDone: (message: string) => void; 
               if (problem) event.target.value = "";
               setLetterProblem(problem);
             }}
-            className="block w-full rounded-lg border border-dashed border-input bg-muted/40 p-2 text-sm text-body file:mr-3 file:rounded-md file:border-0 file:bg-card file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:shadow-xs"
+            className="block w-full rounded-lg border border-dashed border-input bg-muted/40 p-2 text-sm text-body file:mr-3 file:rounded-md file:border-0 file:bg-card file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:shadow-card"
           />
           {errors.letter || letterProblem ? (
             <FieldError>{errors.letter ?? letterProblem}</FieldError>
@@ -563,7 +580,7 @@ function NomineePicker({
             <li key={candidate.host_id}>
               <label
                 className={cn(
-                  "flex items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
+                  "flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 transition-colors duration-150",
                   checked ? "border-primary/40 bg-primary/[0.06]" : "border-border",
                   disabled ? "opacity-50" : "cursor-pointer hover:bg-muted/60"
                 )}

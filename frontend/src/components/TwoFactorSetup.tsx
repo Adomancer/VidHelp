@@ -83,7 +83,7 @@ export default function TwoFactorSetup({ onDone }: { onDone: (user: AuthUser) =>
     <form onSubmit={handleSubmit} className="space-y-5" noValidate>
       <p className="text-sm text-body">Scan kode ini dengan aplikasi authenticator kamu:</p>
       <div className="flex justify-center">
-        <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
+        <div className="rounded-xl border border-border bg-white p-4 shadow-card">
           <QRCodeSVG value={secret.otpauth_url} size={184} marginSize={0} />
         </div>
       </div>

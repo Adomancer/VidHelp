@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Clock, ExternalLink, Star, UserRoundPlus } from "lucide-react";
+import { Check, ChevronDown, Clock, ExternalLink, Star, UserRoundPlus } from "lucide-react";
 import { errorMessage, operatorBackupApi, showInTab, type BackupCandidate, type BackupRequest } from "@/lib/api";
 import { formatClock, formatDateTime, formatDuration, formatWindow } from "@/lib/format";
 import { useApiData } from "@/lib/useApiData";
@@ -253,7 +253,8 @@ function CandidateList({
                 Tolak
               </Button>
             )}
-            <Button type="button" size="sm" variant="success" disabled={!candidate.eligible} onClick={() => onPick(candidate)}>
+            <Button type="button" size="sm" disabled={!candidate.eligible} onClick={() => onPick(candidate)}>
+              <Check aria-hidden="true" />
               Setujui
             </Button>
           </div>

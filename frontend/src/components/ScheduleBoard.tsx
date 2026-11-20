@@ -16,10 +16,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "./AuthProvider";
 import BackupDialog from "./BackupDialog";
+import Combobox from "./Combobox";
 import { parseDateInput } from "./DatePicker";
 import FormAlert from "./FormAlert";
 import ScheduleMonth from "./ScheduleMonth";
-import SearchableSelect from "./SearchableSelect";
 import SlotDetailDialog from "./SlotDetailDialog";
 import SlotDialog from "./SlotDialog";
 import StopSlotDialog from "./StopSlotDialog";
@@ -190,14 +190,17 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
       {/* Brand, week, add */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="w-full sm:w-60">
-          <SearchableSelect
-            value={brandId}
+          <Combobox
+            value={brandId || null}
             onChange={(value) => {
+              if (!value) return;
               void setChosenBrandId(value);
               rememberBrand(value);
             }}
             options={activeBrands.map((brand) => ({ value: brand.id, label: brand.name }))}
             placeholder={brands.data ? "Pilih brand…" : "Memuat brand…"}
+            empty="Brand tidak ditemukan."
+            aria-label="Pilih brand"
           />
         </div>
 
@@ -213,7 +216,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
           onChange={switchView}
         />
 
-        <div className="flex items-center gap-0.5 rounded-lg border border-input bg-card p-0.5 shadow-xs">
+        <div className="flex items-center gap-0.5 rounded-lg border border-input bg-card p-0.5 shadow-card">
           <IconButton
             label={view === "week" ? "Minggu sebelumnya" : "Bulan sebelumnya"}
             onClick={() => (view === "week" ? goToWeek(addDays(week, -7)) : setMonth(addMonths(month, -1)))}
@@ -237,7 +240,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                 size="icon-sm"
                 aria-label="Pilih tanggal di kalender"
                 title="Pilih tanggal di kalender"
-                className="text-body max-md:size-10"
+                className="text-body"
               >
                 <CalendarDays />
               </Button>
@@ -318,7 +321,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                 aria-selected={mobileDay === day.value}
                 onClick={() => setMobileDay(day.value)}
                 className={cn(
-                  "rounded-lg border px-0.5 py-1.5 text-center transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "min-h-11 rounded-lg border px-0.5 py-1.5 text-center transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                   mobileDay === day.value
                     ? "border-primary bg-primary text-primary-foreground"
                     : day.date === today
@@ -356,7 +359,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                   aria-label={`${day.long} ${formatLongDate(day.date)}`}
                   className={cn(
                     mobileDay === day.value ? "flex" : "hidden",
-                    "min-h-40 flex-col gap-1.5 rounded-xl border p-2 shadow-xs lg:flex dark:shadow-none",
+                    "min-h-40 flex-col gap-1.5 rounded-xl border p-2 shadow-card lg:flex",
                     isToday ? "border-primary/50 bg-primary/[0.04] ring-1 ring-primary/15" : "border-border bg-card"
                   )}
                 >
@@ -376,14 +379,14 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                       onClick={() => setDialog({ kind: "slot", day: day.value })}
                       aria-label={`Tambah slot hari ${day.long}`}
                       title={`Tambah slot hari ${day.long}`}
-                      className="text-muted-foreground max-md:size-10"
+                      className="text-muted-foreground max-md:size-11"
                     >
                       <Plus />
                     </Button>
                   </header>
 
                   {day.event && (
-                    <div className="rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-[11px] text-warning">
+                    <div className="rounded-md border border-warning/30 bg-warning-subtle px-2 py-1.5 text-[11px] text-warning">
                       <span className="flex items-center gap-1 font-semibold">
                         <Ticket className="size-3 shrink-0" aria-hidden="true" />
                         {day.event.name}
@@ -398,7 +401,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                       type="button"
                       onClick={() => setDialog({ kind: "detail", slot, date: addDays(day.date, -1) })}
                       className={cn(
-                        "w-full rounded-lg border border-dashed border-input px-2 py-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
+                        "w-full rounded-lg border border-dashed border-input px-2 py-1.5 text-left transition-colors duration-150 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50",
                         day.eventDayBefore && "opacity-40"
                       )}
                     >
@@ -427,7 +430,7 @@ export default function ScheduleBoard({ isAdmin = false }: { isAdmin?: boolean }
                       <button
                         type="button"
                         onClick={() => setDialog({ kind: "slot", day: day.value })}
-                        className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+                        className="inline-flex min-h-11 items-center gap-1 rounded px-2 text-xs font-medium text-brand transition-colors duration-150 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring/50 md:min-h-0 md:px-1"
                       >
                         <Plus className="size-3" aria-hidden="true" />
                         Tambah slot
@@ -482,8 +485,8 @@ function SlotCard({ slot, backup, replaced, onOpen }: { slot: ScheduleSlot; back
       type="button"
       onClick={onOpen}
       className={cn(
-        "w-full rounded-md border-l-[3px] px-2 py-1.5 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-        pd ? "border-warning bg-warning/10 hover:bg-warning/15" : "border-primary bg-primary/[0.07] hover:bg-primary/[0.12]",
+        "w-full rounded-md border-l-[3px] px-2 py-1.5 text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        pd ? "border-warning bg-warning-subtle hover:bg-warning-subtle/80" : "border-primary bg-primary/[0.07] hover:bg-primary/[0.12]",
         replaced && "opacity-45"
       )}
     >
@@ -544,7 +547,7 @@ function Hint({ text, children }: { text: string; children: ReactNode }) {
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (
-    <Button type="button" variant="ghost" size="icon-sm" onClick={onClick} aria-label={label} title={label} className="text-body max-md:size-10">
+    <Button type="button" variant="ghost" size="icon-sm" onClick={onClick} aria-label={label} title={label} className="text-body">
       {children}
     </Button>
   );

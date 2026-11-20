@@ -52,7 +52,7 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
         >
           <Bell />
           {unread > 0 && (
-            <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white tabular-nums ring-2 ring-background">
+            <span className="absolute top-1.5 right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive-solid px-1 text-[10px] leading-none font-semibold text-white tabular-nums ring-2 ring-background">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
@@ -95,7 +95,7 @@ export default function NotificationBell({ align = "end" }: { align?: "start" | 
                 type="button"
                 onClick={() => openNotification(notification)}
                 className={cn(
-                  "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-muted focus-visible:bg-muted",
+                  "flex min-h-11 w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
                   !notification.read_at && "bg-primary/[0.04]"
                 )}
               >

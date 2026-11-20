@@ -102,7 +102,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
     <div ref={containerRef} className="relative flex-1">
       <div
         onClick={() => inputRef.current?.focus()}
-        className="flex min-h-10 w-full cursor-text flex-wrap items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 py-1 shadow-xs transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 md:min-h-9 dark:bg-input/30"
+        className="flex min-h-11 w-full cursor-text flex-wrap items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 py-1 shadow-card transition-colors duration-150 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50 md:min-h-9 dark:bg-input/30"
       >
         <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
 
@@ -169,7 +169,7 @@ export default function HostSearch({ value, onChange }: HostSearchProps) {
           id={listId}
           role="listbox"
           aria-multiselectable="true"
-          className="absolute z-30 mt-1.5 max-h-80 w-full animate-in overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 fade-in-0 zoom-in-95"
+          className="absolute z-30 mt-1.5 max-h-80 w-full animate-in overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-popover duration-150 fade-in-0 zoom-in-95"
         >
           {options.map((option, index) => (
             <li

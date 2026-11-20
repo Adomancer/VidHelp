@@ -157,7 +157,7 @@ function LevelStep({ level, previous, index, last, onChanged }: { level: Level; 
 
   return (
     <Step index={index} last={last}>
-      <div className="rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+      <div className="rounded-xl border border-border bg-card shadow-card">
         {editing ? (
           <div className="p-4">
             <LevelForm
@@ -213,7 +213,7 @@ function LevelStep({ level, previous, index, last, onChanged }: { level: Level; 
                   disabled={level.hosts_count > 0}
                   title={level.hosts_count > 0 ? "Masih dipakai host" : "Hapus level"}
                   aria-label={`Hapus ${level.name}`}
-                  className="text-muted-foreground hover:text-destructive max-md:size-10"
+                  className="text-muted-foreground hover:text-destructive"
                 >
                   <Trash2 />
                 </Button>
@@ -343,7 +343,7 @@ function Upcoming({ promotions, days }: { promotions: RatePromotion[]; days: num
             <li key={promotion.host_id}>
               <Link
                 href={`/admin/hosts/${promotion.host_id}`}
-                className="flex items-center gap-3 rounded-lg px-1 py-2.5 outline-none hover:bg-muted/50 focus-visible:bg-muted/60"
+                className="flex min-h-11 items-center gap-3 rounded-lg px-1 py-2.5 transition-colors duration-150 outline-none hover:bg-muted/50 focus-visible:bg-muted/60"
               >
                 <UserAvatar user={promotion} size="size-8 text-xs" />
                 <div className="min-w-0 flex-1">
@@ -386,7 +386,7 @@ function Pinned({ hosts }: { hosts: PinnedRateHost[] }) {
             <li key={host.host_id}>
               <Link
                 href={`/admin/hosts/${host.host_id}`}
-                className="flex items-center gap-3 rounded-lg px-1 py-2 outline-none hover:bg-muted/50 focus-visible:bg-muted/60"
+                className="flex min-h-11 items-center gap-3 rounded-lg px-1 py-2 transition-colors duration-150 outline-none hover:bg-muted/50 focus-visible:bg-muted/60"
               >
                 <UserAvatar user={host} size="size-7 text-[11px]" />
                 <span className="min-w-0 flex-1 truncate text-sm text-foreground">{host.name}</span>

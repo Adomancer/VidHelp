@@ -17,7 +17,7 @@ export function Highlight({ text, query }: { text: string; query: string }) {
   for (let at = lower.indexOf(needle); at !== -1; at = lower.indexOf(needle, from)) {
     if (at > from) parts.push(text.slice(from, at));
     parts.push(
-      <mark key={at} className="rounded-sm bg-warning/30 px-0.5 text-foreground">
+      <mark key={at} className="rounded-sm bg-warning-subtle px-0.5 text-foreground ring-1 ring-warning/30">
         {text.slice(at, at + needle.length)}
       </mark>
     );
@@ -87,7 +87,7 @@ export function BrandCard({
         }
       }}
       className={cn(
-        "group flex h-full cursor-pointer flex-col gap-3 rounded-2xl border border-border p-4 shadow-xs transition duration-200 outline-none hover:border-foreground/20 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50 motion-safe:hover:-translate-y-0.5 dark:shadow-none",
+        "group flex h-full cursor-pointer flex-col gap-3 rounded-xl border border-border p-4 shadow-card transition-colors duration-150 outline-none hover:border-foreground/20 focus-visible:ring-2 focus-visible:ring-ring/50",
         inactive ? "bg-muted/40" : "bg-card"
       )}
     >
@@ -104,7 +104,6 @@ export function BrandCard({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="max-md:size-10"
             onClick={(click) => {
               click.stopPropagation();
               onKnowledge();
@@ -119,7 +118,6 @@ export function BrandCard({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="max-md:size-10"
             onClick={(click) => {
               click.stopPropagation();
               onEdit();
@@ -152,9 +150,9 @@ export function BrandCard({
       </dl>
 
       <div className="mt-auto flex items-center justify-between gap-2">
-        <span className="flex items-center gap-0.5 text-sm font-medium text-muted-foreground transition-colors group-hover:text-brand">
+        <span className="flex items-center gap-0.5 text-sm font-medium text-muted-foreground transition-colors duration-150 group-hover:text-brand">
           Lihat detail
-          <ChevronRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+          <ChevronRight className="size-4 transition-transform duration-150 group-hover:translate-x-1" aria-hidden="true" />
         </span>
         {knowledgeOnly && (
           <StatusBadge tone="warning" className="h-5 truncate px-1.5 text-[11px]">

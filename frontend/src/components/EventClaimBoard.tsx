@@ -195,7 +195,7 @@ function EventPanel({
   const share = Math.min(100, (event.my_claims / Math.max(1, event.max_slots_per_host)) * 100);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
       {/* What the event is */}
       <div className="space-y-4 border-b border-border p-5 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -267,7 +267,7 @@ function EventPanel({
                   aria-selected={selected}
                   onClick={() => setChosenDay(date)}
                   className={cn(
-                    "shrink-0 rounded-lg border px-3 py-2 text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                    "min-h-11 shrink-0 rounded-lg border px-3 py-2 text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                     selected ? "border-primary bg-primary/10" : "border-border hover:bg-muted"
                   )}
                 >
@@ -341,8 +341,8 @@ function BlockTile({
   return (
     <li
       className={cn(
-        "flex items-center gap-3 rounded-lg border px-3.5 py-3 transition-colors",
-        block.state === "free" ? "border-primary/30 bg-primary/[0.03]" : block.state === "mine" ? "border-success/40 bg-success/[0.06]" : "border-border",
+        "flex items-center gap-3 rounded-lg border px-3.5 py-3 transition-colors duration-150",
+        block.state === "free" ? "border-primary/30 bg-primary/[0.03]" : block.state === "mine" ? "border-success/40 bg-success-subtle" : "border-border",
         block.state === "past" && "opacity-55"
       )}
     >
@@ -363,7 +363,7 @@ function BlockTile({
           onClick={onClaim}
           disabled={full || busy}
           title={full ? "Kuota kamu untuk event ini sudah penuh" : undefined}
-          className="min-w-20 active:scale-[0.97]"
+          className="min-w-20"
         >
           {pending ? "Mengambil…" : "Ambil"}
         </Button>

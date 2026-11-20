@@ -16,10 +16,10 @@ import Card from "../Card";
 import ConfirmDialog from "../ConfirmDialog";
 import ErrorState from "../ErrorState";
 import { CardsSkeleton } from "../Loading";
-import { notifyCapsule } from "../Toast";
+import { notify } from "../Toast";
 import { AssignDialog } from "./AssignDialog";
 import { EventForm } from "./EventForm";
-import { activeHosts, type BlockStatus, blockTime, statusOf, TALL } from "./shared";
+import { activeHosts, type BlockStatus, blockTime, statusOf } from "./shared";
 
 /** The chosen event: summary, settings, legend, and a card per day. */
 export function EventBoard({
@@ -97,7 +97,7 @@ export function EventBoard({
           event={event}
           onDone={(message) => {
             setEditing(false);
-            notifyCapsule(message);
+            notify({ text: message });
             void refresh(event.id);
           }}
           onCancel={() => setEditing(false)}
@@ -111,10 +111,10 @@ export function EventBoard({
           cancelLabel="Kembali"
           onConfirm={async () => {
             try {
-              notifyCapsule((await eventApi.remove(token, event.id)).message);
+              notify({ text: (await eventApi.remove(token, event.id)).message });
               await onDeleted();
             } catch (caught) {
-              notifyCapsule(errorMessage(caught), "error");
+              notify({ text: errorMessage(caught), tone: "error" });
             }
           }}
           onClose={() => setDeleting(false)}
@@ -175,11 +175,11 @@ function Summary({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="lg" onClick={onEdit} className={TALL}>
+          <Button type="button" variant="outline" onClick={onEdit}>
             <Pencil aria-hidden="true" />
             Edit event
           </Button>
-          <Button type="button" variant="destructive" size="lg" onClick={onDelete} className={TALL}>
+          <Button type="button" variant="destructive" onClick={onDelete}>
             <Trash2 aria-hidden="true" />
             Hapus
           </Button>
@@ -213,10 +213,10 @@ function EventSettings({ event, refresh }: { event: SpecialEvent; refresh: () =>
   async function save() {
     setSaving(true);
     try {
-      notifyCapsule((await eventApi.update(token, event.id, { max_slots_per_host: maxValue, open_full_schedule: full })).message);
+      notify({ text: (await eventApi.update(token, event.id, { max_slots_per_host: maxValue, open_full_schedule: full })).message });
       await refresh();
     } catch (caught) {
-      notifyCapsule(errorMessage(caught), "error");
+      notify({ text: errorMessage(caught), tone: "error" });
     } finally {
       setSaving(false);
     }
@@ -234,14 +234,14 @@ function EventSettings({ event, refresh }: { event: SpecialEvent; refresh: () =>
           value={max}
           onChange={(change) => setMax(change.target.value)}
           aria-invalid={valid ? undefined : true}
-          className={cn(inputClass, TALL, "w-28 tabular-nums")}
+          className={cn(inputClass, "w-28 tabular-nums")}
         />
       </label>
-      <label className="flex h-11 items-center gap-2.5 text-sm text-body">
+      <label className="flex h-11 items-center gap-2.5 text-sm text-body md:h-9">
         <Switch checked={full} onCheckedChange={setFull} />
         Gantikan jadwal reguler
       </label>
-      <Button type="button" variant="outline" size="lg" disabled={!changed || !valid || saving} onClick={() => void save()} className={cn(TALL, "sm:ml-auto")}>
+      <Button type="button" variant="outline" disabled={!changed || !valid || saving} onClick={() => void save()} className="sm:ml-auto">
         {saving ? "Menyimpan…" : "Simpan pengaturan"}
       </Button>
       {!valid && <p className="w-full text-xs text-destructive">Maks blok per host diisi angka 1 sampai 100.</p>}
@@ -253,7 +253,7 @@ function EventSettings({ event, refresh }: { event: SpecialEvent; refresh: () =>
 const tileStyle: Record<BlockStatus, string> = {
   taken: "border-transparent bg-primary text-primary-foreground",
   open: "border-primary/45 bg-primary/10 text-brand",
-  regular: "border-warning/50 bg-warning/10 text-warning",
+  regular: "border-warning/50 bg-warning-subtle text-warning",
   past: "border-transparent bg-muted text-muted-foreground/70",
 };
 
@@ -306,7 +306,7 @@ function DayCard({
   const filled = statuses.filter((status) => status === "taken").length;
 
   return (
-    <section className="rounded-2xl border border-border bg-card shadow-xs dark:shadow-none">
+    <section className="rounded-xl border border-border bg-card shadow-card">
       <header className="flex items-baseline justify-between gap-3 border-b border-border px-4 py-3">
         <h3 className="text-base font-bold text-foreground">{formatDay(`${day}T00:00`)}</h3>
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
@@ -329,7 +329,7 @@ function DayCard({
                 title={status === "regular" ? (block.reason ?? "Ada jadwal reguler") : block.claim ? block.claim.host_name : undefined}
                 aria-label={`${blockTime(block)}, ${label}${clickable ? (block.claim ? ", ganti atau lepas host" : ", tunjuk host") : ""}`}
                 className={cn(
-                  "flex h-14 w-full flex-col justify-center rounded-lg border px-2.5 text-left transition outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                  "flex h-14 w-full flex-col justify-center rounded-lg border px-2.5 text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                   tileStyle[status],
                   clickable ? "cursor-pointer hover:brightness-95 dark:hover:brightness-110" : "cursor-not-allowed",
                   mine && "ring-[3px] ring-success ring-inset"

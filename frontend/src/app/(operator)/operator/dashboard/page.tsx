@@ -107,7 +107,7 @@ export default function OperatorDashboardPage() {
             <li key={item.href}>
               <Link
                 href={item.href}
-                className="group flex items-center gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors outline-none hover:border-input hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="group flex min-h-11 items-center gap-3 rounded-lg border border-border px-3.5 py-3 transition-colors duration-150 outline-none hover:border-input hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring/50"
               >
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-brand">
                   <item.icon className="size-4" aria-hidden="true" />

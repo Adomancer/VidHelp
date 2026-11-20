@@ -1,33 +1,35 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Archive, Ban, KeyRound, MoreHorizontal, Search, Trash2, UserPlus, Users } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Archive, Ban, Check, KeyRound, MoreHorizontal, Trash2, UserPlus, Users } from "lucide-react";
 import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { adminApi, errorMessage, type AuthUser, type EraseReason, type RoleName, type UserStatus } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { roleLabel, statusLabel } from "@/lib/labels";
-import { inputClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { formValue, useApiForm } from "@/lib/useApiForm";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import DataTable from "@/components/DataTable";
+import Dialog from "@/components/Dialog";
 import EmptyState from "@/components/EmptyState";
-import ErrorState from "@/components/ErrorState";
 import FormActions from "@/components/FormActions";
 import FormAlert from "@/components/FormAlert";
-import { TableSkeleton, RefreshBar } from "@/components/Loading";
-import Modal from "@/components/Modal";
+import { FormFieldFull, FormGrid } from "@/components/FormGrid";
 import PageHeader from "@/components/PageHeader";
 import Pagination from "@/components/Pagination";
+import SearchInput from "@/components/SearchInput";
 import SelectField, { NativeSelect } from "@/components/SelectField";
 import StatusBadge, { type Tone } from "@/components/StatusBadge";
 import TextField from "@/components/TextField";
 import { notify } from "@/components/Toast";
 import ToggleGroup, { ShortLabel } from "@/components/ToggleGroup";
 import UserAvatar from "@/components/UserAvatar";
+import { DensityToggle, useTableDensity, type BulkAction } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const tabs = [
@@ -70,6 +72,7 @@ export default function AdminUsersPage() {
   const [creating, setCreating] = useState(false);
   const [erasing, setErasing] = useState<AuthUser | null>(null);
   const [confirm, setConfirm] = useState<Confirm>(null);
+  const [density, setDensity] = useTableDensity();
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const status = tab === "all" ? undefined : tab;
@@ -107,6 +110,74 @@ export default function AdminUsersPage() {
   }
 
   const users = result.data;
+  const canBulkApprove = tab === "pending" || tab === "all";
+
+  const columns: ColumnDef<AuthUser>[] = [
+    {
+      id: "user",
+      enableSorting: false,
+      header: "Pengguna",
+      cell: ({ row }) => <UserCell user={row.original} />,
+    },
+    {
+      id: "signup",
+      enableSorting: false,
+      header: "Mendaftar",
+      meta: { cellClassName: "whitespace-nowrap text-muted-foreground" },
+      cell: ({ row }) => <Signup user={row.original} />,
+    },
+    {
+      id: "status",
+      enableSorting: false,
+      header: "Status",
+      cell: ({ row }) => <UserStatusBadge user={row.original} />,
+    },
+    {
+      id: "role",
+      enableSorting: false,
+      header: "Peran",
+      cell: ({ row }) => (
+        <RoleSelect
+          user={row.original}
+          disabled={row.original.id === me.id || busyId === row.original.id || Boolean(row.original.erased_at)}
+          onConfirm={setConfirm}
+        />
+      ),
+    },
+    {
+      id: "actions",
+      enableSorting: false,
+      header: () => <span className="sr-only">Aksi</span>,
+      meta: { align: "right" },
+      cell: ({ row }) => (
+        <RowActions
+          user={row.original}
+          isMe={row.original.id === me.id}
+          busy={busyId === row.original.id}
+          run={run}
+          onConfirm={setConfirm}
+          onErase={setErasing}
+        />
+      ),
+    },
+  ];
+
+  const bulkActions: BulkAction<AuthUser>[] = [
+    {
+      id: "approve-pending",
+      label: "Setujui",
+      icon: Check,
+      isEligible: (item) => !item.erased_at && item.status === "pending",
+      confirmTitle: (count) => `Setujui ${count} pendaftar?`,
+      confirmDescription: (count) => `${count} akun yang menunggu persetujuan akan langsung diaktifkan dan dapat masuk ke aplikasi.`,
+      confirmLabel: "Setujui semua",
+      getItemLabel: (item) => `${item.name} (${item.email})`,
+      runItem: async (item) => {
+        await adminApi.activateUser(token, item.id);
+      },
+      concurrency: 3,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -129,97 +200,71 @@ export default function AdminUsersPage() {
           onChange={selectTab}
           fill
         />
-        <div className="relative lg:w-72">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <input
-            type="search"
+        <div className="flex items-center gap-2">
+          <SearchInput
             value={query}
-            onChange={(event) => type(event.target.value)}
+            onChange={type}
             placeholder="Cari nama atau email…"
             aria-label="Cari pengguna"
-            className={cn(inputClass, "pl-9")}
+            className="min-w-0 flex-1 lg:w-64 lg:flex-none"
           />
+          <DensityToggle density={density} onChange={setDensity} className="hidden md:inline-flex" />
         </div>
       </div>
 
       {error && <FormAlert tone="error">{error}</FormAlert>}
-      {result.error && <ErrorState message={result.error} onRetry={result.reload} />}
 
-      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
-        <RefreshBar active={result.loading && Boolean(users)} />
-        {!users && !result.error && <TableSkeleton rows={6} columns={4} />}
-
-        {users && users.data.length === 0 && (
+      <DataTable<AuthUser>
+        key={tab}
+        framed
+        columns={columns}
+        data={users?.data ?? []}
+        getRowId={(item) => item.id}
+        density={density}
+        stickyHeader
+        stickyFirstColumn
+        loading={!users && !result.error}
+        reloading={result.loading && Boolean(users)}
+        error={result.error}
+        onRetry={result.reload}
+        enableRowSelection={canBulkApprove}
+        canSelectRow={(item) => !item.erased_at && item.status === "pending"}
+        bulkActions={canBulkApprove ? bulkActions : undefined}
+        onBulkDone={() => void reloadUsers()}
+        rowClassName={() => "text-body"}
+        empty={
           <EmptyState
             icon={Users}
             title={tab === "pending" ? "Tidak ada yang menunggu persetujuan" : "Pengguna tidak ditemukan"}
             description={search ? `Tidak ada yang cocok dengan "${search}".` : undefined}
           />
+        }
+        renderMobile={(item, { selected, toggleSelected, selectable }) => (
+          <div className="space-y-3 p-4">
+            <div className="flex items-start justify-between gap-3">
+              {canBulkApprove && selectable && (
+                <Checkbox checked={selected} onCheckedChange={toggleSelected} aria-label={`Pilih ${item.name}`} className="mt-1 shrink-0" />
+              )}
+              <div className="min-w-0 flex-1">
+                <UserCell user={item} />
+              </div>
+              <UserStatusBadge user={item} />
+            </div>
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <Signup user={item} inline />
+              <RoleSelect user={item} disabled={item.id === me.id || busyId === item.id || Boolean(item.erased_at)} onConfirm={setConfirm} />
+            </div>
+            <RowActions user={item} isMe={item.id === me.id} busy={busyId === item.id} run={run} onConfirm={setConfirm} onErase={setErasing} stretch />
+          </div>
         )}
-
-        {users && users.data.length > 0 && (
-          <>
-            {/* Laptop and tablet: a table */}
-            <Table containerClassName="hidden md:block">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pengguna</TableHead>
-                  <TableHead>Mendaftar</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Peran</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Aksi</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.data.map((user) => (
-                  <TableRow key={user.id} className="text-body hover:bg-muted/40">
-                    <TableCell>
-                      <UserCell user={user} />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      <Signup user={user} />
-                    </TableCell>
-                    <TableCell>
-                      <UserStatusBadge user={user} />
-                    </TableCell>
-                    <TableCell>
-                      <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} onConfirm={setConfirm} />
-                    </TableCell>
-                    <TableCell>
-                      <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {/* Phones: one card per user */}
-            <ul className="divide-y divide-border md:hidden">
-              {users.data.map((user) => (
-                <li key={user.id} className="space-y-3 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <UserCell user={user} />
-                    <UserStatusBadge user={user} />
-                  </div>
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <Signup user={user} inline />
-                    <RoleSelect user={user} disabled={user.id === me.id || busyId === user.id || Boolean(user.erased_at)} onConfirm={setConfirm} />
-                  </div>
-                  <RowActions user={user} isMe={user.id === me.id} busy={busyId === user.id} run={run} onConfirm={setConfirm} onErase={setErasing} stretch />
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
+      />
 
       {users && (
         <Pagination
           page={users.current_page}
           lastPage={users.last_page}
           total={users.total}
+          pageSize={users.per_page}
           unit="pengguna"
           onChange={(next) => void setUrlState({ page: next })}
         />
@@ -415,7 +460,7 @@ function RowActions({
       {menu.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" size="icon-sm" className="max-md:size-10" disabled={busy} aria-label={`Aksi lain untuk ${user.name}`}>
+            <Button type="button" variant="ghost" size="icon-sm" disabled={busy} aria-label={`Aksi lain untuk ${user.name}`}>
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
@@ -451,26 +496,33 @@ function CreateAccountForm({ onDone, onCancel }: { onDone: (message: string) => 
   );
 
   return (
-    <Modal title="Buat akun" description="Akun langsung aktif. Berikan email dan kata sandinya ke orang tersebut untuk masuk." onClose={onCancel}>
-      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
-        {error && (
-          <div className="sm:col-span-2">
-            <FormAlert tone="error">{error}</FormAlert>
-          </div>
-        )}
-        <TextField label="Nama" name="name" autoComplete="off" error={errors.name} />
-        <TextField label="Email" name="email" type="email" autoComplete="off" error={errors.email} />
-        <TextField label="Kata sandi" name="password" type="text" autoComplete="new-password" placeholder="Minimal 8 karakter" error={errors.password} />
-        <SelectField
-          label="Peran"
-          name="role"
-          defaultValue="host"
-          error={errors.role}
-          options={roles.map((role) => ({ value: role, label: roleLabel(role) }))}
-        />
-        <FormActions loading={loading} submitLabel="Buat akun" onCancel={onCancel} />
+    <Dialog
+      title="Buat akun"
+      description="Akun langsung aktif. Berikan email dan kata sandinya ke orang tersebut untuk masuk."
+      onClose={onCancel}
+      closeOnOutsideClick={false}
+    >
+      <form onSubmit={handleSubmit} noValidate>
+        <FormGrid>
+          {error && (
+            <FormFieldFull>
+              <FormAlert tone="error">{error}</FormAlert>
+            </FormFieldFull>
+          )}
+          <TextField label="Nama" name="name" autoComplete="off" error={errors.name} />
+          <TextField label="Email" name="email" type="email" autoComplete="off" error={errors.email} />
+          <TextField label="Kata sandi" name="password" type="text" autoComplete="new-password" placeholder="Minimal 8 karakter" error={errors.password} />
+          <SelectField
+            label="Peran"
+            name="role"
+            defaultValue="host"
+            error={errors.role}
+            options={roles.map((role) => ({ value: role, label: roleLabel(role) }))}
+          />
+          <FormActions loading={loading} submitLabel="Buat akun" onCancel={onCancel} />
+        </FormGrid>
       </form>
-    </Modal>
+    </Dialog>
   );
 }
 
@@ -492,21 +544,25 @@ function EraseForm({ user, onDone, onCancel }: { user: AuthUser; onDone: (messag
   );
 
   return (
-    <Modal title={`Hapus ${user.name} permanen`} onClose={onCancel}>
-      <FormAlert tone="warning">
-        Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini tidak bisa
-        dibatalkan.
-      </FormAlert>
-      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
-        {error && (
-          <div className="sm:col-span-2">
-            <FormAlert tone="error">{error}</FormAlert>
-          </div>
-        )}
-        <SelectField label="Alasan" name="reason" error={errors.reason} options={eraseReasons} />
-        <TextField label="Catatan (opsional)" name="note" maxLength={500} placeholder="mis. diminta lewat WhatsApp tgl 5 Okt" error={errors.note} />
-        <FormActions loading={loading} submitLabel="Hapus permanen" onCancel={onCancel} variant="danger" />
-      </form>
-    </Modal>
+    <Dialog title={`Hapus ${user.name} permanen`} onClose={onCancel} closeOnOutsideClick={false}>
+      <div className="space-y-4">
+        <FormAlert tone="warning">
+          Menghapus akun masuk, kontak, KTP, data bank, foto, dan surat sakit. Jam kerja, poin, dan slip gaji tetap ada tanpa nama. Tindakan ini tidak bisa
+          dibatalkan.
+        </FormAlert>
+        <form onSubmit={handleSubmit} noValidate>
+          <FormGrid>
+            {error && (
+              <FormFieldFull>
+                <FormAlert tone="error">{error}</FormAlert>
+              </FormFieldFull>
+            )}
+            <SelectField label="Alasan" name="reason" error={errors.reason} options={eraseReasons} />
+            <TextField label="Catatan (opsional)" name="note" maxLength={500} placeholder="mis. diminta lewat WhatsApp tgl 5 Okt" error={errors.note} />
+            <FormActions loading={loading} submitLabel="Hapus permanen" onCancel={onCancel} variant="danger" />
+          </FormGrid>
+        </form>
+      </div>
+    </Dialog>
   );
 }

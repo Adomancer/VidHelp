@@ -27,11 +27,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "./AuthProvider";
 import Chip from "./Chip";
+import Combobox from "./Combobox";
 import DatePicker from "./DatePicker";
 import Dialog from "./Dialog";
 import FormAlert from "./FormAlert";
 import HostDayTimeline, { type DayBlock } from "./HostDayTimeline";
-import SearchableSelect from "./SearchableSelect";
 import type { ToastMessage } from "./Toast";
 import ToggleGroup from "./ToggleGroup";
 
@@ -284,12 +284,14 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
         {error && <FormAlert tone="error">{error}</FormAlert>}
 
         <Step number={1} title="Siapa yang live?">
-          <SearchableSelect
-            value={form.assignmentId}
-            onChange={(value) => set("assignmentId", value)}
+          <Combobox
+            value={form.assignmentId || null}
+            onChange={(value) => set("assignmentId", value ?? "")}
             options={hostOptions}
             placeholder="Pilih host…"
+            empty="Host tidak ditemukan."
             disabled={readOnly}
+            aria-label="Pilih host"
           />
           <FieldError message={errors.assignment_id} />
           {assignment && (
@@ -308,7 +310,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
                       aria-checked={form.day === value}
                       onClick={() => setForm((current) => ({ ...current, day: value }))}
                       className={cn(
-                        "rounded-md px-2.5 py-2 text-xs font-medium transition-colors md:px-2 md:py-0.5",
+                        "min-h-11 rounded-md px-3 py-2 text-xs font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:min-h-0 md:px-2 md:py-0.5",
                         form.day === value ? "bg-primary/10 text-brand" : "text-muted-foreground hover:bg-muted"
                       )}
                     >
@@ -378,7 +380,7 @@ export default function SlotDialog({ hosts, slot, day, week, isAdmin, onClose, o
             </p>
           )}
           {conflicts && conflicts.length > 0 && (
-            <div role="alert" className="mt-3 space-y-1 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <div role="alert" className="mt-3 space-y-1 rounded-lg border border-destructive/30 bg-destructive-subtle px-4 py-3 text-sm text-destructive">
               <p className="font-medium">Bentrok dengan jadwal lain:</p>
               <ul className="list-disc space-y-0.5 pl-5">
                 {conflicts.map((conflict) => (
@@ -482,7 +484,7 @@ function Choice({ checked, onSelect, children }: { checked: boolean; onSelect: (
       onClick={onSelect}
       onKeyDown={(event) => (event.key === " " || event.key === "Enter") && event.target === event.currentTarget && onSelect()}
       className={cn(
-        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         checked ? "border-primary bg-primary/[0.06] text-foreground" : "border-input text-body hover:bg-muted/60"
       )}
     >
@@ -529,7 +531,7 @@ function DateInput({ value, min, onChange, label }: { value: string; min?: strin
   return (
     // Clicks stay here (the calendar's too: React events bubble out of its portal), not on the option around it
     <span onClick={(event) => event.stopPropagation()}>
-      <DatePicker value={value} min={min} onChange={onChange} aria-label={label} className="h-9 w-auto px-2.5 text-sm md:h-8" />
+      <DatePicker value={value} min={min} onChange={onChange} aria-label={label} className="h-11 w-auto px-2.5 text-sm md:h-8" />
     </span>
   );
 }

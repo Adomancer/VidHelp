@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Megaphone, Search, Star } from "lucide-react";
+import { ChevronRight, Megaphone, Star } from "lucide-react";
 import { operatorBackupApi, shownKeys, splitApiError, type BackupReason, type ScheduleSlot, type SlotBackupMarker } from "@/lib/api";
 import { toDateInput } from "@/lib/format";
 import { describeTimes, formatDayDate, upcomingDates } from "@/lib/schedule";
-import { inputSmClass, textareaClass } from "@/lib/ui";
+import { textareaClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import Chip from "./Chip";
 import Dialog from "./Dialog";
 import FormAlert from "./FormAlert";
 import { ListSkeleton } from "./Loading";
+import SearchInput from "./SearchInput";
 import type { ToastMessage } from "./Toast";
 import UserAvatar from "./UserAvatar";
 
@@ -140,19 +141,16 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
 
         {backupDate && !existing && (
           <section>
-            <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-foreground">Host pengganti</h3>
-              <div className="relative w-44">
-                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Cari nama…"
-                  aria-label="Cari host pengganti"
-                  className={cn(inputSmClass, "pl-8")}
-                />
-              </div>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Cari nama…"
+                aria-label="Cari host pengganti"
+                className="w-full sm:w-48"
+                inputClassName="md:h-8 md:text-xs"
+              />
             </div>
 
             {candidates.error && <FormAlert tone="error">{candidates.error}</FormAlert>}
@@ -164,7 +162,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
                 <label
                   key={candidate.host_id}
                   className={cn(
-                    "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
+                    "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors duration-150",
                     cover === candidate.host_id ? "border-primary bg-primary/[0.06]" : "border-border hover:bg-muted/60"
                   )}
                 >
@@ -198,7 +196,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
 
               <label
                 className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors",
+                  "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 transition-colors duration-150",
                   cover === OPEN ? "border-primary bg-primary/[0.06]" : "border-dashed border-input hover:bg-muted/60"
                 )}
               >
@@ -218,7 +216,7 @@ export default function BackupDialog({ slot, date, markers, onClose, onSaved }: 
                     type="button"
                     onClick={() => setShowBusy(!showBusy)}
                     aria-expanded={showBusy}
-                    className="inline-flex items-center gap-1 rounded text-xs font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                    className="inline-flex min-h-11 items-center gap-1 rounded px-1 text-xs font-medium text-muted-foreground transition-colors duration-150 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:min-h-0 md:px-0"
                   >
                     <ChevronRight className={cn("size-3.5 transition-transform", showBusy && "rotate-90")} aria-hidden="true" />
                     Tidak tersedia ({busy.length})

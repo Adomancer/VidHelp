@@ -116,7 +116,7 @@ export default function HostPayPage() {
                       <li key={slip.id}>
                         <Link
                           href={`/host/pay/slips/${slip.id}`}
-                          className="flex items-center gap-4 px-5 py-3.5 transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60 md:px-6"
+                          className="flex min-h-11 items-center gap-4 px-5 py-3.5 transition-colors duration-150 outline-none hover:bg-muted/60 focus-visible:bg-muted/60 md:px-6"
                         >
                           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                             <FileText className="size-4" aria-hidden="true" />
@@ -263,7 +263,7 @@ function BrandPeriods({ periods, onChanged }: { periods: BrandPeriod[]; onChange
                       ` · diajukan ${formatDate(period.request.requested_at)}${period.request.requester ? ` oleh ${period.request.requester}` : ""}`}
                     {period.request?.paid_at && ` · lunas ${formatDate(period.request.paid_at)}`}
                   </p>
-                  <Button type="button" variant="outline" size="xs" onClick={() => download(period)}>
+                  <Button type="button" variant="outline" size="sm" onClick={() => download(period)}>
                     <Download aria-hidden="true" />
                     Laporan brand (Excel)
                   </Button>

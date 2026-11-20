@@ -7,7 +7,6 @@ import { BadgeCheck, CalendarRange, ChevronRight, Hourglass, Landmark, Search } 
 import { parseAsInteger, parseAsString, parseAsStringLiteral, useQueryState, useQueryStates } from "nuqs";
 import { payrollApi, type PayrollOverview, type PeriodListItem } from "@/lib/api";
 import { compactHours, compactRupiah, formatDuration, formatPeriodDates, formatRupiah } from "@/lib/format";
-import { inputClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
@@ -16,14 +15,14 @@ import { useAuth } from "../AuthProvider";
 import DataTable from "../DataTable";
 import Dialog from "../Dialog";
 import EmptyState from "../EmptyState";
-import ErrorState from "../ErrorState";
 import FormAlert from "../FormAlert";
-import { RefreshBar, TableSkeleton } from "../Loading";
 import Pagination from "../Pagination";
 import PeriodBadge from "../PeriodBadge";
+import SearchInput from "../SearchInput";
 import StatCard from "../StatCard";
 import { notify } from "../Toast";
 import ToggleGroup, { ShortLabel } from "../ToggleGroup";
+import { DensityToggle, useTableDensity } from "../data-table";
 import { PeriodDetail } from "./PeriodDetail";
 import { daysSince } from "./shared";
 
@@ -74,6 +73,7 @@ export function Periods() {
   const overview = useApiData("payroll-summary", () => payrollApi.summary(token));
   const invalidate = useInvalidate();
   const [error, setError] = useState<string | null>(null);
+  const [density, setDensity] = useTableDensity();
   const list = periods.data?.data;
 
   const [selected, setSelected] = useQueryState("period");
@@ -111,20 +111,11 @@ export function Periods() {
           onChange={show}
           fill
         />
-        <div className="relative lg:w-72">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => type(event.target.value)}
-            placeholder="Cari brand…"
-            aria-label="Cari brand"
-            className={cn(inputClass, "pl-9")}
-          />
+        <div className="flex items-center gap-2">
+          <SearchInput value={query} onChange={type} placeholder="Cari brand…" aria-label="Cari brand" className="min-w-0 flex-1 lg:w-64 lg:flex-none" />
+          <DensityToggle density={density} onChange={setDensity} className="hidden md:inline-flex" />
         </div>
       </div>
-
-      {periods.error && <ErrorState message={periods.error} onRetry={periods.reload} />}
 
       <div className="space-y-2">
         {periods.data && periods.data.total > 0 && (
@@ -132,46 +123,47 @@ export function Periods() {
             {periods.data.total} periode · {orderNotes[status]}
           </p>
         )}
-        <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
-          <RefreshBar active={periods.loading && Boolean(list)} />
-          {!list && !periods.error && <TableSkeleton rows={8} columns={4} />}
-          {list?.length === 0 && <EmptyState icon={search ? Search : CalendarRange} title={empty.title} description={empty.description} />}
-
-          {list && list.length > 0 && (
-            <DataTable
-              columns={periodColumns}
-              data={list}
-              getRowId={(period) => period.id}
-              onRowClick={(period) => select(period.id)}
-              rowOpensDialog
-              rowClassName={(period) => cn("text-body", period.id === selected ? "bg-primary/[0.06] [&_svg]:text-brand" : "hover:bg-muted/40")}
-              renderMobile={(period) => (
-                <button
-                  type="button"
-                  onClick={() => select(period.id)}
-                  className={cn(
-                    "w-full space-y-2.5 p-4 text-left outline-none focus-visible:bg-muted/60",
-                    period.id === selected ? "bg-primary/[0.06]" : "active:bg-muted/60"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground">{period.brand?.name}</p>
-                      <p className="text-xs text-muted-foreground tabular-nums">
-                        {formatPeriodDates(period.period_start, period.period_end)} · {period.hosts} host
-                      </p>
-                    </div>
-                    <PeriodStatusCell period={period} align="end" />
-                  </div>
-                  <div className="flex items-end justify-between gap-4">
-                    <HoursProgress period={period} className="min-w-0 flex-1" />
-                    <PayCell period={period} />
-                  </div>
-                </button>
+        <DataTable
+          framed
+          density={density}
+          stickyHeader
+          stickyFirstColumn
+          columns={periodColumns}
+          data={list ?? []}
+          getRowId={(period) => period.id}
+          loading={!list && !periods.error}
+          reloading={periods.loading && Boolean(list)}
+          error={periods.error}
+          onRetry={periods.reload}
+          onRowClick={(period) => select(period.id)}
+          rowOpensDialog
+          rowClassName={(period) => cn("text-body", period.id === selected ? "bg-primary/[0.06] [&_svg]:text-brand" : "hover:bg-muted/40")}
+          empty={<EmptyState icon={search ? Search : CalendarRange} title={empty.title} description={empty.description} />}
+          renderMobile={(period) => (
+            <button
+              type="button"
+              onClick={() => select(period.id)}
+              className={cn(
+                "w-full space-y-2.5 p-4 text-left transition-colors duration-150 outline-none focus-visible:bg-muted/60",
+                period.id === selected ? "bg-primary/[0.06]" : "active:bg-muted/60"
               )}
-            />
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-foreground">{period.brand?.name}</p>
+                  <p className="text-xs text-muted-foreground tabular-nums">
+                    {formatPeriodDates(period.period_start, period.period_end)} · {period.hosts} host
+                  </p>
+                </div>
+                <PeriodStatusCell period={period} align="end" />
+              </div>
+              <div className="flex items-end justify-between gap-4">
+                <HoursProgress period={period} className="min-w-0 flex-1" />
+                <PayCell period={period} />
+              </div>
+            </button>
           )}
-        </div>
+        />
       </div>
 
       {periods.data && (
@@ -179,6 +171,7 @@ export function Periods() {
           page={periods.data.current_page}
           lastPage={periods.data.last_page}
           total={periods.data.total}
+          pageSize={periods.data.per_page}
           unit="periode"
           onChange={(next) => void setUrlState({ page: next })}
         />

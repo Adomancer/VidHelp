@@ -65,7 +65,7 @@ export default function HostDayTimeline({ busy, available, selection, onPick, di
           <span
             key={`free-${index}`}
             title={`Biasanya bisa: ${block.label}`}
-            className="absolute inset-y-0 border-x border-success/30 bg-success/12"
+            className="absolute inset-y-0 border-x border-success/30 bg-success-subtle/80"
             style={{ left: percent(block.start), width: percent(block.end - block.start) }}
           />
         ))}
@@ -107,7 +107,7 @@ export default function HostDayTimeline({ busy, available, selection, onPick, di
           <span className="h-2.5 w-3 rounded-sm bg-foreground/60" /> Sudah live
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2.5 w-3 rounded-sm border border-success/40 bg-success/20" /> Biasanya bisa
+          <span className="h-2.5 w-3 rounded-sm border border-success/40 bg-success-subtle" /> Biasanya bisa
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-3 rounded-sm border-2 border-primary" /> Slot ini

@@ -9,12 +9,12 @@ import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import Dialog from "@/components/Dialog";
 import StatusBadge from "@/components/StatusBadge";
-import { notifyCapsule } from "@/components/Toast";
+import { notify } from "@/components/Toast";
 import { useAuth } from "@/components/AuthProvider";
 import UserAvatar from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { BrandAvatar, BrandPills, Highlight } from "./BrandCard";
-import { payrollState, TOAST_MS } from "./shared";
+import { payrollState } from "./shared";
 
 export function BrandDrawer({
   brand,
@@ -34,9 +34,9 @@ export function BrandDrawer({
   async function copy() {
     try {
       await navigator.clipboard.writeText(htmlToText(brand.product_knowledge ?? ""));
-      notifyCapsule("Product knowledge disalin", "success", TOAST_MS);
+      notify({ text: "Product knowledge disalin" });
     } catch {
-      notifyCapsule("Gagal menyalin, coba lagi", "error", TOAST_MS);
+      notify({ text: "Gagal menyalin, coba lagi", tone: "error" });
     }
   }
 
@@ -56,10 +56,10 @@ export function BrandDrawer({
       }
       footer={
         <>
-          <Button type="button" variant="outline" size="lg" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose}>
             Tutup
           </Button>
-          <Button type="button" size="lg" onClick={onEdit}>
+          <Button type="button" onClick={onEdit}>
             <Pencil aria-hidden="true" />
             Edit brand
           </Button>
@@ -94,7 +94,7 @@ export function BrandDrawer({
             <span
               className={cn(
                 "flex size-10 shrink-0 items-center justify-center rounded-full",
-                brand.leader ? "bg-warning/12 text-warning" : "bg-muted text-faint"
+                brand.leader ? "bg-warning-subtle text-warning" : "bg-muted text-faint"
               )}
             >
               <Crown className="size-5" aria-hidden="true" />
@@ -180,7 +180,7 @@ function BrandHosts({ brand }: { brand: BrandSummary }) {
             onClick={() => setOpen(!open)}
             aria-expanded={open}
             aria-controls={`brand-hosts-${brand.id}`}
-            className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm font-medium text-foreground transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/50"
+            className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm font-medium text-foreground transition-colors duration-150 outline-none hover:bg-muted/50 focus-visible:bg-muted/50"
           >
             <span>
               {count} host aktif

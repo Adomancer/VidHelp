@@ -96,7 +96,7 @@ export function KnowledgeFiles({
           <button
             type="button"
             onClick={() => open(file)}
-            className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left outline-none hover:bg-muted/50 focus-visible:bg-muted/60"
+            className="flex min-h-11 min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 outline-none hover:bg-muted/50 focus-visible:bg-muted/60"
           >
             <FileIcon file={file} />
             <span className="min-w-0 flex-1">
@@ -115,7 +115,7 @@ export function KnowledgeFiles({
               onClick={() => onRemove(file)}
               aria-label={`Hapus ${file.original_name}`}
               title="Hapus"
-              className="text-muted-foreground hover:text-destructive max-md:size-10"
+              className="text-muted-foreground hover:text-destructive"
             >
               <Trash2 />
             </Button>

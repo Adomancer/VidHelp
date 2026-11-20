@@ -11,7 +11,7 @@ export default function Chip({ selected = false, className, children, ...props }
       type="button"
       aria-pressed={selected}
       className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm whitespace-nowrap transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 md:h-8",
+        "inline-flex h-11 items-center gap-1.5 rounded-lg border px-3 text-sm whitespace-nowrap transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 md:h-8",
         selected ? "border-primary bg-primary/10 font-medium text-brand" : "border-input text-body hover:bg-muted",
         className
       )}

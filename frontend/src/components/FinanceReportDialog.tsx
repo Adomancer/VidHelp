@@ -9,10 +9,10 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "./AuthProvider";
+import Combobox from "./Combobox";
 import DatePicker, { MonthPicker, parseDateInput } from "./DatePicker";
 import Dialog from "./Dialog";
 import FormAlert from "./FormAlert";
-import SearchableSelect from "./SearchableSelect";
 import { NativeSelect } from "./SelectField";
 import { notify } from "./Toast";
 
@@ -120,8 +120,8 @@ export default function FinanceReportDialog({ onClose }: { onClose: () => void }
                 aria-checked={range === value}
                 onClick={() => setRange(value)}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                  range === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  "min-h-11 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:min-h-9",
+                  range === value ? "bg-card text-foreground shadow-card dark:bg-secondary" : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 {label}
@@ -170,11 +170,12 @@ export default function FinanceReportDialog({ onClose }: { onClose: () => void }
         <div className="space-y-1.5">
           <Label htmlFor="report-brand">Brand</Label>
           {/* Over a hundred brands: type to find one ("all" stands for every brand) */}
-          <SearchableSelect
+          <Combobox
             id="report-brand"
             value={brandId || "all"}
-            onChange={(value) => setBrandId(value === "all" ? "" : value)}
+            onChange={(value) => setBrandId(!value || value === "all" ? "" : value)}
             options={[{ value: "all", label: "Semua brand" }, ...(brands.data?.brands.map((brand) => ({ value: brand.id, label: brand.name })) ?? [])]}
+            empty="Brand tidak ditemukan."
             className="sm:w-72"
           />
         </div>

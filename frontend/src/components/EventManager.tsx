@@ -10,15 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "./AuthProvider";
 import Card from "./Card";
+import Combobox, { type ComboboxOption } from "./Combobox";
 import EmptyState from "./EmptyState";
 import ErrorState from "./ErrorState";
-import FilterCombobox, { type FilterOption } from "./FilterCombobox";
 import { CardsSkeleton } from "./Loading";
 import PageHeader from "./PageHeader";
-import { notifyCapsule } from "./Toast";
+import { notify } from "./Toast";
+import { TableFilterDrawer } from "./data-table";
 import { EventBoard } from "./events/EventBoard";
 import { EventForm } from "./events/EventForm";
-import { activeHosts, dateRange, type HostLite, TALL } from "./events/shared";
+import { activeHosts, dateRange, type HostLite } from "./events/shared";
 
 /**
  * Admin/operator: special events (PD, double date). Narrow the list by brand, host or event,
@@ -49,7 +50,7 @@ export default function EventManager() {
     const entry = brandCounts.get(event.brand_id) ?? { name: event.brand?.name ?? "-", count: 0 };
     brandCounts.set(event.brand_id, { ...entry, count: entry.count + 1 });
   }
-  const brandOptions: FilterOption[] = [...brandCounts.entries()]
+  const brandOptions: ComboboxOption[] = [...brandCounts.entries()]
     .sort(([, a], [, b]) => a.name.localeCompare(b.name, "id"))
     .map(([id, { name, count }]) => ({ value: id, label: name, meta: `${count} event` }));
 
@@ -68,7 +69,7 @@ export default function EventManager() {
   const hostPool: HostLite[] = brandId
     ? activeHosts(brandHosts.data?.assignments ?? [])
     : [...hostCounts.entries()].map(([id, { name }]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "id"));
-  const hostOptions: FilterOption[] = hostPool.map((host) => ({ value: host.id, label: host.name, meta: `${hostCounts.get(host.id)?.count ?? 0} blok` }));
+  const hostOptions: ComboboxOption[] = hostPool.map((host) => ({ value: host.id, label: host.name, meta: `${hostCounts.get(host.id)?.count ?? 0} blok` }));
   // A host from another brand doesn't filter this one's events
   const hostFilter = hostId && (!brandId || !brandHostsReady || hostPool.some((host) => host.id === hostId)) ? hostId : null;
   const noBrandHosts = Boolean(brandId) && brandHostsReady && hostPool.length === 0;
@@ -76,7 +77,7 @@ export default function EventManager() {
   const matching = (brand: string | null, host: string | null) =>
     base.filter((event) => (!brand || event.brand_id === brand) && (!host || (blocksOf.get(event.id) ?? []).some((block) => block.claim?.host_id === host)));
   const filtered = matching(brandId, hostFilter);
-  const eventOptions: FilterOption[] = filtered.map((event) => ({
+  const eventOptions: ComboboxOption[] = filtered.map((event) => ({
     value: event.id,
     label: event.name,
     description: `${event.brand?.name ?? "-"} · ${dateRange(event)}`,
@@ -84,6 +85,7 @@ export default function EventManager() {
   }));
   const selected = filtered.find((event) => event.id === eventParam) ?? filtered[0];
   const anyFilter = Boolean(brandId || hostFilter || eventParam);
+  const activeFilterCount = [brandId, hostFilter, eventParam].filter(Boolean).length;
 
   /** Changes only mark the shared cache stale, so load what this page shows again now. */
   const refresh = (id: string) =>
@@ -109,10 +111,51 @@ export default function EventManager() {
   }
 
   const newEventButton = (
-    <Button type="button" size="lg" onClick={() => setCreating(true)} className={TALL}>
+    <Button type="button" onClick={() => setCreating(true)}>
       <Plus aria-hidden="true" />
       Event baru
     </Button>
+  );
+
+  const filterFields = (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor="filter-brand">Brand</Label>
+        <Combobox
+          id="filter-brand"
+          clearable
+          options={brandOptions}
+          value={brandId}
+          onChange={chooseBrand}
+          placeholder="Semua brand"
+          empty="Brand tidak ditemukan."
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="filter-host">Host</Label>
+        <Combobox
+          id="filter-host"
+          clearable
+          options={hostOptions}
+          value={hostFilter}
+          onChange={chooseHost}
+          placeholder={!brandHostsReady || detailsLoading ? "Memuat host…" : noBrandHosts ? "Tidak ada host di brand ini" : "Semua host"}
+          empty={brandId ? "Tidak ada host di brand tersebut." : "Belum ada host yang mengambil blok."}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="filter-event">Event</Label>
+        <Combobox
+          id="filter-event"
+          clearable
+          options={eventOptions}
+          value={selected?.id ?? null}
+          onChange={(value) => void setEventParam(value)}
+          placeholder="Pilih event"
+          empty="Tidak ada event yang cocok."
+        />
+      </div>
+    </>
   );
 
   return (
@@ -123,42 +166,17 @@ export default function EventManager() {
         actions={newEventButton}
       />
 
-      <Card bodyClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_auto] xl:items-end">
-        <div className="space-y-1.5">
-          <Label htmlFor="filter-brand">Brand</Label>
-          <FilterCombobox
-            id="filter-brand"
-            options={brandOptions}
-            value={brandId}
-            onChange={chooseBrand}
-            placeholder="Semua brand"
-            empty="Brand tidak ditemukan."
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="filter-host">Host</Label>
-          <FilterCombobox
-            id="filter-host"
-            options={hostOptions}
-            value={hostFilter}
-            onChange={chooseHost}
-            placeholder={!brandHostsReady || detailsLoading ? "Memuat host…" : noBrandHosts ? "Tidak ada host di brand ini" : "Semua host"}
-            empty={brandId ? "Tidak ada host di brand tersebut." : "Belum ada host yang mengambil blok."}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="filter-event">Event</Label>
-          <FilterCombobox
-            id="filter-event"
-            options={eventOptions}
-            value={selected?.id ?? null}
-            onChange={(value) => void setEventParam(value)}
-            placeholder="Pilih event"
-            empty="Tidak ada event yang cocok."
-          />
-        </div>
+      <div className="flex items-center justify-between gap-2 md:hidden">
+        <span className="truncate text-sm font-medium text-foreground">{selected?.name ?? "Semua event"}</span>
+        <TableFilterDrawer title="Filter event" activeCount={activeFilterCount} onReset={reset}>
+          {filterFields}
+        </TableFilterDrawer>
+      </div>
+
+      <Card className="hidden md:block" bodyClassName="grid gap-4 md:grid-cols-2 xl:grid-cols-[repeat(3,minmax(0,1fr))_auto] xl:items-end">
+        {filterFields}
         <div className="flex items-center md:col-span-2 xl:col-span-1">
-          <Button type="button" variant="outline" size="lg" onClick={reset} disabled={!anyFilter} className={TALL}>
+          <Button type="button" variant="outline" onClick={reset} disabled={!anyFilter}>
             <RotateCcw aria-hidden="true" />
             Reset
           </Button>
@@ -206,7 +224,7 @@ export default function EventManager() {
         <EventForm
           onDone={(message, id) => {
             setCreating(false);
-            notifyCapsule(message);
+            notify({ text: message });
             void setEventParam(id);
             void refresh(id);
           }}

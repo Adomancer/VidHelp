@@ -9,10 +9,10 @@ import { ListSkeleton } from "../Loading";
 import UserAvatar from "../UserAvatar";
 
 const statTones = {
-  warning: "bg-warning/12 text-warning",
-  info: "bg-info/10 text-info",
-  success: "bg-success/10 text-success",
-  danger: "bg-destructive/10 text-destructive",
+  warning: "bg-warning-subtle text-warning",
+  info: "bg-info-subtle text-info",
+  success: "bg-success-subtle text-success",
+  danger: "bg-destructive-subtle text-destructive",
 };
 
 /** A count that also opens its tab. */
@@ -39,7 +39,7 @@ export function Stat({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex min-w-0 flex-col rounded-xl border bg-card p-4 text-left shadow-xs transition-colors outline-none hover:bg-muted/30 focus-visible:ring-3 focus-visible:ring-ring/50 sm:p-5 dark:shadow-none",
+        "flex min-w-0 flex-col rounded-xl border bg-card p-4 text-left shadow-card transition-colors duration-150 outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/50 sm:p-5",
         active ? "border-primary/40 ring-1 ring-primary/20" : "border-border"
       )}
     >
@@ -75,7 +75,7 @@ export function StartingSoon({
     .slice(0, 5);
 
   return (
-    <section ref={ref} className="rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+    <section ref={ref} className="rounded-xl border border-border bg-card shadow-card">
       <header className="flex items-center gap-2 border-b border-border px-4 py-3">
         <CalendarClock className="size-4 text-muted-foreground" aria-hidden="true" />
         <h2 className="text-sm font-semibold text-foreground">Mulai segera</h2>
@@ -95,7 +95,7 @@ export function StartingSoon({
                 <button
                   type="button"
                   onClick={() => onShow(backup)}
-                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-muted/40 focus-visible:bg-muted/40"
+                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-150 outline-none hover:bg-muted/40 focus-visible:bg-muted/40"
                 >
                   {backup.requester && <UserAvatar user={backup.requester.user} size="size-8 text-xs" />}
                   <span className="min-w-0 flex-1">
@@ -135,7 +135,7 @@ export function Recap({ recap, className, innerRef }: { recap: BackupRecap | und
   const rate = total > 0 ? Math.round((filled / total) * 100) : 0;
 
   return (
-    <section className={cn("rounded-xl border border-border bg-card shadow-xs dark:shadow-none", className)}>
+    <section className={cn("rounded-xl border border-border bg-card shadow-card", className)}>
       <div ref={innerRef}>
         <header className="flex items-baseline justify-between gap-2 border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold text-foreground">Ringkasan riwayat</h2>

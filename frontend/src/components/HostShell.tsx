@@ -84,17 +84,12 @@ function NextSession() {
   return (
     <Link
       href={next ? "/host/live" : "/host/schedule"}
-      className="block rounded-lg border border-sidebar-border bg-background/60 p-3 transition-colors outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+      className="block rounded-lg border border-sidebar-border bg-background/60 p-3 transition-colors duration-150 outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
     >
       {next ? (
         <>
           <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-faint uppercase">
-            {next.live && (
-              <span className="relative flex size-1.5" aria-hidden="true">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-success" />
-              </span>
-            )}
+            {next.live && <span className="inline-flex size-1.5 rounded-full bg-success ring-2 ring-success/25" aria-hidden="true" />}
             {next.live ? "Sedang live" : "Sesi berikutnya"}
           </p>
           <p className="mt-1.5 truncate text-sm font-medium text-foreground">{next.session.brand.name}</p>

@@ -11,106 +11,134 @@
  * Names follow shadcn/ui; `body`, `faint`, `brand` and the status colors are VidHelp's own.
  */
 :root {
-  --background: #f7f7f8;
-  --foreground: #0a0a0f;
+  --background: #f8f8fa;
+  --foreground: #111114;
   --body: #3f3f46;
-  --muted-foreground: #71717a;
-  --faint: #8a8a93;
+  --muted-foreground: #52525b;
+  --faint: #666670;
 
   --card: #ffffff;
-  --card-foreground: #0a0a0f;
+  --card-foreground: #111114;
   --popover: #ffffff;
-  --popover-foreground: #0a0a0f;
+  --popover-foreground: #111114;
 
-  --primary: #5750f1;
-  --primary-hover: #4a43de;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
   --primary-foreground: #ffffff;
-  --brand: #5750f1;
+  --brand: #4338ca;
 
-  --secondary: #efeff1;
+  --secondary: #efeff2;
   --secondary-foreground: #18181b;
   --muted: #f4f4f5;
   --accent: #f4f4f5;
   --accent-foreground: #18181b;
 
-  --destructive: #dc2626;
-  --success: #15803d;
-  --warning: #b45309;
-  --info: #2563eb;
+  --destructive: #b91c1c;
+  --destructive-subtle: #fef2f2;
+  --destructive-solid: #b91c1c;
+  --destructive-solid-hover: #991b1b;
+  --success: #166534;
+  --success-subtle: #f0fdf4;
+  --warning: #92400e;
+  --warning-subtle: #fffbeb;
+  --info: #1d4ed8;
+  --info-subtle: #eff6ff;
 
   --border: #e4e4e7;
-  --input: #d4d4d8;
-  --ring: #5750f1;
+  --input: #c8c8d0;
+  --ring: #4f46e5;
 
   /* Categorical order validated with the dataviz checks (light surface #fff);
      slots 2-5 sit under 3:1 here, so charts using them show labels or a table. */
-  --chart-1: #5750f1;
-  --chart-2: #eb6834;
-  --chart-3: #1baf7a;
-  --chart-4: #eda100;
-  --chart-5: #e87ba4;
+  --chart-1: #4f46e5;
+  --chart-2: #d95d2b;
+  --chart-3: #158f65;
+  --chart-4: #c88600;
+  --chart-5: #c95682;
 
   --radius: 0.625rem;
+  --radius-badge: 0.375rem;
+  --radius-control: 0.5rem;
+  --radius-surface: 0.75rem;
+
+  --shadow-card: 0 1px 2px 0 rgb(17 17 20 / 0.04);
+  --shadow-popover: 0 4px 12px -2px rgb(17 17 20 / 0.08), 0 2px 4px -2px rgb(17 17 20 / 0.04);
+  --shadow-dialog: 0 12px 32px -4px rgb(17 17 20 / 0.14);
 
   --sidebar: #ffffff;
   --sidebar-foreground: #3f3f46;
-  --sidebar-primary: #5750f1;
+  --sidebar-primary: #4f46e5;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f4f4f5;
-  --sidebar-accent-foreground: #0a0a0f;
+  --sidebar-accent-foreground: #111114;
   --sidebar-border: #e4e4e7;
-  --sidebar-ring: #5750f1;
+  --sidebar-ring: #4f46e5;
 
   color-scheme: light;
 }
 
 .dark {
-  --background: #0a0a0d;
-  --foreground: #fafafa;
+  --background: #0c0c0f;
+  --foreground: #f8f8fa;
   --body: #d4d4d8;
   --muted-foreground: #a1a1aa;
-  --faint: #71717a;
+  --faint: #8a8a96;
 
-  --card: #121216;
-  --card-foreground: #fafafa;
-  --popover: #16161b;
-  --popover-foreground: #fafafa;
+  --card: #141418;
+  --card-foreground: #f8f8fa;
+  --popover: #18181d;
+  --popover-foreground: #f8f8fa;
 
-  --primary: #5750f1;
-  --primary-hover: #6a64f4;
+  --primary: #4f46e5;
+  --primary-hover: #5b52eb;
   --primary-foreground: #ffffff;
-  --brand: #a5a1fa;
+  --brand: #a5b4fc;
 
-  --secondary: #1f1f25;
-  --secondary-foreground: #fafafa;
-  --muted: #1b1b21;
-  --accent: #1f1f25;
-  --accent-foreground: #fafafa;
+  --secondary: #202027;
+  --secondary-foreground: #f8f8fa;
+  --muted: #1c1c22;
+  --accent: #202027;
+  --accent-foreground: #f8f8fa;
 
-  --destructive: #f87171;
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --info: #60a5fa;
+  --destructive: #fca5a5;
+  --destructive-subtle: #2a1619;
+  --destructive-solid: #dc2626;
+  --destructive-solid-hover: #b91c1c;
+  --success: #86efac;
+  --success-subtle: #12241a;
+  --warning: #fcd34d;
+  --warning-subtle: #271f10;
+  --info: #93c5fd;
+  --info-subtle: #131f33;
 
-  --border: #26262d;
-  --input: #34343c;
-  --ring: #7c76f6;
+  --border: #26262e;
+  --input: #353540;
+  --ring: #818cf8;
 
-  /* Same hues stepped for the dark surface (#121216), validated as a set */
-  --chart-1: #5750f1;
-  --chart-2: #d95926;
-  --chart-3: #199e70;
-  --chart-4: #c98500;
-  --chart-5: #d55181;
+  /* Same hues stepped for the dark surface (#141418), validated as a set */
+  --chart-1: #6366f1;
+  --chart-2: #e06b3b;
+  --chart-3: #22a878;
+  --chart-4: #d99714;
+  --chart-5: #de6694;
 
-  --sidebar: #0f0f13;
+  --radius: 0.625rem;
+  --radius-badge: 0.375rem;
+  --radius-control: 0.5rem;
+  --radius-surface: 0.75rem;
+
+  --shadow-card: none;
+  --shadow-popover: 0 4px 16px -2px rgb(0 0 0 / 0.45);
+  --shadow-dialog: 0 12px 32px -4px rgb(0 0 0 / 0.55);
+
+  --sidebar: #101014;
   --sidebar-foreground: #d4d4d8;
-  --sidebar-primary: #5750f1;
+  --sidebar-primary: #4f46e5;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1c1c22;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #1f1f25;
-  --sidebar-ring: #7c76f6;
+  --sidebar-accent-foreground: #f8f8fa;
+  --sidebar-border: #202027;
+  --sidebar-ring: #818cf8;
 
   color-scheme: dark;
 }
@@ -139,9 +167,15 @@
   --color-accent-foreground: var(--accent-foreground);
 
   --color-destructive: var(--destructive);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-solid: var(--destructive-solid);
+  --color-destructive-solid-hover: var(--destructive-solid-hover);
   --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
   --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
   --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
 
   --color-border: var(--border);
   --color-input: var(--input);
@@ -172,6 +206,10 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-popover: var(--shadow-popover);
+  --shadow-dialog: var(--shadow-dialog);
 }
 
 @layer base {
@@ -208,10 +246,10 @@
   animation: none;
 }
 ::view-transition-old(.page-exit) {
-  animation: 100ms ease-in both page-out;
+  animation: 120ms ease-out both page-out;
 }
 ::view-transition-new(.page-enter) {
-  animation: 220ms cubic-bezier(0.2, 0, 0, 1) 60ms both page-in;
+  animation: 160ms ease-out both page-in;
 }
 @keyframes page-out {
   to {
@@ -221,7 +259,6 @@
 @keyframes page-in {
   from {
     opacity: 0;
-    translate: 0 6px;
   }
 }
 

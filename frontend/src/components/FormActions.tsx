@@ -6,7 +6,7 @@ interface FormActionsProps {
   submitLabel: React.ReactNode;
   onCancel?: () => void;
   cancelLabel?: string;
-  variant?: "default" | "danger" | "success";
+  variant?: "default" | "danger";
   disabled?: boolean;
 }
 

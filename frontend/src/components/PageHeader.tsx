@@ -18,7 +18,7 @@ export default function PageHeader({ title, description, actions, back, classNam
       {back && (
         <Link
           href={back.href}
-          className="inline-flex items-center gap-1.5 rounded-md text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none print:hidden"
+          className="-my-2 inline-flex min-h-11 items-center gap-1.5 rounded-md py-2 text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none md:my-0 md:min-h-0 md:py-0 print:hidden"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           {back.label}
@@ -26,7 +26,7 @@ export default function PageHeader({ title, description, actions, back, classNam
       )}
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
+          <h1 className="text-2xl leading-tight font-semibold tracking-[-0.02em] text-foreground">{title}</h1>
           {description && <div className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2 print:hidden">{actions}</div>}

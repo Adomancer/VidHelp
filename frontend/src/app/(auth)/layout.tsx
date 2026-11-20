@@ -18,17 +18,17 @@ const highlights = [
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="grid min-h-dvh bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <aside className="relative hidden overflow-hidden bg-[#16133d] p-10 text-white lg:flex lg:flex-col xl:p-14">
+      <aside className="relative hidden overflow-hidden border-r border-border bg-foreground p-10 text-background lg:flex lg:flex-col xl:p-14 dark:bg-card dark:text-foreground">
         {/* Soft grid and glow, drawn in CSS */}
         <div
           aria-hidden="true"
           className="absolute inset-0 [background-image:linear-gradient(to_right,white_1px,transparent_1px),linear-gradient(to_bottom,white_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_top_left,black_30%,transparent_75%)] [background-size:44px_44px] opacity-[0.07]"
         />
-        <div aria-hidden="true" className="absolute -top-40 -left-32 size-[32rem] rounded-full bg-[#5750f1] opacity-40 blur-[120px]" />
-        <div aria-hidden="true" className="absolute -right-24 -bottom-48 size-[28rem] rounded-full bg-[#5750f1] opacity-25 blur-[120px]" />
+        <div aria-hidden="true" className="absolute -top-40 -left-32 size-[32rem] rounded-full bg-primary opacity-35 blur-[120px]" />
+        <div aria-hidden="true" className="absolute -right-24 -bottom-48 size-[28rem] rounded-full bg-primary opacity-25 blur-[120px]" />
 
         <div className="relative flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-white text-base font-bold text-[#5750f1]">V</span>
+          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">V</span>
           <span className="text-lg font-semibold tracking-tight">VidHelp</span>
         </div>
 
@@ -61,10 +61,10 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
         <div className="flex flex-1 items-center justify-center px-5 pb-12 sm:px-8">{children}</div>
         <nav className="flex justify-center gap-5 pb-6 text-xs text-muted-foreground">
-          <Link href="/terms" className="hover:text-foreground">
+          <Link href="/terms" className="inline-flex min-h-11 items-center hover:text-foreground md:min-h-0">
             Ketentuan Layanan
           </Link>
-          <Link href="/privacy" className="hover:text-foreground">
+          <Link href="/privacy" className="inline-flex min-h-11 items-center hover:text-foreground md:min-h-0">
             Kebijakan Privasi
           </Link>
         </nav>

@@ -5,7 +5,7 @@ import { Check, ChevronRight, Download, History, MousePointerClick, Search, Spar
 import { parseAsString, parseAsStringLiteral, useQueryStates } from "nuqs";
 import { errorMessage, pointsApi, type RatingRow } from "@/lib/api";
 import { appDate, formatDate, formatShortDate } from "@/lib/format";
-import { inputClass, inputSmClass } from "@/lib/ui";
+import { inputSmClass } from "@/lib/ui";
 import { useApiData, useInvalidate } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-mobile";
@@ -20,12 +20,15 @@ import { ListSkeleton, RefreshBar } from "@/components/Loading";
 import PageHeader from "@/components/PageHeader";
 import { SpBadge } from "@/components/PointsMeter";
 import { sourceLabels } from "@/components/PointsDesk";
-import SearchableSelect from "@/components/SearchableSelect";
+import Combobox from "@/components/Combobox";
+import SearchInput from "@/components/SearchInput";
 import StatusBadge from "@/components/StatusBadge";
 import { notify } from "@/components/Toast";
 import ToggleGroup from "@/components/ToggleGroup";
 import UserAvatar from "@/components/UserAvatar";
+import { TableFilterDrawer } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -213,7 +216,7 @@ export default function AdminRatingsPage() {
 
       {/* Where the month stands, and the one-click part of the job */}
       {rows && rows.length > 0 && (
-        <section className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-xs md:flex-row md:items-center dark:shadow-none">
+        <section className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-card md:flex-row md:items-center">
           <div className="min-w-0 flex-1">
             <p className="text-sm text-body">
               <span className="font-semibold text-foreground tabular-nums">{rated.length}</span> dari {scoped.length} host
@@ -242,7 +245,7 @@ export default function AdminRatingsPage() {
               {clean.length > 0 && (
                 <Button
                   type="button"
-                  className="h-auto min-h-10 whitespace-normal md:min-h-9"
+                  className="h-auto min-h-11 whitespace-normal md:min-h-9"
                   onClick={() => setBulk({ withoutDeductions: true, count: clean.length })}
                   title="Host tanpa potongan rating bulan ini"
                 >
@@ -278,22 +281,40 @@ export default function AdminRatingsPage() {
           grid
         />
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center xl:ml-auto">
-          <SearchableSelect
-            value={brand || "all"}
-            onChange={(next) => void setUrlState({ brand: next === "all" ? null : next, host: null })}
-            options={[{ value: "all", label: "Semua brand" }, ...brands]}
-            aria-label="Brand"
-            className="sm:w-56"
-          />
-          <div className="relative sm:w-56">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <input
-              type="search"
+          <div className="hidden sm:block sm:w-56">
+            <Combobox
+              clearable
+              options={brands}
+              value={brand || null}
+              onChange={(next) => void setUrlState({ brand: next ?? null, host: null })}
+              placeholder="Semua brand"
+              empty="Brand tidak ditemukan."
+              aria-label="Brand"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="sm:hidden">
+              <TableFilterDrawer title="Filter rating" activeCount={brand ? 1 : 0} onReset={() => void setUrlState({ brand: null, host: null })}>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mobile-rating-brand">Brand</Label>
+                  <Combobox
+                    id="mobile-rating-brand"
+                    clearable
+                    options={brands}
+                    value={brand || null}
+                    onChange={(next) => void setUrlState({ brand: next ?? null, host: null })}
+                    placeholder="Semua brand"
+                    empty="Brand tidak ditemukan."
+                  />
+                </div>
+              </TableFilterDrawer>
+            </div>
+            <SearchInput
               value={search}
-              onChange={(event) => void setUrlState({ q: event.target.value || null, host: null })}
+              onChange={(next) => void setUrlState({ q: next || null, host: null })}
               placeholder="Cari host…"
               aria-label="Cari host"
-              className={cn(inputClass, "pl-9")}
+              className="min-w-0 flex-1 sm:w-56 sm:flex-none"
             />
           </div>
         </div>
@@ -301,7 +322,7 @@ export default function AdminRatingsPage() {
 
       <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         {/* The queue */}
-        <section className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+        <section className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
           <RefreshBar active={ratings.loading && Boolean(rows)} />
           {list.length > 0 && (
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2 text-xs text-muted-foreground">
@@ -343,7 +364,7 @@ export default function AdminRatingsPage() {
 
         {/* The open host, beside the list from lg */}
         {sideBySide && (
-          <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+          <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-card">
             {panel ?? <EmptyState icon={MousePointerClick} title="Pilih host" description="Penilaiannya muncul di sini." className="flex-1" />}
           </section>
         )}
@@ -405,7 +426,7 @@ function QueueRow({ row, max, active, onOpen }: { row: RatingRow; max: number; a
         onClick={onOpen}
         aria-current={active || undefined}
         className={cn(
-          "flex w-full items-center gap-3 border-l-2 px-4 py-2.5 text-left transition-colors outline-none focus-visible:bg-muted/60",
+          "flex min-h-11 w-full items-center gap-3 border-l-2 px-4 py-2.5 text-left transition-colors duration-150 outline-none focus-visible:bg-muted/60",
           active ? "border-l-primary bg-primary/[0.06]" : "border-l-transparent hover:bg-muted/40"
         )}
       >
@@ -649,11 +670,11 @@ function StarPicker({ value, max, onPick }: { value: number; max: number; onPick
           onMouseEnter={() => setHover(star)}
           aria-label={`${star} bintang`}
           aria-pressed={value === star}
-          className="rounded-md p-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md p-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:min-h-0 md:min-w-0"
         >
           <Star
             className={cn(
-              "size-8 transition-colors",
+              "size-8 transition-colors duration-150",
               shown >= star ? "fill-warning text-warning" : shown >= star - 0.5 ? "fill-warning/40 text-warning" : "text-border"
             )}
             aria-hidden="true"

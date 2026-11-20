@@ -6,10 +6,10 @@ import type { Tone } from "./StatusBadge";
 const iconTones: Record<Tone, string> = {
   neutral: "bg-muted text-muted-foreground",
   brand: "bg-primary/10 text-brand",
-  success: "bg-success/10 text-success",
-  warning: "bg-warning/12 text-warning",
-  danger: "bg-destructive/10 text-destructive",
-  info: "bg-info/10 text-info",
+  success: "bg-success-subtle text-success",
+  warning: "bg-warning-subtle text-warning",
+  danger: "bg-destructive-subtle text-destructive",
+  info: "bg-info-subtle text-info",
 };
 
 interface StatCardProps {
@@ -55,13 +55,16 @@ export default function StatCard({
     </>
   );
 
-  const classes = cn("flex min-w-0 flex-col rounded-xl border border-border bg-card shadow-xs dark:shadow-none", compact ? "px-4 py-3" : "p-5", className);
+  const classes = cn("flex min-w-0 flex-col rounded-xl border border-border bg-card shadow-card", compact ? "px-4 py-3" : "p-4 md:p-5", className);
 
   if (href) {
     return (
       <Link
         href={href}
-        className={cn(classes, "transition-colors outline-none hover:border-input hover:bg-muted/30 focus-visible:ring-3 focus-visible:ring-ring/50")}
+        className={cn(
+          classes,
+          "transition-colors duration-150 outline-none hover:border-input hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring/50"
+        )}
       >
         {body}
       </Link>
@@ -76,7 +79,7 @@ export default function StatCard({
         aria-pressed={selected}
         className={cn(
           classes,
-          "text-left transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          "text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
           selected ? "border-primary/50 bg-primary/[0.04] ring-1 ring-primary/20" : "hover:border-input hover:bg-muted/30"
         )}
       >

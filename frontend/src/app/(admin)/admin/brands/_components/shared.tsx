@@ -4,8 +4,6 @@ import { type BrandSummary } from "@/lib/api";
 import { toDateInput } from "@/lib/format";
 import { htmlToText } from "@/lib/richText";
 
-export const TOAST_MS = 2200;
-
 const includes = (text: string | null | undefined, query: string) => Boolean(text && query && text.toLowerCase().includes(query.toLowerCase()));
 
 /** Why a brand matches the search: in its name or leader, or only in its product knowledge. */

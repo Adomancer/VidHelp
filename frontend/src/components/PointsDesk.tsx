@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Flag, MessageSquareWarning, Search, ShieldAlert, ThumbsUp, Users } from "lucide-react";
+import { Flag, MessageSquareWarning, ShieldAlert, ThumbsUp, Users } from "lucide-react";
 import { parseAsString, useQueryState } from "nuqs";
 import { errorMessage, operatorApi, pointsApi, type PointLog, type PointsHostDetail, type ViolationType } from "@/lib/api";
 import { formatDate, formatShortDate, toDateInput } from "@/lib/format";
@@ -22,9 +22,10 @@ import ErrorState from "./ErrorState";
 import { FieldError, FieldHint } from "./FieldMessage";
 import FormActions from "./FormActions";
 import FormAlert from "./FormAlert";
+import { FormFieldFull, FormGrid } from "./FormGrid";
 import { CardsSkeleton, ListSkeleton } from "./Loading";
-import Modal from "./Modal";
 import PointsMeter, { SpBadge } from "./PointsMeter";
+import SearchInput from "./SearchInput";
 import { NativeSelect } from "./SelectField";
 import { notify } from "./Toast";
 import UserAvatar from "./UserAvatar";
@@ -91,26 +92,25 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
 
       <div className="grid items-start gap-4 lg:grid-cols-[19rem_minmax(0,1fr)] xl:grid-cols-[21rem_minmax(0,1fr)]">
         <div className="space-y-2 lg:sticky lg:top-20">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => {
-                const next = event.target.value;
-                setQuery(next);
-                clearTimeout(debounce.current);
-                debounce.current = setTimeout(() => void setSearch(next.trim()), 300);
-              }}
-              placeholder="Cari host…"
-              aria-label="Cari host"
-              className={cn(inputClass, "pl-9")}
-            />
-          </div>
-          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+          <SearchInput
+            value={query}
+            onChange={(next) => {
+              setQuery(next);
+              clearTimeout(debounce.current);
+              debounce.current = setTimeout(() => void setSearch(next.trim()), 300);
+            }}
+            placeholder="Cari host…"
+            aria-label="Cari host"
+          />
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
             {!list && !hosts.error && <ListSkeleton rows={5} className="p-3" />}
             {list?.length === 0 && <EmptyState compact icon={Users} title="Tidak ada host aktif" />}
-            <ul className={cn("max-h-[calc(100dvh-16rem)] divide-y divide-border overflow-y-auto transition-opacity", hosts.loading && list && "opacity-60")}>
+            <ul
+              className={cn(
+                "max-h-[calc(100dvh-16rem)] divide-y divide-border overflow-y-auto transition-opacity duration-150",
+                hosts.loading && list && "opacity-60"
+              )}
+            >
               {list?.map((host) => {
                 const active = host.host_id === hostId;
                 return (
@@ -120,7 +120,7 @@ export default function PointsDesk({ isAdmin = false }: { isAdmin?: boolean }) {
                       onClick={() => setSelected(host.host_id)}
                       aria-current={active ? "true" : undefined}
                       className={cn(
-                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors outline-none focus-visible:bg-muted",
+                        "flex min-h-11 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150 outline-none focus-visible:bg-muted",
                         active ? "bg-primary/[0.07]" : "hover:bg-muted/60"
                       )}
                     >
@@ -207,19 +207,19 @@ function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: b
           )}
         </div>
         {form === "violation" && (
-          <Modal title={`Catat pelanggaran · ${data.host.user.name}`} onClose={() => setForm(null)}>
+          <Dialog title={`Catat pelanggaran · ${data.host.user.name}`} onClose={() => setForm(null)} closeOnOutsideClick={false}>
             <ViolationForm hostId={hostId} onDone={done} onCancel={() => setForm(null)} />
-          </Modal>
+          </Dialog>
         )}
         {form === "complaint" && (
-          <Modal title={`Komplain brand · ${data.host.user.name}`} onClose={() => setForm(null)}>
+          <Dialog title={`Komplain brand · ${data.host.user.name}`} onClose={() => setForm(null)} closeOnOutsideClick={false}>
             <ComplaintForm hostId={hostId} onDone={done} onCancel={() => setForm(null)} />
-          </Modal>
+          </Dialog>
         )}
         {form === "sp" && (
-          <Modal title={`Terbitkan SP manual · ${data.host.user.name}`} onClose={() => setForm(null)}>
+          <Dialog title={`Terbitkan SP manual · ${data.host.user.name}`} onClose={() => setForm(null)} closeOnOutsideClick={false}>
             <WarningForm hostId={hostId} onDone={done} onCancel={() => setForm(null)} />
-          </Modal>
+          </Dialog>
         )}
       </Card>
 
@@ -254,7 +254,7 @@ function HostPoints({ hostId, isAdmin, onChanged }: { hostId: string; isAdmin: b
                       {log.points_change}
                     </span>
                     {isAdmin && !log.voided_at && (
-                      <Button type="button" variant="link" size="xs" onClick={() => setVoiding(log)} className="h-auto px-0 text-destructive max-md:min-h-10">
+                      <Button type="button" variant="link" size="xs" onClick={() => setVoiding(log)} className="h-auto px-0 text-destructive max-md:min-h-11">
                         Batalkan
                       </Button>
                     )}
@@ -305,7 +305,7 @@ function WarningsCard({ data, isAdmin, act }: { data: PointsHostDetail; isAdmin:
                 </p>
               </div>
               {isAdmin && !letter.voided_at && (
-                <Button type="button" variant="link" size="xs" onClick={() => setVoiding(letter)} className="h-auto px-0 text-destructive max-md:min-h-10">
+                <Button type="button" variant="link" size="xs" onClick={() => setVoiding(letter)} className="h-auto px-0 text-destructive max-md:min-h-11">
                   Batalkan
                 </Button>
               )}
@@ -351,48 +351,50 @@ function ViolationForm({ hostId, onDone, onCancel }: FormProps) {
   );
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
-      {error && (
-        <div className="sm:col-span-2">
-          <FormAlert tone="error">{error}</FormAlert>
+    <form onSubmit={handleSubmit} noValidate>
+      <FormGrid>
+        {error && (
+          <FormFieldFull>
+            <FormAlert tone="error">{error}</FormAlert>
+          </FormFieldFull>
+        )}
+        <FormFieldFull className="space-y-1.5">
+          <Label htmlFor="violation-type">Pelanggaran</Label>
+          <NativeSelect id="violation-type" value={chosen?.id ?? ""} onChange={(event) => setTypeId(event.target.value)}>
+            {types.data?.violation_types.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name} (−{type.default_points})
+              </option>
+            ))}
+          </NativeSelect>
+          <FieldError>{errors.violation_type_id}</FieldError>
+        </FormFieldFull>
+        <div className="space-y-1.5">
+          <Label htmlFor="violation-points">Poin yang dipotong</Label>
+          <input
+            id="violation-points"
+            key={chosen?.id}
+            name="points"
+            type="number"
+            min={1}
+            max={100}
+            placeholder={String(chosen?.default_points ?? "")}
+            className={cn(inputClass, "tabular-nums")}
+          />
+          {errors.points ? <FieldError>{errors.points}</FieldError> : <FieldHint>Kosongkan untuk memakai nilai bawaan.</FieldHint>}
         </div>
-      )}
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label htmlFor="violation-type">Pelanggaran</Label>
-        <NativeSelect id="violation-type" value={chosen?.id ?? ""} onChange={(event) => setTypeId(event.target.value)}>
-          {types.data?.violation_types.map((type) => (
-            <option key={type.id} value={type.id}>
-              {type.name} (−{type.default_points})
-            </option>
-          ))}
-        </NativeSelect>
-        <FieldError>{errors.violation_type_id}</FieldError>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="violation-points">Poin yang dipotong</Label>
-        <input
-          id="violation-points"
-          key={chosen?.id}
-          name="points"
-          type="number"
-          min={1}
-          max={100}
-          placeholder={String(chosen?.default_points ?? "")}
-          className={cn(inputClass, "tabular-nums")}
-        />
-        {errors.points ? <FieldError>{errors.points}</FieldError> : <FieldHint>Kosongkan untuk memakai nilai bawaan.</FieldHint>}
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="violation-date">Tanggal</Label>
-        <DatePicker id="violation-date" name="occurred_on" defaultValue={toDateInput()} max={toDateInput()} />
-        <FieldError>{errors.occurred_on}</FieldError>
-      </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label htmlFor="violation-reason">Kejadiannya</Label>
-        <input id="violation-reason" name="reason" maxLength={255} className={inputClass} />
-        <FieldError>{errors.reason}</FieldError>
-      </div>
-      <FormActions loading={loading} submitLabel="Catat" onCancel={onCancel} />
+        <div className="space-y-1.5">
+          <Label htmlFor="violation-date">Tanggal</Label>
+          <DatePicker id="violation-date" name="occurred_on" defaultValue={toDateInput()} max={toDateInput()} />
+          <FieldError>{errors.occurred_on}</FieldError>
+        </div>
+        <FormFieldFull className="space-y-1.5">
+          <Label htmlFor="violation-reason">Kejadiannya</Label>
+          <input id="violation-reason" name="reason" maxLength={255} className={inputClass} />
+          <FieldError>{errors.reason}</FieldError>
+        </FormFieldFull>
+        <FormActions loading={loading} submitLabel="Catat" onCancel={onCancel} />
+      </FormGrid>
     </form>
   );
 }
@@ -414,39 +416,41 @@ function ComplaintForm({ hostId, onDone, onCancel }: FormProps) {
   );
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
-      {error && (
-        <div className="sm:col-span-2">
-          <FormAlert tone="error">{error}</FormAlert>
+    <form onSubmit={handleSubmit} noValidate>
+      <FormGrid>
+        {error && (
+          <FormFieldFull>
+            <FormAlert tone="error">{error}</FormAlert>
+          </FormFieldFull>
+        )}
+        <div className="space-y-1.5">
+          <Label htmlFor="complaint-brand">Brand</Label>
+          <NativeSelect id="complaint-brand" name="brand_id">
+            {brands.data?.brands.map((brand) => (
+              <option key={brand.id} value={brand.id}>
+                {brand.name}
+              </option>
+            ))}
+          </NativeSelect>
+          <FieldError>{errors.brand_id}</FieldError>
         </div>
-      )}
-      <div className="space-y-1.5">
-        <Label htmlFor="complaint-brand">Brand</Label>
-        <NativeSelect id="complaint-brand" name="brand_id">
-          {brands.data?.brands.map((brand) => (
-            <option key={brand.id} value={brand.id}>
-              {brand.name}
-            </option>
-          ))}
-        </NativeSelect>
-        <FieldError>{errors.brand_id}</FieldError>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="complaint-points">Poin yang dipotong</Label>
-        <input id="complaint-points" name="points" type="number" min={1} max={100} className={cn(inputClass, "tabular-nums")} />
-        {errors.points ? <FieldError>{errors.points}</FieldError> : <FieldHint>Kosongkan untuk memakai nilai bawaan.</FieldHint>}
-      </div>
-      <div className="space-y-1.5 sm:col-span-2">
-        <Label htmlFor="complaint-description">Keluhan dari brand</Label>
-        <textarea id="complaint-description" name="description" rows={3} maxLength={2000} className={textareaClass} />
-        <FieldError>{errors.description}</FieldError>
-      </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="complaint-date">Tanggal</Label>
-        <DatePicker id="complaint-date" name="occurred_on" defaultValue={toDateInput()} max={toDateInput()} />
-        <FieldError>{errors.occurred_on}</FieldError>
-      </div>
-      <FormActions loading={loading} submitLabel="Catat" onCancel={onCancel} />
+        <div className="space-y-1.5">
+          <Label htmlFor="complaint-points">Poin yang dipotong</Label>
+          <input id="complaint-points" name="points" type="number" min={1} max={100} className={cn(inputClass, "tabular-nums")} />
+          {errors.points ? <FieldError>{errors.points}</FieldError> : <FieldHint>Kosongkan untuk memakai nilai bawaan.</FieldHint>}
+        </div>
+        <FormFieldFull className="space-y-1.5">
+          <Label htmlFor="complaint-description">Keluhan dari brand</Label>
+          <textarea id="complaint-description" name="description" rows={3} maxLength={2000} className={textareaClass} />
+          <FieldError>{errors.description}</FieldError>
+        </FormFieldFull>
+        <div className="space-y-1.5">
+          <Label htmlFor="complaint-date">Tanggal</Label>
+          <DatePicker id="complaint-date" name="occurred_on" defaultValue={toDateInput()} max={toDateInput()} />
+          <FieldError>{errors.occurred_on}</FieldError>
+        </div>
+        <FormActions loading={loading} submitLabel="Catat" onCancel={onCancel} />
+      </FormGrid>
     </form>
   );
 }

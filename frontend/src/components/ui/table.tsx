@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 function Table({
   className,
@@ -30,7 +30,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
     <thead
       data-slot="table-header"
       className={cn(
-        "border-b border-border bg-muted/50 text-left text-xs text-muted-foreground",
+        "border-b border-border bg-muted text-left text-xs font-semibold tracking-[0.02em] text-muted-foreground",
         className
       )}
       {...props}
@@ -66,7 +66,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "transition-colors data-[state=selected]:bg-muted",
+        "group/row transition-colors duration-150 data-[state=selected]:bg-secondary",
         className
       )}
       {...props}

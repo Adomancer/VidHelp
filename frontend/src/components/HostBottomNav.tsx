@@ -52,7 +52,7 @@ export default function HostBottomNav({ claimable = 0 }: { claimable?: number })
     <>
       <nav
         aria-label="Menu host"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden print:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden print:hidden"
       >
         <ul className="mx-auto grid max-w-lg grid-cols-5">
           {tabs.map((item) => {
@@ -109,7 +109,7 @@ export default function HostBottomNav({ claimable = 0 }: { claimable?: number })
                       onClick={() => setSheetOpen(false)}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex min-h-14 items-center gap-3 px-4 py-3 transition-colors outline-none focus-visible:bg-muted active:bg-muted",
+                        "flex min-h-14 items-center gap-3 px-4 py-3 transition-colors duration-150 outline-none focus-visible:bg-muted active:bg-muted",
                         active && "bg-primary/[0.06]"
                       )}
                     >
@@ -153,8 +153,8 @@ function TabIcon({ icon, active, badge }: { icon: NavIconName; active: boolean; 
   return (
     <span
       className={cn(
-        "relative flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-200 group-focus-visible:ring-3 group-focus-visible:ring-ring/50",
-        active ? "bg-primary/12 text-brand" : "text-muted-foreground group-active:bg-muted"
+        "relative flex h-8 w-14 items-center justify-center rounded-full transition-colors duration-150 group-focus-visible:ring-2 group-focus-visible:ring-ring/50",
+        active ? "bg-primary/10 text-brand" : "text-muted-foreground group-active:bg-muted"
       )}
     >
       <NavIcon name={icon} className="size-5" />

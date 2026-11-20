@@ -2,24 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { parseAsInteger, parseAsStringLiteral, useQueryState } from "nuqs";
-import { Plus, Search, Tag, X } from "lucide-react";
+import { Plus, Search, Tag } from "lucide-react";
 import { operatorApi, type BrandSummary } from "@/lib/api";
-import { inputClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
-import { cn } from "@/lib/utils";
 import { KnowledgeEditor } from "@/components/BrandKnowledge";
 import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import { CardsSkeleton, RefreshBar } from "@/components/Loading";
 import PageHeader from "@/components/PageHeader";
+import Pagination from "@/components/Pagination";
+import SearchInput from "@/components/SearchInput";
 import { NativeSelect } from "@/components/SelectField";
+import ToggleGroup from "@/components/ToggleGroup";
 import { useAuth } from "@/components/AuthProvider";
+import { TableFilterDrawer } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { BrandCard } from "./_components/BrandCard";
 import { BrandDrawer } from "./_components/BrandDrawer";
 import { BrandForm } from "./_components/BrandForm";
-import { PAGE_SIZE, Pager } from "./_components/Pager";
 import { searchMatch } from "./_components/shared";
+
+const PAGE_SIZE = 10;
 
 const statuses = ["semua", "aktif", "nonaktif"] as const;
 const conditions = ["tanpa-leader", "belum-gajian", "obs"] as const;
@@ -105,13 +109,15 @@ export default function AdminBrandsPage() {
     window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
   }
 
+  const activeFilterCount = (condition ? 1 : 0) + (sort !== "nama" ? 1 : 0);
+
   return (
     <div className="flex min-h-[calc(100dvh-8.5rem)] flex-col gap-6">
       <PageHeader
-        title={<span className="text-[30px] leading-tight">Brand</span>}
+        title="Brand"
         description="Target jam, siklus pembayaran dan product knowledge tiap brand. Host ditugaskan ke brand di halaman Host."
         actions={
-          <Button type="button" size="lg" onClick={() => setForm({ brand: null, fromDetail: false })}>
+          <Button type="button" onClick={() => setForm({ brand: null, fromDetail: false })}>
             <Plus aria-hidden="true" />
             Brand baru
           </Button>
@@ -120,84 +126,114 @@ export default function AdminBrandsPage() {
 
       {/* Toolbar: search, status, condition, sort */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-0 flex-[1_1_20rem]">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <input
-            type="search"
-            value={input}
-            onChange={(change) => setInput(change.target.value)}
-            placeholder="Cari nama brand, leader, atau isi product knowledge…"
-            aria-label="Cari brand"
-            className={cn(inputClass, "h-11 pr-10 pl-9 md:h-11 [&::-webkit-search-cancel-button]:hidden")}
-          />
-          {input && (
-            <button
-              type="button"
-              onClick={() => setInput("")}
-              aria-label="Hapus pencarian"
-              className="absolute top-1/2 right-1.5 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors outline-none hover:bg-muted-foreground/20 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 md:right-2.5 md:size-6"
-            >
-              <X className="size-3.5" aria-hidden="true" />
-            </button>
-          )}
-        </div>
+        <SearchInput
+          value={input}
+          onChange={setInput}
+          placeholder="Cari nama brand, leader, atau isi product knowledge…"
+          aria-label="Cari brand"
+          className="min-w-0 flex-[1_1_18rem]"
+        />
 
-        <div role="radiogroup" aria-label="Status brand" className="inline-flex h-11 items-center gap-1 rounded-lg border border-border bg-card p-1">
-          {statuses.map((item) => (
-            <button
-              key={item}
-              type="button"
-              role="radio"
-              aria-checked={status === item}
-              onClick={() => {
-                void setStatus(item === "semua" ? null : item);
-                void setPage(null);
-              }}
-              className={cn(
-                "flex h-full items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                status === item ? "bg-primary/10 text-brand" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {statusLabels[item]}
-              <span className="text-xs tabular-nums opacity-80">{counts[item]}</span>
-            </button>
-          ))}
-        </div>
-
-        <NativeSelect
-          aria-label="Kondisi brand"
-          value={condition ?? ""}
-          onChange={(change) => {
-            void setCondition((change.target.value || null) as Condition | null);
+        <ToggleGroup
+          label="Status brand"
+          value={status}
+          onChange={(item) => {
+            void setStatus(item === "semua" ? null : item);
             void setPage(null);
           }}
-          wrapperClassName="w-full sm:w-56"
-          className="h-11 md:h-11"
-        >
-          <option value="">Semua kondisi</option>
-          {conditions.map((item) => (
-            <option key={item} value={item}>
-              {conditionLabels[item]}
-            </option>
-          ))}
-        </NativeSelect>
+          options={statuses.map((item) => ({
+            value: item,
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <span>{statusLabels[item]}</span>
+                <span className="text-xs tabular-nums opacity-80">{counts[item]}</span>
+              </span>
+            ),
+          }))}
+        />
 
-        <NativeSelect
-          aria-label="Urutkan"
-          value={sort}
-          onChange={(change) => {
-            void setSort(change.target.value === "nama" ? null : (change.target.value as Sort));
-            void setPage(null);
-          }}
-          wrapperClassName="w-full sm:w-48"
-          className="h-11 md:h-11"
-        >
-          {sorts.map((item) => (
-            <option key={item} value={item}>
-              {sortLabels[item]}
-            </option>
-          ))}
-        </NativeSelect>
+        <div className="hidden md:flex md:items-center md:gap-2">
+          <NativeSelect
+            aria-label="Kondisi brand"
+            value={condition ?? ""}
+            onChange={(change) => {
+              void setCondition((change.target.value || null) as Condition | null);
+              void setPage(null);
+            }}
+            wrapperClassName="w-56"
+          >
+            <option value="">Semua kondisi</option>
+            {conditions.map((item) => (
+              <option key={item} value={item}>
+                {conditionLabels[item]}
+              </option>
+            ))}
+          </NativeSelect>
+
+          <NativeSelect
+            aria-label="Urutkan"
+            value={sort}
+            onChange={(change) => {
+              void setSort(change.target.value === "nama" ? null : (change.target.value as Sort));
+              void setPage(null);
+            }}
+            wrapperClassName="w-48"
+          >
+            {sorts.map((item) => (
+              <option key={item} value={item}>
+                {sortLabels[item]}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+
+        <div className="md:hidden">
+          <TableFilterDrawer
+            title="Filter & urutkan brand"
+            activeCount={activeFilterCount}
+            onReset={() => {
+              void setCondition(null);
+              void setSort(null);
+              void setPage(null);
+            }}
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="mobile-brand-condition">Kondisi</Label>
+              <NativeSelect
+                id="mobile-brand-condition"
+                value={condition ?? ""}
+                onChange={(change) => {
+                  void setCondition((change.target.value || null) as Condition | null);
+                  void setPage(null);
+                }}
+              >
+                <option value="">Semua kondisi</option>
+                {conditions.map((item) => (
+                  <option key={item} value={item}>
+                    {conditionLabels[item]}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="mobile-brand-sort">Urutkan</Label>
+              <NativeSelect
+                id="mobile-brand-sort"
+                value={sort}
+                onChange={(change) => {
+                  void setSort(change.target.value === "nama" ? null : (change.target.value as Sort));
+                  void setPage(null);
+                }}
+              >
+                {sorts.map((item) => (
+                  <option key={item} value={item}>
+                    {sortLabels[item]}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          </TableFilterDrawer>
+        </div>
       </div>
 
       {brands.error && <ErrorState message={brands.error} onRetry={brands.reload} />}
@@ -207,7 +243,7 @@ export default function AdminBrandsPage() {
         <div className="relative">
           <RefreshBar active={brands.loading} />
           {all.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border">
+            <div className="rounded-xl border border-dashed border-border bg-card/50">
               <EmptyState
                 icon={Tag}
                 title="Belum ada brand"
@@ -221,9 +257,8 @@ export default function AdminBrandsPage() {
               />
             </div>
           ) : shown.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-border px-6 py-14 text-center">
-              <p className="text-sm font-medium text-foreground">Tidak ada brand ditemukan.</p>
-              <p className="mt-1 text-sm text-muted-foreground">Coba ubah kata kunci atau filter pencarian.</p>
+            <div className="rounded-xl border border-dashed border-border bg-card/50">
+              <EmptyState icon={Search} title="Tidak ada brand ditemukan" description="Coba ubah kata kunci atau filter pencarian." />
             </div>
           ) : (
             <ul className="grid auto-rows-[250px] grid-cols-1 gap-4 min-[900px]:grid-cols-2 min-[1500px]:grid-cols-5">
@@ -243,7 +278,7 @@ export default function AdminBrandsPage() {
         </div>
       )}
 
-      {results.length > 0 && <Pager page={page} lastPage={lastPage} total={results.length} onChange={goTo} />}
+      {results.length > 0 && <Pagination page={page} lastPage={lastPage} total={results.length} unit="brand" pageSize={PAGE_SIZE} onChange={goTo} />}
 
       {detail && !form && !knowledge && (
         <BrandDrawer

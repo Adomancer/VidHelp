@@ -29,7 +29,7 @@ export default function OperatorBrandsPage() {
 
       {brands.error && <ErrorState message={brands.error} onRetry={brands.reload} />}
 
-      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
+      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-card">
         <RefreshBar active={brands.loading && Boolean(list)} />
         {!list && !brands.error && <TableSkeleton rows={4} columns={2} />}
         {list?.length === 0 && <EmptyState icon={Tag} title="Belum ada brand" description="Admin menambahkan brand di halaman Brand." />}

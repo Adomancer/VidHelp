@@ -37,7 +37,7 @@ export default function TwoFactorChallengeForm({ challengeToken, onRestart }: { 
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="space-y-5" noValidate>
-      <div className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-xs">
+      <div className="flex items-start gap-3 rounded-xl border border-border bg-card p-4 shadow-card">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-brand">
           <ShieldCheck className="size-4" aria-hidden="true" />
         </span>

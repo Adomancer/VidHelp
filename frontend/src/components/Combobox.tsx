@@ -7,7 +7,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-export interface FilterOption {
+export interface ComboboxOption {
   value: string;
   label: string;
   /** A second line under the label, e.g. brand and dates. */
@@ -16,25 +16,43 @@ export interface FilterOption {
   meta?: string;
 }
 
-interface FilterComboboxProps {
-  id: string;
-  options: FilterOption[];
+interface ComboboxProps {
+  id?: string;
+  options: ComboboxOption[];
   value: string | null;
   onChange: (value: string | null) => void;
-  placeholder: string;
+  placeholder?: string;
   /** Shown when the search finds nothing. */
   empty?: string;
+  clearable?: boolean;
+  disabled?: boolean;
   className?: string;
+  "aria-label"?: string;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
 }
 
 /** Items rendered at first; scrolling to the bottom of the list shows this many more. */
 const PAGE = 30;
 
 /**
- * A filter you can type into: the list narrows as you type, shows more as you scroll, works
- * with the arrow keys and Enter, and has an ✕ to clear the choice.
+ * Searchable select/filter combobox: narrows as you type, loads 30 items per scroll batch,
+ * works with keyboard navigation, and optionally supports clearing the choice.
  */
-export default function FilterCombobox({ id, options, value, onChange, placeholder, empty = "Tidak ada hasil.", className }: FilterComboboxProps) {
+export default function Combobox({
+  id,
+  options,
+  value,
+  onChange,
+  placeholder = "Pilih…",
+  empty = "Tidak ada hasil.",
+  clearable = false,
+  disabled = false,
+  className,
+  "aria-label": ariaLabel,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
+}: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [limit, setLimit] = useState(PAGE);
@@ -62,7 +80,11 @@ export default function FilterCombobox({ id, options, value, onChange, placehold
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn("h-11 w-full justify-between bg-card pr-3 font-normal shadow-xs md:h-11", selected && "pr-16")}
+            aria-label={ariaLabel}
+            aria-invalid={ariaInvalid}
+            aria-describedby={ariaDescribedBy}
+            disabled={disabled}
+            className={cn("w-full justify-between bg-card pr-3 font-normal", clearable && selected && !disabled && "pr-20 md:pr-14")}
           >
             <span className={cn("truncate", selected ? "text-foreground" : "text-muted-foreground")}>{selected ? selected.label : placeholder}</span>
             <ChevronsUpDown className="text-muted-foreground" aria-hidden="true" />
@@ -113,14 +135,14 @@ export default function FilterCombobox({ id, options, value, onChange, placehold
           </Command>
         </PopoverContent>
       </Popover>
-      {selected && (
+      {clearable && selected && !disabled && (
         <button
           type="button"
           onClick={() => onChange(null)}
           aria-label={`Hapus pilihan ${selected.label}`}
-          className="absolute top-1/2 right-9 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 md:size-7"
+          className="absolute top-1/2 right-8 flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:right-7 md:size-7"
         >
-          <X className="size-4" aria-hidden="true" />
+          <X className="size-4 md:size-3.5" aria-hidden="true" />
         </button>
       )}
     </div>

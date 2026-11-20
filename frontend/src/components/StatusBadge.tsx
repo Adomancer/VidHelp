@@ -3,12 +3,12 @@ import { cn } from "@/lib/utils";
 export type Tone = "neutral" | "brand" | "success" | "warning" | "danger" | "info";
 
 const toneClasses: Record<Tone, string> = {
-  neutral: "bg-secondary text-body",
-  brand: "bg-primary/10 text-brand",
-  success: "bg-success/10 text-success",
-  warning: "bg-warning/12 text-warning",
-  danger: "bg-destructive/10 text-destructive",
-  info: "bg-info/10 text-info",
+  neutral: "bg-secondary text-body ring-1 ring-inset ring-border",
+  brand: "bg-primary/10 text-brand ring-1 ring-inset ring-primary/20",
+  success: "bg-success-subtle text-success ring-1 ring-inset ring-success/20",
+  warning: "bg-warning-subtle text-warning ring-1 ring-inset ring-warning/20",
+  danger: "bg-destructive-subtle text-destructive ring-1 ring-inset ring-destructive/20",
+  info: "bg-info-subtle text-info ring-1 ring-inset ring-info/20",
 };
 
 /** Text color only, for dots, icons and numbers that follow a status. */
@@ -51,8 +51,7 @@ export default function StatusBadge({ tone = "neutral", dot = false, pulse = fal
     >
       {(dot || pulse) && (
         <span className="relative flex size-1.5" aria-hidden="true">
-          {pulse && <span className="absolute inline-flex size-full animate-ping rounded-full bg-current opacity-60" />}
-          <span className="relative inline-flex size-1.5 rounded-full bg-current" />
+          <span className={cn("relative inline-flex size-1.5 rounded-full bg-current", pulse && "ring-2 ring-current/25")} />
         </span>
       )}
       {children}

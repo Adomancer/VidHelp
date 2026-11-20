@@ -9,9 +9,9 @@ import { useMediaQuery } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import Card from "./Card";
+import Combobox from "./Combobox";
 import Dialog from "./Dialog";
 import EmptyState from "./EmptyState";
-import { NativeSelect } from "./SelectField";
 import StatusBadge, { type Tone } from "./StatusBadge";
 import UserAvatar from "./UserAvatar";
 
@@ -271,7 +271,7 @@ export default function ScheduleMonth({
   return (
     <div className="space-y-4">
       {/* The month at a glance; the last three filter the grid */}
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-xs sm:grid-cols-5 dark:shadow-none [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
+      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card sm:grid-cols-5 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         <Metric label="Sesi live" value={totals.sessions} />
         <Metric label="Jam live" value={compactHours(totals.minutes)} />
         <Metric
@@ -293,14 +293,16 @@ export default function ScheduleMonth({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <NativeSelect small wrapperClassName="w-48" value={hostId} onChange={(event) => setHostId(event.target.value)} aria-label="Sorot host">
-            <option value="">Sorot host…</option>
-            {hosts.map((host) => (
-              <option key={host.host_id} value={host.host_id}>
-                {host.host.user.name}
-              </option>
-            ))}
-          </NativeSelect>
+          <Combobox
+            clearable
+            value={hostId || null}
+            onChange={(value) => setHostId(value ?? "")}
+            options={hosts.map((host) => ({ value: host.host_id, label: host.host.user.name }))}
+            placeholder="Sorot host…"
+            empty="Host tidak ditemukan."
+            className="w-56"
+            aria-label="Sorot host"
+          />
           {hostTotals && (
             <span className="text-sm text-muted-foreground">
               <span className="font-medium text-foreground">{hostName}</span>: {hostTotals.sessions} sesi · {compactHours(hostTotals.minutes)}
@@ -325,7 +327,7 @@ export default function ScheduleMonth({
         <Legend />
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-border shadow-xs dark:shadow-none" aria-busy={loading || undefined}>
+      <div className="overflow-hidden rounded-xl border border-border bg-border shadow-card" aria-busy={loading || undefined}>
         <div className="grid grid-cols-7 gap-px" aria-hidden="true">
           {DAYS.map((day) => (
             <div key={day.value} className="bg-muted/60 px-2 py-2 text-center text-xs font-medium text-muted-foreground md:text-left">
@@ -400,7 +402,7 @@ function Metric({ label, value, tone, active, onClick }: { label: string; value:
       aria-pressed={active}
       title={active ? "Tampilkan semua hari" : "Sorot hari-hari ini di kalender"}
       className={cn(
-        "relative bg-card px-4 py-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/60",
+        "relative bg-card px-4 py-3 text-left transition-colors duration-150 outline-none hover:bg-muted/50 focus-visible:bg-muted/60",
         active && "bg-primary/[0.06] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary"
       )}
     >
@@ -474,7 +476,7 @@ function DayCell({
       aria-selected={selected || undefined}
       onClick={onOpen}
       className={cn(
-        "group relative flex min-h-16 flex-col gap-1 p-1.5 text-left transition-[background-color,opacity] outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:min-h-32 md:gap-1.5 md:p-2",
+        "group relative flex min-h-16 flex-col gap-1 p-1.5 text-left transition-[background-color,opacity] duration-150 outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:min-h-32 md:gap-1.5 md:p-2",
         day.inMonth ? "bg-card hover:bg-muted" : "bg-muted text-faint hover:bg-secondary",
         selected && "z-10 ring-2 ring-primary ring-inset",
         dimmed && "opacity-35"
@@ -514,7 +516,7 @@ function DayCell({
       </div>
 
       {day.event && (
-        <span className="hidden items-center gap-1 truncate rounded bg-warning/12 px-1.5 py-0.5 text-[11px] font-medium text-warning md:flex">
+        <span className="hidden items-center gap-1 truncate rounded bg-warning-subtle px-1.5 py-0.5 text-[11px] font-medium text-warning md:flex">
           <Ticket className="size-3 shrink-0" aria-hidden="true" />
           <span className="truncate">{day.event.name}</span>
         </span>
@@ -566,7 +568,7 @@ function DayDetail({
   return (
     <div className="space-y-5">
       {day.event && (
-        <div className="flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/10 px-3.5 py-3 text-sm text-warning">
+        <div className="flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning-subtle px-3.5 py-3 text-sm text-warning">
           <Ticket className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <p>
             <span className="font-semibold">{day.event.name}</span>: jadwal reguler hari ini diganti blok event.
@@ -617,7 +619,7 @@ function DayDetail({
                   type="button"
                   onClick={() => onOpenSlot(session.slot, session.date)}
                   className={cn(
-                    "flex w-full items-center gap-3 bg-card px-3.5 py-3 text-left transition-colors outline-none hover:bg-muted/50 focus-visible:bg-muted/60",
+                    "flex w-full items-center gap-3 bg-card px-3.5 py-3 text-left transition-colors duration-150 outline-none hover:bg-muted/50 focus-visible:bg-muted/60",
                     hostId && session.slot.assignment.host_id !== hostId && "opacity-50"
                   )}
                 >

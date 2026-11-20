@@ -96,7 +96,7 @@ export default function AppShell(props: AppShellProps) {
 function Logo({ panel, compact = false }: { panel: string; compact?: boolean }) {
   return (
     <>
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-xs">V</span>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground shadow-card">V</span>
       {!compact && (
         <span className="grid min-w-0 leading-tight">
           <span className="truncate text-[15px] font-semibold tracking-tight text-foreground">VidHelp</span>
@@ -139,7 +139,7 @@ function ShellSidebar({ panel, homeHref, links, badges = {}, accountLinks, sideb
                       asChild
                       isActive={isActive}
                       tooltip={badge > 0 ? `${link.label} (${badge})` : link.label}
-                      className="h-9 text-sidebar-foreground data-active:bg-primary/10 data-active:font-medium data-active:text-brand data-active:hover:bg-primary/15 data-active:hover:text-brand [&>svg]:text-muted-foreground data-active:[&>svg]:text-brand"
+                      className="h-11 text-sidebar-foreground transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-sidebar-ring md:h-9 data-active:bg-primary/10 data-active:font-medium data-active:text-brand data-active:hover:bg-primary/15 data-active:hover:text-brand [&>svg]:text-muted-foreground data-active:[&>svg]:text-brand"
                     >
                       <Link href={link.href} onClick={closeOnPhone} aria-current={isActive ? "page" : undefined}>
                         <NavIcon name={link.icon} className="size-4" />
@@ -147,7 +147,7 @@ function ShellSidebar({ panel, homeHref, links, badges = {}, accountLinks, sideb
                       </Link>
                     </SidebarMenuButton>
                     {badge > 0 && (
-                      <SidebarMenuBadge className="top-2! rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-active/menu-button:text-primary-foreground">
+                      <SidebarMenuBadge className="top-3! rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-active/menu-button:text-primary-foreground md:top-2!">
                         {badge > 99 ? "99+" : badge}
                       </SidebarMenuBadge>
                     )}
@@ -176,18 +176,18 @@ function ShellHeader({ panel, homeHref, links, search, hostSearchPath, mobileNav
   const current = currentLink(links, pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/85 px-3 backdrop-blur-md md:px-5 print:hidden">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card/90 px-3 backdrop-blur-md md:px-5 print:hidden">
       {/* Phones with a tab bar get the logo; everyone else the menu button */}
       {mobileNav && (
         <Link
           href={homeHref}
-          className="flex items-center gap-2 rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+          className="flex size-11 items-center justify-center rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:hidden"
           aria-label="VidHelp"
         >
           <Logo panel={panel} compact />
         </Link>
       )}
-      <SidebarTrigger className={cn("size-9 text-muted-foreground hover:text-foreground", mobileNav && "hidden md:inline-flex")} />
+      <SidebarTrigger className={cn("size-11 text-muted-foreground hover:text-foreground md:size-9", mobileNav && "hidden md:inline-flex")} />
       <Separator orientation="vertical" className={cn("mx-1 h-5 data-vertical:self-center", mobileNav && "hidden md:block")} />
 
       <nav aria-label="Lokasi halaman" className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
@@ -208,7 +208,7 @@ function ShellHeader({ panel, homeHref, links, search, hostSearchPath, mobileNav
           <Link
             href={profileHref}
             aria-label="Profil saya"
-            className="ml-1 rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:hidden"
+            className="flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:hidden"
           >
             <UserAvatar size="size-8 text-xs" />
           </Link>

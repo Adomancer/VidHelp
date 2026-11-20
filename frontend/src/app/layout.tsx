@@ -33,7 +33,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <QueryProvider>
           <AuthSessionProvider>
             <NuqsAdapter>
-              <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
+              <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
             </NuqsAdapter>
           </AuthSessionProvider>
         </QueryProvider>

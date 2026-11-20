@@ -82,9 +82,9 @@ export default function Dialog({
             if (closeOnOutsideClick) requestClose();
           }}
           className={cn(
-            "fixed z-50 flex flex-col bg-popover text-popover-foreground shadow-2xl ring-1 ring-foreground/10 outline-none",
+            "fixed z-50 flex flex-col border border-border bg-popover text-popover-foreground shadow-dialog outline-none",
             // Phones: a sheet rising from the bottom
-            "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)] duration-300 ease-out data-open:animate-in data-open:slide-in-from-bottom",
+            "inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)] duration-200 ease-out data-open:animate-in data-open:slide-in-from-bottom",
             placements[placement],
             widths[size]
           )}
@@ -106,7 +106,7 @@ export default function Dialog({
               size="icon-sm"
               onClick={requestClose}
               aria-label="Tutup"
-              className="-mt-1 -mr-2 shrink-0 text-muted-foreground max-md:size-10"
+              className="-mt-1 -mr-2 shrink-0 text-muted-foreground"
             >
               <X />
             </Button>
@@ -115,7 +115,7 @@ export default function Dialog({
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">{children}</div>
 
           {confirming ? (
-            <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-warning/30 bg-warning/10 px-5 py-3.5 sm:rounded-b-xl sm:px-6">
+            <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-warning/25 bg-warning-subtle px-5 py-3.5 sm:rounded-b-xl sm:px-6">
               <TriangleAlert className="size-4 shrink-0 text-warning" aria-hidden="true" />
               <p className="min-w-48 flex-1 text-sm text-warning">Ada isian yang belum disimpan. Tutup dan buang perubahan?</p>
               <Button type="button" variant="ghost" autoFocus onClick={() => setConfirming(false)}>

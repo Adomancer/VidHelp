@@ -11,17 +11,19 @@ import { formValue, useApiForm } from "@/lib/useApiForm";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "../AuthProvider";
+import Combobox from "../Combobox";
 import ConfirmDialog from "../ConfirmDialog";
+import Dialog from "../Dialog";
 import EmptyState from "../EmptyState";
 import ErrorState from "../ErrorState";
 import { FieldError } from "../FieldMessage";
 import FormActions from "../FormActions";
 import FormAlert from "../FormAlert";
+import { FormFieldFull, FormGrid } from "../FormGrid";
 import { CardsSkeleton } from "../Loading";
-import Modal from "../Modal";
 import RupiahInput from "../RupiahInput";
-import SearchableSelect from "../SearchableSelect";
 import { NativeSelect } from "../SelectField";
 import StatusBadge from "../StatusBadge";
 import { notify } from "../Toast";
@@ -99,7 +101,7 @@ export function Kasbon() {
           const skipped = advance.installments.find((installment) => installment.status === "scheduled" && installment.skip_count > 0);
 
           return (
-            <li key={advance.id} className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-xs dark:shadow-none">
+            <li key={advance.id} className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">
@@ -122,13 +124,24 @@ export function Kasbon() {
                 )}
               </div>
               <div className="flex gap-1" aria-label={`${paidCount} dari ${advance.installment_count} cicilan terbayar`}>
-                {advance.installments.map((installment) => (
-                  <span
-                    key={installment.id}
-                    title={`${installment.seq}: ${formatRupiah(installment.amount)}${installment.skip_count > 0 ? ` · dilewati ${installment.skip_count}×` : ""}`}
-                    className={cn("h-2 flex-1 rounded-full", installmentColor(installment))}
-                  />
-                ))}
+                {advance.installments.map((installment) => {
+                  const label = `Cicilan ${installment.seq}: ${formatRupiah(installment.amount)}${installment.skip_count > 0 ? ` · dilewati ${installment.skip_count}×` : ""}`;
+                  return (
+                    <Tooltip key={installment.id}>
+                      <TooltipTrigger asChild>
+                        <span
+                          tabIndex={0}
+                          aria-label={label}
+                          className={cn(
+                            "h-2 flex-1 rounded-full transition-opacity duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                            installmentColor(installment)
+                          )}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>{label}</TooltipContent>
+                    </Tooltip>
+                  );
+                })}
               </div>
               {skipped && (
                 <FormAlert tone="warning">
@@ -171,7 +184,7 @@ export function Kasbon() {
                       variant="ghost"
                       size="xs"
                       onClick={() => setRemoving(advance)}
-                      className="ml-auto text-destructive hover:text-destructive max-md:h-10 max-md:px-3"
+                      className="ml-auto text-destructive hover:text-destructive max-md:h-11 max-md:px-3"
                     >
                       Hapus (salah catat)
                     </Button>
@@ -219,75 +232,80 @@ function AdvanceForm({ onDone, onCancel }: { onDone: (message: string) => void; 
   );
 
   return (
-    <Modal title="Catat kasbon" description="Dicicil sama rata dari slip gaji host berikutnya (brand apa pun)." onClose={onCancel}>
-      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
-        {error && (
-          <div className="sm:col-span-2">
-            <FormAlert tone="error">{error}</FormAlert>
+    <Dialog title="Catat kasbon" description="Dicicil sama rata dari slip gaji host berikutnya (brand apa pun)." onClose={onCancel} closeOnOutsideClick={false}>
+      <form onSubmit={handleSubmit} noValidate>
+        <FormGrid>
+          {error && (
+            <FormFieldFull>
+              <FormAlert tone="error">{error}</FormAlert>
+            </FormFieldFull>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="advance-host">Host</Label>
+            {hosts.error && <ErrorState message={hosts.error} onRetry={hosts.reload} />}
+            {/* Hundreds of hosts: type to find one; the hidden field sends the choice with the form */}
+            <Combobox
+              id="advance-host"
+              value={hostId || null}
+              onChange={(value) => setChosenId(value ?? "")}
+              options={hosts.data?.hosts.map((host) => ({ value: host.host_id, label: host.name })) ?? []}
+              placeholder="Pilih host…"
+              empty="Host tidak ditemukan."
+            />
+            <input type="hidden" name="host_id" value={hostId} />
+            <FieldError>{errors.host_id}</FieldError>
           </div>
-        )}
-        <div className="space-y-1.5">
-          <Label htmlFor="advance-host">Host</Label>
-          {hosts.error && <ErrorState message={hosts.error} onRetry={hosts.reload} />}
-          {/* Hundreds of hosts: type to find one; the hidden field sends the choice with the form */}
-          <SearchableSelect
-            id="advance-host"
-            value={hostId}
-            onChange={setChosenId}
-            options={hosts.data?.hosts.map((host) => ({ value: host.host_id, label: host.name })) ?? []}
-            placeholder="Pilih host…"
-          />
-          <input type="hidden" name="host_id" value={hostId} />
-          <FieldError>{errors.host_id}</FieldError>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="advance-type">Jenis</Label>
-          <NativeSelect id="advance-type" name="type">
-            <option value="loan">Pinjaman</option>
-            <option value="early_payment">Gaji di muka</option>
-          </NativeSelect>
-          <FieldError>{errors.type}</FieldError>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="advance-amount">Jumlah</Label>
-          <RupiahInput
-            id="advance-amount"
-            name="total_amount"
-            placeholder="0"
-            aria-invalid={errors.total_amount ? true : undefined}
-            aria-describedby="advance-limit"
-          />
-          <FieldError>{errors.total_amount}</FieldError>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="advance-installments">Jumlah cicilan</Label>
-          <input
-            id="advance-installments"
-            name="installment_count"
-            type="number"
-            min={1}
-            max={24}
-            defaultValue={1}
-            className={cn(inputClass, "tabular-nums")}
-          />
-          <FieldError>{errors.installment_count}</FieldError>
-        </div>
-        <p id="advance-limit" className={cn("text-xs text-muted-foreground sm:col-span-2", limit.loading && "opacity-60")}>
-          {!limit.data
-            ? "Kasbon berjalan tidak boleh melebihi gaji bulanan host menurut jadwalnya."
-            : limit.data.limit.monthly_salary === 0
-              ? "Host ini belum punya jadwal aktif atau tarif, jadi belum bisa kasbon."
-              : `Bisa kasbon sampai ${formatRupiah(limit.data.limit.available)}: gaji bulanan dari jadwal ${formatRupiah(limit.data.limit.monthly_salary)}, kasbon berjalan ${formatRupiah(limit.data.limit.outstanding)}.`}
-        </p>
-        <div className="space-y-1.5 sm:col-span-2">
-          <Label htmlFor="advance-notes">
-            Catatan <span className="font-normal text-muted-foreground">(opsional)</span>
-          </Label>
-          <input id="advance-notes" name="notes" maxLength={255} className={inputClass} />
-          <FieldError>{errors.notes}</FieldError>
-        </div>
-        <FormActions loading={loading} submitLabel="Catat kasbon" onCancel={onCancel} />
+          <div className="space-y-1.5">
+            <Label htmlFor="advance-type">Jenis</Label>
+            <NativeSelect id="advance-type" name="type">
+              <option value="loan">Pinjaman</option>
+              <option value="early_payment">Gaji di muka</option>
+            </NativeSelect>
+            <FieldError>{errors.type}</FieldError>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="advance-amount">Jumlah</Label>
+            <RupiahInput
+              id="advance-amount"
+              name="total_amount"
+              placeholder="0"
+              aria-invalid={errors.total_amount ? true : undefined}
+              aria-describedby="advance-limit"
+            />
+            <FieldError>{errors.total_amount}</FieldError>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="advance-installments">Jumlah cicilan</Label>
+            <input
+              id="advance-installments"
+              name="installment_count"
+              type="number"
+              min={1}
+              max={24}
+              defaultValue={1}
+              className={cn(inputClass, "tabular-nums")}
+            />
+            <FieldError>{errors.installment_count}</FieldError>
+          </div>
+          <FormFieldFull>
+            <p id="advance-limit" className={cn("text-xs text-muted-foreground", limit.loading && "opacity-60")}>
+              {!limit.data
+                ? "Kasbon berjalan tidak boleh melebihi gaji bulanan host menurut jadwalnya."
+                : limit.data.limit.monthly_salary === 0
+                  ? "Host ini belum punya jadwal aktif atau tarif, jadi belum bisa kasbon."
+                  : `Bisa kasbon sampai ${formatRupiah(limit.data.limit.available)}: gaji bulanan dari jadwal ${formatRupiah(limit.data.limit.monthly_salary)}, kasbon berjalan ${formatRupiah(limit.data.limit.outstanding)}.`}
+            </p>
+          </FormFieldFull>
+          <FormFieldFull className="space-y-1.5">
+            <Label htmlFor="advance-notes">
+              Catatan <span className="font-normal text-muted-foreground">(opsional)</span>
+            </Label>
+            <input id="advance-notes" name="notes" maxLength={255} className={inputClass} />
+            <FieldError>{errors.notes}</FieldError>
+          </FormFieldFull>
+          <FormActions loading={loading} submitLabel="Catat kasbon" onCancel={onCancel} />
+        </FormGrid>
       </form>
-    </Modal>
+    </Dialog>
   );
 }

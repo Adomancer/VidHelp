@@ -73,8 +73,8 @@ export default function RichTextEditor({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-input bg-card shadow-xs transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 dark:bg-input/30",
-        invalid && "border-destructive ring-3 ring-destructive/20"
+        "overflow-hidden rounded-lg border border-input bg-card shadow-card transition-colors duration-150 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/50 dark:bg-input/30",
+        invalid && "border-destructive ring-2 ring-destructive/20"
       )}
     >
       {editor && <Toolbar editor={editor} />}
@@ -135,7 +135,7 @@ function Toolbar({ editor }: { editor: Editor }) {
           aria-pressed={active}
           title={label}
           className={cn(
-            "flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40 disabled:hover:bg-transparent",
+            "flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-40 disabled:hover:bg-transparent md:size-8",
             active && "bg-primary/10 text-brand hover:bg-primary/15 hover:text-brand"
           )}
         >

@@ -3,9 +3,6 @@
 import { type BrandHost, type EventBlock, type SpecialEvent } from "@/lib/api";
 import { formatClock, formatDay, formatShortDate } from "@/lib/format";
 
-/** Main controls are 44px high, for tablets and phones. */
-export const TALL = "h-11 md:h-11";
-
 /** taken: someone holds it · open: can be given · regular: the brand's own schedule runs · past: over */
 export type BlockStatus = "taken" | "open" | "regular" | "past";
 

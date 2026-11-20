@@ -61,7 +61,7 @@ export default function AdminSettingsPage() {
               <li key={group.key}>
                 <a
                   href={`#${sectionId(group)}`}
-                  className="block rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                  className="block rounded-md px-3 py-2 text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
                 >
                   {group.label}
                 </a>
@@ -143,7 +143,7 @@ function SettingsForm({ groups, onSaved }: { groups: SettingGroup[]; onSaved: (g
       ))}
 
       {changed.length > 0 && (
-        <div className="sticky bottom-4 z-10 animate-in space-y-3 rounded-xl border border-primary/30 bg-popover/95 p-4 shadow-lg ring-1 ring-foreground/5 backdrop-blur-md duration-200 fade-in-0 slide-in-from-bottom-2">
+        <div className="sticky bottom-4 z-10 animate-in space-y-3 rounded-xl border border-primary/30 bg-popover/95 p-4 shadow-popover backdrop-blur-md duration-200 fade-in-0 slide-in-from-bottom-2">
           {error && <FormAlert tone="error">{error}</FormAlert>}
           {turningOn2fa && (
             <FormAlert tone="warning">
@@ -249,7 +249,7 @@ function SettingRow({
           disabled={isDefault}
           title="Pakai nilai bawaan"
           aria-label={`Pakai nilai bawaan untuk ${setting.label}`}
-          className={cn("max-md:size-10", "text-muted-foreground", isDefault && "invisible")}
+          className={cn("text-muted-foreground", isDefault && "invisible")}
         >
           <RotateCcw />
         </Button>

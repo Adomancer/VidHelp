@@ -5,11 +5,11 @@ import { errorMessage, eventApi, type EventBlock, type SpecialEvent } from "@/li
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "../AuthProvider";
+import Combobox from "../Combobox";
 import Dialog from "../Dialog";
-import FilterCombobox from "../FilterCombobox";
 import FormAlert from "../FormAlert";
-import { notifyCapsule } from "../Toast";
-import { blockTime, dayOf, type HostLite, TALL } from "./shared";
+import { notify } from "../Toast";
+import { blockTime, dayOf, type HostLite } from "./shared";
 
 /** Give a block to a host, change who holds it, or take it back. */
 export function AssignDialog({
@@ -43,7 +43,7 @@ export function AssignDialog({
     setError(null);
     try {
       await action();
-      notifyCapsule(message);
+      notify({ text: message });
       await onDone();
     } catch (caught) {
       setError(errorMessage(caught));
@@ -69,22 +69,20 @@ export function AssignDialog({
       onClose={() => !busy && onClose()}
       footer={
         <>
-          <Button type="button" variant="outline" size="lg" onClick={onClose} disabled={busy} className={TALL}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
             Tutup
           </Button>
           {holder && (
             <Button
               type="button"
               variant="destructive"
-              size="lg"
               disabled={busy}
               onClick={() => void run(() => eventApi.release(token, holder.id), `${holder.host_name} dilepas dari ${time}`)}
-              className={TALL}
             >
               Lepas
             </Button>
           )}
-          <Button type="button" size="lg" onClick={save} disabled={busy} className={TALL}>
+          <Button type="button" onClick={save} disabled={busy}>
             {busy ? "Menyimpan…" : "Simpan"}
           </Button>
         </>
@@ -103,8 +101,9 @@ export function AssignDialog({
         {error && <FormAlert tone="error">{error}</FormAlert>}
         <div className="space-y-1.5">
           <Label htmlFor="assign-host">Host</Label>
-          <FilterCombobox
+          <Combobox
             id="assign-host"
+            clearable
             options={options.map((host) => {
               const count = held.get(host.id) ?? 0;
               const full = count >= event.max_slots_per_host && host.id !== holder?.host_id;

@@ -266,7 +266,7 @@ function Summary({ days }: { days: Day[] }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-xs sm:grid-cols-4 dark:shadow-none">
+    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border shadow-card sm:grid-cols-4">
       {metrics.map((metric) => (
         <div key={metric.label} className="bg-card px-4 py-3">
           <span className="block truncate text-xs text-muted-foreground">{metric.label}</span>
@@ -298,7 +298,7 @@ function Calendar({ days, today }: { days: Day[]; today: string }) {
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border border-border bg-border shadow-xs dark:shadow-none">
+      <div className="overflow-hidden rounded-xl border border-border bg-border shadow-card">
         <div className="grid grid-cols-7 gap-px" aria-hidden="true">
           {DAYS.map((day) => (
             <div key={day.value} className="bg-muted/60 px-2 py-2 text-center text-xs font-medium text-muted-foreground md:text-left">
@@ -377,7 +377,7 @@ function DayCell({ day, focused, selected, onOpen }: { day: Day; focused: boolea
       aria-selected={selected || undefined}
       onClick={onOpen}
       className={cn(
-        "relative flex min-h-16 flex-col gap-1 bg-card p-1.5 text-left transition-colors outline-none hover:bg-muted focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:min-h-28 md:gap-1.5 md:p-2",
+        "relative flex min-h-16 flex-col gap-1 bg-card p-1.5 text-left transition-colors duration-150 outline-none hover:bg-muted focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset md:min-h-28 md:gap-1.5 md:p-2",
         day.past && "bg-muted text-faint hover:bg-secondary",
         selected && "z-10 ring-2 ring-primary ring-inset"
       )}

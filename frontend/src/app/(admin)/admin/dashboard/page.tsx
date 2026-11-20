@@ -150,12 +150,7 @@ function LiveStat({ counts }: { counts: AdminDashboard["today"]["counts"] }) {
       value={
         <span className="inline-flex items-center gap-2">
           {live}
-          {live > 0 && (
-            <span className="relative flex size-2" aria-hidden="true">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
-              <span className="relative inline-flex size-2 rounded-full bg-success" />
-            </span>
-          )}
+          {live > 0 && <span className="inline-flex size-2 rounded-full bg-success" aria-hidden="true" />}
         </span>
       }
       note={
@@ -330,7 +325,7 @@ function FilterChip({ selected, onClick, children }: { selected: boolean; onClic
       onClick={onClick}
       aria-pressed={selected}
       className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:h-6 md:px-2.5",
+        "inline-flex h-11 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring/50 md:h-7 md:px-2.5",
         selected ? "border-primary/50 bg-primary/10 text-foreground" : "border-border text-body hover:bg-muted"
       )}
     >
@@ -358,7 +353,7 @@ function Backups({ backups }: { backups: DashboardBackup[] }) {
                 <li key={backup.id}>
                   <Link
                     href={`/admin/backups?tab=${backup.status}`}
-                    className="block px-4 py-2 transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60"
+                    className="block px-4 py-2 transition-colors duration-150 outline-none hover:bg-muted/60 focus-visible:bg-muted/60"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="min-w-0 truncate text-sm">
@@ -404,12 +399,12 @@ function Attention({ attention }: { attention: AdminDashboard["attention"] }) {
               <li key={item.key}>
                 <Link
                   href={item.href}
-                  className="group flex items-center gap-2.5 rounded-lg px-2 py-1 transition-colors outline-none hover:bg-muted focus-visible:bg-muted"
+                  className="group flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-1 transition-colors duration-150 outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 md:min-h-0"
                 >
                   <span
                     className={cn(
                       "flex size-6 shrink-0 items-center justify-center rounded-md",
-                      item.urgent ? "bg-destructive/10 text-destructive" : "bg-warning/12 text-warning"
+                      item.urgent ? "bg-destructive-subtle text-destructive" : "bg-warning-subtle text-warning"
                     )}
                   >
                     <NavIcon name={item.icon} className="size-3.5" />

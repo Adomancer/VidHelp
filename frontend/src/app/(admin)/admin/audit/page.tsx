@@ -1,24 +1,26 @@
 "use client";
 
-import { Fragment, useState } from "react";
-import { ChevronDown, ClipboardList, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { ChevronDown, ClipboardList, X } from "lucide-react";
 import { parseAsInteger, parseAsString, useQueryStates } from "nuqs";
 import { adminApi, type AuditFilters, type AuditLogEntry } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { inputClass } from "@/lib/ui";
 import { useApiData } from "@/lib/useApiData";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import DataTable from "@/components/DataTable";
 import DatePicker from "@/components/DatePicker";
 import EmptyState from "@/components/EmptyState";
-import ErrorState from "@/components/ErrorState";
 import FormAlert from "@/components/FormAlert";
-import { RefreshBar, TableSkeleton } from "@/components/Loading";
 import PageHeader from "@/components/PageHeader";
 import Pagination from "@/components/Pagination";
+import SearchInput from "@/components/SearchInput";
 import { NativeSelect } from "@/components/SelectField";
 import StatusBadge, { type Tone } from "@/components/StatusBadge";
+import { DensityToggle, TableFilterDrawer, useTableDensity } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const actionLabels: Record<string, string> = {
@@ -101,8 +103,13 @@ export default function AuditLogPage() {
   const { token } = useAuth();
   const [{ page, ...params }, setUrlState] = useQueryStates(urlState);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [density, setDensity] = useTableDensity();
   const filters: AuditFilters = {};
   for (const key of filterKeys) if (params[key]) filters[key] = params[key];
+  const [searchDraft, setSearchDraft] = useState(filters.search ?? "");
+  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => () => clearTimeout(debounce.current), []);
 
   const result = useApiData(`audit-${JSON.stringify(filters)}-${page}`, () => adminApi.auditLogs(token, { ...filters, page }), { keepPrevious: true });
   const logs = result.data?.logs;
@@ -112,9 +119,29 @@ export default function AuditLogPage() {
     setOpenId(null);
   }
 
+  function resetAllFilters() {
+    clearTimeout(debounce.current);
+    setSearchDraft("");
+    applyFilters({});
+  }
+
+  function handleSearchChange(next: string) {
+    setSearchDraft(next);
+    clearTimeout(debounce.current);
+    const trimmed = next.trim();
+    if (!trimmed) {
+      applyFilters({ ...filters, search: undefined });
+      return;
+    }
+    debounce.current = setTimeout(() => {
+      applyFilters({ ...filters, search: trimmed });
+    }, 300);
+  }
+
   const change = (key: keyof AuditFilters, value: string) => applyFilters({ ...filters, [key]: value || undefined });
   const scoped = filters.target_id || filters.user_id;
   const filtered = Object.values(filters).some(Boolean);
+  const drawerFilterCount = [filters.action, filters.target_table, filters.from, filters.to].filter(Boolean).length;
   const toggle = (id: string) => setOpenId(openId === id ? null : id);
 
   const who = (log: AuditLogEntry) =>
@@ -125,7 +152,7 @@ export default function AuditLogPage() {
           event.stopPropagation();
           applyFilters({ ...filters, user_id: log.user!.id });
         }}
-        className="max-w-full min-w-0 rounded text-left outline-none hover:text-brand focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="max-w-full min-w-0 rounded text-left transition-colors duration-150 outline-none hover:text-brand focus-visible:ring-2 focus-visible:ring-ring/50 max-md:inline-flex max-md:min-h-11 max-md:flex-col max-md:justify-center"
         title="Tampilkan semua yang dilakukan orang ini"
       >
         <span className="block truncate font-medium text-foreground">{log.user.name}</span>
@@ -143,7 +170,7 @@ export default function AuditLogPage() {
           event.stopPropagation();
           if (log.target_id) applyFilters({ ...filters, target_table: log.target_table!, target_id: log.target_id });
         }}
-        className="rounded text-left outline-none hover:text-brand focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="rounded text-left transition-colors duration-150 outline-none hover:text-brand focus-visible:ring-2 focus-visible:ring-ring/50 max-md:inline-flex max-md:min-h-11 max-md:flex-col max-md:justify-center"
         title="Tampilkan riwayat data ini"
       >
         <span className="block text-xs text-muted-foreground">{tableLabel(log.target_table)}</span>
@@ -153,78 +180,176 @@ export default function AuditLogPage() {
       <span className="text-faint">–</span>
     );
 
+  const columns: ColumnDef<AuditLogEntry>[] = [
+    {
+      id: "created_at",
+      enableSorting: false,
+      header: "Waktu",
+      meta: { cellClassName: "whitespace-nowrap text-muted-foreground tabular-nums" },
+      cell: ({ row }) => formatDateTime(row.original.created_at),
+    },
+    {
+      id: "actor",
+      enableSorting: false,
+      header: "Siapa",
+      cell: ({ row }) => who(row.original),
+    },
+    {
+      id: "action",
+      enableSorting: false,
+      header: "Aksi",
+      cell: ({ row }) => <StatusBadge tone={actionTone(row.original.action)}>{actionLabel(row.original.action)}</StatusBadge>,
+    },
+    {
+      id: "target",
+      enableSorting: false,
+      header: "Data",
+      cell: ({ row }) => target(row.original),
+    },
+    {
+      id: "ip",
+      enableSorting: false,
+      header: "IP",
+      meta: { cellClassName: "font-mono text-xs text-muted-foreground tabular-nums" },
+      cell: ({ row }) => row.original.ip_address ?? "–",
+    },
+    {
+      id: "expand",
+      enableSorting: false,
+      header: () => <span className="sr-only">Detail</span>,
+      meta: { align: "right", headClassName: "w-10" },
+      cell: ({ row }) => (
+        <ChevronDown
+          className={cn("ml-auto size-4 text-faint transition-transform duration-150", openId === row.original.id && "rotate-180")}
+          aria-hidden="true"
+        />
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader title="Log audit" description="Setiap aktivitas masuk dan setiap perubahan data penting: siapa, kapan, apa yang berubah, dan dari mana." />
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
-        <form
-          className="relative sm:col-span-2 lg:w-60"
-          onSubmit={(event) => {
-            event.preventDefault();
-            change("search", String(new FormData(event.currentTarget).get("search") ?? "").trim());
-          }}
-        >
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-          <input
-            key={filters.search ?? ""}
-            name="search"
-            type="search"
-            defaultValue={filters.search}
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between">
+        <div className="flex flex-1 flex-wrap items-end gap-2">
+          <SearchInput
+            value={searchDraft}
+            onChange={handleSearchChange}
             placeholder="Cari orang, data, atau IP…"
-            aria-label="Cari"
-            className={cn(inputClass, "pl-9")}
+            aria-label="Cari log audit"
+            className="min-w-0 flex-1 md:w-60 md:flex-none"
           />
-        </form>
-        <NativeSelect wrapperClassName="lg:w-44" value={filters.action ?? ""} onChange={(event) => change("action", event.target.value)} aria-label="Aksi">
-          <option value="">Semua aksi</option>
-          {result.data?.actions.map((action) => (
-            <option key={action} value={action}>
-              {actionLabel(action)}
-            </option>
-          ))}
-        </NativeSelect>
-        <NativeSelect
-          wrapperClassName="lg:w-48"
-          value={filters.target_table ?? ""}
-          onChange={(event) => change("target_table", event.target.value)}
-          aria-label="Jenis data"
-        >
-          <option value="">Semua data</option>
-          {result.data?.target_tables.map((table) => (
-            <option key={table} value={table}>
-              {tableLabel(table)}
-            </option>
-          ))}
-        </NativeSelect>
-        <div className="space-y-1 text-xs text-muted-foreground lg:w-40">
-          <span id="audit-from">Dari</span>
-          <DatePicker
-            value={filters.from ?? ""}
-            onChange={(value) => change("from", value)}
-            max={filters.to}
-            placeholder="Awal"
-            clearable
-            aria-describedby="audit-from"
-          />
+
+          <div className="md:hidden">
+            <TableFilterDrawer
+              title="Filter log audit"
+              activeCount={drawerFilterCount}
+              onReset={() => applyFilters({ ...filters, action: undefined, target_table: undefined, from: undefined, to: undefined })}
+            >
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="mobile-audit-action">Aksi</Label>
+                  <NativeSelect id="mobile-audit-action" value={filters.action ?? ""} onChange={(event) => change("action", event.target.value)}>
+                    <option value="">Semua aksi</option>
+                    {result.data?.actions.map((action) => (
+                      <option key={action} value={action}>
+                        {actionLabel(action)}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mobile-audit-table">Jenis data</Label>
+                  <NativeSelect id="mobile-audit-table" value={filters.target_table ?? ""} onChange={(event) => change("target_table", event.target.value)}>
+                    <option value="">Semua data</option>
+                    {result.data?.target_tables.map((table) => (
+                      <option key={table} value={table}>
+                        {tableLabel(table)}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mobile-audit-from">Dari</Label>
+                  <DatePicker
+                    id="mobile-audit-from"
+                    value={filters.from ?? ""}
+                    onChange={(value) => change("from", value)}
+                    max={filters.to}
+                    placeholder="Awal"
+                    clearable
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mobile-audit-to">Sampai</Label>
+                  <DatePicker
+                    id="mobile-audit-to"
+                    value={filters.to ?? ""}
+                    onChange={(value) => change("to", value)}
+                    min={filters.from}
+                    placeholder="Hari ini"
+                    clearable
+                  />
+                </div>
+              </div>
+            </TableFilterDrawer>
+          </div>
+
+          <div className="hidden md:flex md:flex-wrap md:items-end md:gap-2">
+            <NativeSelect wrapperClassName="w-44" value={filters.action ?? ""} onChange={(event) => change("action", event.target.value)} aria-label="Aksi">
+              <option value="">Semua aksi</option>
+              {result.data?.actions.map((action) => (
+                <option key={action} value={action}>
+                  {actionLabel(action)}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
+              wrapperClassName="w-48"
+              value={filters.target_table ?? ""}
+              onChange={(event) => change("target_table", event.target.value)}
+              aria-label="Jenis data"
+            >
+              <option value="">Semua data</option>
+              {result.data?.target_tables.map((table) => (
+                <option key={table} value={table}>
+                  {tableLabel(table)}
+                </option>
+              ))}
+            </NativeSelect>
+            <div className="w-40 space-y-1 text-xs text-muted-foreground">
+              <span id="audit-from">Dari</span>
+              <DatePicker
+                value={filters.from ?? ""}
+                onChange={(value) => change("from", value)}
+                max={filters.to}
+                placeholder="Awal"
+                clearable
+                aria-describedby="audit-from"
+              />
+            </div>
+            <div className="w-40 space-y-1 text-xs text-muted-foreground">
+              <span id="audit-to">Sampai</span>
+              <DatePicker
+                value={filters.to ?? ""}
+                onChange={(value) => change("to", value)}
+                min={filters.from}
+                placeholder="Hari ini"
+                clearable
+                aria-describedby="audit-to"
+              />
+            </div>
+            {filtered && (
+              <Button type="button" variant="ghost" onClick={resetAllFilters} className="text-muted-foreground">
+                <X aria-hidden="true" />
+                Hapus filter
+              </Button>
+            )}
+          </div>
         </div>
-        <div className="space-y-1 text-xs text-muted-foreground lg:w-40">
-          <span id="audit-to">Sampai</span>
-          <DatePicker
-            value={filters.to ?? ""}
-            onChange={(value) => change("to", value)}
-            min={filters.from}
-            placeholder="Hari ini"
-            clearable
-            aria-describedby="audit-to"
-          />
-        </div>
-        {filtered && (
-          <Button type="button" variant="ghost" onClick={() => applyFilters({})} className="text-muted-foreground">
-            <X aria-hidden="true" />
-            Hapus filter
-          </Button>
-        )}
+
+        <DensityToggle density={density} onChange={setDensity} className="hidden md:inline-flex" />
       </div>
 
       {scoped && (
@@ -239,98 +364,55 @@ export default function AuditLogPage() {
           </button>
         </FormAlert>
       )}
-      {result.error && <ErrorState message={result.error} onRetry={result.reload} />}
 
-      <div className="relative overflow-hidden rounded-xl border border-border bg-card shadow-xs dark:shadow-none">
-        <RefreshBar active={result.loading && Boolean(logs)} />
-        {!logs && !result.error && <TableSkeleton rows={8} columns={5} />}
-        {logs?.data.length === 0 && (
-          <EmptyState icon={ClipboardList} title="Tidak ada catatan" description="Tidak ada aktivitas yang cocok dengan filter ini." />
-        )}
-
-        {logs && logs.data.length > 0 && (
-          <>
-            <Table containerClassName="hidden md:block">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Waktu</TableHead>
-                  <TableHead>Siapa</TableHead>
-                  <TableHead>Aksi</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead>IP</TableHead>
-                  <TableHead className="w-10">
-                    <span className="sr-only">Detail</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.data.map((log) => {
-                  const open = openId === log.id;
-                  return (
-                    <Fragment key={log.id}>
-                      <TableRow
-                        onClick={() => toggle(log.id)}
-                        className={cn("cursor-pointer text-body hover:bg-muted/40", open && "bg-muted/40")}
-                        aria-expanded={open}
-                      >
-                        <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">{formatDateTime(log.created_at)}</TableCell>
-                        <TableCell>{who(log)}</TableCell>
-                        <TableCell>
-                          <StatusBadge tone={actionTone(log.action)}>{actionLabel(log.action)}</StatusBadge>
-                        </TableCell>
-                        <TableCell>{target(log)}</TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{log.ip_address ?? "–"}</TableCell>
-                        <TableCell className="text-right">
-                          <ChevronDown className={cn("ml-auto size-4 text-faint transition-transform", open && "rotate-180")} aria-hidden="true" />
-                        </TableCell>
-                      </TableRow>
-                      {open && (
-                        <TableRow className="bg-muted/30">
-                          <TableCell colSpan={6} className="py-4">
-                            <Details log={log} />
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
-
-            <ul className="divide-y divide-border md:hidden">
-              {logs.data.map((log) => {
-                const open = openId === log.id;
-                return (
-                  <li key={log.id} className={cn("space-y-3 p-4", open && "bg-muted/30")}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 text-sm">{who(log)}</div>
-                      <StatusBadge tone={actionTone(log.action)}>{actionLabel(log.action)}</StatusBadge>
-                    </div>
-                    <div className="text-sm">{target(log)}</div>
-                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                      <span className="tabular-nums">
-                        {formatDateTime(log.created_at)}
-                        {log.ip_address && ` · ${log.ip_address}`}
-                      </span>
-                      <Button type="button" variant="ghost" size="xs" className="max-md:h-10 max-md:px-3" onClick={() => toggle(log.id)} aria-expanded={open}>
-                        Detail
-                        <ChevronDown className={cn("transition-transform", open && "rotate-180")} aria-hidden="true" />
-                      </Button>
-                    </div>
-                    {open && <Details log={log} />}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-      </div>
+      <DataTable<AuditLogEntry>
+        framed
+        columns={columns}
+        data={logs?.data ?? []}
+        getRowId={(log) => log.id}
+        density={density}
+        stickyHeader
+        stickyFirstColumn
+        loading={!logs && !result.error}
+        reloading={result.loading && Boolean(logs)}
+        error={result.error}
+        onRetry={result.reload}
+        onRowClick={(log) => toggle(log.id)}
+        renderExpanded={(log) => <Details log={log} />}
+        isRowExpanded={(log) => openId === log.id}
+        rowClassName={(log) => cn("text-body", openId === log.id && "bg-muted/40")}
+        empty={<EmptyState icon={ClipboardList} title="Tidak ada catatan" description="Tidak ada aktivitas yang cocok dengan filter ini." />}
+        renderMobile={(log) => {
+          const open = openId === log.id;
+          return (
+            <div className={cn("space-y-3 p-4", open && "bg-muted/30")}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 text-sm">{who(log)}</div>
+                <StatusBadge tone={actionTone(log.action)}>{actionLabel(log.action)}</StatusBadge>
+              </div>
+              <div className="text-sm">{target(log)}</div>
+              <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <span className="tabular-nums">
+                  {formatDateTime(log.created_at)}
+                  {log.ip_address && ` · ${log.ip_address}`}
+                </span>
+                <Button type="button" variant="ghost" size="xs" onClick={() => toggle(log.id)} aria-expanded={open}>
+                  Detail
+                  <ChevronDown className={cn("transition-transform duration-150", open && "rotate-180")} aria-hidden="true" />
+                </Button>
+              </div>
+              {open && <Details log={log} />}
+            </div>
+          );
+        }}
+      />
 
       {logs && (
         <Pagination
           page={logs.current_page}
           lastPage={logs.last_page}
           total={logs.total}
+          pageSize={logs.per_page}
           unit="catatan"
           onChange={(next) => void setUrlState({ page: next })}
         />
@@ -366,12 +448,14 @@ function Details({ log }: { log: AuditLogEntry }) {
                   <TableCell className="px-3 py-1.5 align-top font-mono text-xs text-muted-foreground">{field}</TableCell>
                   {showBefore && (
                     <TableCell className="px-3 py-1.5 align-top break-all">
-                      <span className={cn(changed && "rounded bg-destructive/10 px-1 text-destructive line-through decoration-destructive/40")}>{before}</span>
+                      <span className={cn(changed && "rounded bg-destructive-subtle px-1 text-destructive line-through decoration-destructive/40")}>
+                        {before}
+                      </span>
                     </TableCell>
                   )}
                   {showAfter && (
                     <TableCell className="px-3 py-1.5 align-top break-all">
-                      <span className={cn(changed ? "rounded bg-success/10 px-1 text-success" : "text-foreground")}>{after}</span>
+                      <span className={cn(changed ? "rounded bg-success-subtle px-1 text-success" : "text-foreground")}>{after}</span>
                     </TableCell>
                   )}
                 </TableRow>

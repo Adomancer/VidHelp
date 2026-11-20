@@ -14,19 +14,21 @@ interface SelectFieldProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 /** Labelled native select (works with FormData and the phone's own picker); shows its error underneath. */
-export default function SelectField({ label, name, error, hint, options, id, ...props }: SelectFieldProps) {
+export default function SelectField({ label, name, error, hint, options, id, "aria-describedby": ariaDescribedBy, ...props }: SelectFieldProps) {
   const fieldId = id ?? name;
+  const messageId = error ? `${fieldId}-error` : hint ? `${fieldId}-hint` : undefined;
+
   return (
     <div className="space-y-1.5">
       <Label htmlFor={fieldId}>{label}</Label>
-      <NativeSelect id={fieldId} name={name} aria-invalid={error ? true : undefined} {...props}>
+      <NativeSelect id={fieldId} name={name} aria-invalid={error ? true : undefined} aria-describedby={ariaDescribedBy ?? messageId} {...props}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
       </NativeSelect>
-      {error ? <FieldError>{error}</FieldError> : <FieldHint>{hint}</FieldHint>}
+      {error ? <FieldError id={messageId}>{error}</FieldError> : <FieldHint id={messageId}>{hint}</FieldHint>}
     </div>
   );
 }

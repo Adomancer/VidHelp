@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { inputClass, inputSmClass } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 import { FieldError } from "./FieldMessage";
@@ -15,6 +16,7 @@ interface DurationInputProps {
 
 /** Hours + minutes fields for a duration, so nobody has to type 0.33. */
 export default function DurationInput({ label, hours, onChange, error, compact = false }: DurationInputProps) {
+  const errorId = useId();
   const total = Math.round(hours * 60);
   const h = Math.floor(total / 60);
   const m = total % 60;
@@ -22,6 +24,8 @@ export default function DurationInput({ label, hours, onChange, error, compact =
   const set = (nextH: number, nextM: number) => onChange(Math.round(((Math.max(0, nextH) * 60 + Math.min(59, Math.max(0, nextM))) / 60) * 100) / 100);
 
   const input = compact ? cn(inputSmClass, "w-16 tabular-nums") : cn(inputClass, "tabular-nums");
+  const invalid = error ? true : undefined;
+  const describedBy = error ? errorId : undefined;
 
   return (
     <fieldset className="space-y-1.5">
@@ -34,6 +38,8 @@ export default function DurationInput({ label, hours, onChange, error, compact =
           value={h}
           onChange={(event) => set(Number(event.target.value), m)}
           aria-label={`${label} jam`}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           className={input}
         />
         <span className="text-sm text-muted-foreground">jam</span>
@@ -45,11 +51,13 @@ export default function DurationInput({ label, hours, onChange, error, compact =
           value={m}
           onChange={(event) => set(h, Number(event.target.value))}
           aria-label={`${label} menit`}
+          aria-invalid={invalid}
+          aria-describedby={describedBy}
           className={input}
         />
         <span className="text-sm text-muted-foreground">menit</span>
       </div>
-      <FieldError>{error}</FieldError>
+      <FieldError id={describedBy}>{error}</FieldError>
     </fieldset>
   );
 }

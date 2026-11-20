@@ -13,7 +13,6 @@ import DatePicker from "../DatePicker";
 import Dialog from "../Dialog";
 import FormAlert from "../FormAlert";
 import { NativeSelect } from "../SelectField";
-import { TALL } from "./shared";
 
 /** Checks before sending, so obvious mistakes show at once next to their field. */
 function validate(data: FormData): Record<string, string> {
@@ -41,7 +40,7 @@ export function EventForm({ event, onDone, onCancel }: { event?: SpecialEvent; o
   const today = toDateInput();
   const brands = useApiData("brands", () => operatorApi.brands(token));
   const [checks, setChecks] = useState<Record<string, string>>({});
-  const input = cn(inputClass, TALL, "tabular-nums");
+  const input = cn(inputClass, "tabular-nums");
 
   const {
     loading,
@@ -99,10 +98,10 @@ export function EventForm({ event, onDone, onCancel }: { event?: SpecialEvent; o
       onClose={onCancel}
       footer={
         <>
-          <Button type="button" variant="outline" size="lg" onClick={onCancel} className={TALL}>
+          <Button type="button" variant="outline" onClick={onCancel}>
             Batal
           </Button>
-          <Button type="submit" form="event-form" size="lg" disabled={loading} className={TALL}>
+          <Button type="submit" form="event-form" disabled={loading}>
             {loading ? "Menyimpan…" : event ? "Simpan perubahan" : "Buat event"}
           </Button>
         </>
@@ -117,14 +116,14 @@ export function EventForm({ event, onDone, onCancel }: { event?: SpecialEvent; o
         {event ? (
           <div className="space-y-1.5">
             <span className="block text-sm font-medium text-foreground">Brand</span>
-            <p className="flex h-11 items-center rounded-lg border border-border bg-muted/50 px-3 text-sm text-muted-foreground">{event.brand?.name}</p>
+            <p className="flex h-11 items-center rounded-lg border border-border bg-muted/50 px-3 text-sm text-muted-foreground md:h-9">{event.brand?.name}</p>
             <span className="block text-xs text-muted-foreground">Brand tidak bisa diubah. Hapus dan buat ulang event kalau salah brand.</span>
           </div>
         ) : (
           field(
             "Brand",
             "brand_id",
-            <NativeSelect name="brand_id" className={TALL}>
+            <NativeSelect name="brand_id">
               {brands.data?.brands
                 .filter((brand) => brand.status === "active")
                 .map((brand) => (
