@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   // Lets a phone on the same Wi-Fi open the dev server by the laptop's IP.
   allowedDevOrigins: ["192.168.0.100"],
 
+  experimental: {
+    agentUpgrade: "security",
+  },
+
   // Security headers for every response. The Content-Security-Policy is set per request in src/proxy.ts (it needs a nonce).
   async headers() {
     return [
